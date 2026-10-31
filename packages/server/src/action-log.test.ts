@@ -97,6 +97,17 @@ describe('action log', () => {
     expect(createActionLog({ file, now: () => 100 }).recent()[0]?.target).toBe('PR #100')
   })
 
+  test('reads resolve entries (Close and Keep)', async () => {
+    const resolve = (result: string): Record<string, unknown> => ({ action: 'resolve', repoId: 'id-r', repo: 'r', target: '2026-10-20 · BLOCKED · orchestrator → human', result })
+    const file = join(root, 'resolve.jsonl')
+    await writeFile(file, [{ at: 1, ...resolve('closed') }, { at: 2, ...resolve('kept') }, { at: 3, ...resolve('answered') }, { at: 4, ...resolve('changed') }].map((e) => JSON.stringify(e)).join('\n'))
+    expect(createActionLog({ file, now: () => 5 }).recent().map((e) => [e.at, e.action, e.result])).toEqual([
+      [4, 'resolve', 'changed'],
+      [2, 'resolve', 'kept'],
+      [1, 'resolve', 'closed'],
+    ])
+  })
+
   test('reads resume entries', async () => {
     const resume = (result: 'started' | 'failed', auto: boolean, message?: string): NewActionEntry => ({
       action: 'resume',

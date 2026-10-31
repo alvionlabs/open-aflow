@@ -25,6 +25,12 @@ export type AnswerOutcome = 'answered' | 'changed' | 'failed'
 /** What the answer route sends back. */
 export type AnswerResult = { outcome: AnswerOutcome; message?: string; logged: boolean }
 
+/** Close or Keep: the entry's `**Resolution:** pending` rewritten (`closed`, `kept`), or why not. */
+export type ResolveOutcome = 'closed' | 'kept' | 'changed' | 'failed'
+
+/** What the resolve route sends back. */
+export type ResolveResult = { outcome: ResolveOutcome; message?: string; logged: boolean }
+
 export type ResumeOutcome = 'started' | 'failed'
 
 /** What the resume route sends back. */
@@ -32,12 +38,13 @@ export type ResumeResult = { outcome: ResumeOutcome; message?: string; logged: b
 
 /**
  * One logged action. A merge's `target` is `PR #N`; an answer's is the queue entry's
- * `<date> · <TYPE> · <from → to>`, never the answer text or the body. A resume's is
+ * `<date> · <TYPE> · <from → to>`, never the answer text or the body; a resolve's (Close or Keep) the same. A resume's is
  * `<run> · <word>`; `auto` marks one the automatic check sent.
  */
 export type ActionEntry = { at: number; repoId: string; repo: string; target: string; message?: string } & (
   | { action: 'merge'; result: MergeOutcome }
   | { action: 'answer'; result: AnswerOutcome }
+  | { action: 'resolve'; result: ResolveOutcome }
   | { action: 'resume'; result: ResumeOutcome; reply: 'continue' | 'go'; auto: boolean }
 )
 

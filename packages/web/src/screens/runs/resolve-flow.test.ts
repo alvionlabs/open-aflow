@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ResolveResult } from '@pod-board/model'
 import { UNREACHABLE, type ActionReply } from '../../actions-client.ts'
 import type { Post } from './answer-flow.ts'
-import { INITIAL_RESOLVE, busyLabel, createResolveFlow, reduceResolve, resolveAnchor, type ResolveState, type ResolveTarget } from './resolve-flow.ts'
+import { INITIAL_RESOLVE, busyLabel, createResolveFlow, reduceResolve, resolveAnchor, triageTarget, type ResolveState, type ResolveTarget } from './resolve-flow.ts'
 import type { WaitingRow } from './queue-view.ts'
 
 const CLOSE: ResolveTarget = { repoId: 'r1', line: '- [2026-10-20 · BLOCKED · orchestrator → human · plan: old] gate 1 (x): y **Resolution:** pending', kind: 'close' }
@@ -87,5 +87,13 @@ describe('Close and Keep', () => {
     expect(resolveAnchor(INITIAL_RESOLVE, rows, 'r1')).toBeUndefined()
     // While saving there is nothing to show under the row: the button says what's happening.
     expect(resolveAnchor({ kind: 'saving', seq: 1, target: KEEP }, rows, 'r1')).toBeUndefined()
+  })
+
+  it('a row offers Close when done, else Keep with a value in use, else neither', () => {
+    const row = (over: Partial<WaitingRow>) => ({ key: 'k', line: 'L', ...over }) as WaitingRow
+    expect(triageTarget(row({ done: 'plan old is archived', keep: 'x' }), 'r1')).toEqual({ repoId: 'r1', line: 'L', kind: 'close' })
+    expect(triageTarget(row({ keep: 'white' }), 'r1')).toEqual({ repoId: 'r1', line: 'L', kind: 'keep' })
+    expect(triageTarget(row({}), 'r1')).toBeUndefined()
+    expect(triageTarget(undefined, 'r1')).toBeUndefined()
   })
 })

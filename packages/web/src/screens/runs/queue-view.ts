@@ -2,7 +2,7 @@
 // The selected plan's own entries first, then the repo's entries that join no plan. Other plans'
 // entries show under their own run. Pure; WaitingOnYou.tsx is the glue.
 
-import { isAnswerable, type BoardRepo, type QueueItem, type RunSummary } from '@pod-board/model'
+import { isAnswerable, triage, type BoardRepo, type QueueItem, type RunSummary } from '@pod-board/model'
 import type { AnswerState } from './answer-flow.ts'
 import { entryKind, type EntryKind } from './entry-kind.ts'
 import type { Chip, ChipClass } from './view.ts'
@@ -34,6 +34,10 @@ export type WaitingRow = {
   text: string
   /** Shows the Answer button. */
   answerable: boolean
+  /** The board reads the entry as settled: the reason, shown as `Done: <reason>` with Close. */
+  done?: string
+  /** The entry's value in use, shown as the default with Keep; never with `done`. */
+  keep?: string
   /** `Your answer: <answer>` on an answered entry. */
   yourAnswer?: string
   waiting?: string
@@ -64,6 +68,7 @@ export function waitingEntries(repo: BoardRepo | undefined, selected: RunSummary
 }
 
 export function waitingRows(repo: BoardRepo | undefined, selected: RunSummary | undefined): WaitingRow[] {
+  if (!repo) return []
   return waitingEntries(repo, selected).map((e, i) => {
     const body = plain(e.body)
     const kind = entryKind(body)
@@ -79,6 +84,9 @@ export function waitingRows(repo: BoardRepo | undefined, selected: RunSummary | 
       answerable: isAnswerable(e),
     }
     if (e.date !== undefined) row.date = e.date
+    const t = triage(repo, e)
+    if (t.done !== undefined) row.done = t.done
+    if (t.keep !== undefined) row.keep = t.keep
     if (e.answer !== undefined) {
       row.yourAnswer = `Your answer: ${e.answer}`
       row.waiting = ANSWER_WAITING

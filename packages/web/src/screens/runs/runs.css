@@ -1323,6 +1323,21 @@
   align-self: center;
 }
 
+/* The Done or default line sits under the entry, in its column; the actions centre on both. */
+.waiting-tab .wait-row > .wait-hint {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.waiting-tab .wait-row:has(> .wait-hint) > .inplace-actions {
+  grid-row: 1 / span 2;
+}
+
+/* On the card the line sits under the detail, before the actions. */
+.next-step .wait-hint {
+  margin-top: 8px;
+}
+
 /*
  * The rows, the group headers and the empty line share the tab labels' and the Log blocks' 16 px text
  * inset. The rows' hairlines still span the column, as the tab bar's line and the Log blocks do.
@@ -1401,7 +1416,9 @@
 @media (max-width: 820px) {
   .waiting-tab .wait-row > .wait-toggle,
   .waiting-tab .wait-row > .wait-head,
-  .waiting-tab .wait-row > .inplace-actions {
+  .waiting-tab .wait-row > .wait-hint,
+  .waiting-tab .wait-row > .inplace-actions,
+  .waiting-tab .wait-row:has(> .wait-hint) > .inplace-actions {
     grid-column: 1 / -1;
     grid-row: auto;
   }

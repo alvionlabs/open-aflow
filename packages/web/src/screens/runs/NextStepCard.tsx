@@ -6,6 +6,8 @@ import { MergeConfirm, mergeButtonId, useMergeFlow } from './MergeConfirm.tsx'
 import type { NextItem } from './next-step.ts'
 import { answerNote } from './queue-view.ts'
 import { ReplyPanel } from './ReplyPanel.tsx'
+import { INITIAL_RESOLVE, createResolveFlow, triageTarget, type ResolveState } from './resolve-flow.ts'
+import { TriageButton, TriageError, TriageLine } from './Triage.tsx'
 import { nextStatus } from './view.ts'
 
 type Props = { repo: BoardRepo; run: RunSummary; card: NextItem }
@@ -20,6 +22,8 @@ export function NextStepCard({ repo, run, card }: Props) {
   const [answer, setAnswer] = useState<AnswerState>(INITIAL)
   const answerFlow = useMemo(() => createAnswerFlow(setAnswer), [])
   const [merge, mergeFlow] = useMergeFlow()
+  const [resolve, setResolve] = useState<ResolveState>(INITIAL_RESOLVE)
+  const resolveFlow = useMemo(() => createResolveFlow(setResolve), [])
   const answerButton = useRef<HTMLButtonElement>(null)
   const titleId = useId()
 
@@ -34,6 +38,9 @@ export function NextStepCard({ repo, run, card }: Props) {
   const a = card.action
   const status = nextStatus(card.status)
   const calm = card.tier === 'nothing'
+  // One queue write at a time: Answer, Close and Keep wait for each other.
+  const saving = answer.kind === 'saving' || resolve.kind === 'saving'
+  const triage = a.kind === 'answer' ? triageTarget(card.entry, repo.id) : undefined
   return (
     <>
       <section className={calm ? 'card calm next-step' : 'card next-step'} aria-labelledby={titleId}>
@@ -52,6 +59,7 @@ export function NextStepCard({ repo, run, card }: Props) {
         </h2>
         {/* A reply's rows each say why, so its detail would only repeat the first one. */}
         {card.detail && a.kind !== 'reply' && <p className="next-detail">{card.detail}</p>}
+        {a.kind === 'answer' && card.entry && <TriageLine row={card.entry} />}
         {a.kind === 'answer' && (
           <div className="inplace-actions next-acts">
             <button
@@ -59,11 +67,12 @@ export function NextStepCard({ repo, run, card }: Props) {
               className="btn primary"
               type="button"
               aria-expanded={answerLine === a.line}
-              disabled={answer.kind === 'saving'}
+              disabled={saving}
               onClick={() => answerFlow.open({ repoId: a.repoId, line: a.line, ...(card.entry ? { entry: card.entry.text } : {}) })}
             >
               Answer
             </button>
+            {triage && <TriageButton target={triage} state={resolve} flow={resolveFlow} busy={saving} size="md" />}
           </div>
         )}
         {a.kind === 'merge' && (
@@ -86,6 +95,8 @@ export function NextStepCard({ repo, run, card }: Props) {
       </section>
       {/* The form quotes the entry it opened for, never the card's current one: the Board can move the card on. */}
       {answer.kind !== 'idle' && <AnswerForm state={answer} flow={answerFlow} note={answerNote(run)} {...(quote === undefined ? {} : { entry: quote })} />}
+      {/* A failed Close or Keep stays under the card, even after the Board moves the card on. */}
+      <TriageError state={resolve} flow={resolveFlow} />
       {merge.kind !== 'idle' && <MergeConfirm state={merge} flow={mergeFlow} label={`PR #${merge.target.number}`} />}
     </>
   )

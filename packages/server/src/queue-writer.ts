@@ -1,11 +1,11 @@
-// The one write the board makes in a repo: an answer appended to one line of
-// `pod-docs/handoff-queue.md`. Every other byte of the file stays as it was. The
-// rules and why are in pod-docs/feature-details/actions.md.
+// The one file the board writes in a repo: one line of `pod-docs/handoff-queue.md`, either an answer
+// appended to it or (Close and Keep) its `**Resolution:** pending` rewritten. Every other byte of the
+// file stays as it was. The rules and why are in pod-docs/feature-details/actions.md.
 
 import { randomBytes } from 'node:crypto'
 import { readFile, realpath, rename, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
-import { cleanAnswer, withAnswer, type AnswerOutcome } from '@pod-board/model'
+import { cleanAnswer, withAnswer, withResolution, type AnswerOutcome } from '@pod-board/model'
 
 /** The file calls the writer makes. Injectable so tests can fake a symlink or a held file on any OS. */
 export type QueueFs = {
@@ -26,6 +26,7 @@ export const nodeQueueFs: QueueFs = {
 }
 
 export type WriteAnswer = { outcome: AnswerOutcome; message?: string }
+export type WriteResolution = { outcome: 'resolved' | 'changed' | 'failed'; message?: string }
 
 export const QUEUE_FILE = 'pod-docs/handoff-queue.md'
 const RENAME_RETRIES = 3
@@ -36,7 +37,7 @@ const MISSING = { outcome: 'changed', message: 'The queue file is missing.' } as
 const TWICE = { outcome: 'changed', message: 'Two entries read the same. Answer it in the chat.' } as const
 const MOVED = { outcome: 'changed', message: 'The queue changed while saving. Look again.' } as const
 const OUTSIDE = { outcome: 'failed', message: 'queue file is outside the repo' } as const
-const failed = (err: unknown): WriteAnswer => ({ outcome: 'failed', message: `Couldn't write the queue (${codeOf(err) ?? 'unknown'}).` })
+const failed = (err: unknown) => ({ outcome: 'failed', message: `Couldn't write the queue (${codeOf(err) ?? 'unknown'}).` }) as const
 
 /**
  * Appends the answer to the queue line whose trim is `line`. A missing file is never created; a queue whose
@@ -45,6 +46,26 @@ const failed = (err: unknown): WriteAnswer => ({ outcome: 'failed', message: `Co
 export async function writeAnswer(req: { repoPath: string; line: string; text: string }, fs: QueueFs = nodeQueueFs): Promise<WriteAnswer> {
   const clean = cleanAnswer(req.text)
   if (!clean.ok) return { outcome: 'failed', message: clean.error }
+  const r = await writeLine(req.repoPath, req.line, (raw) => answered(raw, clean.text), fs)
+  return r.outcome === 'written' ? { outcome: 'answered' } : r
+}
+
+/**
+ * Rewrites the `**Resolution:** pending` of the queue line whose trim is `line` to `**Resolution:** <text>`
+ * (Close and Keep), with the answer's guards. A line that no longer reads as pending is `changed`.
+ */
+export async function writeResolution(req: { repoPath: string; line: string; text: string }, fs: QueueFs = nodeQueueFs): Promise<WriteResolution> {
+  const clean = cleanAnswer(req.text)
+  if (!clean.ok) return { outcome: 'failed', message: clean.error }
+  const r = await writeLine(req.repoPath, req.line, (raw) => resolved(raw, clean.text), fs)
+  return r.outcome === 'written' ? { outcome: 'resolved' } : r
+}
+
+type Written = { outcome: 'written' } | { outcome: 'changed' | 'failed'; message: string }
+
+/** The shared write: one line through `edit` (undefined: the line doesn't read as expected), renamed over the file. */
+async function writeLine(repoPath: string, line: string, edit: (raw: string) => string | undefined, fs: QueueFs): Promise<Written> {
+  const req = { repoPath, line }
 
   let repo: string
   let file: string
@@ -67,7 +88,9 @@ export async function writeAnswer(req: { repoPath: string; line: string; text: s
   if (found.length === 0) return CHANGED
   if (found.length > 1) return TWICE
   const target = found[0]!
-  const next = Buffer.concat([before.subarray(0, target.start), Buffer.from(answered(target.text, clean.text), 'utf8'), before.subarray(target.end)])
+  const edited = edit(target.text)
+  if (edited === undefined) return CHANGED
+  const next = Buffer.concat([before.subarray(0, target.start), Buffer.from(edited, 'utf8'), before.subarray(target.end)])
 
   const temp = join(dirname(file), `.${basename(file)}.${randomBytes(6).toString('hex')}.tmp`)
   try {
@@ -90,7 +113,7 @@ export async function writeAnswer(req: { repoPath: string; line: string; text: s
   for (let attempt = 0; ; attempt++) {
     try {
       await fs.rename(temp, file)
-      return { outcome: 'answered' }
+      return { outcome: 'written' }
     } catch (err) {
       const code = codeOf(err)
       if ((code === 'EPERM' || code === 'EBUSY') && attempt < RENAME_RETRIES) {
@@ -124,6 +147,14 @@ function answered(raw: string, text: string): string {
   const lead = raw.slice(0, raw.length - raw.trimStart().length)
   const trail = raw.slice(raw.trimEnd().length)
   return lead + withAnswer(raw.trim(), text) + trail
+}
+
+/** The line with its pending Resolution rewritten; undefined when it no longer reads as pending. */
+function resolved(raw: string, text: string): string | undefined {
+  const lead = raw.slice(0, raw.length - raw.trimStart().length)
+  const trail = raw.slice(raw.trimEnd().length)
+  const out = withResolution(raw.trim(), text)
+  return out === undefined ? undefined : lead + out + trail
 }
 
 async function drop(fs: QueueFs, temp: string): Promise<void> {

@@ -7,6 +7,8 @@ import { MergeConfirm, mergeButtonId, useMergeFlow } from './MergeConfirm.tsx'
 import type { NextItem } from './next-step.ts'
 import { answerNote, type WaitingRow } from './queue-view.ts'
 import { ReplyPanel } from './ReplyPanel.tsx'
+import { INITIAL_RESOLVE, createResolveFlow, resolveAnchor, triageTarget, type ResolveState } from './resolve-flow.ts'
+import { TriageButton, TriageError, TriageLine } from './Triage.tsx'
 import {
   NOTHING_ELSE,
   answerAnchor,
@@ -80,6 +82,8 @@ export function WaitingTab({ repo, run, items }: Props) {
   const [answer, setAnswer] = useState<AnswerState>(INITIAL)
   const flow = useMemo(() => createAnswerFlow(setAnswer), [])
   const [merge, mergeFlow] = useMergeFlow()
+  const [resolve, setResolve] = useState<ResolveState>(INITIAL_RESOLVE)
+  const resolveFlow = useMemo(() => createResolveFlow(setResolve), [])
   const answerButtons = useRef(new Map<string, HTMLButtonElement>())
   const [lastReply, setLastReply] = useState<ReplySeen | undefined>()
   // Groups whose open state differs from their start (Someday starts closed), kept by key like the rows.
@@ -103,6 +107,11 @@ export function WaitingTab({ repo, run, items }: Props) {
 
   const answerAt = answerAnchor(answer, items, repo.id)
   const mergeAt = mergeAnchor(merge, items, repo.id)
+  const resolveAt = resolveAnchor(
+    resolve,
+    items.flatMap((i) => (i.entry ? [{ key: i.key, line: i.entry.line }] : [])),
+    repo.id,
+  )
   const answerLine = answer.kind === 'idle' ? undefined : answer.target.line
   // Focus goes back to the entry's Answer button when the form closes, if it's still there.
   useEffect(() => {
@@ -110,18 +119,22 @@ export function WaitingTab({ repo, run, items }: Props) {
     return () => answerButtons.current.get(answerLine)?.focus()
   }, [answerLine])
 
-  const saving = answer.kind === 'saving'
+  // One queue write at a time: Answer, Close and Keep wait for each other.
+  const saving = answer.kind === 'saving' || resolve.kind === 'saving'
   const merging = merge.kind === 'merging'
   const form = <AnswerForm state={answer} flow={flow} note={answerNote(run)} />
   const confirm = merge.kind === 'idle' ? null : <MergeConfirm state={merge} flow={mergeFlow} label={`PR #${merge.target.number}`} />
   const shown = keepOpen(open, keys)
   const shownGroups = keepOpen(flipped, groupKeys)
-  const anchors = [answerAt, mergeAt]
+  const anchors = [answerAt, mergeAt, resolveAt]
+  const resolveError = <TriageError state={resolve} flow={resolveFlow} />
 
   const row = (item: NextItem): ReactNode => {
     const e = item.entry
     const a = item.action
     const isOpen = shown.has(item.key)
+    // Close or Keep sits beside Answer, only on an entry you can answer.
+    const triage = a.kind === 'answer' ? triageTarget(e, repo.id) : undefined
     return (
       <li key={item.key} className={`wait-row t-${item.tier}`}>
         {e ? (
@@ -132,6 +145,7 @@ export function WaitingTab({ repo, run, items }: Props) {
             {item.detail && <span className="wait-detail muted">{item.detail}</span>}
           </div>
         )}
+        {e && <TriageLine row={e} />}
         {e?.yourAnswer && (
           <p className="wait-answer">
             <span>{e.yourAnswer}</span> <span className="note">{e.waiting}</span>
@@ -151,6 +165,7 @@ export function WaitingTab({ repo, run, items }: Props) {
             >
               Answer
             </button>
+            {triage && <TriageButton target={triage} state={resolve} flow={resolveFlow} busy={saving} size="sm" />}
           </div>
         )}
         {a.kind === 'merge' && (
@@ -170,6 +185,7 @@ export function WaitingTab({ repo, run, items }: Props) {
         {a.kind === 'reply' && <ReplyPanel key="reply-panel" view={a.panel} target={a.panel.target} framed={false} />}
         {answerAt === item.key && form}
         {mergeAt === item.key && confirm}
+        {resolveAt === item.key && resolveError}
       </li>
     )
   }
@@ -214,6 +230,7 @@ export function WaitingTab({ repo, run, items }: Props) {
       })}
       {answerAt === 'end' && form}
       {mergeAt === 'end' && confirm}
+      {resolveAt === 'end' && resolveError}
     </div>
   )
 }

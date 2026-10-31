@@ -121,6 +121,27 @@
   overflow-wrap: anywhere;
 }
 
+/* Done: <reason>, or the value in use as the default: muted, one line, the whole text in its title. */
+.wait-hint {
+  margin: 0;
+  max-width: 72ch;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--size-small);
+  color: var(--muted);
+}
+
+/* A failed Close or Keep: its reason, then Dismiss. */
+.triage-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
 /* The reply panel inside a row or the card: no frame of its own. */
 .reply-panel.bare {
   display: grid;
