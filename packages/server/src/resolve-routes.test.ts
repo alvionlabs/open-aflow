@@ -39,6 +39,8 @@ const GATE = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]`
 const GATE_LIVE = '- `[2026-10-21 · BLOCKED · orchestrator → human · plan: live]` gate 1 (blocked-concern): B1 is stuck. **Resolution:** pending'
 const VALUE = '- `[2026-10-21 · PENDING · engineer → human · plan: live]` decision: badge colour? value in use: `white`. Answer to change. **Resolution:** pending'
 const BOTH = '- `[2026-10-20 · PENDING · orchestrator → human · plan: old]` gate 4 (wave-check-failed): wave 2. Value in use: skip it. **Resolution:** pending'
+// A gate 1 naming a merged wave PR: the blocker can outlive the PR, so no Close (review round 2).
+const GATE1_NAMES_PR = '- `[2026-10-21 · BLOCKED · orchestrator → human · plan: live]` gate 1 (blocked-concern): B1 cannot pass verify on top of #11: the schema A1 changed breaks its migration. **Resolution:** pending'
 // Written after the archive: no Close.
 const GATE6_FINAL = '- `[2026-10-20 · PENDING · orchestrator → human · plan: old]` gate 6 (escalation-valve): plan PR https://github.com/x/r/pull/30 withheld, wave 2 carried a one-way slice. **Resolution:** pending'
 const PLAIN = '- `[2026-10-21 · PENDING · engineer → human · plan: live]` someday: tidy the logs. **Resolution:** pending'
@@ -54,7 +56,13 @@ beforeEach(async () => {
   await writeFile(join(repoPath, 'pod-docs', 'README.md'), '# pod docs\n\npod docs: 2\n')
   await writeFile(join(repoPath, 'pod-docs', 'plans', 'archive', 'old.md'), plan('old', 'archived'))
   await writeFile(join(repoPath, 'pod-docs', 'plans', 'live.md'), plan('live', 'active'))
-  await writeFile(join(repoPath, 'pod-docs', 'handoff-queue.md'), ['# Handoff Queue', '', GATE, GATE_LIVE, VALUE, BOTH, PLAIN, TO_POD, GATE6_FINAL, ''].join('\n'))
+  // Plan live's sprint one: slice A1 pushed as #11, which gh reports merged.
+  await mkdir(join(repoPath, 'pod-docs', 'sprints'), { recursive: true })
+  await writeFile(
+    join(repoPath, 'pod-docs', 'sprints', 'one.md'),
+    ['# Sprint: one', '', '_From plan: pod-docs/plans/live.md · Slug: one · Status: active_', '', '| Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |', '|---|---|---|---|---|---|---|---|', '| 1 | A1 | a | one-A1 | #11 | pushed | high | — |', ''].join('\n'),
+  )
+  await writeFile(join(repoPath, 'pod-docs', 'handoff-queue.md'), ['# Handoff Queue', '', GATE, GATE_LIVE, VALUE, BOTH, PLAIN, TO_POD, GATE6_FINAL, GATE1_NAMES_PR, ''].join('\n'))
   await mkdir(join(root, 'cfg'), { recursive: true })
   await writeFile(join(root, 'cfg', 'config.json'), JSON.stringify({ version: 1, repos: [{ path: repoPath }] }))
   await mkdir(join(root, 'ports'))
@@ -64,7 +72,11 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-const ghExec = (async (args: string[]) => (args[0] === 'auth' ? { status: 'ok', stdout: '' } : { status: 'ok', stdout: '[]' })) as GhExec
+const ghExec = (async (args: string[]) => {
+  if (args[0] === 'auth') return { status: 'ok', stdout: '' }
+  if (args[1] === 'view' && args[2] === '11') return { status: 'ok', stdout: JSON.stringify({ number: 11, state: 'MERGED', url: 'u11', statusCheckRollup: [], baseRefName: 'main', mergedAt: '2026-10-30T10:00:00Z' }) }
+  return { status: 'ok', stdout: '[]' }
+}) as GhExec
 
 type SetupOpts = { fs?: QueueFs; token?: boolean; host?: string }
 
@@ -81,6 +93,9 @@ async function setup(opts: SetupOpts = {}) {
     now: () => NOW,
   })
   let board: Board = await service.build()
+  // gh answers once asked, as the watcher does after its first build.
+  await service.refreshGh(board)
+  board = await service.build()
   const source = {
     board: () => board,
     subscribe: () => () => {},
@@ -154,6 +169,7 @@ describe('resolve route', () => {
       [{ repoId: s.repoId, line: GATE_LIVE, kind: 'close' }, 409, 'The board no longer reads this entry as done.'],
       // A gate 6 holding back the final PR, written after the plan archive.
       [{ repoId: s.repoId, line: GATE6_FINAL, kind: 'close' }, 409, 'The board no longer reads this entry as done.'],
+      [{ repoId: s.repoId, line: GATE1_NAMES_PR, kind: 'close' }, 409, 'The board no longer reads this entry as done.'],
       // Neither rule.
       [{ repoId: s.repoId, line: PLAIN, kind: 'close' }, 409, 'The board no longer reads this entry as done.'],
       [{ repoId: s.repoId, line: PLAIN, kind: 'keep' }, 409, 'This entry states no value in use.'],

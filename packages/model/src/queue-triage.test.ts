@@ -52,6 +52,8 @@ const GATE6_FINAL_OLD = '- `[2026-10-20 · PENDING · orchestrator → human · 
 const GATE3_FINAL_WAVE_OLD = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 3 (auto-merge-fail): plan PR #20 has no passing CI since wave 2. **Resolution:** pending'
 const GATE1_REPORTER_OLD = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 1 (blocked-concern): the reporter could not write the report of wave 2. **Resolution:** pending'
 const GATE1_BETWEEN_SPRINTS = '- `[2026-10-21 · BLOCKED · orchestrator → human · plan: live · sprint: first]` gate 1 (blocked-concern): the next sprint draft is blocked. **Resolution:** pending'
+// A gate 1 naming a wave PR: the PR can merge while the blocker stays (review round 2).
+const GATE1_NAMES_PR_LIVE = '- `[2026-10-21 · BLOCKED · orchestrator → human · plan: live]` gate 1 (blocked-concern): B1 cannot pass verify on top of #11: the schema A1 changed breaks its migration. **Resolution:** pending'
 const GATE6_WAVE_OLD = '- `[2026-10-20 · PENDING · orchestrator → human · plan: old]` gate 6 (escalation-valve): wave 2 PR https://github.com/x/r/pull/12 held for you to merge. **Resolution:** pending'
 const GATE5_LIVE_DONE_SPRINT = '- `[2026-10-21 · BLOCKED · orchestrator → human · plan: live · sprint: first]` gate 5 (safety-bounded): cap hit. **Resolution:** pending'
 const DECISION =
@@ -87,6 +89,7 @@ const ALL = [
   TO_POD,
   VALUE_TO_POD,
   BLOCKED_VALUE,
+  GATE1_NAMES_PR_LIVE,
 ]
 
 function repo(prs: PrStatus[] = []): BoardRepo {
@@ -99,7 +102,7 @@ function repo(prs: PrStatus[] = []): BoardRepo {
     ]),
     'pod-docs/sprints/archive/one.md': sprintDoc('one', 'old', OLD_SLICES),
     'pod-docs/sprints/archive/first.md': sprintDoc('first', 'live'),
-    'pod-docs/sprints/second.md': sprintDoc('second', 'live'),
+    'pod-docs/sprints/second.md': sprintDoc('second', 'live', ['| 1 | A1 | a | second-A1 | #11 | pushed | high | — |']),
     'pod-docs/handoff-queue.md': ['# Handoff Queue', '', ...ALL, ''].join('\n'),
   })
   return { id: 'id', name: 'r', path: '/r', source: 'registered', model, agents: [], prs, claims: [] }
@@ -120,6 +123,12 @@ describe('done entries', () => {
     for (const line of [GATE_OLD, GATE6_FINAL_OLD, GATE3_FINAL_WAVE_OLD, GATE1_REPORTER_OLD, GATE3_FINAL_OLD, GATE2_OLD, HANDBACK_OLD]) {
       expect(doneReason(r, entry(r, line)), line).toBeUndefined()
     }
+  })
+
+  it('a gate 1 naming a merged wave PR is not done: its cause is not the PR', () => {
+    const r = repo([pr(11, 'merged')])
+    expect(doneReason(r, entry(r, GATE1_NAMES_PR_LIVE))).toBeUndefined()
+    expect(triage(r, entry(r, GATE1_NAMES_PR_LIVE))).toEqual({})
   })
 
   it('a gate 3 or 6 naming a wave PR is done once gh says that PR merged', () => {
