@@ -198,10 +198,9 @@ describe('urgent banner css', () => {
     for (const [cls, token] of TONES) {
       const t = `.urgent:has(> .status.${cls})`
       expect(styleOf(t, desktop)['--tone'], t).toBe(`var(--${token})`)
-      // A toned box: 10 % fill on the page, 50 % border; the status word takes the tone.
+      // A toned box: 10 % fill on the page, 50 % border.
       expect(styleOf(t, desktop).background, t).toBe('color-mix(in srgb, var(--tone) 10%, var(--bg))')
       expect(styleOf(t, desktop)['border-color'], t).toBe('color-mix(in srgb, var(--tone) 50%, transparent)')
-      expect(styleOf(`${t} > .status`, desktop).color, t).toBe('var(--tone)')
       expect(styleOf(`${t} .urgent-open.btn.quiet:hover`, desktop).background, t).toBe('color-mix(in srgb, var(--tone) 16%, transparent)')
     }
     // Only those three tint: never running or idle.
@@ -231,5 +230,45 @@ describe('urgent banner css', () => {
     const btn = styleOf('.urgent-open', phone)
     expect(btn.width).toBe('100%')
     expect(Number(/^(\d+)px$/.exec(btn['min-height'] ?? '')?.[1] ?? 0)).toBeGreaterThanOrEqual(44)
+  })
+
+  it('status word keeps its tone and reaches 4.5:1 on the tint, in both themes', () => {
+    const TOKENS = readFileSync(join(here, '../../theme/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    const tokensOf = (sel: string) => Object.assign({}, ...rules(TOKENS).filter((r) => r.media === undefined && r.selectors.includes(sel)).map((r) => decls(r.body))) as Record<string, string>
+    const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    const themes: [string, Record<string, string>][] = [
+      ['light', tokensOf(':root')],
+      ['dark', tokensOf(':root[data-theme="dark"]')],
+    ]
+    const STATUSES: [string, string, number][] = [
+      ['s-bad', 'blocked', 95],
+      ['s-you', 'needs-you', 90],
+      ['s-ok', 'ready', 85],
+    ]
+    for (const [theme, tokens] of themes) {
+      for (const [cls, token, percent] of STATUSES) {
+        const where = `${theme} ${cls}`
+        const sel = `.urgent:has(> .status.${cls})`
+        // The value the CSS really declares, resolved through this theme's tokens.
+        const paint = (value: string | undefined): number[] => {
+          const name = (v: string) => (v === '--tone' ? `--${token}` : v)
+          const plain = /^var\((--[a-z-]+)\)$/.exec(value ?? '')
+          if (plain) return rgb(tokens[name(plain[1]!)]!)
+          const mix = /^color-mix\(in srgb, var\((--[a-z-]+)\) (\d+)%, var\((--[a-z-]+)\)\)$/.exec(value ?? '')
+          expect(mix, `${where}: ${value}`).not.toBeNull()
+          const a = rgb(tokens[name(mix![1]!)]!)
+          const b = rgb(tokens[name(mix![3]!)]!)
+          const p = Number(mix![2]) / 100
+          return a.map((v, i) => v * p + b[i]! * (1 - p))
+        }
+        const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+        const lum = (c: number[]) => 0.2126 * lin(c[0]!) + 0.7152 * lin(c[1]!) + 0.0722 * lin(c[2]!)
+        const declared = styleOf(`${sel} > .status`, desktop).color
+        const [hi, lo] = [lum(paint(declared)), lum(paint(styleOf(sel, desktop).background))].sort((x, y) => y - x)
+        expect((hi! + 0.05) / (lo! + 0.05), `${where}: ${declared}`).toBeGreaterThanOrEqual(4.5)
+        // Toned, not plain --fg: the tone stays the larger part of the mix.
+        expect(declared, where).toBe(`color-mix(in srgb, var(--tone) ${percent}%, var(--fg))`)
+      }
+    }
   })
 })
