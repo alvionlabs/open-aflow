@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import type { Board } from '@pod-board/model'
 import * as model from '@pod-board/model'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { createBoardService, finalPrBranches, type BoardServiceDeps } from './board-service.ts'
+import { createBoardService, finalPrBranches, livePrNumbers, type BoardServiceDeps } from './board-service.ts'
 import type { GhReader, GhStatus, PrStatus } from './gh.ts'
 import { normalizeRepoPath, repoId } from './guard.ts'
 import { projectDirName } from './transcript-files.ts'
@@ -710,5 +710,30 @@ describe('finalPrBranches', () => {
     const plans = { alpha: plan('alpha', 'active', [['one', 'done']]) }
     expect(branches(plans, [], [handBack('alpha')])).toEqual([])
     expect(branches(plans, [], [handBack('alpha', false)])).toEqual(['alpha'])
+  })
+})
+
+describe('livePrNumbers: the staging PR a pending gate 7 names', () => {
+  const README = '# pod docs\n\npod docs: 2\n'
+  const archived = ['# Plan: old', '', '_Generated: 2026-10-18 · Status: archived · Grilled-with: grilling_', '', '## Sprint sequence', '', '| Sprint | Goal | Status | Depends on |', '|---|---|---|---|', '| one | goal | done | — |', ''].join('\n')
+  const gate7 = (resolution = 'pending', plan = ' · plan: old') =>
+    `- \`[2026-10-20 · PENDING · orchestrator → human${plan}]\` gate 7 (plan-complete): plan old merged to \`pod-staging\` (final PR https://github.com/o/r/pull/20); review it and merge the staging PR https://github.com/o/r/pull/21 to \`main\` when ready. **Resolution:** ${resolution}`
+  const numbers = (queue: string[]) =>
+    livePrNumbers(
+      model.buildRepoModel({ 'pod-docs/README.md': README, 'pod-docs/plans/archive/old.md': archived, 'pod-docs/handoff-queue.md': ['# Handoff Queue', '', ...queue, ''].join('\n') }),
+    )
+
+  test('asked by number while the entry is pending, whatever the plan, once', () => {
+    // The archived, unclaimed plan gives nothing else; the gate 7 gives its staging PR, not its final PR.
+    expect(numbers([gate7()])).toEqual([21])
+    // An entry that joins no plan counts too; two entries naming the same PR ask once.
+    expect(numbers([gate7('pending', ''), gate7()])).toEqual([21])
+    // `#N` instead of a URL.
+    expect(numbers([gate7().replace('https://github.com/o/r/pull/21', '#22')])).toEqual([22])
+  })
+
+  test('not once resolved, nor for an entry that names no staging PR', () => {
+    expect(numbers([gate7('2026-10-21 — merged')])).toEqual([])
+    expect(numbers([gate7().replace('the staging PR https://github.com/o/r/pull/21', 'the staging branch')])).toEqual([])
   })
 })

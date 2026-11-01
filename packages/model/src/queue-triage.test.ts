@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BoardRepo, PrStatus } from './board.ts'
 import { parseQueue } from './pod-flow/model.ts'
-import { closeText, doneReason, keepText, triage, valueInUse, withResolution } from './queue-triage.ts'
+import { closeText, doneReason, keepText, stagingPrOf, triage, valueInUse, withResolution } from './queue-triage.ts'
 import { buildRepoModel, type QueueItem } from './run-model.ts'
 
 const README = '# pod docs\n\npod docs: 2\n'
@@ -42,6 +42,7 @@ const DONE_WITH_VALUE = '- `[2026-10-20 · BLOCKED · orchestrator → human · 
 const PLAIN = '- `[2026-10-21 · PENDING · engineer → human · plan: live]` someday: tidy the logs. **Resolution:** pending'
 const ANSWERED_GATE = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 1 (blocked-concern): A1. **Resolution:** pending **Answer (human):** rerun'
 const TO_POD = '- `[2026-10-20 · BLOCKED · engineer → orchestrator · plan: old]` gate 1 (blocked-concern): for pod. **Resolution:** pending'
+const BLOCKED_VALUE = '- `[2026-10-21 · BLOCKED · engineer → human · plan: live]` decision: which store? Value in use: SQLite. **Resolution:** pending'
 const VALUE_TO_POD = '- `[2026-10-21 · PENDING · engineer → orchestrator · plan: live]` decision: x. Value in use: y. **Resolution:** pending'
 
 const ALL = [
@@ -62,6 +63,7 @@ const ALL = [
   ANSWERED_GATE,
   TO_POD,
   VALUE_TO_POD,
+  BLOCKED_VALUE,
 ]
 
 function repo(prs: PrStatus[] = []): BoardRepo {
@@ -159,6 +161,11 @@ describe('triage', () => {
     expect(triage(r, entry(r, PLAIN))).toEqual({})
   })
 
+  it('Keep only on a PENDING: a BLOCKED halts pod and needs a real answer', () => {
+    const r = repo()
+    expect(triage(r, entry(r, BLOCKED_VALUE))).toEqual({})
+  })
+
   it('only for entries you can answer', () => {
     const r = repo()
     // Answered, or routed to pod: nothing to close or keep.
@@ -181,5 +188,14 @@ describe('the resolution', () => {
   it('reads nothing on a line that is not pending', () => {
     expect(withResolution('- `[x · PENDING · a → human]` b **Resolution:** 2026-10-20 — fixed', 'T')).toBeUndefined()
     expect(withResolution('- `[x · PENDING · a → human]` b', 'T')).toBeUndefined()
+  })
+})
+
+describe('the staging PR a gate 7 names', () => {
+  it('reads the number after the words staging PR, not the final PR', () => {
+    const r = repo()
+    expect(stagingPrOf(entry(r, GATE7_OLD))).toBe(21)
+    expect(stagingPrOf(entry(r, HANDBACK_OLD))).toBeUndefined()
+    expect(stagingPrOf(entry(r, GATE_OLD))).toBeUndefined()
   })
 })
