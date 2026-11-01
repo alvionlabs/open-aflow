@@ -163,3 +163,6 @@ export function hashAfterRemove(runs: RunSummary[], selected: RunSummary | undef
   return next ? hashFor(next) : ''
 }
 
+
+export const navigateAfterRemove = (_selected: RunSummary | undefined, _target: RemoveTarget, after: string | undefined): string | undefined => after
+export const moreName = (name: string, repo: string) => `${name} (${repo})`

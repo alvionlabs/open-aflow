@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { BoardRepo, RemoveRepoResult, RunSummary } from '@pod-board/model'
 import type { ActionReply } from '../../actions-client.ts'
 import { RemoveConfirmView } from './RemoveConfirm.tsx'
-import { HEADER_PLACE, REMOVE_ITEM, confirmView, createRemoveFlow, hashAfterRemove, removeTarget, repoOfRun, type Post, type RemoveState, type RemoveTarget } from './remove-flow.ts'
+import { HEADER_PLACE, REMOVE_ITEM, confirmView, createRemoveFlow, hashAfterRemove, moreName, navigateAfterRemove, removeTarget, repoOfRun, type Post, type RemoveState, type RemoveTarget } from './remove-flow.ts'
 
 const A: RemoveTarget = { repoId: 'ra', name: 'alpha-repo', path: 'C:/code/alpha-repo', alsoClaimed: false, runs: 2, place: HEADER_PLACE, returnTo: 'run-menu-trigger' }
 const B: RemoveTarget = { repoId: 'rb', name: 'beta-repo', path: 'C:/code/beta-repo', alsoClaimed: false, runs: 1, place: HEADER_PLACE, returnTo: 'run-menu-trigger' }
@@ -277,5 +277,42 @@ describe('two repos with the same id (chess-web and chess_web)', () => {
     t.flow.remove()
     await t.answer(0, refused('ambiguous repo', 409))
     expect(confirmView(t.flow.state())?.error).toBe("Another repo on the board has the same id, so the board can't tell which one to remove. Nothing changed.")
+  })
+})
+
+describe('navigateAfterRemove: where the page goes when the reply comes', () => {
+  const run = (repoId: string, name: string, plan: string): RunSummary => ({ repoId, repo: name, plan, where: '', state: 'idle' }) as RunSummary
+  const removed = run('ra', 'alpha-repo', 'x')
+  const planned = run('rc', 'gamma', 'two')
+  const other = run('rb', 'beta-repo', 'one')
+
+  it('the plain path: the page still shows the removed repo run, so it goes to the planned run', () => {
+    expect(navigateAfterRemove(removed, A, '#/rc/two')).toBe('#/rc/two')
+  })
+
+  it('the Board-first path: the page already fell back to the planned run, so it goes (stays) there', () => {
+    expect(navigateAfterRemove(planned, A, '#/rc/two')).toBe('#/rc/two')
+  })
+
+  it('no run on the page: it goes to the planned hash', () => {
+    expect(navigateAfterRemove(undefined, A, '')).toBe('')
+  })
+
+  it('the user opened another run during the request: the page stays on their choice', () => {
+    expect(navigateAfterRemove(other, A, '#/rc/two')).toBeUndefined()
+  })
+
+  it('nothing planned: nowhere to go', () => {
+    expect(navigateAfterRemove(removed, A, undefined)).toBeUndefined()
+  })
+})
+
+describe('moreName: the sidebar ⋯ label', () => {
+  it('adds the repo in brackets when the run has its own name', () => {
+    expect(moreName('Sparring ladder', 'chess-web')).toBe('Sparring ladder (chess-web)')
+  })
+
+  it('drops the brackets when the run is named after its repo', () => {
+    expect(moreName('ytb-feed', 'ytb-feed')).toBe('ytb-feed')
   })
 })
