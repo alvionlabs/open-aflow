@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Next step across runs — how it fits together</title>
+<style>
+  body { margin: 0; background: #000; color: #ededed; font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 24px; margin: 0 0 8px; letter-spacing: -0.02em; }
+  h2 { font-size: 18px; margin: 40px 0 12px; }
+  p { color: #a1a1a1; max-width: 72ch; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #262626; vertical-align: top; }
+  th { color: #a1a1a1; font-weight: 500; }
+  code { font: 13px ui-monospace, monospace; color: #ededed; }
+  .mermaid { background: #0a0a0a; border: 1px solid #262626; border-radius: 12px; padding: 16px; margin: 0 0 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Next step across runs</h1>
+  <p><b style="color:#ededed">Goal:</b> when another run needs you more urgently than the run you're looking at, screen 1 says so in one line at the top of the main column, with a button that opens that run. When nothing outranks the selected run, the page looks exactly as it does today.</p>
+  <p>One sprint, <code>urgent-banner</code>. The model and the server don't change. Plan: <code>pod-docs/plans/next-step-across-runs.md</code>. Look: <code>next-step-across-runs-look.html</code> (B picked).</p>
+
+  <h2>Parts</h2>
+  <table>
+    <tr><th>Part</th><th>New or changed</th><th>Where</th><th>Does</th></tr>
+    <tr><td>Elsewhere picker</td><td>new</td><td><code>packages/web/src/screens/runs/</code> (pure)</td><td>From every listed run's <code>nextSteps</code>, picks the most urgent item outside the selected run, says whether it outranks the selected run's card, and counts the other runs that also outrank it</td></tr>
+    <tr><td>Urgent banner</td><td>new</td><td><code>packages/web/src/screens/runs/</code></td><td>One line: status dot and word, item title, run and repo, <code>+N more</code>, and "Open run"</td></tr>
+    <tr><td>Runs screen</td><td>changed</td><td><code>packages/web/src/screens/runs/</code></td><td>Places the banner above the run header; "Open run" selects the run</td></tr>
+    <tr><td>Next step</td><td>unchanged</td><td><code>nextSteps</code></td><td>Same tiers and kinds as today; the picker reads it for every run</td></tr>
+  </table>
+
+  <h2>How they connect</h2>
+  <pre class="mermaid">
+flowchart LR
+  Model[(Board model)] -->|repos, runs, queue, PRs| NextStep[Next step: nextSteps per run]
+  NextStep -->|each run's card item and tier| Picker[Elsewhere picker]
+  Selected[Selected run] -->|run id, its card tier| Picker
+  Picker -->|item, run, +N more, or nothing| Banner[Urgent banner]
+  Banner -->|Open run: run id| RunsScreen[Runs screen]
+  RunsScreen -->|selects run| Selected
+  </pre>
+
+  <h2>Main flow</h2>
+  <pre class="mermaid">
+sequenceDiagram
+  actor You
+  participant Page as Runs screen
+  participant Picker as Elsewhere picker
+  participant Banner as Urgent banner
+  Note over Page: pod writes a BLOCKED halt in repo Y
+  Page->>Picker: Board update, every run, selected run X
+  Picker-->>Page: Y's halt outranks X's decision
+  Page->>Banner: show Y's halt
+  Banner-->>You: blocked · Autopilot stopped · chess-web · Sparring ladder [Open run]
+  You->>Banner: Open run
+  Banner->>Page: select run Y
+  Page-->>You: Y's header, flow and card with Answer
+  Note over Picker: nothing outranks Y's card now, so no banner
+  </pre>
+
+  <h2>Rules (defaults)</h2>
+  <table>
+    <tr><th>Rule</th><th>Value</th></tr>
+    <tr><td>What outranks</td><td>Tier order blocked → merge → reply → pending; another run shows only with a strictly higher tier than the selected run's card; anything beats "Nothing to do"</td></tr>
+    <tr><td>Pending kinds that count</td><td><code>now</code>, <code>decision</code>, <code>before …</code>; never <code>someday</code>, <code>other</code> or answered</td></tr>
+    <tr><td>Several runs outrank</td><td>Highest tier, then oldest; <code>+N more</code> for the rest</td></tr>
+    <tr><td>Actions</td><td>None in the banner; "Open run" only</td></tr>
+    <tr><td>Dismiss</td><td>None; it leaves when the item is handled</td></tr>
+    <tr><td>Where</td><td>Screen 1 only</td></tr>
+  </table>
+</main>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "dark" });
+</script>
+</body>
+</html>
