@@ -60,7 +60,7 @@ flowchart TD
 - The 9 px label-to-arrow gap comes from `.btn.trail`, and every trail button shares it (queue, someday).
 - The tone comes from `.urgent:has(> .status.s-bad)` and its `s-you` and `s-ok` rules, because `runs-screen.test.ts` pins the exact markup `<div class="urgent">`. A new status class gets no tint until it has a rule.
 - `.btn.quiet` is muted in `base.css`. `.urgent-open.btn.quiet` sets the label back to `--fg`; don't drop it.
-- On the light theme, the status word is below 4.5:1 on its own tint: blocked 4.49, needs you 4.13, ready 3.88 (measured). It is a known gap, not a target to match elsewhere.
+- On the light theme, the status word is below 4.5:1 on its own tint: blocked 4.49, needs you 4.13, ready 3.88 (measured). The human has not yet picked a fix.
 
 ## History
 
