@@ -2,7 +2,7 @@
 
 ## What it is
 
-Board actions change something outside the board: merge a PR that waits on you (a handed-back wave PR, a reviewed fix PR, or the final plan PR), append your answer to a queue entry that waits on you, and resume a run with `continue` or `go` (see [resume.md](resume.md)). Every merge, answer, and resume request that passes its checks goes in the action log. Server side: `packages/server/src` (the action, answer, and queue-writer modules); the routes sit behind the action guard ([server.md](server.md)). The screens are in [runs-and-pipeline.md](runs-and-pipeline.md).
+Board actions change something outside the board: merge a PR that waits on you (a handed-back wave PR, a reviewed fix PR, or the final plan PR), append your answer to a queue entry that waits on you, and resume a run with `continue` or `go` (see [resume.md](resume.md)). Every merge, answer, and resume request that passes its checks goes in the action log, and so does each repo removed from the board (Remove repo, [server.md](server.md)). Server side: `packages/server/src` (the action, answer, and queue-writer modules); the routes sit behind the action guard ([server.md](server.md)). The screens are in [runs-and-pipeline.md](runs-and-pipeline.md).
 
 ## How it works
 
@@ -15,7 +15,7 @@ Board actions change something outside the board: merge a PR that waits on you (
 - **Resolve (Close and Keep):** `POST /api/actions/resolve` with `repoId`, `line`, and `kind` (`close` or `keep`); any other field counts for nothing. The entry must be `isAnswerable` (`404 not waiting on you`), and the server's own `triage` of it must give a Done reason for `close` or a value for `keep` (`409` with `The board no longer reads this entry as done.` or `This entry states no value in use.`). The writer rewrites the line's `**Resolution:** pending` to `**Resolution:** <local date> — closed from the board: <reason>` or `— kept: <value>`, with the answer's path and guards; a line that no longer reads as pending is `changed`. It shares the answer's one write per repo (`409 answer in progress`). Results: `closed`, `kept`, `changed`, or `failed`, logged as `resolve` with the entry's header as the target.
 - **Where you press it:** Merge and Answer sit on the Next step card, or on a row in the Waiting tab, and open in place under it; the Action log is in the Log tab. Continue and Go sit on a reply ([runs-and-pipeline.md](runs-and-pipeline.md)).
 - **Path:** exactly `<repo>/pod-docs/handoff-queue.md`, whose real path must sit under the repo's real path. A missing file is never created.
-- **Action log:** one JSON line per logged request in `<config dir>/actions.jsonl`, never in a repo. Merge, answer, and resume entries each pair an `action` with its own results; the reader drops lines that don't fit. `Board.actions` is the newest 50; after each logged action the server rebuilds the Board and sends it before it answers. A failed append gives `logged: false`.
+- **Action log:** one JSON line per logged request in `<config dir>/actions.jsonl`, never in a repo. Merge, answer, resolve, resume, and remove-repo entries (`removed` or `failed`, the target is the repo's path) each pair an `action` with its own results; the reader drops lines that don't fit. `Board.actions` is the newest 50; after each logged action the server rebuilds the Board and sends it before it answers. A failed append gives `logged: false`.
 
 ## Why it's this way
 
@@ -48,3 +48,4 @@ Board actions change something outside the board: merge a PR that waits on you (
 - 2026-10-28 · calm-dashboard · Merge and Answer moved to the Next step card and the Waiting tab, the Action log to the Log tab; the routes didn't change; final PR #54 passed review at round 1 · [report](../reports/calm-dashboard.html)
 - 2026-10-31 · fix-queue-triage · added: the resolve route (Close and Keep) and `resolve` entries in the action log; the queue writer can rewrite an entry's pending Resolution as well as append an answer. The PRs the server asks gh about now include the staging PR a pending gate 7 entry names.
 - 2026-10-31 · fix-queue-triage review round 1 · fixed: a staging PR asked by number (a pending gate 7 names it) no longer hides the same PR found by the staging branch.
+- 2026-11-01 · fix-remove-repo · added: `remove-repo` entries (`removed`, `failed`) in the action log.
