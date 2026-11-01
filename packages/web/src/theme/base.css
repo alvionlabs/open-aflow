@@ -303,6 +303,23 @@ a:hover {
   opacity: 0.5;
 }
 
+/* Danger: an action that takes something away (Remove repo). The blocked red, in every state. */
+.btn.danger,
+.btn.danger:hover,
+.btn.danger:active {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--danger-fg);
+}
+
+.btn.danger:hover {
+  opacity: 0.88;
+}
+
+.btn.danger:active {
+  opacity: 0.76;
+}
+
 /* Quiet button (the draft's ghost): no fill or frame until hovered, for the lesser choice (Cancel). */
 .btn.quiet {
   background: transparent;

@@ -66,6 +66,21 @@
   background: var(--hover);
 }
 
+/* Remove repo: the danger item, red in every state. */
+.mi-danger,
+.mi-danger:hover {
+  color: var(--danger);
+}
+
+/* The sidebar card's ⋯ menu: fixed beside its button, so the sidebar's scroll box doesn't clip it. */
+.menu.run-more-panel {
+  position: fixed;
+  z-index: 20;
+  box-sizing: border-box;
+  min-width: 160px;
+  max-width: calc(100vw - 16px);
+}
+
 .mi-action:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: -2px;

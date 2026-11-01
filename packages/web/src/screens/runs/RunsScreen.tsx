@@ -14,7 +14,18 @@ import { nextSteps } from './next-step.ts'
 import { runHeader } from './plan-view.ts'
 import { switchView } from './resume-flow.ts'
 import { RemoveConfirm } from './RemoveConfirm.tsx'
-import { INITIAL as REMOVE_IDLE, confirmView as removeView, createRemoveFlow, hashAfterRemove, removeLabel, removeTarget, repoOfRun, type RemoveState } from './remove-flow.ts'
+import { MENU_TRIGGER_ID } from './BarMenu.tsx'
+import {
+  HEADER_PLACE,
+  INITIAL as REMOVE_IDLE,
+  confirmView as removeView,
+  createRemoveFlow,
+  hashAfterRemove,
+  moreButtonId,
+  removeTarget,
+  repoOfRun,
+  type RemoveState,
+} from './remove-flow.ts'
 import { RunHeader } from './RunHeader.tsx'
 import { RunsList } from './RunsList.tsx'
 import { SideHandle } from './SideHandle.tsx'
@@ -71,7 +82,8 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   // A plan's full flow (Think → You → sprints → Check → Ship); a fix run's Build, Review, Ship.
   const stages = fixPipeline?.stages ?? (repo && pipeline && selected?.plan !== undefined ? (buildFlow(repo, selected.plan, now) ?? []) : [])
 
-  // Remove from the board: the confirm opens under the run header; after a removal the page moves on.
+  // Remove repo, from the header's ⋯ or a sidebar card's ⋯: the confirm opens under the one it came from;
+  // after a removal the page moves on when the open run's repo left.
   const [removeState, setRemoveState] = useState<RemoveState>(REMOVE_IDLE)
   const latest = useRef({ runs, selected })
   latest.current = { runs, selected }
@@ -85,12 +97,22 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
     [],
   )
   useEffect(() => removeFlow.cancel(), [runKey, removeFlow])
-  const toRemove = removeTarget(repo, board?.repos ?? [])
+  const repos = board?.repos ?? []
+  const toRemove = removeTarget(repo, { repos, runs, place: HEADER_PLACE, returnTo: MENU_TRIGGER_ID })
+  const sideTarget = (run: RunSummary) => removeTarget(repoOfRun(repos, run), { repos, runs, place: hashFor(run), returnTo: moreButtonId(run) })
   const removing = removeView(removeState)
-  const removePanel =
-    removing && removeState.kind !== 'idle' && removeState.target.path === repo?.path ? (
-      <RemoveConfirm view={removing} onRemove={() => removeFlow.remove()} onCancel={() => removeFlow.cancel()} onKey={(k) => removeFlow.key(k)} />
+  const panelAt = (place: string) =>
+    removing && removeState.kind !== 'idle' && removeState.target.place === place ? (
+      <RemoveConfirm
+        key={place}
+        view={removing}
+        returnTo={removeState.target.returnTo}
+        onRemove={() => removeFlow.remove()}
+        onCancel={() => removeFlow.cancel()}
+        onKey={(k) => removeFlow.key(k)}
+      />
     ) : null
+  const removePanel = removeState.kind !== 'idle' && removeState.target.path === repo?.path ? panelAt(HEADER_PLACE) : null
 
   const press = (t: Tab) => {
     const next = tabPress(shown, t, view)
@@ -112,7 +134,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
       key={runKey}
       autoContinue={selected?.plan !== undefined && autoSwitch ? { target: { repoId: selected.repoId, run: selected.plan }, on: autoSwitch.on } : undefined}
       portBase={selected?.portBase}
-      {...(toRemove ? { remove: { label: removeLabel(toRemove.name), onPick: () => removeFlow.open(toRemove) } } : {})}
+      {...(toRemove ? { remove: { onPick: () => removeFlow.open(toRemove) } } : {})}
     />
   )
 
@@ -131,7 +153,17 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
               </span>
             )}
           </div>
-          <RunsList runs={runs} selected={selected} repos={board?.repos ?? []} />
+          <RunsList
+            runs={runs}
+            selected={selected}
+            repos={repos}
+            removable={(r) => sideTarget(r) !== undefined}
+            onRemove={(r) => {
+              const t = sideTarget(r)
+              if (t) removeFlow.open(t)
+            }}
+            panelFor={(r) => panelAt(hashFor(r))}
+          />
           <div className="side-foot">
             <button ref={repoButton} className="btn lead add-repo" type="button" aria-haspopup="dialog" onClick={() => setPicking(true)}>
               <Icon name="plus" />

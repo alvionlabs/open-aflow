@@ -10,21 +10,16 @@ type ViewProps = {
   panelRef?: RefObject<HTMLElement | null>
 }
 
-/** The confirm's markup: an in-place panel, not a dialog. */
+/** The confirm's markup: an in-place panel, not a dialog. Remove is the danger button; Cancel stays neutral. */
 export function RemoveConfirmView({ view, onRemove, onCancel, onKey, panelRef }: ViewProps) {
   return (
-    <section
-      ref={panelRef}
-      className="inplace remove-confirm"
-      aria-label={view.heading}
-      tabIndex={-1}
-      onKeyDown={(e: KeyboardEvent) => onKey(e.key)}
-    >
+    <section ref={panelRef} className="inplace remove-confirm" aria-label={view.heading} tabIndex={-1} onKeyDown={(e: KeyboardEvent) => onKey(e.key)}>
       <div className="merge-head">
         <b>{view.heading}</b>
         <span className="mono note remove-path">{view.path}</span>
       </div>
       <p className="remove-body">{view.body}</p>
+      {view.runsLine && <p className="remove-body">{view.runsLine}</p>}
       {view.claimNote && <p className="remove-body muted">{view.claimNote}</p>}
       {view.status && (
         <p className="muted merge-status" role="status">
@@ -37,7 +32,7 @@ export function RemoveConfirmView({ view, onRemove, onCancel, onKey, panelRef }:
         </p>
       )}
       <div className="inplace-actions">
-        <button className="btn primary" type="button" disabled={view.busy} onClick={onRemove}>
+        <button className="btn danger" type="button" disabled={view.busy} onClick={onRemove}>
           Remove
         </button>
         <button className="btn quiet" type="button" disabled={view.busy} onClick={onCancel}>
@@ -48,17 +43,22 @@ export function RemoveConfirmView({ view, onRemove, onCancel, onKey, panelRef }:
   )
 }
 
-/** The confirm under the run header. Focus moves into it when it opens and back to the ⋯ trigger when it closes. */
-export function RemoveConfirm(props: Omit<ViewProps, 'panelRef'>) {
+/**
+ * The confirm, under the run header or under a sidebar card. Focus moves into it when it opens and back
+ * to the ⋯ button it came from (`returnTo`) when it closes; when that button left with its card, to the
+ * header's ⋯.
+ */
+export function RemoveConfirm({ returnTo, ...props }: Omit<ViewProps, 'panelRef'> & { returnTo: string }) {
   const ref = useRef<HTMLElement>(null)
   useEffect(() => {
     const panel = ref.current
     panel?.focus()
-    // After a removal the menu remounts for the next run, so find the trigger once the page has settled.
+    // After a removal the page settles first (the menu remounts, the card leaves), so look the button up then.
     // A panel still on the page wasn't closed (StrictMode runs this cleanup once on mount): keep focus.
     return () => {
       setTimeout(() => {
-        if (!panel?.isConnected) document.getElementById(MENU_TRIGGER_ID)?.focus()
+        if (panel?.isConnected) return
+        ;(document.getElementById(returnTo) ?? document.getElementById(MENU_TRIGGER_ID))?.focus()
       }, 0)
     }
   }, [])

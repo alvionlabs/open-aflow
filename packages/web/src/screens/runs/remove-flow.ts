@@ -7,8 +7,21 @@ import type { BoardRepo, RemoveRepoResult, RunSummary } from '@pod-board/model'
 import { postAction, type ActionReply } from '../../actions-client.ts'
 import { hashFor } from '../../selection.ts'
 
-/** The repo to remove. `alsoClaimed`: a port claim lists it too, so it stays on the board. */
-export type RemoveTarget = { repoId: string; name: string; path: string; alsoClaimed: boolean }
+/**
+ * The repo to remove. `alsoClaimed`: a port claim lists it too, so it stays on the board. `runs`: how many
+ * sidebar runs are its own. `place`: where the confirm opens, `header` or the sidebar card's hash. `returnTo`:
+ * the id of the ⋯ button that gets focus back when the confirm closes.
+ */
+export type RemoveTarget = { repoId: string; name: string; path: string; alsoClaimed: boolean; runs: number; place: string; returnTo: string }
+
+/** The confirm's place under the run header. */
+export const HEADER_PLACE = 'header'
+
+/** The ⋯ menus' item. The confirm names the repo. */
+export const REMOVE_ITEM = 'Remove repo'
+
+/** A sidebar card's ⋯ button id. */
+export const moreButtonId = (run: Pick<RunSummary, 'repoId' | 'plan' | 'fix'>) => `run-more-${hashFor(run)}`
 export type Post = <T>(path: string, body: object) => Promise<ActionReply<T>>
 
 export type RemoveState =
@@ -77,8 +90,6 @@ export function createRemoveFlow(
   }
 }
 
-/** The ⋯ menu item's label. */
-export const removeLabel = (name: string) => `Remove ${name} from the board`
 
 /**
  * The Board repo a run belongs to. Two paths that differ only in non-alphanumeric characters
@@ -94,15 +105,22 @@ export function repoOfRun(repos: BoardRepo[], run: RunSummary | undefined): Boar
  * What Remove acts on, or undefined for a repo only a port claim lists (the board would list it again
  * from the claim) and for a repo whose id another Board repo shares (the rest of the page can't tell them apart).
  */
-export function removeTarget(repo: BoardRepo | undefined, repos: BoardRepo[] = repo ? [repo] : []): RemoveTarget | undefined {
+export function removeTarget(
+  repo: BoardRepo | undefined,
+  ctx: { repos: BoardRepo[]; runs: RunSummary[]; place: string; returnTo: string },
+): RemoveTarget | undefined {
   if (!repo || repo.source === 'claim') return undefined
-  if (repos.filter((r) => r.id === repo.id).length > 1) return undefined
-  return { repoId: repo.id, name: repo.name, path: repo.path, alsoClaimed: repo.source === 'both' }
+  if (ctx.repos.filter((r) => r.id === repo.id).length > 1) return undefined
+  const runs = ctx.runs.filter((r) => isRunOf(r, repo.id, repo.name)).length
+  return { repoId: repo.id, name: repo.name, path: repo.path, alsoClaimed: repo.source === 'both', runs, place: ctx.place, returnTo: ctx.returnTo }
 }
 
-export type RemoveView = { heading: string; body: string; path: string; claimNote?: string; busy: boolean; status?: string; error?: string }
+/** Whether a run is this repo's: its id and, since two repos can share an id, its name. */
+const isRunOf = (run: RunSummary, repoId: string, name: string) => run.repoId === repoId && run.repo === name
 
-const BODY = "This changes only the board's list. The repo's files, pod docs, and runs are not touched. You can add it again with Add repo."
+export type RemoveView = { heading: string; body: string; path: string; runsLine?: string; claimNote?: string; busy: boolean; status?: string; error?: string }
+
+const BODY = "Only the board's list changes; its files aren't touched."
 const CLAIM_NOTE = 'A running pod run also lists this repo through its port claim, so it stays in the sidebar until that run ends.'
 
 const ERRORS: Record<string, string> = {
@@ -116,8 +134,11 @@ const ERRORS: Record<string, string> = {
 /** The panel's words and state; undefined while closed. */
 export function confirmView(s: RemoveState): RemoveView | undefined {
   if (s.kind === 'idle') return undefined
-  const v: RemoveView = { heading: `${removeLabel(s.target.name)}?`, body: BODY, path: s.target.path, busy: s.kind === 'removing' }
+  const v: RemoveView = { heading: `Remove ${s.target.name}?`, body: BODY, path: s.target.path, busy: s.kind === 'removing' }
+  const n = s.target.runs
+  // A claim keeps the repo, and its runs, on the board.
   if (s.target.alsoClaimed) v.claimNote = CLAIM_NOTE
+  else v.runsLine = n === 1 ? 'Its 1 run leaves the sidebar.' : `Its ${n} runs leave the sidebar.`
   if (s.kind === 'removing') v.status = 'Removing…'
   if (s.kind === 'error') v.error = ERRORS[s.message] ?? s.message
   return v
@@ -126,18 +147,15 @@ export function confirmView(s: RemoveState): RemoveView | undefined {
 /**
  * Where the page goes after a removal: the next run of another repo after the selected one, else the
  * nearest one before it; `''` when no run is left (the empty state); undefined to stay, when a claim
- * keeps the repo on the board.
+ * keeps the repo on the board or the open run is another repo's (a remove from the sidebar).
  */
 export function hashAfterRemove(runs: RunSummary[], selected: RunSummary | undefined, target: RemoveTarget): string | undefined {
   if (target.alsoClaimed) return undefined
+  if (selected && !isRunOf(selected, target.repoId, target.name)) return undefined
   const at = selected ? runs.indexOf(selected) : -1
   // A run whose repo shares the id but not the name is a sibling repo's, and stays.
-  const others = (list: RunSummary[]) => list.filter((r) => r.repoId !== target.repoId || r.repo !== target.name)
+  const others = (list: RunSummary[]) => list.filter((r) => !isRunOf(r, target.repoId, target.name))
   const next = others(runs.slice(at + 1))[0] ?? others(runs.slice(0, Math.max(at, 0))).at(-1)
   return next ? hashFor(next) : ''
 }
 
-
-export const HEADER_PLACE = 'header'
-export const REMOVE_ITEM = ''
-export const moreButtonId = (_run: RunSummary) => ''

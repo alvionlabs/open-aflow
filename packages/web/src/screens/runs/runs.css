@@ -256,6 +256,81 @@
   flex: none;
 }
 
+/*
+ * A card's ⋯ button: beside the card's link (never inside it), in the card's bottom-right corner, under the
+ * status. It shows on hover, while the card holds keyboard focus, and while its menu is open; on a touch
+ * screen always, with a 44 px target around its 24 px box.
+ */
+.run-item {
+  position: relative;
+  min-width: 0;
+}
+
+.run-more-wrap {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+}
+
+.run-more {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+}
+
+.run-more svg {
+  width: 16px;
+  height: 16px;
+}
+
+.run-item:hover .run-more,
+.run-item:focus-within .run-more,
+.run-more[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.run-more:hover,
+.run-more[aria-expanded="true"] {
+  background: var(--hover);
+  border-color: var(--border-strong);
+  color: var(--fg);
+}
+
+/* The sidebar's confirm sits right under its card. */
+.run-item > .remove-confirm {
+  margin: 8px 0 0;
+}
+
+/* base.css makes every icon button 44 px on a phone; this one keeps its 24 px box, and touch gets the target below. */
+@media (max-width: 480px) {
+  .btn.icon.run-more {
+    min-width: 24px;
+    min-height: 24px;
+  }
+}
+
+@media (hover: none) {
+  .run-more {
+    opacity: 1;
+  }
+
+  /* The touch target reaches 44 px around the 24 px button without moving the card's layout. */
+  .run-more::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+}
+
 /* Main column */
 
 .main {

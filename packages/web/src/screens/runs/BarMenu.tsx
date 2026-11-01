@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import type { RefObject } from 'react'
 import { Icon } from '../../theme/icons.tsx'
 import type { ChoiceStorage } from '../../theme/theme.ts'
 import { AutoContinueSwitch } from './AutoContinueSwitch.tsx'
-import { reduceMenu, runKey, type MenuEvent } from './menu-view.ts'
+import { RemoveRepoItem, useMenu } from './menu-parts.tsx'
+import { runKey } from './menu-view.ts'
 import type { RunTarget } from './resume-flow.ts'
 import { ThemeControl } from './ThemeControl.tsx'
 import './menu.css'
 
 type AutoContinue = { target: RunTarget; on: boolean }
 /** The menu's last item: removes the selected run's repo from the board, after a confirm. */
-type Remove = { label: string; onPick: () => void }
+type Remove = { onPick: () => void }
 
 /** The ⋯ trigger's id: the remove confirm sends focus back to it when it closes. */
 export const MENU_TRIGGER_ID = 'run-menu-trigger'
@@ -59,9 +60,7 @@ export function BarMenuView({ open, onToggle, onThemePick, onSwitchPress, autoCo
           {remove && (
             <>
               <hr />
-              <button type="button" className="mi mi-action" onClick={remove.onPick}>
-                {remove.label}
-              </button>
+              <RemoveRepoItem onPick={remove.onPick} />
             </>
           )}
         </div>
@@ -70,42 +69,9 @@ export function BarMenuView({ open, onToggle, onThemePick, onSwitchPress, autoCo
   )
 }
 
-/** The bar's ⋯ menu: the run's auto-continue switch, the theme, the run's port base, and Remove from the board. */
+/** The bar's ⋯ menu: the run's auto-continue switch, the theme, the run's port base, and Remove repo. */
 export function BarMenu({ autoContinue, portBase, remove }: { autoContinue?: AutoContinue; portBase?: number; remove?: Remove }) {
-  const [open, setOpen] = useState(false)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const send = (event: MenuEvent) => {
-    const next = reduceMenu(open, event)
-    setOpen(next.open)
-    if (next.focusTrigger) triggerRef.current?.focus()
-  }
-
-  const key = runKey(autoContinue)
-  const lastKey = useRef(key)
-  useEffect(() => {
-    if (lastKey.current === key) return
-    lastKey.current = key
-    send('run-change')
-  }, [key])
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') send('escape')
-    }
-    const onPress = (e: PointerEvent) => {
-      const t = e.target as Node
-      if (!menuRef.current?.contains(t) && !triggerRef.current?.contains(t)) send('outside')
-    }
-    document.addEventListener('keydown', onKey)
-    document.addEventListener('pointerdown', onPress)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.removeEventListener('pointerdown', onPress)
-    }
-  }, [open])
-
+  const { open, send, triggerRef, menuRef } = useMenu(runKey(autoContinue))
   return (
     <BarMenuView
       open={open}
@@ -114,7 +80,7 @@ export function BarMenu({ autoContinue, portBase, remove }: { autoContinue?: Aut
       onSwitchPress={() => send('press-switch')}
       autoContinue={autoContinue}
       portBase={portBase}
-      {...(remove ? { remove: { label: remove.label, onPick: () => (send('pick-remove'), remove.onPick()) } } : {})}
+      {...(remove ? { remove: { onPick: () => (send('pick-remove'), remove.onPick()) } } : {})}
       triggerRef={triggerRef}
       menuRef={menuRef}
     />
