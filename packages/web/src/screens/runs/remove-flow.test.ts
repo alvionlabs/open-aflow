@@ -166,7 +166,8 @@ describe('removeTarget', () => {
 })
 
 describe('hashAfterRemove', () => {
-  const run = (repoId: string, plan?: string): RunSummary => ({ repoId, repo: repoId, ...(plan ? { plan } : {}), where: '', state: 'idle' }) as RunSummary
+  // A run carries its repo's name, as listRuns gives it: `ra` is A (alpha-repo).
+  const run = (repoId: string, plan?: string): RunSummary => ({ repoId, repo: repoId === 'ra' ? A.name : repoId, ...(plan ? { plan } : {}), where: '', state: 'idle' }) as RunSummary
   const runs = [run('rb', 'one'), run('ra', 'x'), run('rc', 'two'), run('ra', 'y'), run('rd')]
 
   it('moves to the next run of another repo after the selected one', () => {

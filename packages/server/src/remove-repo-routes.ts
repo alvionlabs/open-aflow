@@ -1,6 +1,6 @@
 // The remove-repo route, mounted at /api/actions behind the action guard (app.ts), beside the merge,
 // answer, and resume routes. It takes a repo out of the board's config.json, and nothing else: never
-// the repo's files, claims, or transcripts. The repo comes from the current Board by id. The rules
+// the repo's files, claims, or transcripts. The repo comes from the current Board by id and path. The rules
 // and why are in pod-docs/feature-details/server.md.
 
 import type { Board, NewActionEntry, RemoveRepoResult } from '@pod-board/model'
@@ -23,9 +23,12 @@ export function createRemoveRepoRoutes(deps: RemoveRepoRouteDeps): Hono {
   const app = new Hono()
 
   app.post('/remove-repo', async (c) => {
-    const { repoId } = (await c.req.json()) as Record<string, unknown>
-    if (typeof repoId !== 'string') return c.json({ error: 'bad request' }, 400)
-    const repo = deps.board().repos.find((r) => r.id === repoId)
+    const { repoId, path } = (await c.req.json()) as Record<string, unknown>
+    if (typeof repoId !== 'string' || (path !== undefined && typeof path !== 'string')) return c.json({ error: 'bad request' }, 400)
+    // Two paths that differ only in non-alphanumeric characters share an id, so the path picks the exact repo.
+    const withId = deps.board().repos.filter((r) => r.id === repoId)
+    if (path === undefined && withId.length > 1) return c.json({ error: 'ambiguous repo' }, 409)
+    const repo = path === undefined ? withId[0] : withId.find((r) => r.path === path)
     if (!repo) return c.json({ error: 'not on the board' }, 404)
     // A claim-only repo isn't in the config; the board would list it again from the claim.
     if (repo.source === 'claim') return c.json({ error: 'not registered' }, 404)

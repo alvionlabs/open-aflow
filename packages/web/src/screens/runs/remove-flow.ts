@@ -65,7 +65,7 @@ export function createRemoveFlow(
     if (prev.kind === 'removing' && state.kind === 'idle') onRemoved(prev.target)
     const s = state
     if (s.kind === 'removing') {
-      void post<RemoveRepoResult>('remove-repo', { repoId: s.target.repoId }).then((reply) => dispatch({ type: 'removed', seq: s.seq, reply }))
+      void post<RemoveRepoResult>('remove-repo', { repoId: s.target.repoId, path: s.target.path }).then((reply) => dispatch({ type: 'removed', seq: s.seq, reply }))
     }
   }
   return {
@@ -80,9 +80,23 @@ export function createRemoveFlow(
 /** The ⋯ menu item's label. */
 export const removeLabel = (name: string) => `Remove ${name} from the board`
 
-/** What Remove acts on, or undefined for a repo only a port claim lists: the board would list it again from the claim. */
-export function removeTarget(repo: BoardRepo | undefined): RemoveTarget | undefined {
+/**
+ * The Board repo a run belongs to. Two paths that differ only in non-alphanumeric characters
+ * (`chess-web`, `chess_web`) share an id, so a run's repo name picks between them.
+ */
+export function repoOfRun(repos: BoardRepo[], run: RunSummary | undefined): BoardRepo | undefined {
+  if (!run) return undefined
+  const withId = repos.filter((r) => r.id === run.repoId)
+  return withId.length > 1 ? (withId.find((r) => r.name === run.repo) ?? withId[0]) : withId[0]
+}
+
+/**
+ * What Remove acts on, or undefined for a repo only a port claim lists (the board would list it again
+ * from the claim) and for a repo whose id another Board repo shares (the rest of the page can't tell them apart).
+ */
+export function removeTarget(repo: BoardRepo | undefined, repos: BoardRepo[] = repo ? [repo] : []): RemoveTarget | undefined {
   if (!repo || repo.source === 'claim') return undefined
+  if (repos.filter((r) => r.id === repo.id).length > 1) return undefined
   return { repoId: repo.id, name: repo.name, path: repo.path, alsoClaimed: repo.source === 'both' }
 }
 
@@ -96,6 +110,7 @@ const ERRORS: Record<string, string> = {
   'not on the board': "This repo is no longer in the board's list.",
   'config unreadable': "The board's config file can't be read, so nothing changed. Fix or delete config.json, then try again.",
   'config unwritable': "The board couldn't save its config file, so nothing changed.",
+  'ambiguous repo': "Another repo on the board has the same id, so the board can't tell which one to remove. Nothing changed.",
 }
 
 /** The panel's words and state; undefined while closed. */
@@ -116,9 +131,9 @@ export function confirmView(s: RemoveState): RemoveView | undefined {
 export function hashAfterRemove(runs: RunSummary[], selected: RunSummary | undefined, target: RemoveTarget): string | undefined {
   if (target.alsoClaimed) return undefined
   const at = selected ? runs.indexOf(selected) : -1
-  const others = (list: RunSummary[]) => list.filter((r) => r.repoId !== target.repoId)
+  // A run whose repo shares the id but not the name is a sibling repo's, and stays.
+  const others = (list: RunSummary[]) => list.filter((r) => r.repoId !== target.repoId || r.repo !== target.name)
   const next = others(runs.slice(at + 1))[0] ?? others(runs.slice(0, Math.max(at, 0))).at(-1)
   return next ? hashFor(next) : ''
 }
 
-export const repoOfRun = (_repos: BoardRepo[], _run: RunSummary | undefined): BoardRepo | undefined => undefined

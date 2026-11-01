@@ -14,7 +14,7 @@ import { nextSteps } from './next-step.ts'
 import { runHeader } from './plan-view.ts'
 import { switchView } from './resume-flow.ts'
 import { RemoveConfirm } from './RemoveConfirm.tsx'
-import { INITIAL as REMOVE_IDLE, confirmView as removeView, createRemoveFlow, hashAfterRemove, removeLabel, removeTarget, type RemoveState } from './remove-flow.ts'
+import { INITIAL as REMOVE_IDLE, confirmView as removeView, createRemoveFlow, hashAfterRemove, removeLabel, removeTarget, repoOfRun, type RemoveState } from './remove-flow.ts'
 import { RunHeader } from './RunHeader.tsx'
 import { RunsList } from './RunsList.tsx'
 import { SideHandle } from './SideHandle.tsx'
@@ -57,7 +57,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   const [sideWidth, setSideWidth] = useState(() => readWidth(store.current))
   const repoButton = useRef<HTMLButtonElement>(null)
 
-  const repo = selected && board?.repos.find((r) => r.id === selected.repoId)
+  const repo = repoOfRun(board?.repos ?? [], selected)
   const isFix = selected?.fix !== undefined
   const fixPipeline = repo && isFix && selected?.plan !== undefined ? buildFixPipeline(repo, selected.plan, now) : undefined
   const pipeline = repo && !isFix && selected?.plan !== undefined ? buildPipeline(repo, selected.plan, now) : undefined
@@ -85,10 +85,10 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
     [],
   )
   useEffect(() => removeFlow.cancel(), [runKey, removeFlow])
-  const toRemove = removeTarget(repo)
+  const toRemove = removeTarget(repo, board?.repos ?? [])
   const removing = removeView(removeState)
   const removePanel =
-    removing && removeState.kind !== 'idle' && removeState.target.repoId === repo?.id ? (
+    removing && removeState.kind !== 'idle' && removeState.target.path === repo?.path ? (
       <RemoveConfirm view={removing} onRemove={() => removeFlow.remove()} onCancel={() => removeFlow.cancel()} onKey={(k) => removeFlow.key(k)} />
     ) : null
 
