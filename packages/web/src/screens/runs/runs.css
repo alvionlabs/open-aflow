@@ -1462,7 +1462,7 @@
 
 /* Remove from the board: in place under the run header, like the merge confirm. Its text stays near 72ch. */
 .remove-confirm {
-  margin-top: 16px;
+  margin: 16px 0 32px;
   max-width: 640px;
 }
 

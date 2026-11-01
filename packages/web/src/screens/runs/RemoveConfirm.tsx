@@ -52,10 +52,14 @@ export function RemoveConfirmView({ view, onRemove, onCancel, onKey, panelRef }:
 export function RemoveConfirm(props: Omit<ViewProps, 'panelRef'>) {
   const ref = useRef<HTMLElement>(null)
   useEffect(() => {
-    ref.current?.focus()
+    const panel = ref.current
+    panel?.focus()
     // After a removal the menu remounts for the next run, so find the trigger once the page has settled.
+    // A panel still on the page wasn't closed (StrictMode runs this cleanup once on mount): keep focus.
     return () => {
-      setTimeout(() => document.getElementById(MENU_TRIGGER_ID)?.focus(), 0)
+      setTimeout(() => {
+        if (!panel?.isConnected) document.getElementById(MENU_TRIGGER_ID)?.focus()
+      }, 0)
     }
   }, [])
   // Buttons go disabled while removing; keep focus in the panel so Escape still reaches it.
