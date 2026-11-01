@@ -471,6 +471,27 @@ describe('board service', () => {
     ])
   })
 
+  test('a pending gate 7 naming the staging PR keeps it found by branch: the staging Merge stays', async () => {
+    // As above, plus the gate 7 entry, which makes the server ask gh about #95 by number too.
+    const repo = copyFixture('chess-web', 'chess-web-ui-polish')
+    const gate7 =
+      '- `[2026-10-28 · PENDING · orchestrator → human · plan: ui-polish]` gate 7 (plan-complete): plan ui-polish merged to `ui-polish-staging` (final PR https://github.com/o/r/pull/91); review it and merge the staging PR https://github.com/o/r/pull/95 to `main` when ready. **Resolution:** pending'
+    await writeFile(join(repo, 'pod-docs', 'handoff-queue.md'), `# Handoff Queue\n\n${gate7}\n`)
+    await claim(3200, repo, 'ui-polish')
+    const final: PrStatus = { number: 91, state: 'merged', checks: 'pass', checkedAt: NOW, branch: 'ui-polish', base: 'ui-polish-staging' }
+    const staging: PrStatus = { number: 95, state: 'open', checks: 'pass', checkedAt: NOW, branch: 'ui-polish-staging', base: 'main' }
+    const gh = fakeGh({ 95: 'open' }, 'ok', { 'ui-polish': final, 'ui-polish-staging': staging })
+    const board = await createBoardService(deps(gh)).build()
+    expect(gh.asked).toContain(95)
+    const r = board.repos[0]!
+    // #95 once, the copy found by branch (it carries the branch the staging rule looks for).
+    expect(r.prs.filter((p) => p.number === 95)).toEqual([staging])
+    const plan = r.model.plans.find((p) => p.slug === 'ui-polish')!
+    expect(model.stagingPr(r, plan)).toBe(95)
+    const ship = model.buildFlow(r, 'ui-polish', NOW)?.find((s) => s.key === 'ship')?.steps
+    expect(ship?.map((s) => [s.label, s.state, s.detail])).toContainEqual(['Staging → main', 'you', 'PR #95 · you merge'])
+  })
+
   test('a PR found by branch that is also a numbered live PR is on the Board once', async () => {
     const repo = copyFixture()
     // A hand-back linking #77 makes #77 a live PR by number too.

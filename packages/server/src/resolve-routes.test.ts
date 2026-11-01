@@ -35,10 +35,12 @@ const plan = (slug: string, status: string) =>
     '',
   ].join('\n')
 
-const GATE = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 1 (blocked-concern): A1 cannot pass verify. **Resolution:** pending'
+const GATE = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 4 (wave-check-failed): A1 cannot pass verify. **Resolution:** pending'
 const GATE_LIVE = '- `[2026-10-21 · BLOCKED · orchestrator → human · plan: live]` gate 1 (blocked-concern): B1 is stuck. **Resolution:** pending'
 const VALUE = '- `[2026-10-21 · PENDING · engineer → human · plan: live]` decision: badge colour? value in use: `white`. Answer to change. **Resolution:** pending'
-const BOTH = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 4 (wave-check-failed): wave 2. Value in use: skip it. **Resolution:** pending'
+const BOTH = '- `[2026-10-20 · PENDING · orchestrator → human · plan: old]` gate 4 (wave-check-failed): wave 2. Value in use: skip it. **Resolution:** pending'
+// Written after the archive: no Close.
+const GATE6_FINAL = '- `[2026-10-20 · PENDING · orchestrator → human · plan: old]` gate 6 (escalation-valve): plan PR https://github.com/x/r/pull/30 withheld, wave 2 carried a one-way slice. **Resolution:** pending'
 const PLAIN = '- `[2026-10-21 · PENDING · engineer → human · plan: live]` someday: tidy the logs. **Resolution:** pending'
 const TO_POD = '- `[2026-10-20 · BLOCKED · engineer → orchestrator · plan: old]` gate 1 (blocked-concern): for pod. **Resolution:** pending'
 
@@ -52,7 +54,7 @@ beforeEach(async () => {
   await writeFile(join(repoPath, 'pod-docs', 'README.md'), '# pod docs\n\npod docs: 2\n')
   await writeFile(join(repoPath, 'pod-docs', 'plans', 'archive', 'old.md'), plan('old', 'archived'))
   await writeFile(join(repoPath, 'pod-docs', 'plans', 'live.md'), plan('live', 'active'))
-  await writeFile(join(repoPath, 'pod-docs', 'handoff-queue.md'), ['# Handoff Queue', '', GATE, GATE_LIVE, VALUE, BOTH, PLAIN, TO_POD, ''].join('\n'))
+  await writeFile(join(repoPath, 'pod-docs', 'handoff-queue.md'), ['# Handoff Queue', '', GATE, GATE_LIVE, VALUE, BOTH, PLAIN, TO_POD, GATE6_FINAL, ''].join('\n'))
   await mkdir(join(root, 'cfg'), { recursive: true })
   await writeFile(join(root, 'cfg', 'config.json'), JSON.stringify({ version: 1, repos: [{ path: repoPath }] }))
   await mkdir(join(root, 'ports'))
@@ -150,6 +152,8 @@ describe('resolve route', () => {
     const refused: [unknown, number, string][] = [
       // A gate of a plan that isn't archived.
       [{ repoId: s.repoId, line: GATE_LIVE, kind: 'close' }, 409, 'The board no longer reads this entry as done.'],
+      // A gate 6 holding back the final PR, written after the plan archive.
+      [{ repoId: s.repoId, line: GATE6_FINAL, kind: 'close' }, 409, 'The board no longer reads this entry as done.'],
       // Neither rule.
       [{ repoId: s.repoId, line: PLAIN, kind: 'close' }, 409, 'The board no longer reads this entry as done.'],
       [{ repoId: s.repoId, line: PLAIN, kind: 'keep' }, 409, 'This entry states no value in use.'],

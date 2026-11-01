@@ -140,7 +140,7 @@ describe('waiting on you', () => {
 
 describe('Done and Value in use on the rows', () => {
   const archived = (slug: string) => plan(slug, 'one').replace('Status: active', 'Status: archived')
-  const GATE = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 1 (blocked-concern): A1 stuck. Value in use: skip A1. **Resolution:** pending'
+  const GATE = '- `[2026-10-20 · PENDING · orchestrator → human · plan: old]` gate 4 (wave-check-failed): A1 stuck. Value in use: skip A1. **Resolution:** pending'
   const DECISION = '- `[2026-10-21 · PENDING · engineer → human · plan: old]` decision: the badge colour. value in use: `white`. Answer to change. **Resolution:** pending'
   const PLAIN = '- `[2026-10-21 · PENDING · engineer → human · plan: old]` someday: tidy the logs. **Resolution:** pending'
   const TO_POD = '- `[2026-10-21 · BLOCKED · engineer → orchestrator · plan: old]` gate 1 (blocked-concern): for pod. **Resolution:** pending'
@@ -169,7 +169,8 @@ describe('Done and Value in use on the rows', () => {
 
   it('the Next step card carries the same row', () => {
     const steps = nextSteps(run({ plan: 'old' }), oldRepo(), Date.UTC(2026, 9, 31))
-    expect(steps?.card.entry).toMatchObject({ done: 'plan old is archived' })
-    expect(steps?.rest.find((i) => i.entry?.keep !== undefined)?.entry?.keep).toBe('white')
+    const items = steps ? [steps.card, ...steps.rest] : []
+    expect(items.find((i) => i.entry?.done !== undefined)?.entry?.done).toBe('plan old is archived')
+    expect(items.find((i) => i.entry?.keep !== undefined)?.entry?.keep).toBe('white')
   })
 })

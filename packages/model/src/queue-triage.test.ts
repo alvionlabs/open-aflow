@@ -20,8 +20,20 @@ const plan = (slug: string, status: string, sprints: [string, string][]) =>
     '',
   ].join('\n')
 
-const sprintDoc = (slug: string, from: string) =>
-  [`# Sprint: ${slug}`, '', `_From plan: pod-docs/plans/${from}.md · Slug: ${slug} · Status: active_`, ''].join('\n')
+const sprintDoc = (slug: string, from: string, rows: string[] = []) =>
+  [
+    `# Sprint: ${slug}`,
+    '',
+    `_From plan: pod-docs/plans/${from}.md · Slug: ${slug} · Status: active_`,
+    '',
+    '| Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |',
+    '|------|-------|-------|--------|----|--------|------------|------------|',
+    ...rows,
+    '',
+  ].join('\n')
+
+// Plan old's archived sprint: wave 1 merged as #11, wave 2 as #12. The final PR is #20; #30 is a plan PR, no slice's.
+const OLD_SLICES = ['| 1 | A1 | a | one-A1 | #11 | merged | high | — |', '| 2 | A2 | b | one-A2 | #12 | merged | high | A1 |']
 
 // `old` is archived; `live` is active with sprint `first` archived (done) and `second` active.
 const GATE_OLD = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 1 (blocked-concern): A1 cannot pass verify. **Resolution:** pending'
@@ -35,10 +47,16 @@ const GATE7_OLD =
   '- `[2026-10-20 · PENDING · orchestrator → human · plan: old]` gate 7 (plan-complete): plan old merged to `pod-staging` (final PR https://github.com/x/r/pull/20); review it and merge the staging PR https://github.com/x/r/pull/21 to `main` when ready. **Resolution:** pending'
 const GATE_LIVE = '- `[2026-10-21 · BLOCKED · orchestrator → human · plan: live · sprint: second]` gate 1 (blocked-concern): B1 is stuck. **Resolution:** pending'
 const GATE_LIVE_DONE_SPRINT = '- `[2026-10-21 · BLOCKED · orchestrator → human · plan: live · sprint: first]` gate 4 (wave-check-failed): wave 1 failed. **Resolution:** pending'
+// Halts written after the plan archive (pod's Plan complete step 5), or between sprints, that the human must still act on.
+const GATE6_FINAL_OLD = '- `[2026-10-20 · PENDING · orchestrator → human · plan: old]` gate 6 (escalation-valve): plan PR https://github.com/x/r/pull/30 withheld, wave 2 carried a one-way slice. **Resolution:** pending'
+const GATE3_FINAL_WAVE_OLD = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 3 (auto-merge-fail): plan PR #20 has no passing CI since wave 2. **Resolution:** pending'
+const GATE1_REPORTER_OLD = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 1 (blocked-concern): the reporter could not write the report of wave 2. **Resolution:** pending'
+const GATE1_BETWEEN_SPRINTS = '- `[2026-10-21 · BLOCKED · orchestrator → human · plan: live · sprint: first]` gate 1 (blocked-concern): the next sprint draft is blocked. **Resolution:** pending'
+const GATE6_WAVE_OLD = '- `[2026-10-20 · PENDING · orchestrator → human · plan: old]` gate 6 (escalation-valve): wave 2 PR https://github.com/x/r/pull/12 held for you to merge. **Resolution:** pending'
 const GATE5_LIVE_DONE_SPRINT = '- `[2026-10-21 · BLOCKED · orchestrator → human · plan: live · sprint: first]` gate 5 (safety-bounded): cap hit. **Resolution:** pending'
 const DECISION =
   '- `[2026-10-21 · PENDING · engineer → human · plan: live]` decision: which colour for the badge? Value in use: white. Answer to change it. **Resolution:** pending'
-const DONE_WITH_VALUE = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 1 (blocked-concern): A1 stuck. Value in use: skip A1. **Resolution:** pending'
+const DONE_WITH_VALUE = '- `[2026-10-20 · PENDING · orchestrator → human · plan: old]` gate 4 (wave-check-failed): wave 1 smoke. Value in use: skip A1. **Resolution:** pending'
 const PLAIN = '- `[2026-10-21 · PENDING · engineer → human · plan: live]` someday: tidy the logs. **Resolution:** pending'
 const ANSWERED_GATE = '- `[2026-10-20 · BLOCKED · orchestrator → human · plan: old]` gate 1 (blocked-concern): A1. **Resolution:** pending **Answer (human):** rerun'
 const TO_POD = '- `[2026-10-20 · BLOCKED · engineer → orchestrator · plan: old]` gate 1 (blocked-concern): for pod. **Resolution:** pending'
@@ -57,6 +75,11 @@ const ALL = [
   GATE_LIVE,
   GATE_LIVE_DONE_SPRINT,
   GATE5_LIVE_DONE_SPRINT,
+  GATE6_FINAL_OLD,
+  GATE3_FINAL_WAVE_OLD,
+  GATE1_REPORTER_OLD,
+  GATE1_BETWEEN_SPRINTS,
+  GATE6_WAVE_OLD,
   DECISION,
   DONE_WITH_VALUE,
   PLAIN,
@@ -74,6 +97,7 @@ function repo(prs: PrStatus[] = []): BoardRepo {
       ['first', 'done'],
       ['second', 'active'],
     ]),
+    'pod-docs/sprints/archive/one.md': sprintDoc('one', 'old', OLD_SLICES),
     'pod-docs/sprints/archive/first.md': sprintDoc('first', 'live'),
     'pod-docs/sprints/second.md': sprintDoc('second', 'live'),
     'pod-docs/handoff-queue.md': ['# Handoff Queue', '', ...ALL, ''].join('\n'),
@@ -85,30 +109,32 @@ const pr = (number: number, state: PrStatus['state']): PrStatus => ({ number, st
 const entry = (r: BoardRepo, line: string): QueueItem => r.model.queue.find((e) => e.line === line.trim())!
 
 describe('done entries', () => {
-  it('a wave-time gate halt of an archived plan is done', () => {
+  it('a gate 4 or gate 5 of an archived plan is done: pod writes neither at close-out', () => {
     const r = repo()
-    for (const line of [GATE_OLD, GATE4_OLD, GATE5_OLD, GATE3_WAVE_OLD]) expect(doneReason(r, entry(r, line)), line).toBe('plan old is archived')
+    for (const line of [GATE4_OLD, GATE5_OLD]) expect(doneReason(r, entry(r, line)), line).toBe('plan old is archived')
   })
 
-  it('a gate written at or after the plan archive is not done by the archive alone', () => {
-    // pod archives a plan before its final review, merge and hand-back, so these come after the archive.
-    const r = repo()
-    for (const line of [GATE3_FINAL_OLD, GATE2_OLD, HANDBACK_OLD, GATE7_OLD]) expect(doneReason(r, entry(r, line)), line).toBeUndefined()
-    // The final PR merged changes nothing for the hand-back: pod still waits for continue to clean up.
-    const merged = repo([pr(20, 'merged')])
-    expect(doneReason(merged, entry(merged, HANDBACK_OLD))).toBeUndefined()
+  it('a gate 1, 3 or 6 is not done by the archive: pod can write each after it', () => {
+    // Every PR merged: still nothing for a halt that names no wave PR, or names the plan's (final) PR.
+    const r = repo([pr(11, 'merged'), pr(12, 'merged'), pr(20, 'merged'), pr(30, 'merged')])
+    for (const line of [GATE_OLD, GATE6_FINAL_OLD, GATE3_FINAL_WAVE_OLD, GATE1_REPORTER_OLD, GATE3_FINAL_OLD, GATE2_OLD, HANDBACK_OLD]) {
+      expect(doneReason(r, entry(r, line)), line).toBeUndefined()
+    }
   })
 
-  it('a gate halt of a plan that is not archived is not done', () => {
-    const r = repo()
-    expect(doneReason(r, entry(r, GATE_LIVE))).toBeUndefined()
+  it('a gate 3 or 6 naming a wave PR is done once gh says that PR merged', () => {
+    for (const line of [GATE3_WAVE_OLD, GATE6_WAVE_OLD]) {
+      expect(doneReason(repo(), entry(repo(), line)), line).toBeUndefined()
+      const open = repo([pr(12, 'open')])
+      expect(doneReason(open, entry(open, line)), line).toBeUndefined()
+      const merged = repo([pr(12, 'merged')])
+      expect(doneReason(merged, entry(merged, line)), line).toBe('wave PR #12 merged')
+    }
   })
 
-  it('a wave-time gate halt of an archived sprint is done', () => {
+  it('a gate halt of a plan that is not archived, or of an archived sprint, is not done by that alone', () => {
     const r = repo()
-    expect(doneReason(r, entry(r, GATE_LIVE_DONE_SPRINT))).toBe('sprint first is archived')
-    // Gate 5 is checked after a sprint is archived, so it can be live on an archived sprint.
-    expect(doneReason(r, entry(r, GATE5_LIVE_DONE_SPRINT))).toBeUndefined()
+    for (const line of [GATE_LIVE, GATE1_BETWEEN_SPRINTS, GATE_LIVE_DONE_SPRINT, GATE5_LIVE_DONE_SPRINT]) expect(doneReason(r, entry(r, line)), line).toBeUndefined()
   })
 
   it('a gate 7 entry is done once gh says its staging PR merged', () => {
