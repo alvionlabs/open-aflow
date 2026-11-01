@@ -50,14 +50,15 @@ export function stagingPrOf(entry: Pick<QueueItem, 'body'>): number | undefined 
 const NAMED_PR = /\/pull\/(\d+)|#(\d+)\b/g
 
 /**
- * The wave PRs a gate 1, 3 or 6 halt names: every PR it names (a pull URL or `#N`), when each is a slice's PR
+ * The wave PRs a gate 3 or 6 halt names: every PR it names (a pull URL or `#N`), when each is a slice's PR
  * in one of the plan's sprint docs and none is the plan's final PR (its hand-back's). Empty for any other entry,
- * or when it names no PR or any other PR. pod can write these gates after the plan archive (the final PR held
- * back or failing, the reporter), so only a merged wave PR settles one.
+ * or when it names no PR or any other PR. A gate 3 or 6 is about its PR (it failed to merge, or is held for you),
+ * so that PR merging settles it. Never a gate 1: its cause is a blocker, not a PR, and a PR it names can merge
+ * while the blocker stays.
  */
 export function wavePrsOf(plan: Pick<PlanModel, 'sprints' | 'queue'>, entry: Pick<QueueItem, 'body'>): number[] {
   const gate = haltGate(entry.body)
-  if (gate !== 1 && gate !== 3 && gate !== 6) return []
+  if (gate !== 3 && gate !== 6) return []
   const named = [...new Set([...entry.body.matchAll(NAMED_PR)].map((m) => Number(m[1] ?? m[2])))]
   const slicePrs = new Set(plan.sprints.flatMap((s) => s.waves.flatMap((w) => w.slices.map((x) => x.pr.number))))
   const final = handBackPr(plan)
@@ -70,7 +71,8 @@ export function wavePrsOf(plan: Pick<PlanModel, 'sprints' | 'queue'>, entry: Pic
  * - A gate 7 (or plan-complete hand-back) entry whose named staging PR gh reports merged.
  * - A gate 4 or 5 of an archived plan: pod writes them only between waves and sprints, never at close-out,
  *   and archiving the plan means pod resumed past them.
- * - A gate 1, 3 or 6 whose named wave PRs (wavePrsOf) gh reports merged, and none of them the PR gh found on the plan's branch.
+ * - A gate 3 or 6 whose named wave PRs (wavePrsOf) gh reports merged, and none of them the PR gh found on the plan's branch.
+ *   Never a gate 1: a blocker can outlive any PR it names.
  * Never the archive alone for the hand-back or gates 1, 2, 3, 6 and 7: pod archives a plan before its final review
  * and merge, and can write those after it.
  */
