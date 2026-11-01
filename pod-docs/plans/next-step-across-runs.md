@@ -4,6 +4,8 @@ _Generated: 2026-10-31 · Status: active · Grilled-with: pod (fast)_
 
 Port base: 3000
 
+<!-- autopilot-run: started=2026-11-01T18:09:29Z sprints=1 waves=1 -->
+
 ## Goal
 When another run needs you more urgently than the run you're looking at, screen 1 says so in one line at the top of the main column, with a button that opens that run. When nothing outranks the selected run, the page looks exactly as it does today.
 
@@ -86,7 +88,7 @@ sequenceDiagram
 
 | Sprint | Goal | Status | Depends on |
 |--------|------|--------|------------|
-| urgent-banner | The elsewhere picker, the urgent banner on screen 1, and its docs | active | — |
+| urgent-banner | The elsewhere picker, the urgent banner on screen 1, and its docs | done | — |
 
 Status: `planned` / `active` / `done`. `Depends on` is the only dependency between sprints.
 

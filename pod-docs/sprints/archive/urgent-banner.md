@@ -1,13 +1,12 @@
 # Sprint: Urgent banner
 
-_From plan: pod-docs/plans/next-step-across-runs.md · Slug: urgent-banner · Status: active · Generated: 2026-11-01_
+_From plan: pod-docs/plans/next-step-across-runs.md · Slug: urgent-banner · Status: done · Generated: 2026-11-01_
 
-<!-- autopilot-run: started=2026-11-01T18:09:29Z sprints=0 waves=1 -->
 ## Status board
 
 | Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |
 |------|-------|-------|--------|----|--------|------------|------------|
-| 1 | U1 | Elsewhere picker, urgent banner on screen 1, and its docs | urgent-banner-U1 | — | pending | — | — |
+| 1 | U1 | Elsewhere picker, urgent banner on screen 1, and its docs | urgent-banner-U1 | #66 | merged | medium | — |
 
 One slice: the picker feeds only the banner, and the docs feed only this change, so a split would add a wave check and no parallel work. The picker stays its own pure module with table tests inside the slice.
 
@@ -104,3 +103,14 @@ export function elsewhere(runs: RunSummary[], board: Board | undefined, selected
 - **Depends on:** —
 - **One-way door:** none. The change is web-only and additive: no stored data, no route, no Board JSON change, no auth. Removing the banner is a revert.
 - **Model:** opus
+
+## Sprint summary
+
+- **Synced with merge-target:** up to date
+- **Slices shipped:** U1
+- **Queue entries:** resolved 0, deferred 3 — the three `plan: next-step-across-runs` decisions in `pod-docs/handoff-queue.md` (repo hidden on phones, `+N more` counts items, selected someday card ranks by tier)
+- **Slice log:**
+  - U1: opus · medium · test-first yes · runtime mock repo at 1440/800/375 px, both themes, live BLOCKED append, keyboard Open run · 4 NOTEs (icon gap 9 px, Geist Mono status word, mock session token rewrite, unbuildable `rest` criterion wording) · time lost: none
+  - Wave check (orchestrator): `pnpm verify` pass; mock repo 1440 and 375 px ✓; no wave fix
+  - Stalls: none
+- **Agent context at hand-back:** about 324k (sprint-planner 123k, U1 201k) — each agent's final context size, not tokens billed
