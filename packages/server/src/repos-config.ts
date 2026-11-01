@@ -34,8 +34,48 @@ export function addRepo(
   platform: NodeJS.Platform,
   deps: AddRepoDeps = { ignoresCase },
 ): Promise<{ path: string } | { error: AddRepoError }> {
+  return queued(file, () => addRepoNow(file, repoPath, platform, deps))
+}
+
+export type RemoveRepoError = 'not registered' | 'config unreadable'
+
+/**
+ * Takes a repo out of the config and returns its normalized path. It matches
+ * entries by Repo identity, the same way `addRepo` finds a duplicate, and takes
+ * out every spelling of the repo. The folder doesn't need to exist. It reads the
+ * file as it is now, inside the same queue as `addRepo`, so it never writes back
+ * a list read earlier. A config it can't read is never overwritten, and a repo
+ * that isn't listed writes nothing. It never touches the repo's own files.
+ */
+export function removeRepo(
+  file: string,
+  repoPath: string,
+  platform: NodeJS.Platform,
+  deps: Pick<AddRepoDeps, 'ignoresCase'> = { ignoresCase },
+): Promise<{ path: string } | { error: RemoveRepoError }> {
+  return queued(file, () => removeRepoNow(file, repoPath, platform, deps))
+}
+
+async function removeRepoNow(
+  file: string,
+  repoPath: string,
+  platform: NodeJS.Platform,
+  deps: Pick<AddRepoDeps, 'ignoresCase'>,
+): Promise<{ path: string } | { error: RemoveRepoError }> {
+  const normalized = normalizeRepoPath(repoPath, platform)
+  const loaded = await readConfig(file)
+  if ('error' in loaded) return loaded
+  const caseless = await deps.ignoresCase(normalized)
+  const kept = loaded.config.repos.filter((r) => !sameRepoPath(r.path, normalized, platform, caseless))
+  if (kept.length === loaded.config.repos.length) return { error: 'not registered' }
+  await writeAtomic(file, JSON.stringify({ version: 1, repos: kept } satisfies ConfigFile, null, 2) + '\n')
+  return { path: normalized }
+}
+
+/** Runs writes to the same config file one at a time, adds and removes alike, so none is lost. */
+function queued<T>(file: string, fn: () => Promise<T>): Promise<T> {
   const key = path.resolve(file)
-  const run = (queues.get(key) ?? Promise.resolve()).then(() => addRepoNow(file, repoPath, platform, deps))
+  const run = (queues.get(key) ?? Promise.resolve()).then(fn)
   const tail = run.then(
     () => {},
     () => {},
@@ -148,15 +188,4 @@ async function renameWithRetry(from: string, to: string): Promise<void> {
       await new Promise((r) => setTimeout(r, 25 * (attempt + 1)))
     }
   }
-}
-
-export type RemoveRepoError = 'not registered' | 'config unreadable'
-
-export function removeRepo(
-  _file: string,
-  _repoPath: string,
-  _platform: NodeJS.Platform,
-  _deps: Pick<AddRepoDeps, 'ignoresCase'> = { ignoresCase },
-): Promise<{ path: string } | { error: RemoveRepoError }> {
-  return Promise.resolve({ error: 'not registered' })
 }

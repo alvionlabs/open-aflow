@@ -1,7 +1,7 @@
 import type { RunTarget } from './resume-flow.ts'
 
 /** What happens to the ⋯ menu. `outside` is a press anywhere but the trigger and the menu. */
-export type MenuEvent = 'toggle' | 'escape' | 'outside' | 'pick-theme' | 'press-switch' | 'run-change'
+export type MenuEvent = 'toggle' | 'escape' | 'outside' | 'pick-theme' | 'press-switch' | 'run-change' | 'pick-remove'
 
 export type MenuNext = { open: boolean; focusTrigger: boolean }
 
@@ -18,6 +18,8 @@ export function reduceMenu(open: boolean, event: MenuEvent): MenuNext {
     case 'outside':
       return { open: false, focusTrigger: open }
     case 'run-change':
+    case 'pick-remove':
+      // Remove opens its confirm panel, which takes focus.
       return { open: false, focusTrigger: false }
     case 'pick-theme':
     case 'press-switch':

@@ -6,7 +6,7 @@
 //   #/<repoId>/fix-<slug>             a fix run's pipeline and agent log (it has no wave board)
 //   #/<repoId>/fix-<slug>/agent/<id>  the same, with that engineer's view open
 // A hash that names no run falls back to the first run's pipeline; no runs means
-// none. `resolveSelection` also returns the hash that names what it picked, so the
+// none, with an empty hash. `resolveSelection` also returns the hash that names what it picked, so the
 // page can put it in the URL and a vanished run's hash doesn't come back to life.
 
 import type { RunSummary } from '@pod-board/model'
@@ -65,7 +65,8 @@ export function resolveSelection(
   const key = parseHash(hash)
   const named = key && runs.find((r) => r.repoId === key.repoId && r.plan === key.plan)
   const run = named ?? runs[0]
-  if (!run) return { run: undefined, view: 'pipeline', slice: undefined, hash: undefined }
+  // No runs: an empty hash, so a removed run's hash leaves the URL.
+  if (!run) return { run: undefined, view: 'pipeline', slice: undefined, hash: '' }
   const fix = run.fix !== undefined
   const asked = named && key.view === 'agent' && fix ? key.agent : undefined
   const agent = asked !== undefined && (!agentsOf || agentsOf(run).includes(asked)) ? asked : undefined

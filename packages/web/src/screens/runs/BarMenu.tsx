@@ -8,6 +8,11 @@ import { ThemeControl } from './ThemeControl.tsx'
 import './menu.css'
 
 type AutoContinue = { target: RunTarget; on: boolean }
+/** The menu's last item: removes the selected run's repo from the board, after a confirm. */
+type Remove = { label: string; onPick: () => void }
+
+/** The ⋯ trigger's id: the remove confirm sends focus back to it when it closes. */
+export const MENU_TRIGGER_ID = 'run-menu-trigger'
 
 export type BarMenuViewProps = {
   open: boolean
@@ -17,6 +22,7 @@ export type BarMenuViewProps = {
   onSwitchPress?: () => void
   autoContinue?: AutoContinue
   portBase?: number
+  remove?: Remove
   /** Where the theme is read from and saved; the page's local storage when not given. */
   storage?: ChoiceStorage
   triggerRef?: RefObject<HTMLButtonElement | null>
@@ -24,10 +30,10 @@ export type BarMenuViewProps = {
 }
 
 /** The trigger and, when open, the menu. */
-export function BarMenuView({ open, onToggle, onThemePick, onSwitchPress, autoContinue, portBase, storage, triggerRef, menuRef }: BarMenuViewProps) {
+export function BarMenuView({ open, onToggle, onThemePick, onSwitchPress, autoContinue, portBase, remove, storage, triggerRef, menuRef }: BarMenuViewProps) {
   return (
     <div className="bar-menu">
-      <button ref={triggerRef} type="button" className="btn sm icon" aria-label="Menu" aria-expanded={open} onClick={onToggle}>
+      <button ref={triggerRef} id={MENU_TRIGGER_ID} type="button" className="btn sm icon" aria-label="Menu" aria-expanded={open} onClick={onToggle}>
         <Icon name="more" />
       </button>
       {open && (
@@ -50,14 +56,22 @@ export function BarMenuView({ open, onToggle, onThemePick, onSwitchPress, autoCo
               <span className="mi-note mono">{portBase}</span>
             </div>
           )}
+          {remove && (
+            <>
+              <hr />
+              <button type="button" className="mi mi-action" onClick={remove.onPick}>
+                {remove.label}
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-/** The bar's ⋯ menu: the run's auto-continue switch, the theme, and the run's port base. */
-export function BarMenu({ autoContinue, portBase }: { autoContinue?: AutoContinue; portBase?: number }) {
+/** The bar's ⋯ menu: the run's auto-continue switch, the theme, the run's port base, and Remove from the board. */
+export function BarMenu({ autoContinue, portBase, remove }: { autoContinue?: AutoContinue; portBase?: number; remove?: Remove }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -100,6 +114,7 @@ export function BarMenu({ autoContinue, portBase }: { autoContinue?: AutoContinu
       onSwitchPress={() => send('press-switch')}
       autoContinue={autoContinue}
       portBase={portBase}
+      {...(remove ? { remove: { label: remove.label, onPick: () => (send('pick-remove'), remove.onPick()) } } : {})}
       triggerRef={triggerRef}
       menuRef={menuRef}
     />

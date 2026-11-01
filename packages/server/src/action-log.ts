@@ -1,16 +1,17 @@
-// The action log: one JSON line per merge, answer, or resume request in `<config dir>/actions.jsonl`, and the newest
+// The action log: one JSON line per merge, answer, resume, or remove-repo request in `<config dir>/actions.jsonl`, and the newest
 // 50 in memory for the Board. Read once at start; bad lines are skipped. The rules and why are in
 // pod-docs/feature-details/actions.md.
 
 import { readFileSync } from 'node:fs'
 import { appendFile } from 'node:fs/promises'
-import type { ActionEntry, AnswerOutcome, MergeOutcome, NewActionEntry, ResolveOutcome, ResumeOutcome } from '@pod-board/model'
+import type { ActionEntry, AnswerOutcome, MergeOutcome, NewActionEntry, RemoveRepoOutcome, ResolveOutcome, ResumeOutcome } from '@pod-board/model'
 
 export const ACTION_LOG_MAX = 50
 const MERGE_RESULTS = new Set<string>(['merged', 'queued', 'auto-merge', 'stale', 'failed', 'unconfirmed'] satisfies MergeOutcome[])
 const ANSWER_RESULTS = new Set<string>(['answered', 'changed', 'failed'] satisfies AnswerOutcome[])
 const RESOLVE_RESULTS = new Set<string>(['closed', 'kept', 'changed', 'failed'] satisfies ResolveOutcome[])
 const RESUME_RESULTS = new Set<string>(['started', 'failed'] satisfies ResumeOutcome[])
+const REMOVE_RESULTS = new Set<string>(['removed', 'failed'] satisfies RemoveRepoOutcome[])
 const RESUME_REPLIES = new Set<unknown>(['continue', 'go'])
 
 export type ActionLog = {
@@ -75,6 +76,7 @@ function parseEntry(line: string): ActionEntry | undefined {
   if (e.action === 'merge' && MERGE_RESULTS.has(e.result as string)) entry = { ...base, action: 'merge', result: e.result as MergeOutcome }
   else if (e.action === 'answer' && ANSWER_RESULTS.has(e.result as string)) entry = { ...base, action: 'answer', result: e.result as AnswerOutcome }
   else if (e.action === 'resolve' && RESOLVE_RESULTS.has(e.result as string)) entry = { ...base, action: 'resolve', result: e.result as ResolveOutcome }
+  else if (e.action === 'remove-repo' && REMOVE_RESULTS.has(e.result as string)) entry = { ...base, action: 'remove-repo', result: e.result as RemoveRepoOutcome }
   else if (e.action === 'resume' && RESUME_RESULTS.has(e.result as string) && RESUME_REPLIES.has(e.reply) && typeof e.auto === 'boolean')
     entry = { ...base, action: 'resume', result: e.result as ResumeOutcome, reply: e.reply as 'continue' | 'go', auto: e.auto }
   else return undefined

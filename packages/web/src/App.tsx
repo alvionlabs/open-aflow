@@ -54,7 +54,8 @@ function BoardView({ board, stream, now, hash, setHash }: BoardViewProps) {
 
   useEffect(() => {
     if (!board || selection.hash === undefined || selection.hash === hash) return
-    window.history.replaceState(null, '', selection.hash)
+    // An empty hash drops the `#` too: replaceState with '#' would keep it.
+    window.history.replaceState(null, '', selection.hash === '' ? window.location.pathname + window.location.search : selection.hash)
     setHash(selection.hash)
   }, [board, selection.hash, hash])
 

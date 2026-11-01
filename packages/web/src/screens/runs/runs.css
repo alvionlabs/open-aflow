@@ -1459,3 +1459,27 @@
     min-height: 44px;
   }
 }
+
+/* Remove from the board: in place under the run header, like the merge confirm. Its text stays near 72ch. */
+.remove-confirm {
+  margin-top: 16px;
+  max-width: 640px;
+}
+
+.remove-confirm:focus {
+  outline: none;
+}
+
+.remove-confirm:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.remove-path {
+  overflow-wrap: anywhere;
+}
+
+.remove-body {
+  margin: 0;
+  max-width: 72ch;
+}

@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { buildFixPipeline, buildFlow, buildPipeline, type Board, type RunSummary } from '@pod-board/model'
 import type { StreamState } from '../../board-stream.ts'
 import { hashFor, type View } from '../../selection.ts'
@@ -13,6 +13,8 @@ import { NextStepCard } from './NextStepCard.tsx'
 import { nextSteps } from './next-step.ts'
 import { runHeader } from './plan-view.ts'
 import { switchView } from './resume-flow.ts'
+import { RemoveConfirm } from './RemoveConfirm.tsx'
+import { INITIAL as REMOVE_IDLE, confirmView as removeView, createRemoveFlow, hashAfterRemove, removeLabel, removeTarget, type RemoveState } from './remove-flow.ts'
 import { RunHeader } from './RunHeader.tsx'
 import { RunsList } from './RunsList.tsx'
 import { SideHandle } from './SideHandle.tsx'
@@ -69,6 +71,27 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   // A plan's full flow (Think → You → sprints → Check → Ship); a fix run's Build, Review, Ship.
   const stages = fixPipeline?.stages ?? (repo && pipeline && selected?.plan !== undefined ? (buildFlow(repo, selected.plan, now) ?? []) : [])
 
+  // Remove from the board: the confirm opens under the run header; after a removal the page moves on.
+  const [removeState, setRemoveState] = useState<RemoveState>(REMOVE_IDLE)
+  const latest = useRef({ runs, selected })
+  latest.current = { runs, selected }
+  const removeFlow = useMemo(
+    () =>
+      createRemoveFlow(setRemoveState, (target) => {
+        const next = hashAfterRemove(latest.current.runs, latest.current.selected, target)
+        // With no run left (''), the Board's next update clears the hash (App), and the empty state shows.
+        if (next) window.location.hash = next
+      }),
+    [],
+  )
+  useEffect(() => removeFlow.cancel(), [runKey, removeFlow])
+  const toRemove = removeTarget(repo)
+  const removing = removeView(removeState)
+  const removePanel =
+    removing && removeState.kind !== 'idle' && removeState.target.repoId === repo?.id ? (
+      <RemoveConfirm view={removing} onRemove={() => removeFlow.remove()} onCancel={() => removeFlow.cancel()} onKey={(k) => removeFlow.key(k)} />
+    ) : null
+
   const press = (t: Tab) => {
     const next = tabPress(shown, t, view)
     saveTab(store.current, next.save)
@@ -89,6 +112,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
       key={runKey}
       autoContinue={selected?.plan !== undefined && autoSwitch ? { target: { repoId: selected.repoId, run: selected.plan }, on: autoSwitch.on } : undefined}
       portBase={selected?.portBase}
+      {...(toRemove ? { remove: { label: removeLabel(toRemove.name), onPick: () => removeFlow.open(toRemove) } } : {})}
     />
   )
 
@@ -140,6 +164,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
           ) : view === 'board' && pipeline && selected.plan !== undefined ? (
             <>
               {header && <RunHeader header={header} actions={menu} />}
+              {removePanel}
               <p className="back">
                 <a href={hashFor(selected)}>Back to the run</a>
               </p>
@@ -163,6 +188,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
                   }
                 />
               )}
+              {removePanel}
               <Flow key={`flow:${runKey}`} stages={stages} />
               {steps && <NextStepCard key={runKey} repo={repo} run={selected} card={steps.card} />}
               <div className="tabs" role="group" aria-label="More about this run">
