@@ -1,6 +1,7 @@
 /*
  * The urgent banner: another run's more urgent item, one line at the top of screen 1's main column
- * (plan next-step-across-runs, direction B). No coloured fill or border: only the status dot has a colour.
+ * (plan next-step-across-runs, direction B). Look B of draft 2: tinted by its item's status (blocked, needs you,
+ * ready); any other status keeps the plain box.
  * .urgent-slot is the live region; it has no box of its own, so an empty one takes no space.
  */
 
@@ -16,12 +17,42 @@
   gap: 12px;
   margin-bottom: 24px;
   /* The button side less, as the draft. */
-  padding: 8px 8px 8px 16px;
+  padding: 12px 8px 12px 16px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   background: var(--bg);
   color: var(--fg);
   font: var(--size-dense) / 1.4 var(--font);
+}
+
+/*
+ * The tone, from the status class in the banner: a 10 % fill on the page and a 50 % border.
+ * Blocked, needs you and ready only; running and idle keep the plain box.
+ */
+.urgent:has(> .status.s-bad) {
+  --tone: var(--blocked);
+}
+
+.urgent:has(> .status.s-you) {
+  --tone: var(--needs-you);
+}
+
+.urgent:has(> .status.s-ok) {
+  --tone: var(--ready);
+}
+
+.urgent:has(> .status.s-bad),
+.urgent:has(> .status.s-you),
+.urgent:has(> .status.s-ok) {
+  border-color: color-mix(in srgb, var(--tone) 50%, transparent);
+  background: color-mix(in srgb, var(--tone) 10%, var(--bg));
+}
+
+/* More classes than base.css's .status.s-bad { color: var(--fg) }, so the word takes the tone. */
+.urgent:has(> .status.s-bad) > .status,
+.urgent:has(> .status.s-you) > .status,
+.urgent:has(> .status.s-ok) > .status {
+  color: var(--tone);
 }
 
 .urgent > .status {
@@ -41,6 +72,7 @@
 
 .urgent-title {
   flex: 0 1 auto;
+  font-weight: 500;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -66,14 +98,23 @@
   text-overflow: ellipsis;
 }
 
-/* Balanced on its ink: the arrow's box has about 3 px of empty space each side. */
+/*
+ * A text button: no box until hover. base.css's .btn.sm.trail pads 12 px on the label and 10 px on the
+ * arrow, whose box has about 2.5 px of empty space on the right, so the ink sits balanced.
+ * Three classes, so the label stays --fg over base.css's muted .btn.quiet.
+ */
 .urgent-open {
   flex: none;
-  gap: 4px;
 }
 
-.urgent-open.btn.sm.trail {
-  padding-right: 8px;
+.urgent-open.btn.quiet {
+  color: var(--fg);
+}
+
+.urgent:has(> .status.s-bad) .urgent-open.btn.quiet:hover,
+.urgent:has(> .status.s-you) .urgent-open.btn.quiet:hover,
+.urgent:has(> .status.s-ok) .urgent-open.btn.quiet:hover {
+  background: color-mix(in srgb, var(--tone) 16%, transparent);
 }
 
 /* Phone: the text wraps on one or two lines, then Open run full width as a 44 px target. */
@@ -82,7 +123,7 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: 8px 12px;
-    padding: 8px 12px;
+    padding: 12px;
   }
 
   .urgent-at {
