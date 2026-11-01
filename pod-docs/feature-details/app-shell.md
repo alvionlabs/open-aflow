@@ -38,6 +38,7 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - Native modal focus leaves the dialog for the browser's own UI after the last control (in headless Chrome, `body`); it never reaches the page.
 - "Chrome reports installable" hasn't been checked in a review; agent-browser hangs from Git Bash here ([known issue](../known-issues/agent-browser-git-bash.md)).
 - An in-place panel that gives focus back from an effect cleanup: under the dev server's StrictMode the cleanup also runs once on mount, so it takes focus away from the panel that just opened. Check that the panel left the page first (`isConnected`), as `RemoveConfirm.tsx` does.
+- A menu inside the sidebar must be `position: fixed` (the runs list scrolls, so it clips anything absolute), and must follow its button on scroll, not close: focusing or clicking a card scrolls the list.
 
 ## History
 
@@ -51,3 +52,4 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - 2026-10-28 · fix-sidebar-add-dialog · the full-height left sidebar is back and the top bar is gone: "Pod Board" (with `lost · retrying`) at the top, `Add repo` at the bottom, opening the folder picker in a modal dialog; the ⋯ menu moved to the right end of the run header.
 - 2026-10-31 · fix-sidebar-resize · the sidebar resizes from 200 to 400 px by a handle on its right edge (260 by default, kept per browser, off at 820 px and below).
 - 2026-11-01 · fix-remove-repo · the ⋯ menu ends with `Remove <repo> from the board` for a repo in the config; it opens an in-place confirm under the run header (Remove, Cancel, Escape; focus goes back to ⋯). After a removal the page moves to the next run, or to the empty state; with no runs left the URL drops its dead `#` hash.
+- 2026-11-01 · fix-remove-repo review round 2 · the menu item reads `Remove repo` in the new `--danger` red (the blocked red; `--danger-fg` is the label on a red fill, 4.5:1 or more in both themes), and the confirm's Remove is `.btn.danger`; the confirm names the repo and counts the runs that leave the sidebar. Each sidebar card has its own ⋯ (beside the link, 24 px, shown on hover, keyboard focus, or touch) with the same item and flow; its confirm opens under the card, and the page stays unless the open run's repo left.
