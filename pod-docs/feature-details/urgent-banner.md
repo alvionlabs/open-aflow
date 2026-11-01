@@ -4,7 +4,7 @@
 
 One line at the top of screen 1's main column. It shows when another listed run's Next step card is more urgent than the selected run's card. It names that item and its run, adds `+N more` when other runs also outrank, and has one control: "Open run". When nothing outranks the selected run, it takes no space and screen 1 looks as before. Screen 1 views only (`pipeline` and a fix run's `agent` view), never the wave board or the engineer view.
 
-**Look:** the banner takes its item's status colour: a 10 % fill and a 50 % border (red for `Blocked`, amber for `Needs you`, green for `Ready`). The status word takes the same colour, and the title is weight 500. Any other status keeps the plain box. "Open run" is a text button with no box until hover; on a phone it is full width and 44 px tall.
+**Look:** the banner takes its item's status colour: a 10 % fill and a 50 % border (red for `Blocked`, amber for `Needs you`, green for `Ready`). The status word takes the same colour with a little `--fg` mixed in, and the title is weight 500. Any other status keeps the plain box. "Open run" is a text button with no box until hover; on a phone it is full width and 44 px tall.
 
 ## How it works
 
@@ -60,7 +60,6 @@ flowchart TD
 - The 9 px label-to-arrow gap comes from `.btn.trail`, and every trail button shares it (queue, someday).
 - The tone comes from `.urgent:has(> .status.s-bad)` and its `s-you` and `s-ok` rules, because `runs-screen.test.ts` pins the exact markup `<div class="urgent">`. A new status class gets no tint until it has a rule.
 - `.btn.quiet` is muted in `base.css`. `.urgent-open.btn.quiet` sets the label back to `--fg`; don't drop it.
-- On the light theme, the status word is below 4.5:1 on its own tint: blocked 4.49, needs you 4.13, ready 3.88 (measured). The human has not yet picked a fix.
 
 ## History
 
