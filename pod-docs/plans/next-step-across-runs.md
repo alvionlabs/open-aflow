@@ -86,7 +86,7 @@ sequenceDiagram
 
 | Sprint | Goal | Status | Depends on |
 |--------|------|--------|------------|
-| urgent-banner | The elsewhere picker, the urgent banner on screen 1, and its docs | planned | — |
+| urgent-banner | The elsewhere picker, the urgent banner on screen 1, and its docs | active | — |
 
 Status: `planned` / `active` / `done`. `Depends on` is the only dependency between sprints.
 
