@@ -172,6 +172,25 @@ describe('tokens', () => {
     }
   })
 
+  it('danger text and the danger button reach 4.5 to 1, and the focus ring shows on the page', () => {
+    for (const [theme, t] of themes()) {
+      const danger = t['--danger']
+      const dangerFg = t['--danger-fg']
+      expect(danger, `${theme} --danger`).toBeDefined()
+      expect(dangerFg, `${theme} --danger-fg`).toBeDefined()
+      for (const surface of ['bg', 'surface', 'hover']) {
+        const ratio = contrast(danger!, t[`--${surface}`]!)
+        expect(ratio, `${theme} danger on ${surface} = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5)
+      }
+      expect(contrast(dangerFg!, danger!), `${theme} danger-fg on danger`).toBeGreaterThanOrEqual(4.5)
+      // The ring sits 2 px outside the button, on the page, so it must stand out from the page.
+      expect(contrast(t['--focus']!, t['--bg']!), `${theme} focus on bg`).toBeGreaterThanOrEqual(3)
+    }
+    // Dark's own selector holds the same danger values.
+    expect(darkAttr()['--danger']).toBe(darkMedia()['--danger'])
+    expect(darkAttr()['--danger-fg']).toBe(darkMedia()['--danger-fg'])
+  })
+
   it('faint and status colors are never text', () => {
     // The guarded names are the theme's own, in both themes.
     for (const name of NOT_TEXT) {

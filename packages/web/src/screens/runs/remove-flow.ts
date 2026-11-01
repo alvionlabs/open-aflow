@@ -137,3 +137,7 @@ export function hashAfterRemove(runs: RunSummary[], selected: RunSummary | undef
   return next ? hashFor(next) : ''
 }
 
+
+export const HEADER_PLACE = 'header'
+export const REMOVE_ITEM = ''
+export const moreButtonId = (_run: RunSummary) => ''

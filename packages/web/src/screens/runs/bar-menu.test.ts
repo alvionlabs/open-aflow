@@ -59,12 +59,12 @@ describe('menu contents', () => {
   })
 })
 
-describe('Remove from the board item', () => {
-  it('shows only with remove, as a button named for the repo, last in the menu', () => {
-    expect(render({})).not.toContain('from the board')
-    const html = render({ remove: { label: 'Remove alpha-repo from the board', onPick: noop }, portBase: 3100 })
-    expect(html).toMatch(/<button[^>]*type="button"[^>]*>Remove alpha-repo from the board<\/button>/)
-    expect(html.indexOf('Ports')).toBeLessThan(html.indexOf('Remove alpha-repo'))
+describe('Remove repo item', () => {
+  it('shows only with remove, as a danger button that reads Remove repo, last in the menu', () => {
+    expect(render({})).not.toContain('Remove repo')
+    const html = render({ remove: { onPick: noop }, portBase: 3100 })
+    expect(html).toMatch(/<button type="button" class="mi mi-action mi-danger">Remove repo<\/button>/)
+    expect(html.indexOf('Ports')).toBeLessThan(html.indexOf('Remove repo'))
     expect(text(html)).not.toMatch(/[⋯+]/)
   })
 

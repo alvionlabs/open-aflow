@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest'
 import type { BoardRepo, RemoveRepoResult, RunSummary } from '@pod-board/model'
 import type { ActionReply } from '../../actions-client.ts'
 import { RemoveConfirmView } from './RemoveConfirm.tsx'
-import { confirmView, createRemoveFlow, hashAfterRemove, removeLabel, removeTarget, repoOfRun, type Post, type RemoveState, type RemoveTarget } from './remove-flow.ts'
+import { HEADER_PLACE, REMOVE_ITEM, confirmView, createRemoveFlow, hashAfterRemove, removeTarget, repoOfRun, type Post, type RemoveState, type RemoveTarget } from './remove-flow.ts'
 
-const A: RemoveTarget = { repoId: 'ra', name: 'alpha-repo', path: 'C:\\code\\alpha-repo', alsoClaimed: false }
-const B: RemoveTarget = { repoId: 'rb', name: 'beta-repo', path: 'C:\\code\\beta-repo', alsoClaimed: false }
+const A: RemoveTarget = { repoId: 'ra', name: 'alpha-repo', path: 'C:/code/alpha-repo', alsoClaimed: false, runs: 2, place: HEADER_PLACE, returnTo: 'run-menu-trigger' }
+const B: RemoveTarget = { repoId: 'rb', name: 'beta-repo', path: 'C:/code/beta-repo', alsoClaimed: false, runs: 1, place: HEADER_PLACE, returnTo: 'run-menu-trigger' }
 
 type Call = { path: string; body: object; resolve: (r: ActionReply<unknown>) => void }
 
@@ -112,24 +112,30 @@ describe('remove flow', () => {
 })
 
 describe('confirm words', () => {
-  it('the menu item names the repo', () => {
-    expect(removeLabel('alpha-repo')).toBe('Remove alpha-repo from the board')
+  it('the menu item reads Remove repo', () => {
+    expect(REMOVE_ITEM).toBe('Remove repo')
   })
 
-  it('says plainly that only the board list changes', () => {
+  it('names the repo and says plainly that only the board list changes', () => {
     const s: RemoveState = { kind: 'confirm', seq: 1, target: A }
     const v = confirmView(s)!
-    expect(v.heading).toBe('Remove alpha-repo from the board?')
-    expect(v.body).toBe("This changes only the board's list. The repo's files, pod docs, and runs are not touched. You can add it again with Add repo.")
+    expect(v.heading).toBe('Remove alpha-repo?')
+    expect(v.body).toBe("Only the board's list changes; its files aren't touched.")
+    expect(v.runsLine).toBe('Its 2 runs leave the sidebar.')
     expect(v.path).toBe(A.path)
     expect(v.claimNote).toBeUndefined()
     expect(v.busy).toBe(false)
     expect(confirmView({ kind: 'idle', seq: 0 })).toBeUndefined()
   })
 
-  it('a repo a port claim also lists says it stays in the sidebar while that run holds the claim', () => {
+  it('counts one run in the singular', () => {
+    expect(confirmView({ kind: 'confirm', seq: 1, target: B })!.runsLine).toBe('Its 1 run leaves the sidebar.')
+  })
+
+  it('a repo a port claim also lists keeps its runs: the claim note, no run count', () => {
     const v = confirmView({ kind: 'confirm', seq: 1, target: { ...A, alsoClaimed: true } })!
     expect(v.claimNote).toBe('A running pod run also lists this repo through its port claim, so it stays in the sidebar until that run ends.')
+    expect(v.runsLine).toBeUndefined()
   })
 
   it('removing disables both buttons and says so', () => {
@@ -138,36 +144,51 @@ describe('confirm words', () => {
     expect(v.status).toBe('Removing…')
   })
 
-  it('renders an in-place panel, not a dialog, with Remove and Cancel', () => {
+  it('renders an in-place panel, not a dialog, with a danger Remove and a neutral Cancel', () => {
     const html = renderToStaticMarkup(createElement(RemoveConfirmView, { view: confirmView({ kind: 'confirm', seq: 1, target: A })!, onRemove: () => {}, onCancel: () => {}, onKey: () => {} }))
     expect(html).toMatch(/^<section[^>]*class="inplace remove-confirm"/)
     expect(html).not.toContain('role="dialog"')
     expect(html).toMatch(/tabindex="-1"/)
-    const buttons = [...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map((m) => m[1])
-    expect(buttons).toEqual(['Remove', 'Cancel'])
-    expect(html).toContain('not touched')
+    const buttons = [...html.matchAll(/<button class="([^"]*)"[^>]*>([^<]*)<\/button>/g)].map((m) => [m[2], m[1]])
+    expect(buttons).toEqual([
+      ['Remove', 'btn danger'],
+      ['Cancel', 'btn quiet'],
+    ])
+    expect(html).toContain('Its 2 runs leave the sidebar.')
   })
 })
 
 const repo = (over: Partial<BoardRepo>): BoardRepo =>
   ({ id: 'ra', name: 'alpha-repo', path: A.path, source: 'registered', claims: [], model: { plans: [], queue: [] }, agents: [], prs: [], ...over }) as BoardRepo
+const runOf = (repoId: string, name: string, plan?: string): RunSummary => ({ repoId, repo: name, ...(plan ? { plan } : {}), where: '', state: 'idle' }) as RunSummary
+const ctx = (repos: BoardRepo[], runs: RunSummary[] = [runOf('ra', 'alpha-repo', 'x'), runOf('ra', 'alpha-repo', 'y')]) => ({ repos, runs, place: HEADER_PLACE, returnTo: 'run-menu-trigger' })
 
 describe('removeTarget', () => {
   it('offers Remove for a repo in the config, and not for one listed only through a claim', () => {
-    expect(removeTarget(repo({}))).toEqual(A)
-    expect(removeTarget(repo({ source: 'both' }))).toEqual({ ...A, alsoClaimed: true })
-    expect(removeTarget(repo({ source: 'claim' }))).toBeUndefined()
-    expect(removeTarget(undefined)).toBeUndefined()
+    expect(removeTarget(repo({}), ctx([repo({})]))).toEqual(A)
+    expect(removeTarget(repo({ source: 'both' }), ctx([repo({})]))).toEqual({ ...A, alsoClaimed: true })
+    expect(removeTarget(repo({ source: 'claim' }), ctx([repo({})]))).toBeUndefined()
+    expect(removeTarget(undefined, ctx([]))).toBeUndefined()
   })
 
   it('offers Remove for a repo whose folder is gone', () => {
-    expect(removeTarget(repo({ error: 'repo folder not found' }))).toEqual(A)
+    expect(removeTarget(repo({ error: 'repo folder not found' }), ctx([repo({})]))).toEqual(A)
+  })
+
+  it('counts only that repo runs, and keeps where it was opened and where focus goes back', () => {
+    const runs = [runOf('ra', 'alpha-repo', 'x'), runOf('rb', 'beta-repo', 'y'), runOf('ra', 'alpha-repo', 'z'), runOf('ra', 'alpha-repo')]
+    expect(removeTarget(repo({}), { repos: [repo({})], runs, place: '#/ra/x', returnTo: 'run-more-#/ra/x' })).toEqual({
+      ...A,
+      runs: 3,
+      place: '#/ra/x',
+      returnTo: 'run-more-#/ra/x',
+    })
   })
 })
 
 describe('hashAfterRemove', () => {
   // A run carries its repo's name, as listRuns gives it: `ra` is A (alpha-repo).
-  const run = (repoId: string, plan?: string): RunSummary => ({ repoId, repo: repoId === 'ra' ? A.name : repoId, ...(plan ? { plan } : {}), where: '', state: 'idle' }) as RunSummary
+  const run = (repoId: string, plan?: string): RunSummary => runOf(repoId, repoId === 'ra' ? A.name : repoId, plan)
   const runs = [run('rb', 'one'), run('ra', 'x'), run('rc', 'two'), run('ra', 'y'), run('rd')]
 
   it('moves to the next run of another repo after the selected one', () => {
@@ -181,18 +202,24 @@ describe('hashAfterRemove', () => {
   })
 
   it('clears the hash when no run is left, so the empty state shows', () => {
-    expect(hashAfterRemove([run('ra', 'x'), run('ra', 'y')], run('ra', 'x'), A)).toBe('')
+    const only = [run('ra', 'x'), run('ra', 'y')]
+    expect(hashAfterRemove(only, only[0], A)).toBe('')
   })
 
   it('stays put when a claim keeps the repo on the board', () => {
     expect(hashAfterRemove(runs, runs[1], { ...A, alsoClaimed: true })).toBeUndefined()
   })
+
+  it('stays put when the open run belongs to another repo (a remove from the sidebar)', () => {
+    expect(hashAfterRemove(runs, runs[0], A)).toBeUndefined()
+    expect(hashAfterRemove(runs, runs[2], A)).toBeUndefined()
+  })
 })
 
 describe('two repos with the same id (chess-web and chess_web)', () => {
-  const dash = repo({ id: 'rx', name: 'chess-web', path: 'C:\code\chess-web' })
-  const under = repo({ id: 'rx', name: 'chess_web', path: 'C:\code\chess_web' })
-  const run = (name: string, plan: string): RunSummary => ({ repoId: 'rx', repo: name, plan, where: '', state: 'idle' }) as RunSummary
+  const dash = repo({ id: 'rx', name: 'chess-web', path: 'C:/code/chess-web' })
+  const under = repo({ id: 'rx', name: 'chess_web', path: 'C:/code/chess_web' })
+  const run = (name: string, plan: string): RunSummary => runOf('rx', name, plan)
 
   it('a run finds its own repo, not the first one with its id', () => {
     expect(repoOfRun([dash, under], run('chess_web', 'p'))).toBe(under)
@@ -201,16 +228,17 @@ describe('two repos with the same id (chess-web and chess_web)', () => {
     expect(repoOfRun([dash], run('chess-web', 'p'))).toBe(dash)
   })
 
-  it('Remove is not offered while the id is ambiguous, so the menu never names the wrong repo', () => {
-    expect(removeTarget(under, [dash, under])).toBeUndefined()
-    expect(removeTarget(dash, [dash, under])).toBeUndefined()
-    // With the sibling gone, the item names the selected run's repo.
-    expect(removeLabel(removeTarget(repoOfRun([under], run('chess_web', 'p')), [under])!.name)).toBe('Remove chess_web from the board')
+  it('Remove is not offered while the id is ambiguous, so nothing can remove the wrong repo', () => {
+    expect(removeTarget(under, ctx([dash, under]))).toBeUndefined()
+    expect(removeTarget(dash, ctx([dash, under]))).toBeUndefined()
+    // With the sibling gone, the confirm names the selected run's repo.
+    const t = removeTarget(repoOfRun([under], run('chess_web', 'p')), ctx([under], [run('chess_web', 'p')]))!
+    expect(confirmView({ kind: 'confirm', seq: 1, target: t })!.heading).toBe('Remove chess_web?')
   })
 
   it('hashAfterRemove keeps the sibling run that shares the id', () => {
     const runs = [run('chess-web', 'a'), run('chess_web', 'b')]
-    const target = { repoId: 'rx', name: 'chess-web', path: dash.path, alsoClaimed: false }
+    const target: RemoveTarget = { ...A, repoId: 'rx', name: 'chess-web', path: dash.path }
     expect(hashAfterRemove(runs, runs[0], target)).toBe('#/rx/b')
   })
 
