@@ -194,3 +194,7 @@ Plan `calm-dashboard`. Add posts a folder only when the typed text ends in a sep
 ## 2026-10-28 — Add repo opens a modal dialog from the sidebar
 
 The human asked for the old full-height sidebar back, with Add repo at its bottom opening the folder picker in a dialog. That dialog is the one exception to the calm-dashboard Look's "controls open in place, never a modal" rule. The ⋯ menu sits at the right end of the run header (fix PR https://github.com/iamphduc/pod-board/pull/56).
+
+## 2026-11-01 — urgent items from other runs show as a banner (reverses calm-dashboard)
+
+Plan `next-step-across-runs`. The human picked placement B, a banner above the run: "If it's urgent, I think the B should be the right way to show for user." This reverses calm-dashboard's "Turned down: a card across all runs": the item shows as one line at the top of screen 1's main column, not as a card, and it only navigates (`Open run`); the selected run's Next step card keeps the one primary button. Default rules, agent defaults (override anytime): only each run's card counts; rank `blocked` > `merge` > `reply` > `pending` (kinds `now`, `decision`, `before` only) > `nothing`; it shows only when strictly higher than the selected card's tier; ties go to the oldest entry date in `blocked` and `pending` (undated last), then to the earlier run in the sidebar; `+N more` counts the other outranking items, a shared entry once. Pinned by `packages/web/src/screens/runs/elsewhere.test.ts`.
