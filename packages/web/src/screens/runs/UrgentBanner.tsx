@@ -1,9 +1,11 @@
 import { Icon } from '../../theme/icons.tsx'
 import type { Elsewhere } from './elsewhere.ts'
+import { opensHere } from './open-focus.ts'
 import { nextStatus } from './view.ts'
 import './urgent-banner.css'
 
-type Props = { at: Elsewhere; onOpen?: () => void }
+/** `onOpen` gets the run's hash, and only for a click that opens it in this tab. */
+type Props = { at: Elsewhere; onOpen?: (href: string) => void }
 
 /**
  * Another run's more urgent item, as one line: its status, title, where it is, `+N more`, and
@@ -31,7 +33,7 @@ export function UrgentBanner({ at, onOpen }: Props) {
           </>
         )}
       </span>
-      <a className="btn sm trail urgent-open" href={at.href} aria-label={`Open run ${at.name}`} onClick={onOpen}>
+      <a className="btn sm trail urgent-open" href={at.href} aria-label={`Open run ${at.name}`} onClick={(e) => opensHere(e) && onOpen?.(at.href)}>
         Open run
         <Icon name="arrow-right" />
       </a>

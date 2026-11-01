@@ -11,6 +11,7 @@ import { Chip } from './Chip.tsx'
 import { elsewhere } from './elsewhere.ts'
 import { LogTab } from './LogTab.tsx'
 import { NextStepCard } from './NextStepCard.tsx'
+import { focusOnArrival } from './open-focus.ts'
 import { nextSteps } from './next-step.ts'
 import { runHeader } from './plan-view.ts'
 import { switchView } from './resume-flow.ts'
@@ -57,8 +58,8 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   const [sideWidth, setSideWidth] = useState(() => readWidth(store.current))
   const repoButton = useRef<HTMLButtonElement>(null)
   const runTitle = useRef<HTMLHeadingElement>(null)
-  // Set by the urgent banner's Open run, so focus lands on the next run's title.
-  const focusTitle = useRef(false)
+  // The hash the urgent banner's Open run went to, so focus lands on that run's title.
+  const focusFor = useRef<string | undefined>(undefined)
 
   const repo = selected && board?.repos.find((r) => r.id === selected.repoId)
   const isFix = selected?.fix !== undefined
@@ -76,9 +77,9 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   const urgent = urgentSlot ? elsewhere(runs, board, selected, now) : undefined
 
   useEffect(() => {
-    if (!focusTitle.current) return
-    focusTitle.current = false
-    runTitle.current?.focus()
+    const pending = focusFor.current
+    focusFor.current = undefined
+    if (focusOnArrival(pending, runKey)) runTitle.current?.focus()
   }, [runKey])
   // A plan's full flow (Think → You → sprints → Check → Ship); a fix run's Build, Review, Ship.
   const stages = fixPipeline?.stages ?? (repo && pipeline && selected?.plan !== undefined ? (buildFlow(repo, selected.plan, now) ?? []) : [])
@@ -133,7 +134,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
         <main className={view === 'board' ? 'main wide' : 'main'}>
           {urgentSlot && (
             <div className="urgent-slot" role="status">
-              {urgent && <UrgentBanner at={urgent} onOpen={() => (focusTitle.current = true)} />}
+              {urgent && <UrgentBanner at={urgent} onOpen={(href) => (focusFor.current = href)} />}
             </div>
           )}
           {notices.length > 0 && (
