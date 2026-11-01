@@ -10,6 +10,7 @@ import {
   handBackPr,
   parseAgentTranscript,
   stagingBranches,
+  stagingPrOf,
   type ActionEntry,
   type AutoToggle,
   type AgentRun,
@@ -131,11 +132,13 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
       .map((b) => deps.gh.getBranch(entry.path, b))
       .filter((pr): pr is PrStatus => pr !== undefined)
     const found = [...numbered.filter((p) => !byBranch.some((b) => b.number === p.number)), ...byBranch]
-    // A staging branch's PR to main, once a plan reached its final PR (its base may name the branch).
+    // A staging branch's PR to main, once a plan reached its final PR (its base may name the branch). It
+    // replaces the same PR found by number (a pending gate 7 names it), which has no `branch`, so the staging
+    // rules still find it; a PR a fix or plan branch found stays as it is.
     const staging = stagingBranches({ model, claims: entry.claims, prs: found })
       .map((b) => deps.gh.getBranch(entry.path, b))
-      .filter((pr): pr is PrStatus => pr !== undefined && !found.some((p) => p.number === pr.number))
-    const prs = [...found, ...staging]
+      .filter((pr): pr is PrStatus => pr !== undefined && !byBranch.some((p) => p.number === pr.number))
+    const prs = [...found.filter((p) => !staging.some((s) => s.number === p.number)), ...staging]
     return { ...base, model, agents: await agentsOf(entry.path, listed), prs }
   }
 
@@ -171,7 +174,9 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
 /**
  * The PRs the board asks gh about: per plan that isn't archived, the open PRs
  * of its current sprint's slices, plus its hand-back PR (the model's `handBackPr`). An archived plan a
- * claim names (pod archives it before the final merge) gives its hand-back PR too. In first-seen order.
+ * claim names (pod archives it before the final merge) gives its hand-back PR too. Then the staging PR each
+ * pending gate 7 entry names, so its merged state can make the entry Done (queue-triage.ts); once each, and
+ * only while the entry is pending (a merged PR is final in the gh cache, so it is asked once). In first-seen order.
  */
 export function livePrNumbers(model: RepoModel, claims: Pick<Claim, 'plan'>[] = []): number[] {
   const numbers = new Set<number>()
@@ -187,6 +192,10 @@ export function livePrNumbers(model: RepoModel, claims: Pick<Claim, 'plan'>[] = 
     }
     const handBack = handBackPr(plan)
     if (handBack !== undefined) numbers.add(handBack)
+  }
+  for (const e of model.queue) {
+    const staging = e.isPending ? stagingPrOf(e) : undefined
+    if (staging !== undefined) numbers.add(staging)
   }
   return [...numbers]
 }

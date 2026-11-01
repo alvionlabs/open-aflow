@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildRepoModel, type AnswerResult, type BoardRepo, type RunSummary } from '@pod-board/model'
 import { formView, type AnswerState } from './answer-flow.ts'
 import { ANSWER_NOTE, ANSWER_NOTE_NEXT_WAVE, ANSWER_WAITING, answerNote, formAnchor, waitingRows } from './queue-view.ts'
+import { nextSteps } from './next-step.ts'
 
 const README = '# pod docs\n\npod docs: 2\n'
 
@@ -134,5 +135,42 @@ describe('waiting on you', () => {
     expect(formAnchor({ kind: 'result', seq: 2, target, text: 'x', result: { outcome: 'changed', logged: true } }, rows.slice(1), 'id-r')).toBe('end')
     // Another repo's form never anchors here.
     expect(formAnchor({ kind: 'editing', seq: 1, target: { repoId: 'other', line }, text: '' }, rows, 'id-r')).toBeUndefined()
+  })
+})
+
+describe('Done and Value in use on the rows', () => {
+  const archived = (slug: string) => plan(slug, 'one').replace('Status: active', 'Status: archived')
+  const GATE = '- `[2026-10-20 · PENDING · orchestrator → human · plan: old]` gate 4 (wave-check-failed): A1 stuck. Value in use: skip A1. **Resolution:** pending'
+  const DECISION = '- `[2026-10-21 · PENDING · engineer → human · plan: old]` decision: the badge colour. value in use: `white`. Answer to change. **Resolution:** pending'
+  const PLAIN = '- `[2026-10-21 · PENDING · engineer → human · plan: old]` someday: tidy the logs. **Resolution:** pending'
+  const TO_POD = '- `[2026-10-21 · BLOCKED · engineer → orchestrator · plan: old]` gate 1 (blocked-concern): for pod. **Resolution:** pending'
+
+  function oldRepo(): BoardRepo {
+    const model = buildRepoModel({
+      'pod-docs/README.md': README,
+      'pod-docs/plans/archive/old.md': archived('old'),
+      'pod-docs/handoff-queue.md': ['# Handoff queue', '', GATE, DECISION, PLAIN, TO_POD, ''].join('\n'),
+    })
+    return { id: 'id-r', name: 'r', path: '/r', source: 'registered', model, agents: [], prs: [], claims: [] }
+  }
+
+  it('a Done entry shows its reason and no default; a value in use shows as the default', () => {
+    const [gate, decision, plain, toPod] = waitingRows(oldRepo(), run({ plan: 'old' }))
+    // Done wins over the gate's own value in use.
+    expect(gate).toMatchObject({ done: 'plan old is archived' })
+    expect(gate?.keep).toBeUndefined()
+    expect(decision).toMatchObject({ keep: 'white' })
+    expect(decision?.done).toBeUndefined()
+    for (const r of [plain, toPod]) {
+      expect(r?.done).toBeUndefined()
+      expect(r?.keep).toBeUndefined()
+    }
+  })
+
+  it('the Next step card carries the same row', () => {
+    const steps = nextSteps(run({ plan: 'old' }), oldRepo(), Date.UTC(2026, 9, 31))
+    const items = steps ? [steps.card, ...steps.rest] : []
+    expect(items.find((i) => i.entry?.done !== undefined)?.entry?.done).toBe('plan old is archived')
+    expect(items.find((i) => i.entry?.keep !== undefined)?.entry?.keep).toBe('white')
   })
 })

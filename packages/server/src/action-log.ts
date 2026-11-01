@@ -4,11 +4,12 @@
 
 import { readFileSync } from 'node:fs'
 import { appendFile } from 'node:fs/promises'
-import type { ActionEntry, AnswerOutcome, MergeOutcome, NewActionEntry, ResumeOutcome } from '@pod-board/model'
+import type { ActionEntry, AnswerOutcome, MergeOutcome, NewActionEntry, ResolveOutcome, ResumeOutcome } from '@pod-board/model'
 
 export const ACTION_LOG_MAX = 50
 const MERGE_RESULTS = new Set<string>(['merged', 'queued', 'auto-merge', 'stale', 'failed', 'unconfirmed'] satisfies MergeOutcome[])
 const ANSWER_RESULTS = new Set<string>(['answered', 'changed', 'failed'] satisfies AnswerOutcome[])
+const RESOLVE_RESULTS = new Set<string>(['closed', 'kept', 'changed', 'failed'] satisfies ResolveOutcome[])
 const RESUME_RESULTS = new Set<string>(['started', 'failed'] satisfies ResumeOutcome[])
 const RESUME_REPLIES = new Set<unknown>(['continue', 'go'])
 
@@ -73,6 +74,7 @@ function parseEntry(line: string): ActionEntry | undefined {
   let entry: ActionEntry
   if (e.action === 'merge' && MERGE_RESULTS.has(e.result as string)) entry = { ...base, action: 'merge', result: e.result as MergeOutcome }
   else if (e.action === 'answer' && ANSWER_RESULTS.has(e.result as string)) entry = { ...base, action: 'answer', result: e.result as AnswerOutcome }
+  else if (e.action === 'resolve' && RESOLVE_RESULTS.has(e.result as string)) entry = { ...base, action: 'resolve', result: e.result as ResolveOutcome }
   else if (e.action === 'resume' && RESUME_RESULTS.has(e.result as string) && RESUME_REPLIES.has(e.reply) && typeof e.auto === 'boolean')
     entry = { ...base, action: 'resume', result: e.result as ResumeOutcome, reply: e.reply as 'continue' | 'go', auto: e.auto }
   else return undefined
