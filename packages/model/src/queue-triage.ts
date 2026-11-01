@@ -39,6 +39,14 @@ const HAND_BACK = /^plan\s+`?[\w.-]+`?\s+complete\b/i
 /** The staging PR a gate 7 entry names: the URL or `#N` after the words `staging PR`. */
 const STAGING_PR = /staging\s+PR\s*(?:\S*?\/pull\/(\d+)|#(\d+))/i
 
+/** The staging PR a gate 7 entry (or a plan-complete hand-back) names; undefined for any other entry. */
+export function stagingPrOf(entry: Pick<QueueItem, 'body'>): number | undefined {
+  const body = entry.body
+  if (haltGate(body) !== 7 && !HAND_BACK.test(body.trim())) return undefined
+  const m = STAGING_PR.exec(body)
+  return m ? Number(m[1] ?? m[2]) : undefined
+}
+
 /** Gates pod only writes while a wave runs. Gate 3 and 6 also come at the final PR, so only when the entry names a wave. */
 function isWaveGate(gate: number, body: string): boolean {
   if (gate === 1 || gate === 4) return true
@@ -57,8 +65,7 @@ export function doneReason(repo: TriageRepo, entry: QueueItem): string | undefin
   const body = entry.body
   const gate = haltGate(body)
   if (gate === 7 || HAND_BACK.test(body.trim())) {
-    const m = STAGING_PR.exec(body)
-    const n = m ? Number(m[1] ?? m[2]) : undefined
+    const n = stagingPrOf(entry)
     if (n !== undefined && repo.prs.some((p) => p.number === n && p.state === 'merged')) return `staging PR #${n} merged`
     return undefined
   }
@@ -73,12 +80,12 @@ export function doneReason(repo: TriageRepo, entry: QueueItem): string | undefin
   return undefined
 }
 
-/** Close or Keep for an entry you can answer; Done wins. Empty for any other entry. */
+/** Close or Keep for an entry you can answer; Done wins. Keep only on a PENDING: a BLOCKED halts pod and needs a real answer. */
 export function triage(repo: TriageRepo, entry: QueueItem): Triage {
   if (!isAnswerable(entry)) return {}
   const done = doneReason(repo, entry)
   if (done !== undefined) return { done }
-  const keep = valueInUse(entry.body)
+  const keep = entry.type === 'PENDING' ? valueInUse(entry.body) : undefined
   return keep === undefined ? {} : { keep }
 }
 
