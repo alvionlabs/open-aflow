@@ -48,11 +48,21 @@
   background: color-mix(in srgb, var(--tone) 10%, var(--bg));
 }
 
-/* More classes than base.css's .status.s-bad { color: var(--fg) }, so the word takes the tone. */
-.urgent:has(> .status.s-bad) > .status,
-.urgent:has(> .status.s-you) > .status,
+/*
+ * The status word takes the tone, with just enough --fg to reach 4.5:1 on the tint in both themes.
+ * Each status has its own share: urgent-banner.test.ts computes the ratios from tokens.css.
+ * More classes than base.css's .status.s-bad { color: var(--fg) }, so these win.
+ */
+.urgent:has(> .status.s-bad) > .status {
+  color: color-mix(in srgb, var(--tone) 95%, var(--fg));
+}
+
+.urgent:has(> .status.s-you) > .status {
+  color: color-mix(in srgb, var(--tone) 90%, var(--fg));
+}
+
 .urgent:has(> .status.s-ok) > .status {
-  color: var(--tone);
+  color: color-mix(in srgb, var(--tone) 85%, var(--fg));
 }
 
 .urgent > .status {
