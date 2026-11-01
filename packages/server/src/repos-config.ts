@@ -149,3 +149,14 @@ async function renameWithRetry(from: string, to: string): Promise<void> {
     }
   }
 }
+
+export type RemoveRepoError = 'not registered' | 'config unreadable'
+
+export function removeRepo(
+  _file: string,
+  _repoPath: string,
+  _platform: NodeJS.Platform,
+  _deps: Pick<AddRepoDeps, 'ignoresCase'> = { ignoresCase },
+): Promise<{ path: string } | { error: RemoveRepoError }> {
+  return Promise.resolve({ error: 'not registered' })
+}

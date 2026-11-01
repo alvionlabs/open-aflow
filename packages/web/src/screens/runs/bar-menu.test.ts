@@ -58,3 +58,17 @@ describe('menu contents', () => {
     expect(pressed(render({ storage: store('bogus') }))).toEqual(['Dark'])
   })
 })
+
+describe('Remove from the board item', () => {
+  it('shows only with remove, as a button named for the repo, last in the menu', () => {
+    expect(render({})).not.toContain('from the board')
+    const html = render({ remove: { label: 'Remove alpha-repo from the board', onPick: noop }, portBase: 3100 })
+    expect(html).toMatch(/<button[^>]*type="button"[^>]*>Remove alpha-repo from the board<\/button>/)
+    expect(html.indexOf('Ports')).toBeLessThan(html.indexOf('Remove alpha-repo'))
+    expect(text(html)).not.toMatch(/[⋯+]/)
+  })
+
+  it('gives the trigger a stable id, so focus can come back to it after the confirm closes', () => {
+    expect(render({ open: false })).toMatch(/<button[^>]*id="run-menu-trigger"/)
+  })
+})

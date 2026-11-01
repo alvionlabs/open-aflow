@@ -108,6 +108,16 @@ describe('action log', () => {
     ])
   })
 
+  test('reads remove-repo entries', async () => {
+    const remove = (result: string): Record<string, unknown> => ({ action: 'remove-repo', repoId: 'id-r', repo: 'r', target: '/x/r', result })
+    const file = join(root, 'remove.jsonl')
+    await writeFile(file, [{ at: 1, ...remove('removed') }, { at: 2, ...remove('merged') }, { at: 3, ...remove('failed'), message: 'config unwritable' }].map((e) => JSON.stringify(e)).join('\n'))
+    expect(createActionLog({ file, now: () => 5 }).recent()).toEqual([
+      { at: 3, action: 'remove-repo', repoId: 'id-r', repo: 'r', target: '/x/r', result: 'failed', message: 'config unwritable' },
+      { at: 1, action: 'remove-repo', repoId: 'id-r', repo: 'r', target: '/x/r', result: 'removed' },
+    ])
+  })
+
   test('reads resume entries', async () => {
     const resume = (result: 'started' | 'failed', auto: boolean, message?: string): NewActionEntry => ({
       action: 'resume',
