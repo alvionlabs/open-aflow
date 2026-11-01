@@ -22,6 +22,7 @@ import {
   createRemoveFlow,
   hashAfterRemove,
   moreButtonId,
+  navigateAfterRemove,
   removeTarget,
   repoOfRun,
   type RemoveState,
@@ -89,13 +90,15 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   // Remove repo, from the header's ⋯ or a sidebar card's ⋯: the confirm opens under the one it came from;
   // after a removal the page moves on when the open run's repo left.
   const [removeState, setRemoveState] = useState<RemoveState>(REMOVE_IDLE)
-  const latest = useRef({ planFallback, navigate })
-  latest.current = { planFallback, navigate }
+  const latest = useRef({ planFallback, navigate, selected })
+  latest.current = { planFallback, navigate, selected }
   const removeFlow = useMemo(
     () =>
-      createRemoveFlow(setRemoveState, (_target, after) => {
-        // `after` was planned when Remove was pressed: the new Board may have reached the page first.
-        if (after !== undefined) latest.current.navigate?.(after)
+      createRemoveFlow(setRemoveState, (target, after) => {
+        // `after` was planned when Remove was pressed: the new Board may have reached the page first, and
+        // the user may have opened another run meanwhile, which stays.
+        const go = navigateAfterRemove(latest.current.selected, target, after)
+        if (go !== undefined) latest.current.navigate?.(go)
         latest.current.planFallback?.(undefined)
       }),
     [],

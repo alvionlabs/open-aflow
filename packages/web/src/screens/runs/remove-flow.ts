@@ -164,5 +164,16 @@ export function hashAfterRemove(runs: RunSummary[], selected: RunSummary | undef
 }
 
 
-export const navigateAfterRemove = (_selected: RunSummary | undefined, _target: RemoveTarget, after: string | undefined): string | undefined => after
-export const moreName = (name: string, repo: string) => `${name} (${repo})`
+/**
+ * Where the page goes when the remove succeeds: the hash planned at Remove, but only while the page still
+ * shows the removed repo's run, the planned run (the new Board came first), or no run. A run the user
+ * opened during the request stays.
+ */
+export function navigateAfterRemove(selected: RunSummary | undefined, target: RemoveTarget, after: string | undefined): string | undefined {
+  if (after === undefined) return undefined
+  if (!selected || isRunOf(selected, target.repoId, target.name) || hashFor(selected) === after) return after
+  return undefined
+}
+
+/** The sidebar ⋯ label's run part: `<run name> (<repo>)`, or just the name when the run is named after its repo. */
+export const moreName = (name: string, repo: string) => (name === repo ? name : `${name} (${repo})`)

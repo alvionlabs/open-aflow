@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { BoardRepo, RunSummary } from '@pod-board/model'
 import { hashFor } from '../../selection.ts'
-import { moreButtonId, repoOfRun } from './remove-flow.ts'
+import { moreButtonId, moreName, repoOfRun } from './remove-flow.ts'
 import { RunMoreMenu } from './RunMoreMenu.tsx'
 import { runCard, runChip } from './view.ts'
 
@@ -44,7 +44,7 @@ export function RunsList({ runs, selected, repos, removable, onRemove, panelFor 
                   </span>
                   <span className={`status ${state.cls}`}>{state.label}</span>
                 </a>
-                {more && <RunMoreMenu runName={`${card.name} (${r.repo})`} triggerId={moreButtonId(r)} onRemove={() => onRemove(r)} />}
+                {more && <RunMoreMenu runName={moreName(card.name, r.repo)} triggerId={moreButtonId(r)} onRemove={() => onRemove(r)} />}
                 {panelFor?.(r)}
               </li>
             )
