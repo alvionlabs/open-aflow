@@ -11,12 +11,19 @@ type Props = { at: Elsewhere; onOpen?: () => void }
  */
 export function UrgentBanner({ at, onOpen }: Props) {
   const status = nextStatus(at.item.status)
-  const where = at.repo === undefined ? `· ${at.name}` : `· ${at.repo} · ${at.name}`
   return (
     <div className="urgent">
       <span className={`status ${status.cls}`}>{status.label}</span>
       <span className="urgent-text">
-        <span className="urgent-title">{at.item.title}</span> <span className="urgent-where muted">{where}</span>
+        <span className="urgent-title">{at.item.title}</span> <span className="urgent-where muted">
+          {/* The repo hides on phones, as the draft: the run's name is enough there. */}
+          {at.repo !== undefined && (
+            <span className="urgent-at">
+              · <span className="urgent-repo">{at.repo}</span>{' '}
+            </span>
+          )}
+          · {at.name}
+        </span>
         {at.more > 0 && (
           <>
             {' '}

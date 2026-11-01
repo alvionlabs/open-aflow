@@ -4,8 +4,10 @@
  * .urgent-slot is the live region; it has no box of its own, so an empty one takes no space.
  */
 
+/* A grid item of .main: min-width 0, so a long title ends in an ellipsis instead of widening the column. */
 .urgent-slot {
   display: block;
+  min-width: 0;
 }
 
 .urgent {
@@ -48,8 +50,14 @@
 .urgent-where,
 .urgent-more {
   flex: none;
-  font: var(--size-small) / 1.4 var(--mono);
+  font-size: var(--size-small);
   white-space: nowrap;
+}
+
+/* The status word and the repo in Geist Mono, as the Look says; the run's name in Geist. */
+.urgent-repo,
+.urgent-more {
+  font-family: var(--mono);
 }
 
 .urgent-where {
@@ -72,8 +80,13 @@
 @media (max-width: 480px) {
   .urgent {
     flex-wrap: wrap;
+    align-items: baseline;
     gap: 8px 12px;
     padding: 8px 12px;
+  }
+
+  .urgent-at {
+    display: none;
   }
 
   .urgent-text {

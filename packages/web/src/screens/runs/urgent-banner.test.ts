@@ -36,7 +36,10 @@ describe('urgent banner', () => {
     expect(h).toMatch(/<span class="status s-bad">Blocked<\/span>/)
     expect(text(h)).toBe('Blocked Autopilot stopped: a slice is blocked · chess-web · Sparring ladder +2 more Open run')
     expect(h).toMatch(/class="urgent-title">Autopilot stopped: a slice is blocked</)
-    expect(h).toMatch(/class="urgent-where muted">· chess-web · Sparring ladder</)
+    const whereOf = (x: string) => text(/class="urgent-where muted">([\s\S]*?)<\/span>(?= <span class="urgent-more|<\/span><a )/.exec(x)?.[1] ?? '')
+    expect(whereOf(h)).toBe('· chess-web · Sparring ladder')
+    // The repo in mono, as the Look says.
+    expect(h).toMatch(/<span class="urgent-repo">chess-web<\/span>/)
     expect(h).toMatch(/class="urgent-more muted">\+2 more</)
     // No count at 0.
     const none = html(at())
@@ -44,7 +47,8 @@ describe('urgent banner', () => {
     expect(text(none)).toBe('Blocked Autopilot stopped: a slice is blocked · chess-web · Sparring ladder Open run')
     // A repo row: its name only.
     const row = html(at({ name: 'chess-web', repo: undefined }))
-    expect(row).toMatch(/class="urgent-where muted">· chess-web</)
+    expect(whereOf(row)).toBe('· chess-web')
+    expect(row).not.toMatch(/urgent-repo/)
     // Other statuses take their own class.
     expect(html(at({ item: { ...item, tier: 'merge', status: 'needs-you', title: 'Merge PR #78' } }))).toMatch(/<span class="status s-you">Needs you<\/span>/)
     expect(html(at({ item: { ...item, tier: 'reply', status: 'ready', title: 'Send continue' } }))).toMatch(/<span class="status s-ok">Ready<\/span>/)
@@ -140,6 +144,8 @@ describe('urgent banner css', () => {
     // An empty slot takes no space.
     const slot = Object.assign({}, ...all.filter((r) => r.selectors.includes('.urgent-slot')).map((r) => decls(r.body))) as Record<string, string>
     for (const p of Object.keys(slot)) expect(p, `.urgent-slot ${p}`).not.toMatch(/^(padding|margin|border|gap|row-gap|column-gap|min-height|height)/)
+    // A grid item of .main: without min-width 0 a long title widens the column and the page scrolls sideways.
+    expect(slot['min-width']).toBe('0')
     // Desktop: one line, the title ends in an ellipsis.
     const title = styleOf('.urgent-title', desktop)
     expect(title['text-overflow']).toBe('ellipsis')
