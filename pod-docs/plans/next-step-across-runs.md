@@ -1,6 +1,6 @@
 # Plan: Next step across runs
 
-_Generated: 2026-10-31 · Status: active · Grilled-with: pod (fast)_
+_Generated: 2026-10-31 · Status: archived · Grilled-with: pod (fast)_
 
 Port base: 3000
 
