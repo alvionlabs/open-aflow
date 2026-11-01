@@ -50,13 +50,12 @@ export function RunMoreMenu({ runName, triggerId, onRemove }: { runName: string;
       setPosition({ top: r.bottom + GAP, right })
     }
     place()
-    // The menu is fixed, so it closes when the page or the sidebar scrolls under it.
-    const close = () => send('outside')
-    window.addEventListener('resize', close)
-    window.addEventListener('scroll', close, true)
+    // The menu is fixed, so it follows its button when the page or the sidebar scrolls, or the window resizes.
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
     return () => {
-      window.removeEventListener('resize', close)
-      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
     }
   }, [open])
 

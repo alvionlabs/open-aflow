@@ -257,19 +257,23 @@
 }
 
 /*
- * A card's ⋯ button: beside the card's link (never inside it), in the card's bottom-right corner, under the
- * status. It shows on hover, while the card holds keyboard focus, and while its menu is open; on a touch
- * screen always, with a 44 px target around its 24 px box.
+ * A card's ⋯ button: beside the card's link (never inside it), in a 40 px column at the card's right, on the
+ * name's line after the status. It shows on hover, while the card holds keyboard focus, and while its menu
+ * is open; on a touch screen always, with a 44 px target around its 24 px box.
  */
 .run-item {
   position: relative;
   min-width: 0;
 }
 
+.run-item:has(> .run-more-wrap) > .run {
+  padding-right: 40px;
+}
+
 .run-more-wrap {
   position: absolute;
+  top: 10px;
   right: 8px;
-  bottom: 8px;
 }
 
 .run-more {
@@ -281,6 +285,12 @@
   background: transparent;
   color: var(--muted);
   opacity: 0;
+}
+
+/* .btn.icon is 40 px square; this one is 24 px. */
+.btn.icon.run-more {
+  width: 24px;
+  height: 24px;
 }
 
 .run-more svg {
@@ -301,9 +311,11 @@
   color: var(--fg);
 }
 
-/* The sidebar's confirm sits right under its card. */
+/* The sidebar's confirm sits right under its card, at the sidebar's dense size. */
 .run-item > .remove-confirm {
   margin: 8px 0 0;
+  padding: 12px;
+  font-size: var(--size-dense);
 }
 
 /* base.css makes every icon button 44 px on a phone; this one keeps its 24 px box, and touch gets the target below. */
