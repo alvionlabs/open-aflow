@@ -2,10 +2,11 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { createElement } from 'react'
+import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { RunSummary } from '@pod-board/model'
 import type { Elsewhere } from './elsewhere.ts'
+import type { OpenClick } from './open-focus.ts'
 import type { NextItem } from './next-step.ts'
 import { UrgentBanner } from './UrgentBanner.tsx'
 
@@ -27,6 +28,25 @@ function openOf(h: string): string {
   const m = /<a [^>]*>[\s\S]*?<\/a>/.exec(h)
   expect(m, 'the Open run link').not.toBeNull()
   return m![0]
+}
+
+/** The first <a> element in a rendered tree. */
+function linkOf(node: ReactNode): ReactElement {
+  const walk = (n: ReactNode): ReactElement | undefined => {
+    if (Array.isArray(n)) {
+      for (const c of n) {
+        const f = walk(c)
+        if (f) return f
+      }
+      return undefined
+    }
+    if (!isValidElement(n)) return undefined
+    if (n.type === 'a') return n
+    return walk((n.props as { children?: ReactNode }).children)
+  }
+  const found = walk(node)
+  expect(found, 'the Open run link').toBeDefined()
+  return found!
 }
 
 describe('urgent banner', () => {
@@ -69,6 +89,21 @@ describe('urgent banner', () => {
     expect(a).toMatch(/>Open run<svg[^>]*aria-hidden="true"[^>]*><path d="M3 8h9.5M8 3.5L12.5 8 8 12.5"/)
     expect(text(a)).toBe('Open run')
     expect(a).not.toMatch(/[→›»↗+]|&gt;/)
+  })
+
+  it('open run reports its target only for a click that opens in this tab', () => {
+    const opened: unknown[] = []
+    const a = linkOf(UrgentBanner({ at: at(), onOpen: (href) => opened.push(href) }))
+    const onClick = (a.props as { onClick: (e: OpenClick) => void }).onClick
+    const click = (over: Partial<OpenClick> = {}): OpenClick => ({ button: 0, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, defaultPrevented: false, ...over })
+    // New tab, new window, download, middle click, or a click another handler took: this tab stays.
+    for (const over of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }, { defaultPrevented: true }]) onClick(click(over))
+    expect(opened).toEqual([])
+    onClick(click())
+    expect(opened).toEqual(['#/chess/sparring-ladder'])
+    // No onOpen: a click still works.
+    const bare = linkOf(UrgentBanner({ at: at() }))
+    expect(() => (bare.props as { onClick: (e: OpenClick) => void }).onClick(click())).not.toThrow()
   })
 
   it('navigation only', () => {
