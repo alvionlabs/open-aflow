@@ -28,8 +28,9 @@ describe('selected run', () => {
     expect(resolveSelection(runs, '#/e--projects-b/alpha').run).toBe(runs[0])
   })
 
-  it('no runs gives none', () => {
-    expect(resolveSelection([], '#/e--projects-a/alpha')).toEqual({ run: undefined, view: 'pipeline', slice: undefined, hash: undefined })
+  it('no runs gives none, and an empty hash, so a removed run hash leaves the URL', () => {
+    expect(resolveSelection([], '#/e--projects-a/alpha')).toEqual({ run: undefined, view: 'pipeline', slice: undefined, hash: '' })
+    expect(resolveSelection([], '').hash).toBe('')
   })
 
   it('when the selected run vanishes, the selection moves to the first and the hash follows', () => {
