@@ -1,6 +1,7 @@
 import { useLayoutEffect, useState, type CSSProperties, type RefObject } from 'react'
 import { Icon } from '../../theme/icons.tsx'
 import { RemoveRepoItem, useMenu } from './menu-parts.tsx'
+import { menuPosition } from './menu-position.ts'
 import './menu.css'
 
 export type RunMoreMenuViewProps = {
@@ -33,10 +34,7 @@ export function RunMoreMenuView({ open, onToggle, onRemove, runName, triggerId, 
   )
 }
 
-const GAP = 4
-const EDGE = 8
-
-/** A sidebar card's ⋯ menu. It opens fixed under its button, right edges aligned, inside the viewport. */
+/** A sidebar card's ⋯ menu. It opens fixed under its button (above it near the bottom), right edges aligned, inside the viewport. */
 export function RunMoreMenu({ runName, triggerId, onRemove }: { runName: string; triggerId: string; onRemove: () => void }) {
   const { open, send, triggerRef, menuRef } = useMenu(triggerId)
   const [position, setPosition] = useState<CSSProperties>()
@@ -46,8 +44,7 @@ export function RunMoreMenu({ runName, triggerId, onRemove }: { runName: string;
     const place = () => {
       const r = triggerRef.current?.getBoundingClientRect()
       if (!r) return
-      const right = Math.max(EDGE, window.innerWidth - r.right)
-      setPosition({ top: r.bottom + GAP, right })
+      setPosition(menuPosition(r, menuRef.current?.offsetHeight ?? 0, { width: window.innerWidth, height: window.innerHeight }))
     }
     place()
     // The menu is fixed, so it follows its button when the page or the sidebar scrolls, or the window resizes.

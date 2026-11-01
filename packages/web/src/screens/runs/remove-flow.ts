@@ -27,12 +27,12 @@ export type Post = <T>(path: string, body: object) => Promise<ActionReply<T>>
 export type RemoveState =
   | { kind: 'idle'; seq: number }
   | { kind: 'confirm'; seq: number; target: RemoveTarget }
-  | { kind: 'removing'; seq: number; target: RemoveTarget }
+  | { kind: 'removing'; seq: number; target: RemoveTarget; after?: string | undefined }
   | { kind: 'error'; seq: number; target: RemoveTarget; message: string }
 
 export type RemoveEvent =
   | { type: 'open'; target: RemoveTarget }
-  | { type: 'remove' }
+  | { type: 'remove'; after?: string | undefined }
   | { type: 'removed'; seq: number; reply: ActionReply<RemoveRepoResult> }
   | { type: 'cancel' }
   | { type: 'key'; key: string }
@@ -44,7 +44,7 @@ export function reduce(s: RemoveState, e: RemoveEvent): RemoveState {
     case 'open':
       return s.kind === 'removing' ? s : { kind: 'confirm', seq: s.seq, target: e.target }
     case 'remove':
-      return s.kind === 'confirm' || s.kind === 'error' ? { kind: 'removing', seq: s.seq + 1, target: s.target } : s
+      return s.kind === 'confirm' || s.kind === 'error' ? { kind: 'removing', seq: s.seq + 1, target: s.target, after: e.after } : s
     case 'removed':
       if (s.kind !== 'removing' || e.seq !== s.seq) return s
       return e.reply.ok ? { kind: 'idle', seq: s.seq } : { kind: 'error', seq: s.seq, target: s.target, message: e.reply.message }
@@ -58,15 +58,19 @@ export function reduce(s: RemoveState, e: RemoveEvent): RemoveState {
 export type RemoveFlow = {
   state(): RemoveState
   open(target: RemoveTarget): void
-  remove(): void
+  /** `after`: the hash to go to once removed, planned now from the runs and the selection (`hashAfterRemove`). */
+  remove(after?: string): void
   cancel(): void
   key(key: string): void
 }
 
-/** Runs the reducer, sends `remove-repo` as it moves to removing, and calls `onRemoved` after a removal. */
+/**
+ * Runs the reducer, sends `remove-repo` as it moves to removing, and calls `onRemoved` after a removal with
+ * the hash planned at Remove: by then the new Board may already have moved the selection.
+ */
 export function createRemoveFlow(
   onChange: (s: RemoveState) => void,
-  onRemoved: (target: RemoveTarget) => void,
+  onRemoved: (target: RemoveTarget, after: string | undefined) => void,
   post: Post = (path, body) => postAction(path, body),
 ): RemoveFlow {
   let state = INITIAL
@@ -75,7 +79,7 @@ export function createRemoveFlow(
     state = reduce(state, e)
     if (state === prev) return
     onChange(state)
-    if (prev.kind === 'removing' && state.kind === 'idle') onRemoved(prev.target)
+    if (prev.kind === 'removing' && state.kind === 'idle') onRemoved(prev.target, prev.after)
     const s = state
     if (s.kind === 'removing') {
       void post<RemoveRepoResult>('remove-repo', { repoId: s.target.repoId, path: s.target.path }).then((reply) => dispatch({ type: 'removed', seq: s.seq, reply }))
@@ -84,7 +88,7 @@ export function createRemoveFlow(
   return {
     state: () => state,
     open: (target) => dispatch({ type: 'open', target }),
-    remove: () => dispatch({ type: 'remove' }),
+    remove: (after) => dispatch({ type: 'remove', after }),
     cancel: () => dispatch({ type: 'cancel' }),
     key: (key) => dispatch({ type: 'key', key }),
   }

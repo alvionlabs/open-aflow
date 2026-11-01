@@ -44,7 +44,7 @@ export function RunsList({ runs, selected, repos, removable, onRemove, panelFor 
                   </span>
                   <span className={`status ${state.cls}`}>{state.label}</span>
                 </a>
-                {more && <RunMoreMenu runName={card.name} triggerId={moreButtonId(r)} onRemove={() => onRemove(r)} />}
+                {more && <RunMoreMenu runName={`${card.name} (${r.repo})`} triggerId={moreButtonId(r)} onRemove={() => onRemove(r)} />}
                 {panelFor?.(r)}
               </li>
             )

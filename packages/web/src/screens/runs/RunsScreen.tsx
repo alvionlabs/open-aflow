@@ -47,6 +47,10 @@ type Props = {
   now: number
   /** Where the open tab is remembered; the page's local storage when not given. */
   storage?: TabStorage | undefined
+  /** Sets the run the page falls back to while a remove is in flight (`resolveSelection`'s fallback); undefined clears it. */
+  planFallback?: (hash: string | undefined) => void
+  /** Moves the page to a hash now ('' for none). */
+  navigate?: (hash: string) => void
 }
 
 /** The page's local storage, or nothing where there is none or it throws. */
@@ -61,7 +65,7 @@ function pageStorage(): TabStorage | undefined {
 const TAB_LABELS: Record<Tab, string> = { waiting: 'Waiting', log: 'Log' }
 const TABS: Tab[] = ['waiting', 'log']
 
-export function RunsScreen({ board, stream, runs, selected, view, slice, agent, now, storage }: Props) {
+export function RunsScreen({ board, stream, runs, selected, view, slice, agent, now, storage, planFallback, navigate }: Props) {
   const store = useRef(storage ?? pageStorage())
   const [stored, setStored] = useState<Tab | undefined>(() => readTab(store.current))
   const [picking, setPicking] = useState(false)
@@ -85,18 +89,29 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   // Remove repo, from the header's ⋯ or a sidebar card's ⋯: the confirm opens under the one it came from;
   // after a removal the page moves on when the open run's repo left.
   const [removeState, setRemoveState] = useState<RemoveState>(REMOVE_IDLE)
-  const latest = useRef({ runs, selected })
-  latest.current = { runs, selected }
+  const latest = useRef({ planFallback, navigate })
+  latest.current = { planFallback, navigate }
   const removeFlow = useMemo(
     () =>
-      createRemoveFlow(setRemoveState, (target) => {
-        const next = hashAfterRemove(latest.current.runs, latest.current.selected, target)
-        // With no run left (''), the Board's next update clears the hash (App), and the empty state shows.
-        if (next) window.location.hash = next
+      createRemoveFlow(setRemoveState, (_target, after) => {
+        // `after` was planned when Remove was pressed: the new Board may have reached the page first.
+        if (after !== undefined) latest.current.navigate?.(after)
+        latest.current.planFallback?.(undefined)
       }),
     [],
   )
   useEffect(() => removeFlow.cancel(), [runKey, removeFlow])
+  // A failed or cancelled remove leaves no fallback behind.
+  useEffect(() => {
+    if (removeState.kind !== 'removing') latest.current.planFallback?.(undefined)
+  }, [removeState.kind])
+  /** Remove pressed: plan where the page goes from the runs and the selection now, before the Board changes. */
+  const pressRemove = () => {
+    if (removeState.kind !== 'confirm' && removeState.kind !== 'error') return
+    const after = hashAfterRemove(runs, selected, removeState.target)
+    planFallback?.(after)
+    removeFlow.remove(after)
+  }
   const repos = board?.repos ?? []
   const toRemove = removeTarget(repo, { repos, runs, place: HEADER_PLACE, returnTo: MENU_TRIGGER_ID })
   const sideTarget = (run: RunSummary) => removeTarget(repoOfRun(repos, run), { repos, runs, place: hashFor(run), returnTo: moreButtonId(run) })
@@ -107,7 +122,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
         key={place}
         view={removing}
         returnTo={removeState.target.returnTo}
-        onRemove={() => removeFlow.remove()}
+        onRemove={pressRemove}
         onCancel={() => removeFlow.cancel()}
         onKey={(k) => removeFlow.key(k)}
       />

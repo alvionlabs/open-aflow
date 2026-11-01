@@ -51,7 +51,7 @@ export type Selection = { run: RunSummary | undefined; view: View; slice: string
 
 /**
  * The run, view, and open slice or agent a hash names, corrected: an unknown run → the
- * first run's pipeline; a plan-less run → its pipeline; a fix run never gets the board, and
+ * `fallback` hash's run when it names one, else the first run's pipeline; a plan-less run → its pipeline; a fix run never gets the board, and
  * a plan run never the agent view; a slice that `slicesOf(run)` doesn't list → the board
  * with none open; an agent that `agentsOf(run)` doesn't list → the pipeline. Without
  * `slicesOf` or `agentsOf`, a slice or agent is kept as named.
@@ -61,10 +61,13 @@ export function resolveSelection(
   hash: string,
   slicesOf?: (run: RunSummary) => string[],
   agentsOf?: (run: RunSummary) => string[],
+  fallback?: string,
 ): Selection {
   const key = parseHash(hash)
   const named = key && runs.find((r) => r.repoId === key.repoId && r.plan === key.plan)
-  const run = named ?? runs[0]
+  // A run that vanished (its repo was just removed) goes to `fallback`, the run the remove planned, when it names one.
+  const back = fallback === undefined ? undefined : parseHash(fallback)
+  const run = named ?? (back && runs.find((r) => r.repoId === back.repoId && r.plan === back.plan)) ?? runs[0]
   // No runs: an empty hash, so a removed run's hash leaves the URL.
   if (!run) return { run: undefined, view: 'pipeline', slice: undefined, hash: '' }
   const fix = run.fix !== undefined
