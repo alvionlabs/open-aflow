@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { BoardRepo, RemoveRepoResult, RunSummary } from '@pod-board/model'
 import type { ActionReply } from '../../actions-client.ts'
 import { RemoveConfirmView } from './RemoveConfirm.tsx'
-import { confirmView, createRemoveFlow, hashAfterRemove, removeLabel, removeTarget, type Post, type RemoveState, type RemoveTarget } from './remove-flow.ts'
+import { confirmView, createRemoveFlow, hashAfterRemove, removeLabel, removeTarget, repoOfRun, type Post, type RemoveState, type RemoveTarget } from './remove-flow.ts'
 
 const A: RemoveTarget = { repoId: 'ra', name: 'alpha-repo', path: 'C:\\code\\alpha-repo', alsoClaimed: false }
 const B: RemoveTarget = { repoId: 'rb', name: 'beta-repo', path: 'C:\\code\\beta-repo', alsoClaimed: false }
@@ -52,7 +52,7 @@ describe('remove flow', () => {
     t.flow.remove()
     t.flow.remove()
     expect(t.flow.state().kind).toBe('removing')
-    expect(t.calls.map((c) => [c.path, c.body])).toEqual([['remove-repo', { repoId: 'ra' }]])
+    expect(t.calls.map((c) => [c.path, c.body])).toEqual([['remove-repo', { repoId: 'ra', path: A.path }]])
     await t.answer(0, ok)
     expect(t.flow.state().kind).toBe('idle')
     expect(t.removed).toEqual([A])
@@ -185,5 +185,39 @@ describe('hashAfterRemove', () => {
 
   it('stays put when a claim keeps the repo on the board', () => {
     expect(hashAfterRemove(runs, runs[1], { ...A, alsoClaimed: true })).toBeUndefined()
+  })
+})
+
+describe('two repos with the same id (chess-web and chess_web)', () => {
+  const dash = repo({ id: 'rx', name: 'chess-web', path: 'C:\code\chess-web' })
+  const under = repo({ id: 'rx', name: 'chess_web', path: 'C:\code\chess_web' })
+  const run = (name: string, plan: string): RunSummary => ({ repoId: 'rx', repo: name, plan, where: '', state: 'idle' }) as RunSummary
+
+  it('a run finds its own repo, not the first one with its id', () => {
+    expect(repoOfRun([dash, under], run('chess_web', 'p'))).toBe(under)
+    expect(repoOfRun([dash, under], run('chess-web', 'p'))).toBe(dash)
+    expect(repoOfRun([dash, under], undefined)).toBeUndefined()
+    expect(repoOfRun([dash], run('chess-web', 'p'))).toBe(dash)
+  })
+
+  it('Remove is not offered while the id is ambiguous, so the menu never names the wrong repo', () => {
+    expect(removeTarget(under, [dash, under])).toBeUndefined()
+    expect(removeTarget(dash, [dash, under])).toBeUndefined()
+    // With the sibling gone, the item names the selected run's repo.
+    expect(removeLabel(removeTarget(repoOfRun([under], run('chess_web', 'p')), [under])!.name)).toBe('Remove chess_web from the board')
+  })
+
+  it('hashAfterRemove keeps the sibling run that shares the id', () => {
+    const runs = [run('chess-web', 'a'), run('chess_web', 'b')]
+    const target = { repoId: 'rx', name: 'chess-web', path: dash.path, alsoClaimed: false }
+    expect(hashAfterRemove(runs, runs[0], target)).toBe('#/rx/b')
+  })
+
+  it('a 409 ambiguous repo reads as a plain sentence', async () => {
+    const t = setup()
+    t.flow.open(A)
+    t.flow.remove()
+    await t.answer(0, refused('ambiguous repo', 409))
+    expect(confirmView(t.flow.state())?.error).toBe("Another repo on the board has the same id, so the board can't tell which one to remove. Nothing changed.")
   })
 })

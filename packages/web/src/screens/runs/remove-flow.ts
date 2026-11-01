@@ -120,3 +120,5 @@ export function hashAfterRemove(runs: RunSummary[], selected: RunSummary | undef
   const next = others(runs.slice(at + 1))[0] ?? others(runs.slice(0, Math.max(at, 0))).at(-1)
   return next ? hashFor(next) : ''
 }
+
+export const repoOfRun = (_repos: BoardRepo[], _run: RunSummary | undefined): BoardRepo | undefined => undefined

@@ -267,3 +267,63 @@ describe('remove-repo route', () => {
     expect(s.logged).toEqual([])
   })
 })
+
+describe('remove-repo route: two repos with the same id', () => {
+  // `repoId` turns every non-alphanumeric character into `-`, so these two share one id.
+  let dash: string
+  let under: string
+  beforeEach(async () => {
+    dash = join(root, 'repos', 'chess-web')
+    under = join(root, 'repos', 'chess_web')
+    await makeRepo(dash)
+    await makeRepo(under)
+    await rm(join(root, 'ports'), { recursive: true })
+    await writeFile(cfgFile, JSON.stringify({ version: 1, repos: [{ path: dash }, { path: under }] }))
+  })
+
+  test('the two repos really share an id on the Board', async () => {
+    const s = await setup()
+    expect(s.idOf(dash)).toBe(s.idOf(under))
+    expect(s.board().repos).toHaveLength(2)
+  })
+
+  test('without a path the id is ambiguous: 409, and nothing changes', async () => {
+    const s = await setup()
+    const before = await readFile(cfgFile)
+    const res = await s.post({ repoId: s.idOf(dash) })
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'ambiguous repo' })
+    expect(await readFile(cfgFile)).toEqual(before)
+    expect(s.logged).toEqual([])
+  })
+
+  test('with its path each one is removed, and only that one', async () => {
+    const s = await setup()
+    const id = s.idOf(under)
+    const res = await s.post({ repoId: id, path: under })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ outcome: 'removed', path: under, logged: true })
+    expect((await config()).repos).toEqual([{ path: dash }])
+    expect(s.board().repos.map((r) => r.path)).toEqual([dash])
+    expect(s.logged).toEqual([{ action: 'remove-repo', repoId: id, repo: 'chess_web', target: under, result: 'removed' }])
+    expect((await s.post({ repoId: id, path: dash })).status).toBe(200)
+    expect((await config()).repos).toEqual([])
+  })
+
+  test('a path that is not the Board repo with that id is not on the board', async () => {
+    const s = await setup()
+    const before = await readFile(cfgFile)
+    for (const path of [join(root, 'repos', 'chess.web'), regPath]) {
+      const res = await s.post({ repoId: s.idOf(dash), path })
+      expect(res.status, path).toBe(404)
+      expect(await res.json()).toEqual({ error: 'not on the board' })
+    }
+    expect(await readFile(cfgFile)).toEqual(before)
+  })
+
+  test('a path that is not a string is a bad request', async () => {
+    const s = await setup()
+    const res = await s.post({ repoId: s.idOf(dash), path: 7 })
+    expect(res.status).toBe(400)
+  })
+})
