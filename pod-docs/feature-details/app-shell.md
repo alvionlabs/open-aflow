@@ -37,6 +37,7 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - `showModal()` runs in a layout effect so the dialog is open before the picker's own effect focuses the path box, and the dialog closes before focus goes back to `Add repo`: a focus call while the dialog is still modal lands on an inert button and is lost.
 - Native modal focus leaves the dialog for the browser's own UI after the last control (in headless Chrome, `body`); it never reaches the page.
 - "Chrome reports installable" hasn't been checked in a review; agent-browser hangs from Git Bash here ([known issue](../known-issues/agent-browser-git-bash.md)).
+- An in-place panel that gives focus back from an effect cleanup: under the dev server's StrictMode the cleanup also runs once on mount, so it takes focus away from the panel that just opened. Check that the panel left the page first (`isConnected`), as `RemoveConfirm.tsx` does.
 
 ## History
 
