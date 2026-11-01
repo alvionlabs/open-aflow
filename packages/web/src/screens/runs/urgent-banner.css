@@ -1,1 +1,95 @@
-/* The urgent banner: another run's more urgent item, one line at the top of screen 1's main column. */
+/*
+ * The urgent banner: another run's more urgent item, one line at the top of screen 1's main column
+ * (plan next-step-across-runs, direction B). No coloured fill or border: only the status dot has a colour.
+ * .urgent-slot is the live region; it has no box of its own, so an empty one takes no space.
+ */
+
+.urgent-slot {
+  display: block;
+}
+
+.urgent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  /* The button side less, as the draft. */
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--fg);
+  font: var(--size-dense) / 1.4 var(--font);
+}
+
+.urgent > .status {
+  flex: none;
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+/* The title gives way first: it ends in an ellipsis, the run and the count stay whole. */
+.urgent-text {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.urgent-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.urgent-where,
+.urgent-more {
+  flex: none;
+  font: var(--size-small) / 1.4 var(--mono);
+  white-space: nowrap;
+}
+
+.urgent-where {
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Balanced on its ink: the arrow's box has about 3 px of empty space each side. */
+.urgent-open {
+  flex: none;
+  gap: 4px;
+}
+
+.urgent-open.btn.sm.trail {
+  padding-right: 8px;
+}
+
+/* Phone: the text wraps on one or two lines, then Open run full width as a 44 px target. */
+@media (max-width: 480px) {
+  .urgent {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 8px 12px;
+  }
+
+  .urgent-text {
+    display: block;
+  }
+
+  .urgent-title {
+    white-space: normal;
+  }
+
+  .urgent-where {
+    white-space: normal;
+  }
+
+  .urgent-open {
+    width: 100%;
+    min-height: 44px;
+  }
+}

@@ -119,7 +119,7 @@ const phone = (m?: string) => m !== undefined && /^\(\s*max-width:\s*480px\s*\)$
 describe('urgent banner css', () => {
   it('css tokens, radius and phone button', () => {
     // Only the Look's tokens (and the type and radius scale), no raw colours.
-    expect(CSS).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|oklch|color-mix)\(|\b(red|orange|green|white|black)\b/i)
+    expect(CSS).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|oklch|color-mix)\(|(?<![-\w])(red|orange|green|white|black|transparent)(?![-\w])/i)
     const used = new Set([...CSS.matchAll(/var\((--[a-z-]+)/g)].map((m) => m[1]))
     const allowed = new Set(['--border-strong', '--bg', '--fg', '--muted', '--font', '--mono', '--size-dense', '--size-small', '--size-micro', '--radius-md'])
     expect([...used].filter((t) => !allowed.has(t!))).toEqual([])
