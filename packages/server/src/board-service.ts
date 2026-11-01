@@ -132,11 +132,13 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
       .map((b) => deps.gh.getBranch(entry.path, b))
       .filter((pr): pr is PrStatus => pr !== undefined)
     const found = [...numbered.filter((p) => !byBranch.some((b) => b.number === p.number)), ...byBranch]
-    // A staging branch's PR to main, once a plan reached its final PR (its base may name the branch).
+    // A staging branch's PR to main, once a plan reached its final PR (its base may name the branch). It
+    // replaces the same PR found by number (a pending gate 7 names it), which has no `branch`, so the staging
+    // rules still find it; a PR a fix or plan branch found stays as it is.
     const staging = stagingBranches({ model, claims: entry.claims, prs: found })
       .map((b) => deps.gh.getBranch(entry.path, b))
-      .filter((pr): pr is PrStatus => pr !== undefined && !found.some((p) => p.number === pr.number))
-    const prs = [...found, ...staging]
+      .filter((pr): pr is PrStatus => pr !== undefined && !byBranch.some((p) => p.number === pr.number))
+    const prs = [...found.filter((p) => !staging.some((s) => s.number === p.number)), ...staging]
     return { ...base, model, agents: await agentsOf(entry.path, listed), prs }
   }
 

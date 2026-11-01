@@ -3,9 +3,9 @@
 // Never automatic: the human clicks. Pure. The rules and why are in pod-docs/feature-details/queue-and-replies.md.
 
 import type { BoardRepo } from './board.ts'
-import { haltGate } from './pipeline.ts'
+import { haltGate, handBackPr } from './pipeline.ts'
 import { cleanAnswer, isAnswerable } from './queue-answer.ts'
-import type { QueueItem } from './run-model.ts'
+import type { PlanModel, QueueItem } from './run-model.ts'
 
 /** What the row offers: `done` (the reason) wins over `keep` (the value in use). */
 export type Triage = { done?: string; keep?: string }
@@ -47,19 +47,32 @@ export function stagingPrOf(entry: Pick<QueueItem, 'body'>): number | undefined 
   return m ? Number(m[1] ?? m[2]) : undefined
 }
 
-/** Gates pod only writes while a wave runs. Gate 3 and 6 also come at the final PR, so only when the entry names a wave. */
-function isWaveGate(gate: number, body: string): boolean {
-  if (gate === 1 || gate === 4) return true
-  if (gate === 3 || gate === 6) return /\bwave\b/i.test(body) && !/\bfinal\b/i.test(body)
-  return false
+const NAMED_PR = /\/pull\/(\d+)|#(\d+)\b/g
+
+/**
+ * The wave PRs a gate 1, 3 or 6 halt names: every PR it names (a pull URL or `#N`), when each is a slice's PR
+ * in one of the plan's sprint docs and none is the plan's final PR (its hand-back's). Empty for any other entry,
+ * or when it names no PR or any other PR. pod can write these gates after the plan archive (the final PR held
+ * back or failing, the reporter), so only a merged wave PR settles one.
+ */
+export function wavePrsOf(plan: Pick<PlanModel, 'sprints' | 'queue'>, entry: Pick<QueueItem, 'body'>): number[] {
+  const gate = haltGate(entry.body)
+  if (gate !== 1 && gate !== 3 && gate !== 6) return []
+  const named = [...new Set([...entry.body.matchAll(NAMED_PR)].map((m) => Number(m[1] ?? m[2])))]
+  const slicePrs = new Set(plan.sprints.flatMap((s) => s.waves.flatMap((w) => w.slices.map((x) => x.pr.number))))
+  const final = handBackPr(plan)
+  if (named.length === 0 || named.some((n) => n === final || !slicePrs.has(n))) return []
+  return named
 }
 
 /**
  * Why the entry is settled, from the board's data only; undefined when no rule is certain.
  * - A gate 7 (or plan-complete hand-back) entry whose named staging PR gh reports merged.
- * - A wave-time gate halt (1, 4, a wave's 3 or 6) or a gate 5 of an archived plan: pod ran the plan's close-out after it.
- * - A wave-time gate halt of an archived sprint: pod finished that sprint after it.
- * Not the archive alone for the hand-back, gate 2, 7, or a final PR's 3 or 6: pod archives a plan before it writes those.
+ * - A gate 4 or 5 of an archived plan: pod writes them only between waves and sprints, never at close-out,
+ *   and archiving the plan means pod resumed past them.
+ * - A gate 1, 3 or 6 whose named wave PRs (wavePrsOf) gh reports merged, and none of them the PR gh found on the plan's branch.
+ * Never the archive alone for the hand-back or gates 1, 2, 3, 6 and 7: pod archives a plan before its final review
+ * and merge, and can write those after it.
  */
 export function doneReason(repo: TriageRepo, entry: QueueItem): string | undefined {
   const body = entry.body
@@ -72,11 +85,10 @@ export function doneReason(repo: TriageRepo, entry: QueueItem): string | undefin
   if (gate === undefined) return undefined
   const plan = repo.model.plans.find((p) => p.queue.some((e) => e.line === entry.line))
   if (!plan) return undefined
-  const wave = isWaveGate(gate, body)
-  if (plan.status === 'archived' && (wave || gate === 5)) return `plan ${plan.slug} is archived`
-  // Gate 5 is also checked after a sprint is archived, so it can be live on one.
-  const sprint = entry.sprint === undefined ? undefined : plan.sprints.find((s) => s.slug === entry.sprint)
-  if (wave && sprint?.isArchived) return `sprint ${sprint.slug} is archived`
+  if (plan.status === 'archived' && (gate === 4 || gate === 5)) return `plan ${plan.slug} is archived`
+  const waves = wavePrsOf(plan, entry)
+  const merged = (n: number) => repo.prs.some((p) => p.number === n && p.state === 'merged' && p.branch !== plan.slug)
+  if (waves.length > 0 && waves.every(merged)) return `wave PR #${waves[0]} merged`
   return undefined
 }
 

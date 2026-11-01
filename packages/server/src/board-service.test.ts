@@ -480,9 +480,15 @@ describe('board service', () => {
     await claim(3200, repo, 'ui-polish')
     const final: PrStatus = { number: 91, state: 'merged', checks: 'pass', checkedAt: NOW, branch: 'ui-polish', base: 'ui-polish-staging' }
     const staging: PrStatus = { number: 95, state: 'open', checks: 'pass', checkedAt: NOW, branch: 'ui-polish-staging', base: 'main' }
-    const gh = fakeGh({ 95: 'open' }, 'ok', { 'ui-polish': final, 'ui-polish-staging': staging })
+    // gh by number gives no branch: #91 (the gate 7's final PR, read as its hand-back) with its base, #95 bare.
+    const byNumber: Record<number, PrStatus> = {
+      91: { number: 91, state: 'merged', checks: 'pass', checkedAt: NOW, base: 'ui-polish-staging' },
+      95: { number: 95, state: 'open', checks: 'pass', checkedAt: NOW, base: 'main' },
+    }
+    const asked: number[] = []
+    const gh: GhReader = { ...fakeGh({}, 'ok', { 'ui-polish': final, 'ui-polish-staging': staging }), get: (_p, n) => (asked.push(n), byNumber[n]) }
     const board = await createBoardService(deps(gh)).build()
-    expect(gh.asked).toContain(95)
+    expect(asked).toContain(95)
     const r = board.repos[0]!
     // #95 once, the copy found by branch (it carries the branch the staging rule looks for).
     expect(r.prs.filter((p) => p.number === 95)).toEqual([staging])
