@@ -214,3 +214,7 @@ Plan `next-step-across-runs`. When the selected run's Next step card is a pendin
 ## 2026-11-01 — urgent banner cuts the title first on mid-width screens (agent default — override anytime)
 
 Plan `next-step-across-runs`. From 800 to 1024 px the title ends in an ellipsis while `· <repo> · <name> +N more` stays whole (up to half the line), as the Look says ("the title gives way first").
+
+## 2026-11-01 — urgent banner tinted by status (human reversed "no coloured fill or border" for the banner only)
+
+Plan `next-step-across-runs`, reversing its Look's "Rules out: a colored fill or colored border". The human on the plain banner: "I feel that it's too subtle and also the open run button in nested inside, I think we should use the text button", then, of [draft 2](design-drafts/next-step-across-runs-look-2.html), "B looks good to me". The fill is `color-mix(in srgb, <tone> 10%, var(--bg))` and the border `color-mix(in srgb, <tone> 50%, transparent)`, with the tone `--blocked`, `--needs-you` or `--ready`; any other status keeps the plain box. The status word takes the tone, the title is weight 500, and "Open run" is a text button (`btn sm quiet trail`) in `--fg`. Turned down: A (no change), C (half the tint) and D (a left edge). Every other card keeps the calm-dashboard rule of no coloured fill. The tone is set in CSS with `:has()` on the status class, not with a class from the TSX as first asked, because `runs-screen.test.ts` pins the exact markup `<div class="urgent">`.
