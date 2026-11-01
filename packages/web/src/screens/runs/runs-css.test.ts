@@ -649,7 +649,7 @@ describe('runs.css log tab', () => {
  * shared controls in base.css. The Add repo dialog's picker (picker.css) and screens 2 and 3 have their own files.
  */
 describe('spacing scale', () => {
-  const SCREEN_ONE = ['runs.css', 'tabs.css', 'menu.css', '../../theme/base.css']
+  const SCREEN_ONE = ['runs.css', 'tabs.css', 'menu.css', 'urgent-banner.css', '../../theme/base.css']
   const SPACING = /^(padding|margin|gap|row-gap|column-gap)(-[a-z-]+)?$/
   /**
    * Values off the 4 px scale on purpose, each with its reason. 2 px is the tight-row allowance: the
