@@ -17,14 +17,22 @@ function setup() {
     new Promise<ActionReply<T>>((resolve) => calls.push({ path, body, resolve: resolve as (r: ActionReply<unknown>) => void }))
   const seen: RemoveState[] = []
   const removed: RemoveTarget[] = []
-  const flow = createRemoveFlow((s) => seen.push(s), (t) => removed.push(t), post)
+  const done: [RemoveTarget, string | undefined][] = []
+  const flow = createRemoveFlow(
+    (s) => seen.push(s),
+    (t, after) => {
+      removed.push(t)
+      done.push([t, after])
+    },
+    post,
+  )
   const tick = () => new Promise((r) => setTimeout(r, 0))
   const answer = async (i: number, reply: ActionReply<unknown>) => {
     expect(calls[i], `request ${i} was sent`).toBeDefined()
     calls[i]!.resolve(reply)
     await tick()
   }
-  return { flow, calls, seen, removed, answer }
+  return { flow, calls, seen, removed, done, answer }
 }
 
 const ok: ActionReply<RemoveRepoResult> = { ok: true, data: { outcome: 'removed', path: A.path, logged: true } }
@@ -56,6 +64,27 @@ describe('remove flow', () => {
     await t.answer(0, ok)
     expect(t.flow.state().kind).toBe('idle')
     expect(t.removed).toEqual([A])
+  })
+
+  it('keeps the next-run hash planned when Remove was pressed, though the runs and the selection change before the reply', async () => {
+    const run = (repoId: string, name: string, plan: string): RunSummary => ({ repoId, repo: name, plan, where: '', state: 'idle' }) as RunSummary
+    const before = [run('rb', 'beta-repo', 'one'), run('ra', 'alpha-repo', 'x'), run('rc', 'gamma', 'two')]
+    const t = setup()
+    t.flow.open(A)
+    t.flow.remove(hashAfterRemove(before, before[1], A))
+    // The new Board reaches the page first: A's run is gone and the page fell back to the first run.
+    const after = [before[0]!, before[2]!]
+    expect(hashAfterRemove(after, after[0], A)).toBeUndefined()
+    await t.answer(0, ok)
+    expect(t.done).toEqual([[A, '#/rc/two']])
+  })
+
+  it('a failed remove reports no hash to go to', async () => {
+    const t = setup()
+    t.flow.open(A)
+    t.flow.remove('#/rc/two')
+    await t.answer(0, refused('config unwritable', 500))
+    expect(t.done).toEqual([])
   })
 
   it('Cancel and Escape do nothing while the remove runs', async () => {

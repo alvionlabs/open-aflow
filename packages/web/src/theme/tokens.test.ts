@@ -191,6 +191,18 @@ describe('tokens', () => {
     expect(darkAttr()['--danger-fg']).toBe(darkMedia()['--danger-fg'])
   })
 
+  it('no token is declared twice in one block', () => {
+    const blocks: [string, string][] = [
+      ['light', blockAfter(tokensCss(), ':root {')],
+      ['dark media', blockAfter(blockAfter(tokensCss(), '@media (prefers-color-scheme: dark)'), ':root:not([data-theme="light"])')],
+      ['dark attr', blockAfter(tokensCss(), ':root[data-theme="dark"]')],
+    ]
+    for (const [name, body] of blocks) {
+      const names = [...body.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1]!)
+      expect(names.filter((n, i) => names.indexOf(n) !== i), name).toEqual([])
+    }
+  })
+
   it('faint and status colors are never text', () => {
     // The guarded names are the theme's own, in both themes.
     for (const name of NOT_TEXT) {

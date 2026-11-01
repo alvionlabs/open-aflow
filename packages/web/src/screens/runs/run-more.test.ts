@@ -58,7 +58,7 @@ describe('runs list with the ⋯ button', () => {
     // The link closes before the button opens: no button nested in the link.
     expect(items[0]).toMatch(/<a class="run"[^>]*>(?:(?!<button)[\s\S])*<\/a><div class="run-more-wrap">\s*<button/)
     expect(items[0]).toContain(`id="${moreButtonId(runs[0]!)}"`)
-    expect(items[0]).toContain('aria-label="More for x"')
+    expect(items[0]).toContain('aria-label="More for x (alpha-repo)"')
   })
 
   it('has no ⋯ for a run whose repo cannot be removed (claim-only or an ambiguous id)', () => {

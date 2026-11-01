@@ -173,3 +173,18 @@ describe('fix run routes', () => {
     expect(hashFor(fix, 'agent', 'a/1')).toBe('#/r/fix-scroll/agent/a%2F1')
   })
 })
+
+describe('fallback while a remove is in flight', () => {
+  it('a hash whose run vanished goes to the fallback run, not the first run', () => {
+    const left = [runs[0]!, runs[2]!]
+    const s = resolveSelection(left, '#/e--projects-a/beta', undefined, undefined, '#/e--projects-b')
+    expect(s.run).toBe(runs[2])
+    expect(s.hash).toBe('#/e--projects-b')
+  })
+
+  it('a live hash keeps its run, and a fallback that names no run falls to the first run', () => {
+    expect(resolveSelection(runs, '#/e--projects-a/beta', undefined, undefined, '#/e--projects-b').run).toBe(runs[1])
+    expect(resolveSelection([runs[0]!], '#/e--projects-a/beta', undefined, undefined, '#/gone').run).toBe(runs[0])
+    expect(resolveSelection([runs[0]!], '#/e--projects-a/beta', undefined, undefined, undefined).run).toBe(runs[0])
+  })
+})
