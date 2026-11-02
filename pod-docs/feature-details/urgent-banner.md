@@ -12,13 +12,24 @@ One line at the top of screen 1's main column. It shows when another listed run'
 
 **Narrow layout:** the layout follows the banner's own width, through a container query on `.urgent-slot`, because the 400 px sidebar stays beside the column down to an 821 px viewport (a 325 px column).
 
-| Column width | Layout |
-| --- | --- |
-| Above 760 px | One line. The title gives way first; the run and repo take up to 50 % of the text. |
-| 621–760 px | One line, repo hidden. The run takes up to 40 % of the text. |
-| 620 px and below | Stacked. Row 1: the status and the pill. Row 2: the text, wrapping, repo hidden. Row 3: "Open run", full width and 44 px tall. |
+| Column width | With a count | With no count |
+| --- | --- | --- |
+| Above 760 px | One line. The title gives way first; the run and repo take up to 50 % of the text. | The same |
+| 621–760 px | One line, repo hidden. The run takes up to 40 % of the text. | One line, with the repo |
+| 521–620 px | Stacked. Row 1: the status and the pill. Row 2: the text, wrapping, repo hidden. Row 3: "Open run", full width and 44 px tall. | One line, with the repo |
+| 520 px and below | Stacked | Stacked: the same rows, with no pill |
 
-The 620 px switch is measured with `Needs you`, `+99 more` and a long run name: at 621 px the title still shows 21 characters, and at 601 px only 19. The status, the pill and the button never shrink.
+The switches are measured with a long title and a long run name. The status, the pill and the button never shrink.
+
+| Column | Case | Layout | Title |
+| --- | --- | --- | --- |
+| 761 | `Needs you`, `+99 more` | One line, repo | 27 characters |
+| 760 | `Needs you`, `+99 more` | One line, no repo | 32 characters |
+| 621 | `Needs you`, `+99 more` | One line, no repo | 21 characters |
+| 620 | `Needs you`, `+99 more` | Stacked | Wraps |
+| 528 | `Blocked` / `Needs you`, no count | One line, repo | 19 / 18 characters |
+| 521 | `Blocked` / `Needs you`, no count | One line, repo | 19 / 18 characters |
+| 520 | `Blocked` / `Needs you`, no count | Stacked | Wraps |
 
 ## How it works
 
@@ -59,7 +70,8 @@ flowchart TD
 - **Navigation only, no dismiss.** Actions stay on the target run's card. A dismiss could hide a real block; it is parked as [an idea](../ideas/urgent-banner-dismiss.md).
 - **Tinted by status, with a text button.** The human found the plain box too subtle and the boxed button nested, and picked look B of [draft 2](../design-drafts/next-step-across-runs-look-2.html). Turned down: half the tint (C) and a left edge (D). See [decisions.md](../decisions.md#2026-11-01--urgent-banner-tinted-by-status-human-reversed-no-coloured-fill-or-border-for-the-banner-only).
 - **A stack and a pill for the others.** The human on the muted count: "the plus one is too subtle to notice". The human picked stack A of [draft 3](../design-drafts/next-step-across-runs-look-3.html) and option 4 of [draft 4](../design-drafts/next-step-across-runs-look-4.html). See [decisions.md](../decisions.md#2026-11-01--urgent-banner-stacks-other-items-and-shows-the-count-as-a-pill).
-- **A container query, not a viewport rule.** The column can be narrower than a phone's at a viewport far above 480 px. The trade-off: with `more` = 0, a column of 620 px or less now stacks too, where it stayed on one line before.
+- **A container query, not a viewport rule.** The column can be narrower than a phone's at a viewport far above 480 px.
+- **Separate switches for a banner with no count.** It keeps today's one line and repo until its title would drop below about 20 characters, because it needs no room for a pill or layers. The trade-off is a second block of the same rules; `urgent-banner.test.ts` keeps the two blocks the same.
 - **A link, not a button.** Ctrl+click and middle click open a new tab, and Back works. The trade-off is the focus rule below.
 - Agent defaults, each with its turned-down option, in decisions.md: [repo hidden on phones](../decisions.md#2026-11-01--urgent-banner-hides-the-repo-on-phones-agent-default--override-anytime), [`+N more` counts distinct items](../decisions.md#2026-11-01--urgent-banner-n-more-counts-distinct-items-agent-default--override-anytime), [a selected someday card ranks as pending](../decisions.md#2026-11-01--a-selected-someday-card-still-ranks-as-pending-agent-default--override-anytime), [the title gives way first at 800–1024 px](../decisions.md#2026-11-01--urgent-banner-cuts-the-title-first-on-mid-width-screens-agent-default--override-anytime).
 
@@ -73,7 +85,8 @@ flowchart TD
 - The layers use a negative `z-index`, so `.urgent-slot` holds the stacking context (`isolation: isolate`). `.urgent` must never become a stacking context (no `isolation`, `transform`, `opacity`, `filter` or `z-index`): its own layers would then paint over its fill.
 - The layers sit inside `.urgent`, not in a wrapper, so `--tone` reaches them and `<div class="urgent">` stays the root. They copy the card with `inherit`; don't give them their own colours.
 - `.urgent` sets `--tone: var(--muted)` as the default. Without it, a status with no tone leaves the pill's `color-mix` invalid, and the pill has no fill.
-- Change the 620 px or 760 px switch only after you measure again with the worst case: `Needs you`, `+99 more` and a long title and run name.
+- Change the 520, 620 or 760 px switch only after you measure again with the worst case: `Needs you`, `+99 more` and a long title and run name. Every rule in the 620 and 760 px blocks must name `.urgent-more`, so a banner with no count ignores them.
+- A change to the stacked rows goes in both the 620 and the 520 px blocks.
 - Don't reuse `.banner` or `.banners`: those are the error notices.
 - The focus target is a hash, not a flag. Set it only when `opensHere(e)` is true. A boolean set on every click let a Ctrl+click steal focus on the next run change (review round 1).
 - The selected run is matched by `hashFor`, not object identity.
