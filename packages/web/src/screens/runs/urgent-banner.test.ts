@@ -351,7 +351,7 @@ describe('urgent banner css', () => {
     expect(slot.display).toBe('block')
     // The switch reads the banner's width: the sidebar can take 400 px from the column at any viewport above 820 px.
     expect(CSS).not.toMatch(/@media/)
-    expect(CSS).toMatch(/@container urgent \(max-width: 600px\)/)
+    expect(CSS).toMatch(/@container urgent \(max-width: 620px\)/)
   })
 
   it('stacked: status and pill, then the text, then a 44 px open run', () => {
