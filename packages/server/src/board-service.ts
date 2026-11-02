@@ -22,7 +22,7 @@ import {
 } from '@pod-board/model'
 import { readClaims } from './claims.ts'
 import type { GhReader } from './gh.ts'
-import { ignoresCase as probeIgnoresCase, normalizeRepoPath, repoId, sameRepoPath } from './guard.ts'
+import { ignoresCase as probeIgnoresCase, normalizeRepoPath, repoIds, sameRepoPath } from './guard.ts'
 import { readRepoFiles } from './repo-files.ts'
 import { loadRepos } from './repos-config.ts'
 import { createAgentFileCache, listAgentFiles, type AgentFile } from './transcript-files.ts'
@@ -40,7 +40,10 @@ export type BoardServiceDeps = {
   actions?: () => ActionEntry[]
   /** The auto-continue toggles, read on every build. No dep, no `autoContinue` on the Board. */
   autoContinue?: () => AutoToggle[]
-  /** Called with the plain ids repos clashed on. */
+  /**
+   * Called on each build with the plain ids repos clash on, before the toggles are read. A toggle under such
+   * an id could be any member's, and a member takes the id again when the clash ends, so the store forgets it.
+   */
   retireRepoIds?: (ids: string[]) => Promise<void>
 }
 
@@ -112,9 +115,9 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
     return runs
   }
 
-  async function buildRepo(entry: RepoEntry, listed: AgentFile[]): Promise<BoardRepo> {
+  async function buildRepo(entry: RepoEntry, id: string, listed: AgentFile[]): Promise<BoardRepo> {
     const base = {
-      id: repoId(entry.path, deps.platform, entry.caseless),
+      id,
       name: pathFor(deps.platform).basename(entry.path) || entry.path,
       path: entry.path,
       source: entry.registered ? (entry.claims.length > 0 ? 'both' : 'registered') : 'claim',
@@ -148,7 +151,15 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
     async build() {
       const { entries, configUnreadable } = await repoEntries()
       const listed: AgentFile[] = []
-      const repos = await Promise.all(entries.map((e) => buildRepo(e, listed)))
+      const { ids, clashed } = repoIds(entries, deps.platform)
+      if (clashed.length > 0) {
+        try {
+          await deps.retireRepoIds?.(clashed)
+        } catch {
+          // A failed save keeps the toggle; the next build tries again, and no repo holds its id during the clash.
+        }
+      }
+      const repos = await Promise.all(entries.map((e, i) => buildRepo(e, ids[i]!, listed)))
       // Forget transcripts no repo listed this time: out of the day window, deleted, or their repo gone.
       agentRuns.retain(listed)
       repos.sort((a, b) => compare(a.name.toLowerCase(), b.name.toLowerCase()) || compare(a.path, b.path))

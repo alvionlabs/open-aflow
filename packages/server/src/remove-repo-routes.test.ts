@@ -67,7 +67,7 @@ afterEach(async () => {
 
 const ghExec = (async (args: string[]) => (args[0] === 'auth' ? { status: 'ok', stdout: '' } : { status: 'ok', stdout: '[]' })) as GhExec
 
-type SetupOpts = { append?: (e: NewActionEntry) => Promise<boolean>; removeRepo?: RemoveRepoRouteDeps['removeRepo'] }
+type SetupOpts = { append?: (e: NewActionEntry) => Promise<boolean>; removeRepo?: RemoveRepoRouteDeps['removeRepo']; mapBoard?: (b: Board) => Board }
 
 /** The remove route behind the real app and guard, over a real board service, config file, and temp repos. */
 async function setup(opts: SetupOpts = {}) {
@@ -82,13 +82,14 @@ async function setup(opts: SetupOpts = {}) {
     gh: createGhReader({ exec: ghExec, now: () => NOW }),
     now: () => NOW,
   })
-  let board: Board = await service.build()
+  const build = async () => (opts.mapBoard ?? ((b: Board) => b))(await service.build())
+  let board: Board = await build()
   const source = {
     board: () => board,
     subscribe: () => () => {},
     rebuild: async () => {
       events.push('rebuild')
-      board = await service.build()
+      board = await build()
     },
   }
   const routes = createRemoveRepoRoutes({
@@ -269,7 +270,9 @@ describe('remove-repo route', () => {
 })
 
 describe('remove-repo route: two repos with the same id', () => {
-  // `repoId` turns every non-alphanumeric character into `-`, so these two share one id.
+  // A real Board gives these two distinct ids (`repoIds`); the Board is forced here, because the route keeps its
+  // path check and its 409 as a safety check.
+  const share = (b: Board): Board => ({ ...b, repos: b.repos.map((r) => (r.name.startsWith('chess') ? { ...r, id: 'shared-id' } : r)) })
   let dash: string
   let under: string
   beforeEach(async () => {
@@ -281,14 +284,14 @@ describe('remove-repo route: two repos with the same id', () => {
     await writeFile(cfgFile, JSON.stringify({ version: 1, repos: [{ path: dash }, { path: under }] }))
   })
 
-  test('the two repos really share an id on the Board', async () => {
+  test('a real Board gives the two repos distinct ids, and needs no path', async () => {
     const s = await setup()
-    expect(s.idOf(dash)).toBe(s.idOf(under))
+    expect(s.idOf(dash)).not.toBe(s.idOf(under))
     expect(s.board().repos).toHaveLength(2)
   })
 
   test('without a path the id is ambiguous: 409, and nothing changes', async () => {
-    const s = await setup()
+    const s = await setup({ mapBoard: share })
     const before = await readFile(cfgFile)
     const res = await s.post({ repoId: s.idOf(dash) })
     expect(res.status).toBe(409)
@@ -298,7 +301,7 @@ describe('remove-repo route: two repos with the same id', () => {
   })
 
   test('with its path each one is removed, and only that one', async () => {
-    const s = await setup()
+    const s = await setup({ mapBoard: share })
     const id = s.idOf(under)
     const res = await s.post({ repoId: id, path: under })
     expect(res.status).toBe(200)
@@ -311,7 +314,7 @@ describe('remove-repo route: two repos with the same id', () => {
   })
 
   test('a path that is not the Board repo with that id is not on the board', async () => {
-    const s = await setup()
+    const s = await setup({ mapBoard: share })
     const before = await readFile(cfgFile)
     for (const path of [join(root, 'repos', 'chess.web'), regPath]) {
       const res = await s.post({ repoId: s.idOf(dash), path })
@@ -322,7 +325,7 @@ describe('remove-repo route: two repos with the same id', () => {
   })
 
   test('a path that is not a string is a bad request', async () => {
-    const s = await setup()
+    const s = await setup({ mapBoard: share })
     const res = await s.post({ repoId: s.idOf(dash), path: 7 })
     expect(res.status).toBe(400)
   })

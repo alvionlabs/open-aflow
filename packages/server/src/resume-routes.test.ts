@@ -272,6 +272,7 @@ describe('resume route', () => {
     const store: AutoContinueStore = {
       list: () => real.list(),
       set: (...a) => real.set(...a),
+      dropRepoIds: (...a) => real.dropRepoIds(...a),
       saveKey: async () => {
         throw new Error('disk full')
       },

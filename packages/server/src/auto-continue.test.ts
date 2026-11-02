@@ -188,6 +188,7 @@ describe('automatic check', () => {
     const store: AutoContinueStore = {
       list: () => real.list(),
       set: (...a) => real.set(...a),
+      dropRepoIds: (...a) => real.dropRepoIds(...a),
       saveKey: async (...a) => {
         if (fail) throw new Error('disk full')
         return real.saveKey(...a)
