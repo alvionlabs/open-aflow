@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildRepoModel, type Board, type BoardRepo, type RunSummary } from '@pod-board/model'
-import { agentChip, agentLogRows, banners, confidenceTag, connectionStatus, emptyMessage, groupChip, logBlocks, logRunChip, nextStatus, otherRows, rowFigures, runChip, runLabel, tabPress, titleParts } from './view.ts'
+import { agentChip, agentLogRows, banners, confidenceTag, connectionStatus, emptyMessage, groupChip, logBlocks, logRunChip, nextStatus, otherRows, rowFigures, runCard, runChip, tabPress, titleParts } from './view.ts'
 
 const run = (over: Partial<RunSummary>): RunSummary => ({ repoId: 'r', repo: 'chess-web', where: 'x', state: 'idle', ...over })
 
@@ -20,24 +20,24 @@ describe('screen 1 view helpers', () => {
     expect(connectionStatus('connecting')).toBeUndefined()
   })
 
-  it('run row label', () => {
-    const plan = run({ repoId: 'c', plan: 'sparring-ladder' })
+  it('run card: the run header’s name, with the repo as a muted line', () => {
+    const repo: BoardRepo = { id: 'c', name: 'chess-web', path: '/c', source: 'registered', model: buildRepoModel({}), agents: [], prs: [], claims: [] }
+    const withPr = (title: string): BoardRepo => ({ ...repo, prs: [{ number: 58, state: 'open', checks: 'none', checkedAt: 0, branch: 'fix-scroll', title }] })
+    const claimed: BoardRepo = { ...repo, claims: [{ portBase: 3100, repoPath: '/c', plan: 'fix-scroll' }] }
+    // A plan: its title, as in the run header; the repo under it.
+    expect(runCard(run({ repoId: 'c', plan: 'sparring-ladder', title: 'Sparring ladder to Liem' }), repo)).toEqual({ name: 'Sparring ladder to Liem', repo: 'chess-web' })
+    // A plan with no title anywhere: its slug made readable.
+    expect(runCard(run({ repoId: 'c', plan: 'sprint-column' }), repo)).toEqual({ name: 'Sprint column', repo: 'chess-web' })
+    // A fix run: its PR title without the prefix, case kept; no `fix` in the name (the card's tag says it).
     const fix = run({ repoId: 'c', plan: 'fix-scroll', fix: 'scroll' })
-    const other = run({ repoId: 'w', repo: 'watchless', plan: 'calm' })
-    // One run in its repo: the repo name alone, whatever the run is.
-    expect(runLabel(plan, [plan, other])).toBe('chess-web')
-    expect(runLabel(fix, [fix, other])).toBe('chess-web')
-    expect(runLabel(other, [plan, other])).toBe('watchless')
-    // Two runs in one repo: each adds its plan, or fix and its slug.
-    expect(runLabel(plan, [plan, fix, other])).toBe('chess-web · sparring-ladder')
-    expect(runLabel(fix, [plan, fix, other])).toBe('chess-web · fix · scroll')
-    expect(runLabel(other, [plan, fix, other])).toBe('watchless')
-    // A plan-less repo row among its repo's runs keeps the repo name.
-    const row = run({ repoId: 'c' })
-    expect(runLabel(row, [row, plan])).toBe('chess-web')
-    // Runs of another repo with the same name don't count: the id joins them.
-    const twin = run({ repoId: 'c2', plan: 'other' })
-    expect(runLabel(plan, [plan, twin])).toBe('chess-web')
+    expect(runCard(fix, { ...withPr('fix(server): gh pr list times out'), claims: claimed.claims })).toEqual({ name: 'gh pr list times out', repo: 'chess-web' })
+    // No PR yet: the slug made readable.
+    expect(runCard(fix, claimed)).toEqual({ name: 'Scroll', repo: 'chess-web' })
+    // A repo row (no plan): the repo is the name, so no second line repeats it.
+    expect(runCard(run({ repoId: 'c' }), repo)).toEqual({ name: 'chess-web' })
+    // A run whose repo isn't on the Board yet: the same names from the summary alone.
+    expect(runCard(run({ repoId: 'x', plan: 'sprint-column', title: 'Sprint column fix' }), undefined)).toEqual({ name: 'Sprint column fix', repo: 'chess-web' })
+    expect(runCard(fix, undefined)).toEqual({ name: 'Scroll', repo: 'chess-web' })
   })
 
   it('tab press: toggles, and leaves the engineer view', () => {

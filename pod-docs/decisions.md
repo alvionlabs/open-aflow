@@ -194,3 +194,33 @@ Plan `calm-dashboard`. Add posts a folder only when the typed text ends in a sep
 ## 2026-10-28 — Add repo opens a modal dialog from the sidebar
 
 The human asked for the old full-height sidebar back, with Add repo at its bottom opening the folder picker in a dialog. That dialog is the one exception to the calm-dashboard Look's "controls open in place, never a modal" rule. The ⋯ menu sits at the right end of the run header (fix PR https://github.com/iamphduc/pod-board/pull/56).
+
+## 2026-11-01 — urgent items from other runs show as a banner (reverses calm-dashboard)
+
+Plan `next-step-across-runs`. The human picked placement B, a banner above the run: "If it's urgent, I think the B should be the right way to show for user." This reverses calm-dashboard's "Turned down: a card across all runs": the item shows as one line at the top of screen 1's main column, not as a card, and it only navigates (`Open run`); the selected run's Next step card keeps the one primary button. Default rules, agent defaults (override anytime): only each run's card counts; rank `blocked` > `merge` > `reply` > `pending` (kinds `now`, `decision`, `before` only) > `nothing`; it shows only when strictly higher than the selected card's tier; ties go to the oldest entry date in `blocked` and `pending` (undated last), then to the earlier run in the sidebar; `+N more` counts the other outranking items, a shared entry once. Pinned by `packages/web/src/screens/runs/elsewhere.test.ts`.
+
+## 2026-11-01 — urgent banner hides the repo on phones (agent default — override anytime)
+
+Plan `next-step-across-runs`. At 480 px and below the banner shows `· <run name>` without `· <repo>`, as the look draft's 375 px shot does. To show the repo there too, drop the `.urgent-at { display: none }` rule in `packages/web/src/screens/runs/urgent-banner.css`.
+
+## 2026-11-01 — urgent banner `+N more` counts distinct items (agent default — override anytime)
+
+Plan `next-step-across-runs`. Two runs of one repo that share one unjoined queue entry count once in `+N more`, even when another run wins. Counting runs instead is a one-line change in `packages/web/src/screens/runs/elsewhere.ts`.
+
+## 2026-11-01 — a selected someday card still ranks as pending (agent default — override anytime)
+
+Plan `next-step-across-runs`. When the selected run's Next step card is a pending `someday` or `other` entry, it ranks as `pending`, so another run's pending `decision` raises no banner; only blocked, merge and reply do. The other reading treats such a card as "Nothing to do".
+
+## 2026-11-01 — urgent banner cuts the title first on mid-width screens (agent default — override anytime)
+
+Plan `next-step-across-runs`. From 800 to 1024 px the title ends in an ellipsis while `· <repo> · <name> +N more` stays whole (up to half the line), as the Look says ("the title gives way first").
+
+## 2026-11-01 — urgent banner tinted by status (human reversed "no coloured fill or border" for the banner only)
+
+Plan `next-step-across-runs`, reversing its Look's "Rules out: a colored fill or colored border". The human on the plain banner: "I feel that it's too subtle and also the open run button in nested inside, I think we should use the text button", then, of [draft 2](design-drafts/next-step-across-runs-look-2.html), "B looks good to me". The fill is `color-mix(in srgb, <tone> 10%, var(--bg))` and the border `color-mix(in srgb, <tone> 50%, transparent)`, with the tone `--blocked`, `--needs-you` or `--ready`; any other status keeps the plain box. The status word takes the tone, with `--fg` mixed in to reach 4.5:1 (tone 95 % blocked, 90 % needs you, 85 % ready), the title is weight 500, and "Open run" is a text button (`btn sm quiet trail`) in `--fg`. Turned down: A (no change), C (half the tint) and D (a left edge). Every other card keeps the calm-dashboard rule of no coloured fill.
+
+## 2026-11-01 — urgent banner stacks other items and shows the count as a pill
+
+Plan `next-step-across-runs`. The human on the muted `+1 more`: "the plus one is too subtle to notice". Of [draft 3](design-drafts/next-step-across-runs-look-3.html): "I think we should go with A". Of [draft 4](design-drafts/next-step-across-runs-look-4.html): "4 looks good to me, but we have to handle the narrow width carefully. Yes, keep counting everything". So: with `more` ≥ 1, one or two layers (never more) sit behind the banner, stepped 8 px down and right, in the top card's tone. `+N more` is a pill right before "Open run". It keeps its meaning: every other outranking item, not only the same tier (human's confirmation). Turned down: layers in each item's own status colour (draft 3 B, it needs more data from the picker), layers straight down (draft 3 C), stronger text (draft 4 option 2), and a pill inside the text (draft 4 option 3).
+
+The narrow layout follows the banner's own width through a container query on `.urgent-slot`, not the 480 px viewport rule. Each width is measured with a long title and a long run name, so the title keeps about 20 characters on one line. With a count: the repo hides at a column of 760 px or less, and the banner stacks at 620 px or less. With no count, the banner keeps today's one line and repo, and stacks only at 520 px or less. At a 521 px column, the title shows 19 characters for `Blocked` and 18 for `Needs you`; a 528 px column (viewport 1024, sidebar 400) stays on one line.

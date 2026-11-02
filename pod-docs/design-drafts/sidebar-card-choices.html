@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sidebar cards in PR #65: what changed and one choice</title>
+<style>
+  :root {
+    --bg:#fff; --surface:#fafafa; --hover:#f2f2f2; --border:#eaeaea; --border-strong:#d4d4d4;
+    --fg:#171717; --muted:#666; --faint:#8f8f8f; --focus:#0068d6;
+    --blocked:#d0262f; --danger:#b81d25; --danger-fg:#fff; --needs-you:#b25d00;
+    --running:#0068d6; --ready:#1a8a45; --idle:#7d7d7d; --shadow:rgb(0 0 0 / .08);
+    --font:"Geist","Segoe UI",system-ui,sans-serif;
+    --mono:"Geist Mono",ui-monospace,"Cascadia Code",Consolas,monospace;
+  }
+  :root[data-theme="dark"] {
+    --bg:#000; --surface:#0a0a0a; --hover:#1a1a1a; --border:#262626; --border-strong:#3a3a3a;
+    --fg:#ededed; --muted:#a1a1a1; --faint:#6e6e6e; --focus:#52a8ff;
+    --blocked:#ff5f5f; --danger:#ff5f5f; --danger-fg:#0a0a0a; --needs-you:#f5a623;
+    --running:#52a8ff; --ready:#3ecf72; --idle:#8f8f8f; --shadow:rgb(0 0 0 / .4);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/20px var(--font); }
+  main { max-width:1120px; margin-inline:auto; padding:48px 48px 64px; display:grid; gap:48px; }
+  header { display:flex; justify-content:space-between; gap:16px; align-items:start; }
+  h1 { margin:0; font-size:28px; line-height:36px; letter-spacing:-.02em; }
+  h2 { margin:0 0 4px; font-size:18px; line-height:24px; }
+  p { margin:0; color:var(--muted); max-width:72ch; }
+  code { font:13px var(--mono); }
+  .btn { font:inherit; color:var(--fg); background:transparent; border:1px solid var(--border-strong); border-radius:6px; padding:6px 12px; cursor:pointer; }
+  .btn:hover { background:var(--hover); }
+  :focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+
+  .row { display:flex; flex-wrap:wrap; gap:32px; margin-top:16px; align-items:start; }
+  .col { display:grid; gap:8px; }
+  .cap { font:12px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .note { font-size:13px; color:var(--muted); max-width:260px; }
+  .bad { color:var(--blocked); } .good { color:var(--ready); }
+
+  /* A piece of the sidebar. */
+  .side { width:var(--w,260px); padding:16px; border:1px solid var(--border); border-radius:12px; display:grid; gap:12px; }
+  .wrap { position:relative; container:card / inline-size; }
+  .card { display:block; width:100%; text-align:left; color:inherit; font:inherit; background:transparent;
+          border:1px solid var(--border); border-radius:8px; padding:12px 16px; cursor:pointer; }
+  .wrap:hover .card { background:var(--hover); }
+  .card.open { background:var(--hover); border-color:var(--border-strong); }
+  .top { display:flex; justify-content:space-between; align-items:start; gap:12px; }
+  .name { font-weight:500; min-width:0; }
+  .word { display:inline-block; }
+  .line { display:flex; align-items:center; justify-content:space-between; min-height:24px; margin-top:0; }
+  .repo { font-size:13px; color:var(--muted); }
+
+  .st { display:inline-flex; align-items:center; gap:8px; white-space:nowrap; font-size:13px; flex:none; }
+  .st::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--c); flex:none; }
+  .after .st { flex-direction:row-reverse; }
+  .first .st { width:88px; }
+  .s-bad { --c:var(--blocked); } .s-you { --c:var(--needs-you); } .s-idle { --c:var(--idle); color:var(--muted); }
+  .s-run { --c:var(--running); }
+
+  /* The ghost button. */
+  .ghost { width:24px; height:24px; display:grid; place-items:center; color:var(--muted); background:transparent;
+           border:0; border-radius:6px; padding:0; cursor:pointer; }
+  .ghost:hover, .ghost[aria-expanded="true"] { background:color-mix(in srgb, var(--fg) 12%, transparent); color:var(--fg); }
+  .ghost:active { background:color-mix(in srgb, var(--fg) 16%, transparent); }
+  .wrap .ghost { position:absolute; right:12px; bottom:10px; opacity:0; }
+  .wrap:hover .ghost, .wrap:focus-within .ghost, .ghost[aria-expanded="true"] { opacity:1; }
+  .ghost.show { opacity:1 !important; position:static; }
+  .outlined { width:24px; height:24px; display:grid; place-items:center; color:var(--fg); background:transparent; border:1px solid var(--border-strong); border-radius:6px; padding:0; }
+
+  /* Below the threshold the card stacks. */
+  @container card (max-width: 214px) {
+    .top { flex-direction:column; gap:4px; }
+    .after .st { flex-direction:row; }
+    .first .st { width:auto; }
+  }
+
+  /* The menu. */
+  .menu { position:absolute; right:12px; top:calc(100% - 8px); z-index:2; min-width:144px; padding:4px; background:var(--surface);
+          border:1px solid var(--border-strong); border-radius:8px; box-shadow:0 8px 24px var(--shadow); }
+  .mi { display:block; width:100%; text-align:left; font:inherit; color:var(--danger); background:transparent; border:0; border-radius:6px; padding:8px 12px; cursor:pointer; }
+  .mi:hover, .mi:focus-visible, .mi.t-hover { background:color-mix(in srgb, var(--danger) 14%, transparent); }
+  .mi:active, .mi.t-press { background:color-mix(in srgb, var(--danger) 18%, transparent); }
+  .mi.plain { color:var(--fg); }
+  .mi.plain.t-hover { background:var(--hover); }
+  .demo-menu { position:static; width:180px; box-shadow:none; }
+
+  /* The confirm under a card. */
+  .confirm { margin-top:8px; padding:12px 16px; background:var(--surface); border:1px solid var(--border-strong); border-radius:8px; display:grid; gap:8px; }
+  .confirm b { font-weight:500; }
+  .confirm p { font-size:13px; }
+  .acts { display:flex; gap:8px; flex-wrap:wrap; }
+  .danger { background:var(--danger); color:var(--danger-fg); border-color:var(--danger); }
+  .danger:hover { background:var(--danger); filter:brightness(1.08); }
+
+  label.slider { display:flex; align-items:center; gap:12px; font:13px var(--mono); color:var(--muted); }
+  input[type=range] { width:220px; accent-color:var(--focus); }
+  .seg { display:inline-flex; gap:4px; padding:4px; border:1px solid var(--border); border-radius:8px; }
+  .seg button { font:inherit; font-size:13px; color:var(--muted); background:transparent; border:0; border-radius:6px; padding:4px 12px; cursor:pointer; }
+  .seg button[aria-pressed="true"] { background:var(--hover); color:var(--fg); }
+  .controls { display:flex; flex-wrap:wrap; gap:24px; align-items:center; margin-top:16px; }
+
+  .old .card { padding:12px 14px; }
+  .old .card.reserved .top { padding-right:24px; }
+  .gap-mark { outline:1px dashed var(--blocked); outline-offset:-1px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Sidebar cards in PR #65</h1>
+      <p>What changed after your test, and one choice for you. This page is a drawing in HTML. It runs no board code and changes nothing.</p>
+    </div>
+    <button class="btn" id="theme" type="button">Light theme</button>
+  </header>
+
+  <section>
+    <h2>1. The choice: where does the dot go?</h2>
+    <p>Words such as <code>blocked</code> and <code>update pod</code> have different widths. So one layout can line up the dots and the word edge only if the dot comes last. The second layout keeps the dot first, like the rest of the app, but the words end at different places.</p>
+    <div class="row">
+      <div class="col">
+        <span class="cap">A. Dot after the word (in the PR now)</span>
+        <div class="side after" id="sA"></div>
+        <p class="note">Dots and the right edge both line up. It differs from the Next step card, which reads <code>● Blocked</code>.</p>
+      </div>
+      <div class="col">
+        <span class="cap">B. Dot first, fixed column</span>
+        <div class="side first" id="sB"></div>
+        <p class="note">Dots line up, and it matches the rest of the app. The words end at different places, so some cards have space on the right.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2. Try it: drag the width, hover a card, open the ⋯</h2>
+    <p>Hover a card to see the ⋯. Click it, then hover <code>Remove repo</code>. Click that to see the confirm. Tab and Enter work too. Below 246 px the cards stack.</p>
+    <div class="controls">
+      <label class="slider">Sidebar width <input id="w" type="range" min="200" max="400" step="4" value="260"> <output id="wo">260 px</output></label>
+      <div class="seg" role="group" aria-label="Dot position">
+        <button type="button" id="optA" aria-pressed="true">A. Dot after</button>
+        <button type="button" id="optB" aria-pressed="false">B. Dot first</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="side after" id="live"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. Before and after</h2>
+    <div class="row">
+      <div class="col">
+        <span class="cap bad">Before: gap and an outlined ⋯</span>
+        <div class="side old">
+          <div class="wrap"><div class="card"><div class="top"><span class="name">Three sprints in flight</span><span class="st s-bad">blocked</span></div><div class="line"><span class="repo">claim-only</span></div></div></div>
+          <div class="wrap"><div class="card reserved gap-mark"><div class="top"><span class="name">Three sprints in flight</span><span class="st s-bad">blocked</span></div><div class="line"><span class="repo">mock</span></div></div></div>
+        </div>
+        <p class="note">The second card saved a 40 px column for the ⋯. The red dashes mark that card: its status sits further left.</p>
+      </div>
+      <div class="col">
+        <span class="cap good">After: one edge, ⋯ on line 2</span>
+        <div class="side after">
+          <div class="wrap"><div class="card"><div class="top"><span class="name">Three sprints in flight</span><span class="st s-bad">blocked</span></div><div class="line"><span class="repo">claim-only</span></div></div></div>
+          <div class="wrap"><div class="card"><div class="top"><span class="name">Three sprints in flight</span><span class="st s-bad">blocked</span></div><div class="line"><span class="repo">mock</span><button class="ghost show" type="button" aria-label="More">⋯</button></div></div></div>
+        </div>
+        <p class="note">No saved column. The ⋯ never covers the status.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>4. Small parts</h2>
+    <div class="row">
+      <div class="col">
+        <span class="cap">The ⋯ button</span>
+        <div style="display:flex;gap:16px;align-items:center">
+          <span class="outlined">⋯</span><span class="note">before</span>
+          <button class="ghost show" type="button" aria-label="More">⋯</button><span class="note">now: hover it</span>
+        </div>
+      </div>
+      <div class="col">
+        <span class="cap">Remove repo: rest, hover, press</span>
+        <div class="menu demo-menu"><span class="mi">Remove repo</span><span class="mi t-hover">Remove repo</span><span class="mi t-press">Remove repo</span></div>
+      </div>
+      <div class="col" style="width:260px">
+        <span class="cap">The confirm</span>
+        <div class="confirm" style="margin:0">
+          <b>Remove chess-web?</b>
+          <p>Only the board's list changes; its files aren't touched. Its 1 run leaves the sidebar.</p>
+          <div class="acts"><button class="btn danger" type="button">Remove</button><button class="btn" type="button">Cancel</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+  const RUNS = [
+    { name: 'Three sprints in flight', st: 's-bad', word: 'blocked', repo: 'pod-trial-mock', more: true, runs: 2 },
+    { name: 'Sparring ladder to Liem', st: 's-you', word: 'needs you', repo: 'chess-web', more: true, runs: 1 },
+    { name: 'ytb-feed', st: 's-idle', word: 'idle', repo: '', more: true, runs: 1 },
+    { name: 'claim-only', st: 's-you', word: 'update pod', repo: '', more: false, runs: 1 },
+  ];
+  const words = (s) => s.split(' ').map((w) => `<span class="word">${w}</span>`).join(' ');
+  const card = (r, i, live) => `
+    <div class="wrap" data-i="${i}">
+      <div class="card${i === 0 ? ' open' : ''}">
+        <div class="top"><span class="name">${words(r.name)}</span><span class="st ${r.st}">${r.word}</span></div>
+        <div class="line"><span class="repo">${r.repo}</span></div>
+      </div>
+      ${r.more ? `<button class="ghost" type="button" aria-label="More for ${r.name}" aria-expanded="false" ${live ? 'data-more' : ''}>⋯</button>` : ''}
+    </div>`;
+  const fill = (el, live) => { el.innerHTML = RUNS.map((r, i) => card(r, i, live)).join(''); };
+  fill(document.getElementById('sA'));
+  fill(document.getElementById('sB'));
+  const live = document.getElementById('live');
+  fill(live, true);
+
+  const closeAll = () => {
+    live.querySelectorAll('.menu,.confirm').forEach((n) => n.remove());
+    live.querySelectorAll('[data-more]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  };
+  live.addEventListener('click', (e) => {
+    const more = e.target.closest('[data-more]');
+    if (more) {
+      const open = more.getAttribute('aria-expanded') === 'true';
+      closeAll();
+      if (!open) {
+        more.setAttribute('aria-expanded', 'true');
+        more.insertAdjacentHTML('afterend', '<div class="menu"><button class="mi" type="button" data-remove>Remove repo</button></div>');
+        more.nextElementSibling.firstElementChild.focus();
+      }
+      return;
+    }
+    if (e.target.closest('[data-remove]')) {
+      const wrap = e.target.closest('.wrap');
+      const r = RUNS[Number(wrap.dataset.i)];
+      closeAll();
+      const who = r.repo || r.name;
+      const count = r.runs === 1 ? 'Its 1 run leaves the sidebar.' : `Its ${r.runs} runs leave the sidebar.`;
+      wrap.insertAdjacentHTML('beforeend', `<div class="confirm"><b>Remove ${who}?</b><p>Only the board's list changes; its files aren't touched. ${count}</p><div class="acts"><button class="btn danger" type="button" data-close>Remove</button><button class="btn" type="button" data-close>Cancel</button></div></div>`);
+      return;
+    }
+    if (e.target.closest('[data-close]')) closeAll();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+
+  const w = document.getElementById('w');
+  const wo = document.getElementById('wo');
+  w.addEventListener('input', () => { live.style.setProperty('--w', `${w.value}px`); wo.textContent = `${w.value} px`; });
+
+  const optA = document.getElementById('optA');
+  const optB = document.getElementById('optB');
+  const pick = (a) => {
+    live.classList.toggle('after', a); live.classList.toggle('first', !a);
+    optA.setAttribute('aria-pressed', String(a)); optB.setAttribute('aria-pressed', String(!a));
+  };
+  optA.addEventListener('click', () => pick(true));
+  optB.addEventListener('click', () => pick(false));
+
+  const t = document.getElementById('theme');
+  t.addEventListener('click', () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme === 'dark';
+    root.dataset.theme = dark ? 'light' : 'dark';
+    t.textContent = dark ? 'Dark theme' : 'Light theme';
+  });
+</script>
+</body>
+</html>

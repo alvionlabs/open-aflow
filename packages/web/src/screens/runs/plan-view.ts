@@ -1,10 +1,11 @@
-// The run's flow (columns of step cards), its fold line for phones, and the run header (crumb, name,
-// progress strip, `Wave N of M`), from the model's flow. Pure; the Flow and the header only render these.
+// The run's flow (columns of step cards), its fold line for phones, and the run header (title, meta
+// line, progress strip, `Wave N of M`), from the model's flow. Pure; the Flow and the header only render these.
 
-import { buildFlow, type BoardRepo, type RunSummary, type Stage, type Step, type StepState } from '@pod-board/model'
+import { buildFlow, fixPr, fixRunAgents, isPlanAgent, type BoardRepo, type RunSummary, type Stage, type Step, type StepState } from '@pod-board/model'
 
 export type Segment = 'done' | 'current' | 'rest'
-export type RunHeader = { crumb: string; name: string; segments: Segment[]; wave?: string }
+/** `meta`: `<repo> · <Plan|Fix> · started <when>`, unknown parts left out; empty for a repo row, whose title is the repo. */
+export type RunHeader = { title: string; meta: string; segments: Segment[]; wave?: string }
 
 /** The SVG mark of each state (names in theme/icons.tsx). */
 export type FlowMark = 'check' | 'dot' | 'alert' | 'blocked' | 'circle'
@@ -96,16 +97,127 @@ function waveText(run: RunSummary, repo: BoardRepo): string | undefined {
   return `Wave ${sprint.currentWave ?? last.wave} of ${last.wave}`
 }
 
-/** The header above the flow; undefined with no run or repo, or a run of another repo. */
-export function runHeader(run: RunSummary | undefined, repo: BoardRepo | undefined, now: number): RunHeader | undefined {
+/** POD_BOARD_TRANSCRIPT_DAYS when the Board doesn't say. */
+export const TRANSCRIPT_DAYS = 30
+
+/**
+ * The header above the flow; undefined with no run or repo, or a run of another repo. `transcriptDays`:
+ * the Board's transcript window, which decides whether the earliest agent start can be trusted.
+ */
+export function runHeader(run: RunSummary | undefined, repo: BoardRepo | undefined, now: number, transcriptDays = TRANSCRIPT_DAYS): RunHeader | undefined {
   if (!run || !repo || run.repoId !== repo.id) return undefined
-  const name = run.fix !== undefined ? `fix · ${run.fix}` : (run.plan ?? run.repo)
   // A fix run's claim name and a repo row name no plan, so they have no flow and no strip.
   const flow = run.fix === undefined && run.plan !== undefined ? buildFlow(repo, run.plan, now) : undefined
-  const header: RunHeader = { crumb: run.repo, name, segments: flow ? segments(flow.flatMap((s) => s.steps)) : [] }
+  const header: RunHeader = { title: runName(run, repo), meta: runMeta(run, repo, now, transcriptDays), segments: flow ? segments(flow.flatMap((s) => s.steps)) : [] }
   const wave = run.fix === undefined && run.plan !== undefined ? waveText(run, repo) : undefined
   if (wave !== undefined) header.wave = wave
   return header
+}
+
+/** A conventional-commit prefix: a known type, an optional `(scope)`, an optional `!`, then `:`. */
+const COMMIT_PREFIX = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]*\))?!?:\s*/i
+
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+/** `sprint-column` → `Sprint column`. */
+const readable = (slug: string) => capital(slug.replace(/[-_]+/g, ' ').trim())
+
+/**
+ * The run's human name, the same in the run header and its sidebar card: the plan's title; a fix run's
+ * PR title without its prefix, kept as written, else its slug made readable; a repo row's repo. With no
+ * repo (not on the Board yet), what the run summary alone says.
+ */
+export function runName(run: RunSummary, repo: BoardRepo | undefined): string {
+  if (run.fix !== undefined) {
+    const pr = repo && run.plan !== undefined ? fixPr(repo, run.plan)?.title?.replace(COMMIT_PREFIX, '').trim() : undefined
+    return pr || readable(run.fix)
+  }
+  if (run.plan === undefined) return run.repo
+  return run.title ?? repo?.model.plans.find((p) => p.slug === run.plan)?.title ?? readable(run.plan)
+}
+
+/** `<repo> · <Plan|Fix> · started <when>`; a part that isn't known is left out. */
+function runMeta(run: RunSummary, repo: BoardRepo, now: number, transcriptDays: number): string {
+  if (run.plan === undefined) return ''
+  const started = startedText(run, repo, now, transcriptDays)
+  return [run.repo, run.fix !== undefined ? 'Fix' : 'Plan', started === undefined ? undefined : `started ${started}`].filter((x) => x !== undefined).join(' · ')
+}
+
+const MIN = 60_000
+const HOUR = 60 * MIN
+const DAY = 24 * HOUR
+
+/**
+ * An agent start this close to the window's far edge isn't trusted: the plan's earlier agents may have
+ * aged out of the window, so the earliest one left would read later than the plan really started.
+ */
+const EDGE = DAY
+
+/**
+ * When the run started, as words. A fix run: its earliest agent (engineers and reviewers), else nothing.
+ * A plan: the earliest of these candidates: the autopilot stamp (if any) and every read agent's start;
+ * with no stamp and no agent clearly inside the window (none at all, or the earliest near or past its
+ * edge, so older agents may be unread), the `Generated:` day too. A time more than a day inside the
+ * transcript window reads `N ago`; any other reads as a date (a time's local day, the `Generated:` day as written).
+ */
+function startedText(run: RunSummary, repo: BoardRepo, now: number, transcriptDays: number): string | undefined {
+  if (run.fix !== undefined) {
+    const at = earliest(fixRunAgents(repo, run.plan!, now))
+    return at === undefined ? undefined : startedAgo(at, now)
+  }
+  const plan = repo.model.plans.find((p) => p.slug === run.plan)
+  if (!plan) return undefined
+  const inside = (at: number) => now - at < transcriptDays * DAY - EDGE
+  const agent = earliest(repo.agents.filter((a) => isPlanAgent(a, plan)))
+  const times = [plan.autopilotStartedAt, agent].filter((x) => x !== undefined)
+  const time = times.length > 0 ? Math.min(...times) : undefined
+  const generated = plan.autopilotStartedAt === undefined && (agent === undefined || !inside(agent)) ? plan.generated : undefined
+  const day = generated === undefined ? undefined : localDay(generated)
+  if (generated !== undefined && day !== undefined && (time === undefined || day <= time)) return dayText(generated, now)
+  if (time === undefined) return undefined
+  return inside(time) ? startedAgo(time, now) : dateText(time, now)
+}
+
+/** A `YYYY-MM-DD` day's local midnight, to compare with a time. */
+function localDay(day: string): number | undefined {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() : undefined
+}
+
+const earliest = (agents: { startedAt?: number | undefined }[]): number | undefined => {
+  const starts = agents.flatMap((a) => (a.startedAt === undefined ? [] : [a.startedAt]))
+  return starts.length > 0 ? Math.min(...starts) : undefined
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** A time as its local day: `Oct 2`, with `, 2025` when it isn't now's year. */
+function dateText(at: number, now: number): string {
+  const d = new Date(at)
+  const text = `${MONTHS[d.getMonth()]} ${d.getDate()}`
+  return d.getFullYear() === new Date(now).getFullYear() ? text : `${text}, ${d.getFullYear()}`
+}
+
+/**
+ * A `YYYY-MM-DD` day as `Oct 12`, with `, 2025` when it isn't now's year. Read from the text, not through
+ * `Date`, so the day never shifts with the time zone.
+ */
+function dayText(day: string, now: number): string | undefined {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
+  const month = m && MONTHS[Number(m[2]) - 1]
+  if (!m || !month) return undefined
+  const text = `${month} ${Number(m[3])}`
+  return Number(m[1]) === new Date(now).getFullYear() ? text : `${text}, ${m[1]}`
+}
+
+/** `just now` (under a minute, or ahead of now), `N min ago`, `N h ago`, or `N day(s) ago`, rounded down. */
+export function startedAgo(at: number, now: number): string {
+  const ago = now - at
+  if (ago < MIN) return 'just now'
+  if (ago < HOUR) return `${Math.floor(ago / MIN)} min ago`
+  if (ago < DAY) return `${Math.floor(ago / HOUR)} h ago`
+  const days = Math.floor(ago / DAY)
+  return `${days} ${days === 1 ? 'day' : 'days'} ago`
 }
 
 /** One connector of the flow's path, between two steps by key. `back` runs to an earlier column. */

@@ -9,8 +9,20 @@
 // Rule: a step is `done` only on data that proves it; with nothing to read it is `unknown` ("not recorded").
 // Pure. The rules and why are in pod-docs/feature-details/runs-and-pipeline.md.
 
-import type { AgentRun, BoardRepo, PrStatus } from './board.ts'
-import { buildPipeline, handBackPr, isRunning, prByBranch, spend, type Pipeline, type Stage, type Step, type StepState } from './pipeline.ts'
+import type { AgentRun, BoardRepo } from './board.ts'
+import {
+  buildPipeline,
+  finalPr,
+  handBackPr,
+  isRunning,
+  prByBranch,
+  spend,
+  stagingOf,
+  type Pipeline,
+  type Stage,
+  type Step,
+  type StepState,
+} from './pipeline.ts'
 import type { PlanModel } from './run-model.ts'
 
 export type FlowColumnKey = 'think' | 'you' | 'check' | 'ship'
@@ -29,7 +41,6 @@ const COLUMNS: ({ key: FlowColumnKey; caption: string } | 'sprints')[] = [
 ]
 
 const NOT_RECORDED: FlowReading = { state: 'unknown', detail: 'not recorded' }
-const STAGING = /staging/i
 
 const plural = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`
 
@@ -78,25 +89,13 @@ function readLook({ plan }: FlowCtx): FlowReading {
   return { state: 'done', detail: look.direction ?? 'look set' }
 }
 
-/** The plan's final PR: the hand-back's PR when gh knows it, else the PR gh found on the plan's branch. */
-function finalPr(repo: Pick<BoardRepo, 'prs'>, plan: PlanModel): PrStatus | undefined {
-  const n = handBackPr(plan)
-  return (n === undefined ? undefined : repo.prs.find((p) => p.number === n)) ?? prByBranch(repo, plan.slug)
-}
-
-/** The plan's staging branch: its final PR's base when that is a staging branch, else the repo's decision. */
-function stagingOf(repo: Pick<BoardRepo, 'model' | 'prs'>, plan: PlanModel): string | undefined {
-  const base = finalPr(repo, plan)?.base
-  if (base !== undefined && STAGING.test(base)) return base
-  return repo.model.staging
-}
-
 /**
  * Left out with no staging branch. Waits until the final PR merges; then the staging branch's PR to
  * main (found by its head). An open one always counts and needs you: pod's gate 7 opens it, or reuses
- * one an earlier plan left open (so its number can be below the final PR's). pod-staging is reused by
- * every plan, so a merged one counts as done only when gh's merge times show it merged after the final
- * PR; a merged PR with no times, or a closed one, can't be shown to be this plan's and reads `not open yet`.
+ * one an earlier plan left open (so its number can be below the final PR's); `stagingPr` reads the same
+ * rule for `waitingPrs`, so the Next step card offers its Merge. pod-staging is reused by every plan, so a
+ * merged one counts as done only when gh's merge times show it merged after the final PR; a merged PR
+ * with no times, or a closed one, can't be shown to be this plan's and reads `not open yet`.
  */
 function readStaging(ctx: FlowCtx): FlowReading | undefined {
   const branch = stagingOf(ctx.repo, ctx.plan)

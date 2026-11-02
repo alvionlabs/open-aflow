@@ -179,7 +179,7 @@ a:hover {
 .card {
   display: grid;
   gap: 8px;
-  padding: 24px;
+  padding: 20px 24px;
   background: var(--surface);
   color: var(--fg);
   border: 1px solid var(--border);
@@ -303,6 +303,45 @@ a:hover {
   opacity: 0.5;
 }
 
+/* Danger: an action that takes something away (Remove repo). The blocked red, in every state. */
+.btn.danger,
+.btn.danger:hover,
+.btn.danger:active {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--danger-fg);
+}
+
+.btn.danger:hover {
+  opacity: 0.88;
+}
+
+.btn.danger:active {
+  opacity: 0.76;
+}
+
+/*
+ * Ghost icon button (the ⋯ buttons): no fill or outline at rest; a see-through fill on hover, keyboard
+ * focus, and while its menu is open, so it reads as its own target on a card that is hovered too.
+ */
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.btn.ghost:hover,
+.btn.ghost:focus-visible,
+.btn.ghost[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  border-color: transparent;
+  color: var(--fg);
+}
+
+.btn.ghost:active {
+  background: color-mix(in srgb, var(--fg) 16%, transparent);
+}
+
 /* Quiet button (the draft's ghost): no fill or frame until hovered, for the lesser choice (Cancel). */
 .btn.quiet {
   background: transparent;
@@ -355,7 +394,7 @@ textarea.input {
   width: 100%;
   height: auto;
   min-height: 72px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   font: 400 var(--size-dense) / 1.45 var(--font);
   resize: vertical;
 }
@@ -371,7 +410,7 @@ textarea.input {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin: 0;
   padding: 4px 0;
   border: 0;
@@ -430,7 +469,7 @@ textarea.input {
   -webkit-appearance: none;
   position: relative;
   margin: 0;
-  padding: 10px 12px 12px;
+  padding: 12px;
   border: 0;
   background: none;
   font: 500 var(--size-dense) / 1 var(--font);
@@ -457,7 +496,7 @@ textarea.input {
 }
 
 .tab .n {
-  margin-left: 6px;
+  margin-left: 8px;
   font: 400 var(--size-micro) / 1 var(--mono);
   color: var(--muted);
 }
@@ -477,8 +516,8 @@ textarea.input {
 /* Segmented choice: buttons with aria-pressed. */
 .seg {
   display: flex;
-  gap: 2px;
-  padding: 3px;
+  gap: 4px;
+  padding: 4px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
@@ -515,7 +554,7 @@ textarea.input {
   display: grid;
   gap: 12px;
   min-width: 0;
-  padding: 16px;
+  padding: 12px 16px;
   background: var(--surface);
   color: var(--fg);
   border: 1px solid var(--border);

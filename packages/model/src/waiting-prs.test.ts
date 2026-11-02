@@ -198,6 +198,49 @@ describe('waitingPrs', () => {
     expect(waitingPrs(repo({ 'pod-docs/README.md': README }, { agents, prs: [gh(36, 'open', { branch: name })] }), NOW)).toEqual([])
   })
 
+  describe('the staging → main PR', () => {
+    // Plan alpha is done and claimed; its final PR #80 merged into pod-staging an hour ago.
+    const doneFiles = files({ sprints: [['one', 'done']], docs: { one: [[1, 'A1', 'merged', 'done']] } })
+    const final = gh(80, 'merged', { branch: 'alpha', base: 'pod-staging', mergedAt: NOW - 60 * MIN })
+    const staging = (state: PrStatus['state'], over: Partial<PrStatus> = {}) => gh(91, state, { branch: 'pod-staging', base: 'main', ...over })
+    const listed = (prs: PrStatus[], extra: Partial<BoardRepo> = {}) => waitingPrs(repo(doneFiles, { claims: [claim('alpha')], prs, ...extra }), NOW)
+
+    it('waits on you while it is open, once the final PR merged', () => {
+      expect(listed([final, staging('open')])).toEqual<WaitingPr[]>([{ kind: 'staging', number: 91, url: 'https://github.com/o/r/pull/91', run: 'alpha' }])
+      // pod reuses an open staging PR an earlier plan left, so its number can be below the final PR's.
+      expect(listed([final, gh(13, 'open', { branch: 'pod-staging', base: 'main' })]).map((w) => [w.kind, w.number])).toEqual([['staging', 13]])
+    })
+
+    it("comes after the plan's final PR, which waits first", () => {
+      // A pending hand-back whose PR gh says is open: the final PR waits, and staging isn't open for this plan yet.
+      const handed = files({ sprints: [['one', 'done']], docs: { one: [[1, 'A1', 'merged', 'done']] }, queue: [handBack(80)] })
+      expect(waitingPrs(repo(handed, { claims: [claim('alpha')], prs: [gh(80, 'open', { branch: 'alpha', base: 'pod-staging' }), staging('open')] }), NOW)).toEqual([
+        { kind: 'final', number: 80, url: 'https://github.com/o/r/pull/80', run: 'alpha' },
+      ])
+      // Once the hand-back's PR merged, the staging PR waits instead.
+      expect(waitingPrs(repo(handed, { claims: [claim('alpha')], prs: [final, staging('open')] }), NOW).map((w) => [w.kind, w.number])).toEqual([['staging', 91]])
+    })
+
+    it('does not wait when it is closed, merged, or not open yet', () => {
+      expect(listed([final, staging('closed')])).toEqual([])
+      expect(listed([final, staging('merged', { mergedAt: NOW - 5 * MIN })])).toEqual([])
+      expect(listed([final, staging('merged')])).toEqual([])
+      expect(listed([final])).toEqual([])
+    })
+
+    it('does not wait before the final PR merges, or with no staging branch', () => {
+      expect(listed([gh(80, 'open', { branch: 'alpha', base: 'pod-staging' }), staging('open')])).toEqual([])
+      expect(listed([gh(80, 'closed', { branch: 'alpha', base: 'pod-staging' }), staging('open')])).toEqual([])
+      // A final PR into main: no staging step, so an open pod-staging PR isn't this plan's.
+      expect(listed([gh(80, 'merged', { branch: 'alpha', base: 'main' }), staging('open')])).toEqual([])
+    })
+
+    it('only for a listed run', () => {
+      // Unclaimed, the finished plan is off the runs list.
+      expect(listed([final, staging('open')], { claims: [] })).toEqual([])
+    })
+  })
+
   it('is exported from the package entry', () => {
     expect(model.waitingPrs).toBe(waitingPrs)
   })

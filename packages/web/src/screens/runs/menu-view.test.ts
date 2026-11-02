@@ -48,3 +48,9 @@ describe('open and close', () => {
     expect(runKey(undefined)).toBe('')
   })
 })
+
+describe('Remove from the board', () => {
+  it('picking Remove closes the menu without taking focus back: the confirm panel takes it', () => {
+    expect(run(true, 'pick-remove')).toEqual({ open: false, focusTrigger: false })
+  })
+})

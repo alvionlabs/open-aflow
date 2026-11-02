@@ -10,7 +10,10 @@ export const NO_ACTIONS = 'No actions yet.'
 const OUTCOME_CLS: Record<ActionEntry['result'], ChipClass> = {
   merged: 's-ok',
   answered: 's-ok',
+  closed: 's-ok',
+  kept: 's-ok',
   started: 's-ok',
+  removed: 's-ok',
   queued: 's-run',
   'auto-merge': 's-run',
   stale: 's-you',
@@ -19,7 +22,7 @@ const OUTCOME_CLS: Record<ActionEntry['result'], ChipClass> = {
   failed: 's-bad',
 }
 
-/** merged, answered, and started → ok; queued and auto-merge → run; stale, unconfirmed, and changed → you; failed → bad. */
+/** merged, answered, closed, kept, started, and removed → ok; queued and auto-merge → run; stale, unconfirmed, and changed → you; failed → bad. */
 export const outcomeChip = (result: ActionEntry['result']): Chip => ({ cls: OUTCOME_CLS[result], label: result })
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']

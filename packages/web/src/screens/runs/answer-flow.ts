@@ -9,8 +9,12 @@ import { outcomeChip } from './action-log-view.ts'
 import { ANSWER_NOTE } from './queue-view.ts'
 import type { Chip } from './view.ts'
 
-/** The entry an answer is for: its repo and its whole line as the Board read it. */
-export type AnswerTarget = { repoId: string; line: string }
+/**
+ * The entry an answer is for: its repo and its whole line as the Board read it. `entry`: the text the
+ * card's form quotes, kept from when it opened, so it stays this entry's after the card moves to another.
+ * Only `repoId` and `line` are sent or compared.
+ */
+export type AnswerTarget = { repoId: string; line: string; entry?: string }
 export type Post = <T>(path: string, body: object) => Promise<ActionReply<T>>
 
 /** `seq` counts requests; a reply for an older one is ignored. `text` is what you typed, as typed. */
@@ -117,6 +121,8 @@ function resultWords(r: AnswerResult): string {
 }
 
 export type FormView = {
+  /** The entry's text to quote above the box: the card's form only (a row shows its own entry). */
+  entry?: string
   /** Show the text box with `text`. */
   showText: boolean
   text: string
@@ -135,6 +141,7 @@ export type FormView = {
 export function formView(s: AnswerState, note: string = ANSWER_NOTE): FormView | undefined {
   if (s.kind === 'idle') return undefined
   const base: FormView = { showText: true, text: s.text, canSave: true, note, closeLabel: 'Cancel', cancelDisabled: false }
+  if (s.target.entry !== undefined) base.entry = s.target.entry
   switch (s.kind) {
     case 'editing':
       return s.error === undefined ? base : { ...base, error: s.error }

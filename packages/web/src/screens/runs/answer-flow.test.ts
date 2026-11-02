@@ -176,6 +176,34 @@ describe('answer flow', () => {
     }
   })
 
+  it("keeps quoting the entry it opened for, after the card moves to another entry", async () => {
+    // The card opens its form with the entry's text; the Board then moves the card on, so the card's
+    // entry is no longer this one. The form keeps its own target and its own text.
+    const s = setup()
+    s.flow.open({ ...A, entry: 'Pick a port.' })
+    expect(formView(s.flow.state())?.entry).toBe('Pick a port.')
+    s.flow.type('Use port 3030.')
+    expect(formView(s.flow.state())?.entry).toBe('Pick a port.')
+    s.flow.save()
+    expect(formView(s.flow.state())?.entry).toBe('Pick a port.')
+    // The quoted text never reaches the server: the old line is sent, and a 404 for it is kept.
+    expect(s.calls[0]?.body).toEqual({ repoId: A.repoId, line: A.line, text: 'Use port 3030.' })
+    await s.answer(0, { ok: false, status: 404, message: 'not waiting on you' })
+    expect(formView(s.flow.state())).toMatchObject({ entry: 'Pick a port.', error: 'not waiting on you' })
+    // An answered result keeps quoting its entry too.
+    const t = setup()
+    t.flow.open({ ...A, entry: 'Pick a port.' })
+    t.flow.type('x')
+    t.flow.save()
+    await t.answer(0, ok(result('answered')))
+    expect(formView(t.flow.state())?.entry).toBe('Pick a port.')
+    // Opening the new entry's form starts fresh with its own text.
+    t.flow.open({ ...B, entry: 'Tool missing.' })
+    expect(formView(t.flow.state())).toMatchObject({ entry: 'Tool missing.', text: '' })
+    // A row's form quotes nothing: the row shows its own entry.
+    expect(formView(reduce(INITIAL, { type: 'open', target: A }))).not.toHaveProperty('entry')
+  })
+
   it('drops a reply to an older request', () => {
     const open = reduce(INITIAL, { type: 'open', target: A })
     const typed = reduce(open, { type: 'type', text: 'x' })

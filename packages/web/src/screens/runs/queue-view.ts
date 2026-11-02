@@ -2,8 +2,9 @@
 // The selected plan's own entries first, then the repo's entries that join no plan. Other plans'
 // entries show under their own run. Pure; WaitingOnYou.tsx is the glue.
 
-import { isAnswerable, type BoardRepo, type QueueItem, type RunSummary } from '@pod-board/model'
+import { isAnswerable, triage, type BoardRepo, type QueueItem, type RunSummary } from '@pod-board/model'
 import type { AnswerState } from './answer-flow.ts'
+import { entryKind, type EntryKind } from './entry-kind.ts'
 import type { Chip, ChipClass } from './view.ts'
 
 /** A plan run's note: its Continue resumes /pod:code, which reads the answer. */
@@ -26,8 +27,17 @@ export type WaitingRow = {
   route: string
   /** The body as plain text: no bold, code ticks, or link syntax. */
   body: string
+  /** The kind its body starts with (entry-kind.ts), and the words the row shows for it. */
+  kind: EntryKind
+  kindLabel: string
+  /** `body` without its kind prefix: what the row shows. */
+  text: string
   /** Shows the Answer button. */
   answerable: boolean
+  /** The board reads the entry as settled: the reason, shown as `Done: <reason>` with Close. */
+  done?: string
+  /** The entry's value in use, shown as the default with Keep; never with `done`. */
+  keep?: string
   /** `Your answer: <answer>` on an answered entry. */
   yourAnswer?: string
   waiting?: string
@@ -58,16 +68,25 @@ export function waitingEntries(repo: BoardRepo | undefined, selected: RunSummary
 }
 
 export function waitingRows(repo: BoardRepo | undefined, selected: RunSummary | undefined): WaitingRow[] {
+  if (!repo) return []
   return waitingEntries(repo, selected).map((e, i) => {
+    const body = plain(e.body)
+    const kind = entryKind(body)
     const row: WaitingRow = {
       key: `${i}:${e.line}`,
       line: e.line,
       chip: typeChip(e.type),
       route: e.route.trim(),
-      body: plain(e.body),
+      body,
+      kind: kind.kind,
+      kindLabel: kind.label,
+      text: kind.text,
       answerable: isAnswerable(e),
     }
     if (e.date !== undefined) row.date = e.date
+    const t = triage(repo, e)
+    if (t.done !== undefined) row.done = t.done
+    if (t.keep !== undefined) row.keep = t.keep
     if (e.answer !== undefined) {
       row.yourAnswer = `Your answer: ${e.answer}`
       row.waiting = ANSWER_WAITING

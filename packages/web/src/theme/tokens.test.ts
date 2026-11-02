@@ -172,6 +172,55 @@ describe('tokens', () => {
     }
   })
 
+  it('danger text and the danger button reach 4.5 to 1, and the focus ring shows on the page', () => {
+    for (const [theme, t] of themes()) {
+      const danger = t['--danger']
+      const dangerFg = t['--danger-fg']
+      expect(danger, `${theme} --danger`).toBeDefined()
+      expect(dangerFg, `${theme} --danger-fg`).toBeDefined()
+      for (const surface of ['bg', 'surface', 'hover']) {
+        const ratio = contrast(danger!, t[`--${surface}`]!)
+        expect(ratio, `${theme} danger on ${surface} = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5)
+      }
+      expect(contrast(dangerFg!, danger!), `${theme} danger-fg on danger`).toBeGreaterThanOrEqual(4.5)
+      // The ring sits 2 px outside the button, on the page, so it must stand out from the page.
+      expect(contrast(t['--focus']!, t['--bg']!), `${theme} focus on bg`).toBeGreaterThanOrEqual(3)
+    }
+    // Dark's own selector holds the same danger values.
+    expect(darkAttr()['--danger']).toBe(darkMedia()['--danger'])
+    expect(darkAttr()['--danger-fg']).toBe(darkMedia()['--danger-fg'])
+  })
+
+  it('Remove repo stays 4.5 to 1 on its hover, focus, and press tints', () => {
+    const menuCss = stripComments(readFileSync(join(srcDir, 'screens/runs/menu.css'), 'utf8'))
+    const percents = [...menuCss.matchAll(/color-mix\(in srgb, var\(--danger\) (\d+)%, transparent\)/g)].map((m) => Number(m[1]))
+    expect(percents.length).toBeGreaterThanOrEqual(2)
+    const hex = (n: number) => Math.round(n).toString(16).padStart(2, '0')
+    const mix = (fg: string, bg: string, pct: number) => {
+      const [f, b] = [parseColor(fg), parseColor(bg)]
+      return `#${f.map((v, i) => hex((v * pct + b[i]! * (100 - pct)) / 100)).join('')}`
+    }
+    for (const [theme, t] of themes()) {
+      for (const pct of percents) {
+        // The menu's own background is --surface; the tint is see-through over it.
+        const ratio = contrast(t['--danger']!, mix(t['--danger']!, t['--surface']!, pct))
+        expect(ratio, `${theme} danger on its ${pct}% tint = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  it('no token is declared twice in one block', () => {
+    const blocks: [string, string][] = [
+      ['light', blockAfter(tokensCss(), ':root {')],
+      ['dark media', blockAfter(blockAfter(tokensCss(), '@media (prefers-color-scheme: dark)'), ':root:not([data-theme="light"])')],
+      ['dark attr', blockAfter(tokensCss(), ':root[data-theme="dark"]')],
+    ]
+    for (const [name, body] of blocks) {
+      const names = [...body.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1]!)
+      expect(names.filter((n, i) => names.indexOf(n) !== i), name).toEqual([])
+    }
+  })
+
   it('faint and status colors are never text', () => {
     // The guarded names are the theme's own, in both themes.
     for (const name of NOT_TEXT) {

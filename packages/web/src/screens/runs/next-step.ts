@@ -1,12 +1,15 @@
 // The Next step card and the Waiting tab: the selected run's most urgent item and its one action,
 // then everything else that waits on you. Picks from the model's rules only (the queue entries,
-// waitingPrs, the reply panel), in the plan's order: blocked → merge → reply → pending → info.
+// waitingPrs, the reply panel), in the plan's order: blocked → merge → reply → pending → info,
+// the pending tier sorted by kind (entry-kind.ts).
 // Pure; the card and the tab only render these.
 
 import { haltGate, isAnswerable, waitingPrs, type BoardRepo, type QueueItem, type RunSummary, type WaitingPr } from '@pod-board/model'
+import { KIND_ORDER } from './entry-kind.ts'
 import { waitingEntries, waitingRows, type WaitingRow } from './queue-view.ts'
+import { kindChip } from './waiting-tab.ts'
 import { replyPanel, type ReplyPanelView } from './reply-view.ts'
-import { emptyMessage } from './view.ts'
+import { emptyMessage, type Chip } from './view.ts'
 
 export type NextStatus = 'blocked' | 'needs-you' | 'ready' | 'running' | 'idle'
 export type NextAction =
@@ -27,6 +30,8 @@ export type NextItem = {
   detail?: string
   /** Queue items: the Waiting on you row. */
   entry?: WaitingRow
+  /** A pending or blocked entry's kind as a dot and word (kindChip); none for `other`. */
+  kind?: Chip
   action: NextAction
 }
 /** `card` is the first action item; `rest` is every other item (the Waiting tab's count is its length). */
@@ -49,6 +54,13 @@ function short(text: string): string {
 const ACTION_TIERS = new Set<NextItem['tier']>(['blocked', 'merge', 'reply', 'pending'])
 const TIER_ORDER: NextItem['tier'][] = ['blocked', 'merge', 'reply', 'pending', 'info']
 
+/** Tier first; inside the pending tier, by the entry's kind (now → decision → before → other → someday). */
+function byTier(a: NextItem, b: NextItem): number {
+  const tier = TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier)
+  if (tier !== 0 || a.tier !== 'pending') return tier
+  return KIND_ORDER.indexOf(a.entry?.kind ?? 'other') - KIND_ORDER.indexOf(b.entry?.kind ?? 'other')
+}
+
 /** Keys by line, a repeat numbered in list order, so a row's key never depends on where it sits. */
 function entryKeys(rows: WaitingRow[]): string[] {
   const seen = new Map<string, number>()
@@ -62,17 +74,21 @@ function entryKeys(rows: WaitingRow[]): string[] {
 function entryItem(e: QueueItem, row: WaitingRow, key: string, repoId: string): NextItem {
   const answer: NextAction = { kind: 'answer', repoId, line: row.line }
   const blocked = e.type === 'BLOCKED'
+  // The title is the body without its kind prefix; the kind shows as a dot and word, as on the rows.
+  const title = entryTitle(row.text)
   if (isAnswerable(e)) {
+    const kind = row.kind === 'other' ? {} : { kind: kindChip(row) }
     return blocked
-      ? { key, tier: 'blocked', status: 'blocked', ...entryTitle(row.body), detail: BLOCKED_DETAIL, entry: row, action: answer }
-      : { key, tier: 'pending', status: 'needs-you', ...entryTitle(row.body), detail: PENDING_DETAIL, entry: row, action: answer }
+      ? { key, tier: 'blocked', status: 'blocked', ...title, ...kind, detail: BLOCKED_DETAIL, entry: row, action: answer }
+      : { key, tier: 'pending', status: 'needs-you', ...title, ...kind, detail: PENDING_DETAIL, entry: row, action: answer }
   }
-  return { key, tier: 'info', status: blocked ? 'blocked' : 'idle', ...entryTitle(row.body), detail: row.yourAnswer ?? row.route, entry: row, action: { kind: 'none' } }
+  return { key, tier: 'info', status: blocked ? 'blocked' : 'idle', ...title, detail: row.yourAnswer ?? row.route, entry: row, action: { kind: 'none' } }
 }
 
 function prDetail(pr: WaitingPr): string {
   if (pr.kind === 'wave') return `Wave ${pr.wave} of ${pr.sprint} is handed back to you.`
   if (pr.kind === 'final') return "The plan's final PR is reviewed and waits for you."
+  if (pr.kind === 'staging') return 'The staging → main PR waits for you.'
   return 'The fix PR is reviewed and waits for you.'
 }
 
@@ -118,8 +134,8 @@ export function nextSteps(run: RunSummary | undefined, repo: BoardRepo | undefin
   const panel = replyPanel(run, repo, now)
   const reply = panel && replyItem(panel)
   if (reply) items.push(reply)
-  // A stable sort: list order holds within a tier.
-  const sorted = items.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier))
+  // A stable sort: list order holds within a tier, and within a kind in the pending tier.
+  const sorted = items.sort(byTier)
   const first = sorted[0]
   if (first && ACTION_TIERS.has(first.tier)) return { card: first, rest: sorted.slice(1) }
   return { card: nothingCard(run, repo), rest: sorted }

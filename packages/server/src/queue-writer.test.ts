@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { nodeQueueFs, writeAnswer, type QueueFs } from './queue-writer.ts'
+import { nodeQueueFs, writeAnswer, writeResolution, type QueueFs } from './queue-writer.ts'
 
 const ASK = '- `[2026-10-21 · PENDING · engineer → human · slice: A1]` Pick a name **Resolution:** pending'
 const HALT = '- `[2026-10-21 · BLOCKED · orchestrator → human]` Gate 2 stopped **Resolution:** pending'
@@ -210,5 +210,33 @@ describe('queue writer', () => {
     expect(await readFile(real, 'utf8')).toBe(`${ANSWERED(ASK, 'x')}\n`)
     expect(await readFile(queue, 'utf8')).toBe(`${ASK}\n`)
     expect(await readdir(join(repo, 'docs'))).toEqual(['queue.md'])
+  })
+})
+
+describe('queue writer: a resolution', () => {
+  const KEPT = '2026-10-31 — kept: Ladder'
+
+  test('rewrites pending on one line and keeps the rest byte for byte', async () => {
+    const crlf = ['# Handoff Queue', '', NOTE, `  ${ASK}  `, HALT, ''].join('\r\n')
+    await put(crlf)
+    expect(await writeResolution({ repoPath: repo, line: ASK, text: KEPT })).toEqual({ outcome: 'resolved' })
+    expect((await bytes()).toString('utf8')).toBe(crlf.replace(ASK, ASK.replace('**Resolution:** pending', `**Resolution:** ${KEPT}`)))
+    expect(await folder()).toEqual(['handoff-queue.md'])
+  })
+
+  test('a line that no longer reads as pending, or is gone, is changed', async () => {
+    const resolved = ASK.replace('pending', '2026-10-30 — done')
+    await put(['# Handoff Queue', resolved, ''].join('\n'))
+    // The Board's line is gone: pod rewrote it.
+    expect(await writeResolution({ repoPath: repo, line: ASK, text: KEPT })).toEqual({ outcome: 'changed', message: 'The entry changed since you looked.' })
+    // The line is there but not pending.
+    expect(await writeResolution({ repoPath: repo, line: resolved, text: KEPT })).toEqual({ outcome: 'changed', message: 'The entry changed since you looked.' })
+    expect((await bytes()).toString('utf8')).toBe(['# Handoff Queue', resolved, ''].join('\n'))
+  })
+
+  test('refuses a text that would break the line', async () => {
+    await put(`${ASK}\n`)
+    expect(await writeResolution({ repoPath: repo, line: ASK, text: 'x **Resolution:** y' })).toMatchObject({ outcome: 'failed' })
+    expect((await bytes()).toString('utf8')).toBe(`${ASK}\n`)
   })
 })

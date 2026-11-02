@@ -207,15 +207,61 @@ export function waveHandedPr(repo: BoardRepo, plan: PlanModel, s: SprintModel, w
 export const finalWaitingPr = (repo: BoardRepo, plan: PlanModel, now: number): number | undefined =>
   isRun(repo, plan, now) ? pendingHandBack(repo, plan) : undefined
 
+const STAGING = /staging/i
+
+/** The plan's final PR: the hand-back's PR when gh knows it, else the PR gh found on the plan's branch. */
+export function finalPr(repo: Pick<BoardRepo, 'prs'>, plan: PlanModel): PrStatus | undefined {
+  const n = handBackPr(plan)
+  return (n === undefined ? undefined : repo.prs.find((p) => p.number === n)) ?? prByBranch(repo, plan.slug)
+}
+
+/** The plan's staging branch: its final PR's base when that is a staging branch, else the repo's decision. */
+export function stagingOf(repo: Pick<BoardRepo, 'model' | 'prs'>, plan: PlanModel): string | undefined {
+  const base = finalPr(repo, plan)?.base
+  if (base !== undefined && STAGING.test(base)) return base
+  return repo.model.staging
+}
+
+/**
+ * The final PR merged, as the Ship step reads it: the hand-back's PR once gh says merged, else (no
+ * hand-back) the PR gh found on the plan's branch merged.
+ */
+export function finalMerged(repo: Pick<BoardRepo, 'prs'>, plan: PlanModel): boolean {
+  if (handBackPr(plan) !== undefined) return pendingHandBack(repo, plan) === undefined
+  return prByBranch(repo, plan.slug)?.state === 'merged'
+}
+
+/**
+ * The staging branch's open PR to main, once the plan's final PR merged; undefined with no staging
+ * branch. An open one always counts and needs you: pod's gate 7 opens it, or reuses one an earlier plan
+ * left open (so its number can be below the final PR's). Only `open` counts: a closed or merged one
+ * can't be shown to be this plan's.
+ */
+export function stagingPr(repo: Pick<BoardRepo, 'model' | 'prs'>, plan: PlanModel): number | undefined {
+  const branch = stagingOf(repo, plan)
+  if (branch === undefined || !finalMerged(repo, plan)) return undefined
+  const pr = prByBranch(repo, branch)
+  return pr?.state === 'open' ? pr.number : undefined
+}
+
+/** The staging PR waiting on you, while the plan is on the runs list. */
+export const stagingWaitingPr = (repo: BoardRepo, plan: PlanModel, now: number): number | undefined =>
+  isRun(repo, plan, now) ? stagingPr(repo, plan) : undefined
+
 /** A plan run's state, as the runs list shows it. */
 export type PlanState = 'blocked' | 'needs-you' | 'running' | 'idle'
 
-/** First match wins: blocked → needs-you (an ask, or a wave PR waiting on you) → running → idle. */
+/** First match wins: blocked → needs-you (an ask, a wave PR, or the staging PR waiting on you) → running → idle. */
 export function planState(repo: BoardRepo, plan: PlanModel, now: number): PlanState {
   const current = plan.sprints.find((s) => s.slug === plan.currentSprint)
   const slices = current?.waves.flatMap((w) => w.slices) ?? []
   if (isHalted(plan) || slices.some(isBlockedSlice)) return 'blocked'
-  if (plan.queue.some((e) => e.needsYou) || current?.waves.some((w) => waveWaitingPr(repo, plan, current, w, now) !== undefined)) return 'needs-you'
+  if (
+    plan.queue.some((e) => e.needsYou) ||
+    current?.waves.some((w) => waveWaitingPr(repo, plan, current, w, now) !== undefined) ||
+    stagingPr(repo, plan) !== undefined
+  )
+    return 'needs-you'
   const wave = current?.waves.find((w) => w.wave === current.currentWave)
   if (planAgentRunning(repo, plan, now) || wave?.slices.some((s) => s.status === 'pushed')) return 'running'
   return 'idle'

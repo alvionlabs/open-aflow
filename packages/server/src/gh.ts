@@ -36,7 +36,8 @@ export const AUTH_RECHECK_MS = 60_000
 export const PR_CACHE_MS = 30_000
 export const GH_TIMEOUT_MS = 10_000
 const PR_FIELDS = 'number,state,url,statusCheckRollup,baseRefName,mergedAt'
-const LIST_FIELDS = `${PR_FIELDS},headRefName`
+/** `title` names a fix run in its header; only PRs found by branch need it. */
+const LIST_FIELDS = `${PR_FIELDS},headRefName,title`
 /** A branch gh can't read as a flag, with no spaces or shell characters. */
 const BRANCH = /^[A-Za-z0-9][\w./-]{0,199}$/
 
@@ -248,11 +249,12 @@ function prOf(data: unknown, n: number, checkedAt: number): PrStatus | undefined
   if (typeof d.baseRefName === 'string' && d.baseRefName) pr.base = d.baseRefName
   const mergedAt = typeof d.mergedAt === 'string' ? Date.parse(d.mergedAt) : NaN
   if (Number.isFinite(mergedAt)) pr.mergedAt = mergedAt
+  if (typeof d.title === 'string' && d.title) pr.title = d.title
   return pr
 }
 
 /**
- * Maps `gh pr list --head <branch> --json number,state,url,statusCheckRollup,headRefName` output to
+ * Maps `gh pr list --head <branch> --json number,state,url,statusCheckRollup,headRefName,title` output to
  * the branch's PR, with `branch` set: the open one, else the newest. Entries for another head are
  * skipped. `undefined` when the output isn't a list or holds no usable entry (no PR yet).
  */

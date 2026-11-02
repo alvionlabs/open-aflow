@@ -18,6 +18,7 @@ import {
 import type { StreamState } from '../../board-stream.ts'
 import { hashFor, type View } from '../../selection.ts'
 import type { NextStatus } from './next-step.ts'
+import { runName } from './plan-view.ts'
 import { toggleTab, type Tab } from './tab-memory.ts'
 
 export type ChipClass = 's-run' | 's-ok' | 's-you' | 's-bad' | 's-idle'
@@ -39,15 +40,13 @@ const LOST: Chip = { cls: 's-bad', label: 'lost · retrying' }
 /** The bar's connection status: only while the stream is lost; nothing while live or connecting. */
 export const connectionStatus = (s: StreamState): Chip | undefined => (s === 'lost' ? LOST : undefined)
 
-/**
- * A runs list row's label: the repo name, plus ` · <plan>` or ` · fix · <slug>` only when its repo
- * (by id) has more than one run in the list. A plan-less repo row keeps the name alone.
- */
-export function runLabel(r: RunSummary, runs: RunSummary[]): string {
-  const shared = runs.filter((x) => x.repoId === r.repoId).length > 1
-  if (!shared) return r.repo
-  if (r.fix !== undefined) return `${r.repo} · fix · ${r.fix}`
-  return r.plan === undefined ? r.repo : `${r.repo} · ${r.plan}`
+/** A runs list card's text: the run's name, and its repo as a muted line unless the name already is the repo. */
+export type RunCard = { name: string; repo?: string }
+
+/** A runs list card: the run header's own name (`runName`), so the two always agree; the `fix` tag is the card's, never in the name. */
+export function runCard(r: RunSummary, repo: BoardRepo | undefined): RunCard {
+  const name = runName(r, repo)
+  return r.plan === undefined ? { name } : { name, repo: r.repo }
 }
 
 const NEXT_STATUS: Record<NextStatus, Chip> = {

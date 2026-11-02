@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as model from './index.ts'
 import type { AgentRun, BoardRepo, PrStatus } from './board.ts'
-import { buildPipeline, haltGate, isRun, type Pipeline, type Stage } from './pipeline.ts'
+import { buildPipeline, haltGate, isRun, planState, type Pipeline, type Stage } from './pipeline.ts'
 import { buildRepoModel, type RepoFiles } from './run-model.ts'
 
 // Every snapshot is built inline: test/no-io.test.ts scans this folder, so no file reads here.
@@ -473,6 +473,37 @@ describe('buildPipeline', () => {
 
   it('is exported from the package entry', () => {
     expect(model.buildPipeline).toBe(buildPipeline)
+  })
+})
+
+describe('planState with a staging PR', () => {
+  // Plan alpha is done and claimed; its final PR #80 merged into pod-staging an hour ago.
+  const doneFiles = files({ sprints: [['one', 'done']], docs: { one: [[1, 'A1', 'merged', 'done']] } })
+  const claims = [{ portBase: 3100, repoPath: '/r', plan: 'alpha' }]
+  const gh = (number: number, state: PrStatus['state'], branch: string, base: string, mergedAt?: number): PrStatus => ({
+    number,
+    state,
+    checks: 'pass',
+    checkedAt: NOW,
+    branch,
+    base,
+    ...(mergedAt === undefined ? {} : { mergedAt }),
+  })
+  const final = gh(80, 'merged', 'alpha', 'pod-staging', NOW - 60 * MIN)
+  const stateOf = (prs: PrStatus[]) => {
+    const r = repo(doneFiles, { claims, prs })
+    return planState(r, r.model.plans[0]!, NOW)
+  }
+
+  it('needs you while the staging → main PR is open', () => {
+    expect(stateOf([final, gh(91, 'open', 'pod-staging', 'main')])).toBe('needs-you')
+  })
+
+  it('stays idle when the staging PR is closed, merged, not open yet, or the final PR has not merged', () => {
+    expect(stateOf([final])).toBe('idle')
+    expect(stateOf([final, gh(91, 'closed', 'pod-staging', 'main')])).toBe('idle')
+    expect(stateOf([final, gh(91, 'merged', 'pod-staging', 'main', NOW - 5 * MIN)])).toBe('idle')
+    expect(stateOf([gh(80, 'open', 'alpha', 'pod-staging'), gh(91, 'open', 'pod-staging', 'main')])).toBe('idle')
   })
 })
 

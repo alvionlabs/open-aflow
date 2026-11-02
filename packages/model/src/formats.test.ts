@@ -268,6 +268,35 @@ describe('planFacts', () => {
     expect(planFacts(plan('', '\n```\n## Look\ndirection A\n```\n'))).not.toHaveProperty('look')
   })
 
+  test('generated date', () => {
+    // The metadata line's `Generated:` date, as written (no time zone shift).
+    expect(planFacts(plan('')).generated).toBe('2026-10-17')
+    expect(planFacts('# Plan: P\n\n_Status: active · Generated: 2025-01-05 · Grilled-with: x_\n').generated).toBe('2025-01-05')
+    // Not a date, a prose mention, a code fence, or a date that doesn't exist: not recorded.
+    expect(planFacts('# Plan: P\n\n_Generated: soon · Status: active_\n')).not.toHaveProperty('generated')
+    expect(planFacts("# Plan: P\n\nThe Generated: 2026-10-17 field is pod's.\n")).not.toHaveProperty('generated')
+    expect(planFacts('# Plan: P\n\n```\n_Generated: 2026-10-17 · Status: active_\n```\n')).not.toHaveProperty('generated')
+    expect(planFacts('# Plan: P\n\n_Generated: 2026-13-45 · Status: active_\n')).not.toHaveProperty('generated')
+    expect(planFacts('# Plan: P\n\n_Generated: 2026-02-30 · Status: active_\n')).not.toHaveProperty('generated')
+  })
+
+  test('autopilot started stamp', () => {
+    const withStamp = (line: string) => planFacts(`# Plan: P\n\n_Generated: 2026-10-17 · Status: active_\n${line}\n\n## Goal\n`)
+    expect(withStamp('<!-- autopilot-run: started=2026-10-18T10:31:18Z sprints=0 waves=3 -->').autopilotStartedAt).toBe(Date.UTC(2026, 9, 18, 10, 31, 18))
+    // An offset counts.
+    expect(withStamp('<!-- autopilot-run: started=2026-10-09T17:30:00+07:00 sprints=1 waves=2 -->').autopilotStartedAt).toBe(Date.UTC(2026, 9, 9, 10, 30))
+    // Extra text after the fields is fine.
+    expect(withStamp('<!-- autopilot-run: started=2026-06-04T19:01:08Z sprints=6 waves=15 · COMPLETE 2026-06-05 -->').autopilotStartedAt).toBe(Date.UTC(2026, 5, 4, 19, 1, 8))
+    // No stamp, no started field, or a value that isn't a full time: not recorded.
+    expect(withStamp('')).not.toHaveProperty('autopilotStartedAt')
+    expect(withStamp('<!-- autopilot-run: sprints=0 waves=3 -->')).not.toHaveProperty('autopilotStartedAt')
+    expect(withStamp('<!-- autopilot-run: started=? -->')).not.toHaveProperty('autopilotStartedAt')
+    expect(withStamp('<!-- autopilot-run: started=2026 -->')).not.toHaveProperty('autopilotStartedAt')
+    expect(withStamp('<!-- autopilot-run: started=2026-10-18T25:00:00Z -->')).not.toHaveProperty('autopilotStartedAt')
+    // Prose that quotes the marker isn't one.
+    expect(withStamp('Autopilot keeps `<!-- autopilot-run: started=2026-10-18T10:31:18Z -->` here.')).not.toHaveProperty('autopilotStartedAt')
+  })
+
   test('research links', () => {
     expect(planFacts(plan('', '\nSee [research](../research/folder-picker.md) and research/folder-picker.html, and pod-docs/research/live-feed.md.\n')).researchLinks).toEqual([
       'folder-picker',

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import type { Board } from '@pod-board/model'
 import * as model from '@pod-board/model'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { createBoardService, finalPrBranches, type BoardServiceDeps } from './board-service.ts'
+import { createBoardService, finalPrBranches, livePrNumbers, type BoardServiceDeps } from './board-service.ts'
 import type { GhReader, GhStatus, PrStatus } from './gh.ts'
 import { normalizeRepoPath, repoId } from './guard.ts'
 import { projectDirName } from './transcript-files.ts'
@@ -125,6 +125,8 @@ describe('board service', () => {
     expect(board.generatedAt).toBe(NOW)
     expect(board.gh).toBe('ok')
     expect(board.ghCheckedAt).toBe(NOW)
+    // The transcript day window, so the page knows which agent starts it can trust.
+    expect(board.transcriptDays).toBe(30)
     expect(board.repos).toHaveLength(1)
     const [r] = board.repos
     expect(r).toMatchObject({ id: repoId(path, platform, caseless), name: 'chess-web', path, source: 'both' })
@@ -469,6 +471,33 @@ describe('board service', () => {
     ])
   })
 
+  test('a pending gate 7 naming the staging PR keeps it found by branch: the staging Merge stays', async () => {
+    // As above, plus the gate 7 entry, which makes the server ask gh about #95 by number too.
+    const repo = copyFixture('chess-web', 'chess-web-ui-polish')
+    const gate7 =
+      '- `[2026-10-28 · PENDING · orchestrator → human · plan: ui-polish]` gate 7 (plan-complete): plan ui-polish merged to `ui-polish-staging` (final PR https://github.com/o/r/pull/91); review it and merge the staging PR https://github.com/o/r/pull/95 to `main` when ready. **Resolution:** pending'
+    await writeFile(join(repo, 'pod-docs', 'handoff-queue.md'), `# Handoff Queue\n\n${gate7}\n`)
+    await claim(3200, repo, 'ui-polish')
+    const final: PrStatus = { number: 91, state: 'merged', checks: 'pass', checkedAt: NOW, branch: 'ui-polish', base: 'ui-polish-staging' }
+    const staging: PrStatus = { number: 95, state: 'open', checks: 'pass', checkedAt: NOW, branch: 'ui-polish-staging', base: 'main' }
+    // gh by number gives no branch: #91 (the gate 7's final PR, read as its hand-back) with its base, #95 bare.
+    const byNumber: Record<number, PrStatus> = {
+      91: { number: 91, state: 'merged', checks: 'pass', checkedAt: NOW, base: 'ui-polish-staging' },
+      95: { number: 95, state: 'open', checks: 'pass', checkedAt: NOW, base: 'main' },
+    }
+    const asked: number[] = []
+    const gh: GhReader = { ...fakeGh({}, 'ok', { 'ui-polish': final, 'ui-polish-staging': staging }), get: (_p, n) => (asked.push(n), byNumber[n]) }
+    const board = await createBoardService(deps(gh)).build()
+    expect(asked).toContain(95)
+    const r = board.repos[0]!
+    // #95 once, the copy found by branch (it carries the branch the staging rule looks for).
+    expect(r.prs.filter((p) => p.number === 95)).toEqual([staging])
+    const plan = r.model.plans.find((p) => p.slug === 'ui-polish')!
+    expect(model.stagingPr(r, plan)).toBe(95)
+    const ship = model.buildFlow(r, 'ui-polish', NOW)?.find((s) => s.key === 'ship')?.steps
+    expect(ship?.map((s) => [s.label, s.state, s.detail])).toContainEqual(['Staging → main', 'you', 'PR #95 · you merge'])
+  })
+
   test('a PR found by branch that is also a numbered live PR is on the Board once', async () => {
     const repo = copyFixture()
     // A hand-back linking #77 makes #77 a live PR by number too.
@@ -708,5 +737,30 @@ describe('finalPrBranches', () => {
     const plans = { alpha: plan('alpha', 'active', [['one', 'done']]) }
     expect(branches(plans, [], [handBack('alpha')])).toEqual([])
     expect(branches(plans, [], [handBack('alpha', false)])).toEqual(['alpha'])
+  })
+})
+
+describe('livePrNumbers: the staging PR a pending gate 7 names', () => {
+  const README = '# pod docs\n\npod docs: 2\n'
+  const archived = ['# Plan: old', '', '_Generated: 2026-10-18 · Status: archived · Grilled-with: grilling_', '', '## Sprint sequence', '', '| Sprint | Goal | Status | Depends on |', '|---|---|---|---|', '| one | goal | done | — |', ''].join('\n')
+  const gate7 = (resolution = 'pending', plan = ' · plan: old') =>
+    `- \`[2026-10-20 · PENDING · orchestrator → human${plan}]\` gate 7 (plan-complete): plan old merged to \`pod-staging\` (final PR https://github.com/o/r/pull/20); review it and merge the staging PR https://github.com/o/r/pull/21 to \`main\` when ready. **Resolution:** ${resolution}`
+  const numbers = (queue: string[]) =>
+    livePrNumbers(
+      model.buildRepoModel({ 'pod-docs/README.md': README, 'pod-docs/plans/archive/old.md': archived, 'pod-docs/handoff-queue.md': ['# Handoff Queue', '', ...queue, ''].join('\n') }),
+    )
+
+  test('asked by number while the entry is pending, whatever the plan, once', () => {
+    // The archived, unclaimed plan gives nothing else; the gate 7 gives its staging PR, not its final PR.
+    expect(numbers([gate7()])).toEqual([21])
+    // An entry that joins no plan counts too; two entries naming the same PR ask once.
+    expect(numbers([gate7('pending', ''), gate7()])).toEqual([21])
+    // `#N` instead of a URL.
+    expect(numbers([gate7().replace('https://github.com/o/r/pull/21', '#22')])).toEqual([22])
+  })
+
+  test('not once resolved, nor for an entry that names no staging PR', () => {
+    expect(numbers([gate7('2026-10-21 — merged')])).toEqual([])
+    expect(numbers([gate7().replace('the staging PR https://github.com/o/r/pull/21', 'the staging branch')])).toEqual([])
   })
 })

@@ -104,4 +104,10 @@ describe('action log view', () => {
     expect(rows.map((r) => r.target)).toEqual(['alpha · continue · auto', 'PR #42', 'PR #41'])
     expect(new Set(rows.map((r) => r.key)).size).toBe(3)
   })
+
+  it('remove-repo rows', () => {
+    const remove = (result: 'removed' | 'failed'): ActionEntry => ({ at: NOW, action: 'remove-repo', repoId: 'r1', repo: 'chess-web', target: 'C:/code/chess-web', result })
+    expect(actionLogRows([remove('removed')], NOW)[0]).toMatchObject({ repo: 'chess-web', target: 'C:/code/chess-web', auto: false, chip: { cls: 's-ok', label: 'removed' } })
+    expect(actionLogRows([remove('failed')], NOW)[0]!.chip).toEqual({ cls: 's-bad', label: 'failed' })
+  })
 })

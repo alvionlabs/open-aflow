@@ -15,7 +15,7 @@ describe('menu contents', () => {
     const open = render({ open: true })
     expect(open).toMatch(/<button[^>]*aria-label="Menu"/)
     expect(open).toMatch(/aria-expanded="true"/)
-    expect(open).toContain('class="btn sm icon"')
+    expect(open).toContain('class="btn sm icon ghost"')
     expect(open).toMatch(/<svg[^>]*aria-hidden="true"/)
     expect(text(open)).not.toContain('⋯')
     expect(render({ open: false })).toMatch(/aria-expanded="false"/)
@@ -56,5 +56,19 @@ describe('menu contents', () => {
     expect(pressed(render({ storage: store('system') }))).toEqual(['System'])
     expect(pressed(render({ storage: store() }))).toEqual(['Dark'])
     expect(pressed(render({ storage: store('bogus') }))).toEqual(['Dark'])
+  })
+})
+
+describe('Remove repo item', () => {
+  it('shows only with remove, as a danger button that reads Remove repo, last in the menu', () => {
+    expect(render({})).not.toContain('Remove repo')
+    const html = render({ remove: { onPick: noop }, portBase: 3100 })
+    expect(html).toMatch(/<button type="button" class="mi mi-action mi-danger">Remove repo<\/button>/)
+    expect(html.indexOf('Ports')).toBeLessThan(html.indexOf('Remove repo'))
+    expect(text(html)).not.toMatch(/[⋯+]/)
+  })
+
+  it('gives the trigger a stable id, so focus can come back to it after the confirm closes', () => {
+    expect(render({ open: false })).toMatch(/<button[^>]*id="run-menu-trigger"/)
   })
 })

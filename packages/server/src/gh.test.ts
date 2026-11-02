@@ -424,7 +424,7 @@ describe('createGhReader', () => {
 })
 
 describe('PRs found by head branch (fix runs)', () => {
-  const LIST_FIELDS = 'number,state,url,statusCheckRollup,baseRefName,mergedAt,headRefName'
+  const LIST_FIELDS = 'number,state,url,statusCheckRollup,baseRefName,mergedAt,headRefName,title'
   const item = (n: number, state: string, head = 'fix-scroll') => ({ number: n, state, url: `https://github.com/o/r/pull/${n}`, statusCheckRollup: [], headRefName: head })
 
   /** A fake `gh` that answers `pr list --head <b>` from `lists`. */
@@ -499,6 +499,19 @@ describe('PRs found by head branch (fix runs)', () => {
     expect(reader.getBranch(REPO, 'alpha')?.base).toBe('pod-staging')
     // A base that isn't a string is left out.
     expect(reader.getBranch(REPO, 'fix-b')).not.toHaveProperty('base')
+  })
+
+  test("keeps the PR's title, so a fix run's header can name it", async () => {
+    const gh = listGh()
+    gh.lists.set('fix-a', ok(JSON.stringify([{ ...item(80, 'OPEN', 'fix-a'), title: 'fix(runs): calm the header' }])))
+    gh.lists.set('fix-b', ok(JSON.stringify([{ ...item(81, 'OPEN', 'fix-b'), title: 7 }])))
+    gh.lists.set('fix-c', ok(JSON.stringify([{ ...item(82, 'OPEN', 'fix-c'), title: '' }])))
+    const reader = createGhReader({ exec: gh.exec, now: clock().now })
+    await reader.refresh(REPO, [], ['fix-a', 'fix-b', 'fix-c'])
+    expect(reader.getBranch(REPO, 'fix-a')?.title).toBe('fix(runs): calm the header')
+    // A title that isn't a string, or an empty one, is left out.
+    expect(reader.getBranch(REPO, 'fix-b')).not.toHaveProperty('title')
+    expect(reader.getBranch(REPO, 'fix-c')).not.toHaveProperty('title')
   })
 
   test('a staging branch is asked about again after a merge, since every plan reuses it', async () => {

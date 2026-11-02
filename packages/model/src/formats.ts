@@ -93,7 +93,27 @@ export function planExtras(md: string): { portBase?: number; go: 'unknown' } {
 
 export type PlanLook = { kind: 'set' | 'none' | 'empty'; direction?: string }
 /** What a plan doc records about the steps before its sprints; each field only when the doc shows it. */
-export type PlanFacts = { grilledWith?: string; look?: PlanLook; researchLinks?: string[] }
+/**
+ * `generated`: the metadata line's `Generated:` date, `YYYY-MM-DD` as written. `autopilotStartedAt`: the
+ * plan doc's `<!-- autopilot-run: started=<ISO time> … -->` stamp, in ms.
+ */
+export type PlanFacts = { grilledWith?: string; look?: PlanLook; researchLinks?: string[]; generated?: string; autopilotStartedAt?: number }
+
+/** A `YYYY-MM-DD` that names a real day. */
+function isDay(text: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text)
+  if (!m) return false
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  const day = new Date(Date.UTC(y, mo - 1, d))
+  return day.getUTCFullYear() === y && day.getUTCMonth() === mo - 1 && day.getUTCDate() === d
+}
+
+/** A full ISO date and time with `Z` or an offset, in ms; undefined for anything else. */
+function isoTime(text: string): number | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(text)) return undefined
+  const at = Date.parse(text)
+  return Number.isNaN(at) ? undefined : at
+}
 
 /** The doc's lines with fenced code blocks blanked, so an example never counts. */
 function unfenced(md: string): string[] {
@@ -126,9 +146,19 @@ const NO_UI = /^(?:none\b|n\/a\b|no ui\b|no visual\b)/i
  */
 export function planFacts(md: string): PlanFacts {
   const out: PlanFacts = {}
-  const meta = unfenced(md).find((l) => /^_.*\bGrilled-with:/.test(l.trim()))
+  const all = unfenced(md)
+  const meta = all.find((l) => /^_.*\bGrilled-with:/.test(l.trim()))
   const grilled = meta && /\bGrilled-with:\s*([^·_]*)/.exec(meta)?.[1]?.trim()
   if (grilled) out.grilledWith = grilled
+  // `Generated:` opens the line (`_Generated:`) or follows a space; `_` is a word character, so no `\b`.
+  const GENERATED = /(?:^_|\s)Generated:\s*([^\s·_]+)/
+  const dated = all.find((l) => l.trim().startsWith('_') && GENERATED.test(l.trim()))
+  const generated = dated && GENERATED.exec(dated.trim())?.[1]
+  if (generated && isDay(generated)) out.generated = generated
+  const stamp = all.find((l) => /^[ \t]*<!--\s*autopilot-run(?![\w-])/i.test(l))
+  const started = stamp && /\bstarted=(\S+)/.exec(stamp)?.[1]
+  const startedAt = started ? isoTime(started) : undefined
+  if (startedAt !== undefined) out.autopilotStartedAt = startedAt
   const look = section(md, 'Look')
   if (look !== undefined) {
     if (look === '') out.look = { kind: 'empty' }

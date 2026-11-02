@@ -50,15 +50,22 @@ function BoardView({ board, stream, now, hash, setHash }: BoardViewProps) {
     const fix = repo && run.plan !== undefined ? buildFixPipeline(repo, run.plan, now) : undefined
     return fix?.log.filter((x) => x.engineer).map((x) => x.agentId) ?? []
   }
-  const selection = resolveSelection(runs, hash, slicesOf, agentsOf)
+  // While a remove is in flight, the run it planned to go to; the new Board can arrive before the reply.
+  const [fallback, setFallback] = useState<string>()
+  const selection = resolveSelection(runs, hash, slicesOf, agentsOf, fallback)
+  const navigate = (h: string) => {
+    window.history.replaceState(null, '', h === '' ? window.location.pathname + window.location.search : h)
+    setHash(h)
+  }
 
   useEffect(() => {
     if (!board || selection.hash === undefined || selection.hash === hash) return
-    window.history.replaceState(null, '', selection.hash)
+    // An empty hash drops the `#` too: replaceState with '#' would keep it.
+    window.history.replaceState(null, '', selection.hash === '' ? window.location.pathname + window.location.search : selection.hash)
     setHash(selection.hash)
   }, [board, selection.hash, hash])
 
   return (
-    <RunsScreen board={board} stream={stream} runs={runs} selected={selection.run} view={selection.view} slice={selection.slice} agent={selection.agent} now={now} />
+    <RunsScreen board={board} stream={stream} runs={runs} selected={selection.run} view={selection.view} slice={selection.slice} agent={selection.agent} now={now} planFallback={setFallback} navigate={navigate} />
   )
 }
