@@ -205,7 +205,7 @@
 /*
  * Each run is its own card, as in the sidebar before plan calm-dashboard. The first line holds the name and
  * the status; the second the muted repo, the fix tag, and the ⋯. Every card keeps both lines, so nothing jumps
- * when the ⋯ appears, and every status ends on one rail, its dot last.
+ * when the ⋯ appears, and every status sits in one fixed-width column, dot first, so the dots share one x.
  *
  * The card is a named container (run-card): the sidebar is resizable while the viewport stays put, so the
  * stacked layout below follows the card, not a media query. The ⋯ and its fixed menu sit outside the container.
@@ -239,7 +239,8 @@
 
 .run-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* 88 px holds the longest label the sidebar shows: `update pod`, 85 px with its dot. */
+  grid-template-columns: minmax(0, 1fr) 88px;
   column-gap: 12px;
   align-items: start;
 }
@@ -258,8 +259,7 @@
 
 .run .status {
   flex: none;
-  flex-direction: row-reverse;
-  justify-self: end;
+  justify-self: start;
   /* As tall as the name's first line (14 px at 1.55), so its word and dot centre on that line. */
   min-height: calc(var(--size-dense) * 1.55);
 }
@@ -287,25 +287,24 @@
 }
 
 /*
- * Stacked: name, status, then the repo line. Below 180 px of content (a card of 214 px, a sidebar of 246 px) the
- * status squeezes the name to under one long word. The default 260 px sidebar stays on two columns.
+ * Stacked: name, status, then the repo line. At 172 px of content or less (a card of 206 px, a sidebar of 238 px)
+ * the status column would leave the name under 72 px, too narrow for a word such as `claim-only` (70 px). The
+ * default 260 px sidebar stays on two columns.
  */
-@container run-card (max-width: 180px) {
+@container run-card (max-width: 172px) {
   .run-body {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 4px;
   }
 
   .run .status {
-    flex-direction: row;
-    justify-self: start;
     min-height: 0;
   }
 }
 
 /*
- * A card's ⋯ button: beside the card's link (never inside it), on the card's second line at the right, its dots
- * under the status's dot. It shows on hover, while the card holds keyboard focus, and while its menu is open;
+ * A card's ⋯ button: beside the card's link (never inside it), on the card's second line at the right, its last
+ * dot on the status column's right edge. It shows on hover, while the card holds keyboard focus, and while its menu is open;
  * on a touch screen always, with a 44 px target around its 24 px box. The look is .btn.ghost's.
  */
 .run-more-wrap {

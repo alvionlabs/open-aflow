@@ -41,6 +41,7 @@ No macOS or Linux run and no secret scan; see `pod-docs/decisions.md` (2026-10-2
 
 ## Key docs
 
+- `DESIGN.md` — all design rules (layout, buttons, spacing, status column). Read it before any UI change.
 - `pod-docs/plans/board-read.md` — phase 1 goal, scope, look, and key decisions.
 - `docs/master-plan.md` — the phases beyond this plan.
 - `docs/design/preview.html` — the approved design.
