@@ -285,3 +285,23 @@ describe('elsewhere', () => {
     expect(got!.href).toBe('#/y')
   })
 })
+
+describe('elsewhere after Remove repo', () => {
+  const selected = RECIPE.nothing('a')
+  const gone = RECIPE.blocked('b')
+  const left = RECIPE.now('c')
+
+  it('a removed repo leaves the banner, and Open run points at a run that is still listed', () => {
+    const before = pick(selected, gone, left)
+    expect([before?.run.repoId, before?.more]).toEqual(['b', 1])
+    const after = pick(selected, left)
+    expect([after?.run.repoId, after?.more]).toEqual(['c', 0])
+    expect(after?.href).toBe(hashFor(runOf(left)))
+    expect(after?.href).not.toContain('/b/')
+  })
+
+  it('the banner goes away when the removed repo was the only one that outranked the open run', () => {
+    expect(winner(selected, gone)).toBe('b')
+    expect(pick(selected)).toBeUndefined()
+  })
+})

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { normalizeRepoPath } from './guard.ts'
-import { addRepo, loadRepos } from './repos-config.ts'
+import { addRepo, loadRepos, removeRepo } from './repos-config.ts'
 
 const platform = process.platform
 let root: string
@@ -203,4 +203,131 @@ describe('never overwrites an unreadable config', () => {
     expect(await addRepo(file, repoA, platform)).toEqual({ error: 'config unreadable' })
     expect(await readdir(file)).toEqual([])
   })
+})
+
+describe('removeRepo', () => {
+  const saved = async () => JSON.parse(await readFile(file, 'utf8')) as unknown
+  const writeConfig = async (paths: string[]) => {
+    await mkdir(cfgDir, { recursive: true })
+    await writeFile(file, JSON.stringify({ version: 1, repos: paths.map((p) => ({ path: p })) }))
+  }
+
+  test('removes one of two, keeps the other, and leaves no temp file', async () => {
+    await addRepo(file, repoA, platform)
+    await addRepo(file, repoB, platform)
+    expect(await removeRepo(file, repoA, platform)).toEqual({ path: normalizeRepoPath(repoA, platform) })
+    expect(await saved()).toEqual({ version: 1, repos: [{ path: normalizeRepoPath(repoB, platform) }] })
+    expect(await loadRepos(file)).toEqual({ repos: [normalizeRepoPath(repoB, platform)] })
+    expect(await readdir(cfgDir)).toEqual(['config.json'])
+  })
+
+  test('removing the last repo leaves an empty list, not a missing file', async () => {
+    await addRepo(file, repoA, platform)
+    expect(await removeRepo(file, repoA, platform)).toEqual({ path: normalizeRepoPath(repoA, platform) })
+    expect(await saved()).toEqual({ version: 1, repos: [] })
+  })
+
+  test('never touches the repo folder', async () => {
+    await writeFile(join(repoA, 'keep.md'), 'mine')
+    await addRepo(file, repoA, platform)
+    await removeRepo(file, repoA, platform)
+    expect(await readdir(repoA)).toEqual(['keep.md'])
+    expect(await readFile(join(repoA, 'keep.md'), 'utf8')).toBe('mine')
+  })
+
+  test('matches by normalized path: a trailing slash or a .. part is the same repo', async () => {
+    await addRepo(file, repoA, platform)
+    await addRepo(file, repoB, platform)
+    expect(await removeRepo(file, repoA + '/', platform)).toEqual({ path: normalizeRepoPath(repoA, platform) })
+    expect(await removeRepo(file, join(repoB, '..', 'repo-b'), platform)).toEqual({ path: normalizeRepoPath(repoB, platform) })
+    expect(await saved()).toEqual({ version: 1, repos: [] })
+  })
+
+  test('a file system that ignores case removes another spelling; one that keeps case does not', async () => {
+    await writeConfig([normalizeRepoPath(repoB, platform)])
+    const other = join(root, 'REPO-B')
+    const before = await readFile(file)
+    expect(await removeRepo(file, other, platform, { ignoresCase: async () => false })).toEqual({ error: 'not registered' })
+    expect(await readFile(file)).toEqual(before)
+    expect(await removeRepo(file, other, platform, { ignoresCase: async () => true })).toEqual({ path: normalizeRepoPath(other, platform) })
+    expect(await saved()).toEqual({ version: 1, repos: [] })
+  })
+
+  test.runIf(platform === 'win32')('on win32 another case or slash style is the same repo', async () => {
+    await addRepo(file, repoA, 'win32')
+    expect(await removeRepo(file, repoA.toLowerCase().replaceAll('\\', '/') + '/', 'win32')).toEqual({
+      path: normalizeRepoPath(repoA.toLowerCase(), 'win32'),
+    })
+    expect(await saved()).toEqual({ version: 1, repos: [] })
+  })
+
+  test('removes every hand-edited spelling of the same repo', async () => {
+    await writeConfig([repoA, repoA + '/', normalizeRepoPath(repoB, platform)])
+    await removeRepo(file, repoA, platform)
+    expect(await saved()).toEqual({ version: 1, repos: [{ path: normalizeRepoPath(repoB, platform) }] })
+  })
+
+  test('removes an entry whose folder is gone', async () => {
+    const gone = join(root, 'gone')
+    await writeConfig([gone, normalizeRepoPath(repoA, platform)])
+    expect(await removeRepo(file, gone, platform)).toEqual({ path: normalizeRepoPath(gone, platform) })
+    expect(await saved()).toEqual({ version: 1, repos: [{ path: normalizeRepoPath(repoA, platform) }] })
+  })
+
+  test('a repo not in the list is not registered, and nothing is written', async () => {
+    expect(await removeRepo(file, repoA, platform)).toEqual({ error: 'not registered' })
+    expect(await readdir(root)).toEqual(expect.not.arrayContaining(['cfg']))
+    await addRepo(file, repoB, platform)
+    const before = await readFile(file)
+    expect(await removeRepo(file, repoA, platform)).toEqual({ error: 'not registered' })
+    expect(await readFile(file)).toEqual(before)
+    expect(await readdir(cfgDir)).toEqual(['config.json'])
+  })
+
+  test('removes by path from the file as it is now, not as it was loaded', async () => {
+    await addRepo(file, repoA, platform)
+    await addRepo(file, repoB, platform)
+    expect(await loadRepos(file)).toEqual({ repos: [normalizeRepoPath(repoA, platform), normalizeRepoPath(repoB, platform)] })
+    // Someone edits the file by hand after the board read it.
+    const added = join(root, 'repo-c')
+    await writeConfig([normalizeRepoPath(repoB, platform), added])
+    expect(await removeRepo(file, repoB, platform)).toEqual({ path: normalizeRepoPath(repoB, platform) })
+    expect(await saved()).toEqual({ version: 1, repos: [{ path: added }] })
+    // A repo the hand edit already took out is not registered.
+    expect(await removeRepo(file, repoA, platform)).toEqual({ error: 'not registered' })
+  })
+
+  test('two removes of the same repo at once: one removes, the other finds it gone', async () => {
+    await addRepo(file, repoA, platform)
+    await addRepo(file, repoB, platform)
+    const results = await Promise.all([removeRepo(file, repoA, platform), removeRepo(file, repoA, platform)])
+    expect(results).toEqual([{ path: normalizeRepoPath(repoA, platform) }, { error: 'not registered' }])
+    expect(await saved()).toEqual({ version: 1, repos: [{ path: normalizeRepoPath(repoB, platform) }] })
+  })
+
+  test('removes of two repos at once both land', async () => {
+    await addRepo(file, repoA, platform)
+    await addRepo(file, repoB, platform)
+    await Promise.all([removeRepo(file, repoA, platform), removeRepo(file, repoB, platform)])
+    expect(await saved()).toEqual({ version: 1, repos: [] })
+  })
+
+  test('adds and removes made at the same time share one queue, so none is lost', async () => {
+    await addRepo(file, repoA, platform)
+    const c = join(root, 'repo-c')
+    await mkdir(c)
+    await Promise.all([addRepo(file, repoB, platform), removeRepo(file, repoA, platform), addRepo(file, c, platform)])
+    expect(await saved()).toEqual({ version: 1, repos: [{ path: normalizeRepoPath(repoB, platform) }, { path: normalizeRepoPath(c, platform) }] })
+  })
+
+  for (const text of ['{not json', '', '[]', '{"version":2,"repos":[]}']) {
+    test(`a config of ${JSON.stringify(text)} is unreadable and stays byte for byte`, async () => {
+      await mkdir(cfgDir, { recursive: true })
+      await writeFile(file, text)
+      const before = await readFile(file)
+      expect(await removeRepo(file, repoA, platform)).toEqual({ error: 'config unreadable' })
+      expect(await readFile(file)).toEqual(before)
+      expect(await readdir(cfgDir)).toEqual(['config.json'])
+    })
+  }
 })

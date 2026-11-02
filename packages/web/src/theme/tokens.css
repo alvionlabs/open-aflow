@@ -10,7 +10,10 @@
  *
  * --faint is never text (it fails 4.5:1): icons and rules only. The status
  * colours (--blocked --needs-you --running --ready --idle) colour dots, the
- * check of a finished step, and nothing else. --focus is the focus ring and
+ * check of a finished step, and nothing else. --danger is the red text and fill
+ * for actions that take something away (Remove repo): the blocked red in dark, and
+ * darker in light so it stays 4.5:1 on its own hover tint. --danger-fg is the label
+ * on a --danger fill. --focus is the focus ring and
  * link hover. --shadow is the menu's shadow, the only shadow on the page.
  */
 :root {
@@ -28,6 +31,8 @@
   --primary-fg: #ffffff;
   --focus: #0068d6;
   --blocked: #d0262f;
+  --danger: #b81d25;
+  --danger-fg: #ffffff;
   --needs-you: #b25d00;
   --running: #0068d6;
   --ready: #1a8a45;
@@ -68,6 +73,8 @@
     --primary-fg: #0a0a0a;
     --focus: #52a8ff;
     --blocked: #ff5f5f;
+    --danger: #ff5f5f;
+    --danger-fg: #0a0a0a;
     --needs-you: #f5a623;
     --running: #52a8ff;
     --ready: #3ecf72;
@@ -91,6 +98,8 @@
   --primary-fg: #0a0a0a;
   --focus: #52a8ff;
   --blocked: #ff5f5f;
+  --danger: #ff5f5f;
+  --danger-fg: #0a0a0a;
   --needs-you: #f5a623;
   --running: #52a8ff;
   --ready: #3ecf72;

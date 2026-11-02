@@ -316,14 +316,14 @@ describe('runs.css run cards and Add repo', () => {
   })
 
   it('puts the status in the top-right corner, on the name line, with the repo and the fix tag under the name', () => {
-    const run = stylesAt(1280).get('.run')
-    expect(run?.['align-items']).toBe('baseline')
-    expect(run?.['justify-content']).toBe('space-between')
-    // The name takes a whole line; the muted repo and the tag share the line under it.
-    const head = stylesAt(1280).get('.run-head')
-    expect(head?.['flex-direction'] ?? 'row').toBe('row')
-    expect(head?.['flex-wrap']).toBe('wrap')
-    expect(stylesAt(1280).get('.run-head b')?.['flex-basis']).toBe('100%')
+    const body = stylesAt(1280).get('.run-body')
+    // Top, not baseline: a hyphenated word's box takes its last line's baseline when it wraps, which would drop the status.
+    expect(body?.['align-items']).toBe('start')
+    expect(body?.['grid-template-columns']).toBe('minmax(0, 1fr) 88px')
+    // The muted repo and the tag share the line under the name, across both columns.
+    const line = stylesAt(1280).get('.run-line')
+    expect(line?.['flex-wrap']).toBe('wrap')
+    expect(line?.['grid-column']).toBe('1 / -1')
     expect(stylesAt(1280).get('.run-repo')?.['font-size']).toBe('var(--size-micro)')
     // One padding for every card, so one- and two-line cards line up.
     expect(runsRules().filter((r) => r.selectors.some((s) => s.startsWith('.run') && !s.startsWith('.run-') && !s.startsWith('.runs')) && 'padding' in decls(r.body))).toHaveLength(1)
@@ -646,7 +646,7 @@ describe('runs.css log tab', () => {
 })
 
 /**
- * The CLAUDE.md Spacing rules on screen 1 and the sidebar: runs.css, the tabs and the ⋯ menu, and the
+ * The DESIGN.md Spacing rules on screen 1 and the sidebar: runs.css, the tabs and the ⋯ menu, and the
  * shared controls in base.css. The Add repo dialog's picker (picker.css) and screens 2 and 3 have their own files.
  */
 describe('spacing scale', () => {
@@ -732,7 +732,7 @@ describe('spacing scale', () => {
     const px = (v: string | undefined) => Number(/^(\d+)px/.exec(v ?? '')?.[1] ?? NaN)
     const at = stylesAt(1280)
     // A run card's name and its tag sit closer than the cards do.
-    expect(px(at.get('.run-head')?.['gap'])).toBeLessThan(px(at.get('.run-list')?.['gap']))
+    expect(px(at.get('.run-line')?.['gap'])).toBeLessThan(px(at.get('.run-list')?.['gap']))
     // A step card's title and detail sit closer than the cards do.
     expect(px(at.get('.flow-step')?.['gap'])).toBeLessThan(px(at.get('.flow')?.['row-gap']))
     // The title and its meta line sit closer than the header and the flow.

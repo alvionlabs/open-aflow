@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { buildFixPipeline, buildFlow, buildPipeline, type Board, type RunSummary } from '@pod-board/model'
 import type { StreamState } from '../../board-stream.ts'
 import { hashFor, type View } from '../../selection.ts'
@@ -15,6 +15,20 @@ import { focusOnArrival } from './open-focus.ts'
 import { nextSteps } from './next-step.ts'
 import { runHeader } from './plan-view.ts'
 import { switchView } from './resume-flow.ts'
+import { RemoveConfirm } from './RemoveConfirm.tsx'
+import { MENU_TRIGGER_ID } from './BarMenu.tsx'
+import {
+  HEADER_PLACE,
+  INITIAL as REMOVE_IDLE,
+  confirmView as removeView,
+  createRemoveFlow,
+  hashAfterRemove,
+  moreButtonId,
+  navigateAfterRemove,
+  removeTarget,
+  repoOfRun,
+  type RemoveState,
+} from './remove-flow.ts'
 import { RunHeader } from './RunHeader.tsx'
 import { RunsList } from './RunsList.tsx'
 import { SideHandle } from './SideHandle.tsx'
@@ -37,6 +51,10 @@ type Props = {
   now: number
   /** Where the open tab is remembered; the page's local storage when not given. */
   storage?: TabStorage | undefined
+  /** Sets the run the page falls back to while a remove is in flight (`resolveSelection`'s fallback); undefined clears it. */
+  planFallback?: (hash: string | undefined) => void
+  /** Moves the page to a hash now ('' for none). */
+  navigate?: (hash: string) => void
 }
 
 /** The page's local storage, or nothing where there is none or it throws. */
@@ -51,7 +69,7 @@ function pageStorage(): TabStorage | undefined {
 const TAB_LABELS: Record<Tab, string> = { waiting: 'Waiting', log: 'Log' }
 const TABS: Tab[] = ['waiting', 'log']
 
-export function RunsScreen({ board, stream, runs, selected, view, slice, agent, now, storage }: Props) {
+export function RunsScreen({ board, stream, runs, selected, view, slice, agent, now, storage, planFallback, navigate }: Props) {
   const store = useRef(storage ?? pageStorage())
   const [stored, setStored] = useState<Tab | undefined>(() => readTab(store.current))
   const [picking, setPicking] = useState(false)
@@ -61,7 +79,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   // The hash the urgent banner's Open run went to, so focus lands on that run's title.
   const focusFor = useRef<string | undefined>(undefined)
 
-  const repo = selected && board?.repos.find((r) => r.id === selected.repoId)
+  const repo = repoOfRun(board?.repos ?? [], selected)
   const isFix = selected?.fix !== undefined
   const fixPipeline = repo && isFix && selected?.plan !== undefined ? buildFixPipeline(repo, selected.plan, now) : undefined
   const pipeline = repo && !isFix && selected?.plan !== undefined ? buildPipeline(repo, selected.plan, now) : undefined
@@ -84,6 +102,51 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   // A plan's full flow (Think → You → sprints → Check → Ship); a fix run's Build, Review, Ship.
   const stages = fixPipeline?.stages ?? (repo && pipeline && selected?.plan !== undefined ? (buildFlow(repo, selected.plan, now) ?? []) : [])
 
+  // Remove repo, from the header's ⋯ or a sidebar card's ⋯: the confirm opens under the one it came from;
+  // after a removal the page moves on when the open run's repo left.
+  const [removeState, setRemoveState] = useState<RemoveState>(REMOVE_IDLE)
+  const latest = useRef({ planFallback, navigate, selected })
+  latest.current = { planFallback, navigate, selected }
+  const removeFlow = useMemo(
+    () =>
+      createRemoveFlow(setRemoveState, (target, after) => {
+        // `after` was planned when Remove was pressed: the new Board may have reached the page first, and
+        // the user may have opened another run meanwhile, which stays.
+        const go = navigateAfterRemove(latest.current.selected, target, after)
+        if (go !== undefined) latest.current.navigate?.(go)
+        latest.current.planFallback?.(undefined)
+      }),
+    [],
+  )
+  useEffect(() => removeFlow.cancel(), [runKey, removeFlow])
+  // A failed or cancelled remove leaves no fallback behind.
+  useEffect(() => {
+    if (removeState.kind !== 'removing') latest.current.planFallback?.(undefined)
+  }, [removeState.kind])
+  /** Remove pressed: plan where the page goes from the runs and the selection now, before the Board changes. */
+  const pressRemove = () => {
+    if (removeState.kind !== 'confirm' && removeState.kind !== 'error') return
+    const after = hashAfterRemove(runs, selected, removeState.target)
+    planFallback?.(after)
+    removeFlow.remove(after)
+  }
+  const repos = board?.repos ?? []
+  const toRemove = removeTarget(repo, { repos, runs, place: HEADER_PLACE, returnTo: MENU_TRIGGER_ID })
+  const sideTarget = (run: RunSummary) => removeTarget(repoOfRun(repos, run), { repos, runs, place: hashFor(run), returnTo: moreButtonId(run) })
+  const removing = removeView(removeState)
+  const panelAt = (place: string) =>
+    removing && removeState.kind !== 'idle' && removeState.target.place === place ? (
+      <RemoveConfirm
+        key={place}
+        view={removing}
+        returnTo={removeState.target.returnTo}
+        onRemove={pressRemove}
+        onCancel={() => removeFlow.cancel()}
+        onKey={(k) => removeFlow.key(k)}
+      />
+    ) : null
+  const removePanel = removeState.kind !== 'idle' && removeState.target.path === repo?.path ? panelAt(HEADER_PLACE) : null
+
   const press = (t: Tab) => {
     const next = tabPress(shown, t, view)
     saveTab(store.current, next.save)
@@ -104,6 +167,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
       key={runKey}
       autoContinue={selected?.plan !== undefined && autoSwitch ? { target: { repoId: selected.repoId, run: selected.plan }, on: autoSwitch.on } : undefined}
       portBase={selected?.portBase}
+      {...(toRemove ? { remove: { onPick: () => removeFlow.open(toRemove) } } : {})}
     />
   )
 
@@ -122,7 +186,17 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
               </span>
             )}
           </div>
-          <RunsList runs={runs} selected={selected} repos={board?.repos ?? []} />
+          <RunsList
+            runs={runs}
+            selected={selected}
+            repos={repos}
+            removable={(r) => sideTarget(r) !== undefined}
+            onRemove={(r) => {
+              const t = sideTarget(r)
+              if (t) removeFlow.open(t)
+            }}
+            panelFor={(r) => panelAt(hashFor(r))}
+          />
           <div className="side-foot">
             <button ref={repoButton} className="btn lead add-repo" type="button" aria-haspopup="dialog" onClick={() => setPicking(true)}>
               <Icon name="plus" />
@@ -160,6 +234,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
           ) : view === 'board' && pipeline && selected.plan !== undefined ? (
             <>
               {header && <RunHeader header={header} actions={menu} />}
+              {removePanel}
               <p className="back">
                 <a href={hashFor(selected)}>Back to the run</a>
               </p>
@@ -184,6 +259,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
                   }
                 />
               )}
+              {removePanel}
               <Flow key={`flow:${runKey}`} stages={stages} />
               {steps && <NextStepCard key={runKey} repo={repo} run={selected} card={steps.card} />}
               <div className="tabs" role="group" aria-label="More about this run">

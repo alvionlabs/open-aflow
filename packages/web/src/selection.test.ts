@@ -28,8 +28,9 @@ describe('selected run', () => {
     expect(resolveSelection(runs, '#/e--projects-b/alpha').run).toBe(runs[0])
   })
 
-  it('no runs gives none', () => {
-    expect(resolveSelection([], '#/e--projects-a/alpha')).toEqual({ run: undefined, view: 'pipeline', slice: undefined, hash: undefined })
+  it('no runs gives none, and an empty hash, so a removed run hash leaves the URL', () => {
+    expect(resolveSelection([], '#/e--projects-a/alpha')).toEqual({ run: undefined, view: 'pipeline', slice: undefined, hash: '' })
+    expect(resolveSelection([], '').hash).toBe('')
   })
 
   it('when the selected run vanishes, the selection moves to the first and the hash follows', () => {
@@ -170,5 +171,20 @@ describe('fix run routes', () => {
 
   it('hashFor builds the agent route, encoded', () => {
     expect(hashFor(fix, 'agent', 'a/1')).toBe('#/r/fix-scroll/agent/a%2F1')
+  })
+})
+
+describe('fallback while a remove is in flight', () => {
+  it('a hash whose run vanished goes to the fallback run, not the first run', () => {
+    const left = [runs[0]!, runs[2]!]
+    const s = resolveSelection(left, '#/e--projects-a/beta', undefined, undefined, '#/e--projects-b')
+    expect(s.run).toBe(runs[2])
+    expect(s.hash).toBe('#/e--projects-b')
+  })
+
+  it('a live hash keeps its run, and a fallback that names no run falls to the first run', () => {
+    expect(resolveSelection(runs, '#/e--projects-a/beta', undefined, undefined, '#/e--projects-b').run).toBe(runs[1])
+    expect(resolveSelection([runs[0]!], '#/e--projects-a/beta', undefined, undefined, '#/gone').run).toBe(runs[0])
+    expect(resolveSelection([runs[0]!], '#/e--projects-a/beta', undefined, undefined, undefined).run).toBe(runs[0])
   })
 })

@@ -15,7 +15,8 @@ import { portsDir } from './claims.ts'
 import { claudeBin, createClaudeRunner } from './claude-runner.ts'
 import { configPath, listenConfig, portFromEnv } from './config.ts'
 import { createGhReader, defaultGhExec } from './gh.ts'
-import { addRepo } from './repos-config.ts'
+import { createRemoveRepoRoutes } from './remove-repo-routes.ts'
+import { addRepo, removeRepo } from './repos-config.ts'
 import { createResumeRoutes } from './resume-routes.ts'
 import { createIdleCheck } from './session-activity.ts'
 import { createSessionToken, writeSessionToken } from './session-token.ts'
@@ -99,7 +100,16 @@ const app = createApp({
       }),
     )
     .route('/', createAnswerRoutes({ board: () => watcher.board(), rebuild: () => watcher.rebuild(), log }))
-    .route('/', createResumeRoutes(resume)),
+    .route('/', createResumeRoutes(resume))
+    .route(
+      '/',
+      createRemoveRepoRoutes({
+        board: () => watcher.board(),
+        removeRepo: (p) => removeRepo(configFile, p, platform),
+        rebuild: () => watcher.rebuild(),
+        log,
+      }),
+    ),
 })
 
 const server = serve({ fetch: app.fetch, hostname: listen.hostname, port: listen.port }, () => {

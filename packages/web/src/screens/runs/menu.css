@@ -48,3 +48,56 @@
   width: 100%;
   box-sizing: border-box;
 }
+
+/* Remove from the board: a whole-row button, its text inset the same 12 px as the rows above. */
+.mi-action {
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.mi-action:hover {
+  background: var(--hover);
+}
+
+/* Remove repo: the danger item, red in every state, on a light red tint when hovered, focused, or pressed. */
+.mi-danger,
+.mi-danger:hover,
+.mi-danger:active {
+  color: var(--danger);
+}
+
+.mi-danger:hover,
+.mi-danger:focus-visible {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.mi-danger:active {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+/* The sidebar card's ⋯ menu: fixed beside its button, so the sidebar's scroll box doesn't clip it. */
+.menu.run-more-panel {
+  position: fixed;
+  z-index: 20;
+  box-sizing: border-box;
+  min-width: 160px;
+  max-width: calc(100vw - 16px);
+}
+
+.mi-action:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+@media (max-width: 480px) {
+  .mi-action {
+    min-height: 44px;
+  }
+}
