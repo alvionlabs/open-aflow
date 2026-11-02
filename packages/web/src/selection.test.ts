@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RunSummary } from '@pod-board/model'
-import { hashFor, parseHash, resolveSelection, startClock, LIVE_TICK_MS } from './selection.ts'
+import { followRepoId, hashFor, parseHash, rememberRepoPaths, resolveSelection, startClock, LIVE_TICK_MS } from './selection.ts'
 
 const run = (repoId: string, plan?: string): RunSummary => ({
   repoId,
@@ -186,5 +186,39 @@ describe('fallback while a remove is in flight', () => {
     expect(resolveSelection(runs, '#/e--projects-a/beta', undefined, undefined, '#/e--projects-b').run).toBe(runs[1])
     expect(resolveSelection([runs[0]!], '#/e--projects-a/beta', undefined, undefined, '#/gone').run).toBe(runs[0])
     expect(resolveSelection([runs[0]!], '#/e--projects-a/beta', undefined, undefined, undefined).run).toBe(runs[0])
+  })
+})
+
+describe('a repo whose id changed', () => {
+  const A = { id: 'x-chess-web', path: 'E:\\x\\chess-web' }
+  const B = { id: 'x-chess-web-abc123', path: 'E:\\x\\chess-web' }
+  const seen = () => {
+    const known = new Map<string, string>()
+    rememberRepoPaths(known, [A])
+    rememberRepoPaths(known, [B])
+    return known
+  }
+
+  it('the hash follows the repo to its new id, in every view', () => {
+    for (const rest of ['', '/alpha', '/alpha/board', '/alpha/board/A1', '/fix-a/agent/x1']) {
+      expect(followRepoId(`#/x-chess-web${rest}`, seen(), [B])).toBe(`#/x-chess-web-abc123${rest}`)
+    }
+    // And back, when the clash ends.
+    expect(followRepoId('#/x-chess-web-abc123/alpha', seen(), [A])).toBe('#/x-chess-web/alpha')
+  })
+
+  it('a hash whose id is on the Board, or was never seen, or whose repo left stays as it is', () => {
+    expect(followRepoId('#/x-chess-web-abc123/alpha', seen(), [B])).toBe('#/x-chess-web-abc123/alpha')
+    expect(followRepoId('#/never/alpha', seen(), [B])).toBe('#/never/alpha')
+    expect(followRepoId('#/x-chess-web/alpha', seen(), [{ id: 'y', path: 'E:\\y' }])).toBe('#/x-chess-web/alpha')
+    expect(followRepoId('', seen(), [B])).toBe('')
+    expect(followRepoId('garbage', seen(), [B])).toBe('garbage')
+  })
+
+  it('a removed repo’s id, now another repo’s, names that repo: the id on the Board wins', () => {
+    const known = new Map<string, string>()
+    rememberRepoPaths(known, [{ id: 'p', path: 'E:\\a' }])
+    rememberRepoPaths(known, [{ id: 'p', path: 'E:\\b' }])
+    expect(followRepoId('#/p/alpha', known, [{ id: 'p', path: 'E:\\b' }])).toBe('#/p/alpha')
   })
 })

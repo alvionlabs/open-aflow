@@ -24,6 +24,33 @@ const put = (text: string) => {
 }
 
 describe('auto-continue store', () => {
+  test('dropRepoIds forgets every toggle under those ids, saved, and keeps the rest', async () => {
+    const store = createAutoContinueStore({ file })
+    await store.set('old', 'alpha', true)
+    await store.set('old', 'beta', true)
+    await store.set('keep', 'alpha', true)
+    await store.dropRepoIds(['old', 'none'])
+    expect(store.list()).toEqual([{ repoId: 'keep', run: 'alpha' }])
+    expect(saved()).toEqual({ runs: [{ repoId: 'keep', run: 'alpha' }] })
+    expect(createAutoContinueStore({ file }).list()).toEqual([{ repoId: 'keep', run: 'alpha' }])
+  })
+
+  test('dropRepoIds with nothing to drop writes nothing, and a failed write changes nothing', async () => {
+    let writes = 0
+    put(JSON.stringify({ runs: [{ repoId: 'r1', run: 'alpha' }] }))
+    const store = createAutoContinueStore({
+      file,
+      write: async () => {
+        writes += 1
+        throw new Error('disk full')
+      },
+    })
+    await store.dropRepoIds(['none'])
+    expect(writes).toBe(0)
+    await expect(store.dropRepoIds(['r1'])).rejects.toThrow('disk full')
+    expect(store.list()).toEqual([{ repoId: 'r1', run: 'alpha' }])
+  })
+
   test('reads fail closed and writes atomically', async () => {
     // Missing → all off.
     expect(createAutoContinueStore({ file }).list()).toEqual([])

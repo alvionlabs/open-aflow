@@ -40,6 +40,8 @@ export type BoardServiceDeps = {
   actions?: () => ActionEntry[]
   /** The auto-continue toggles, read on every build. No dep, no `autoContinue` on the Board. */
   autoContinue?: () => AutoToggle[]
+  /** Called with the plain ids repos clashed on. */
+  retireRepoIds?: (ids: string[]) => Promise<void>
 }
 
 export type BoardService = {

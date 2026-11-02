@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
 import { describe, expect, test } from 'vitest'
-import { actionGuard, ignoresCase, normalizeRepoPath, readGuard, repoId, requestGuard, sameRepoPath } from './guard.ts'
+import { actionGuard, ignoresCase, normalizeRepoPath, readGuard, repoId, repoIds, requestGuard, sameRepoPath } from './guard.ts'
 
 function guarded(): Hono {
   const app = new Hono()
@@ -327,5 +327,86 @@ describe('ignoresCase probe', () => {
   test('a missing folder falls back to the OS default and never throws', async () => {
     const gone = join(tmpdir(), 'pod-board-case-gone-' + Date.now(), 'Nope')
     expect(await ignoresCase(gone)).toBe(process.platform === 'win32' || process.platform === 'darwin')
+  })
+})
+
+describe('repoIds', () => {
+  const W = (path: string) => ({ path, caseless: true })
+  const L = (path: string) => ({ path, caseless: false })
+  const SUFFIX = /^e--x-chess-web-[0-9a-f]{6}$/
+
+  test('two paths that differ only in symbols get distinct ids, each with a 6-hex suffix', () => {
+    const { ids, clashed } = repoIds([W('E:/x/chess-web'), W('E:/x/chess_web')], 'win32')
+    expect(ids[0]).toMatch(SUFFIX)
+    expect(ids[1]).toMatch(SUFFIX)
+    expect(ids[0]).not.toBe(ids[1])
+    expect(clashed).toEqual(['e--x-chess-web'])
+  })
+
+  test('a repo with no clash keeps today’s id, byte for byte, beside a clash', () => {
+    const { ids, clashed } = repoIds([W('E:/Projects/Pod-Board'), W('E:/x/a-b'), W('E:/x/a_b'), L('/home/Me/my repo')], 'win32')
+    expect(ids[0]).toBe('e--projects-pod-board')
+    expect(ids[0]).toBe(repoId('E:/Projects/Pod-Board', 'win32', true))
+    expect(ids[3]).toBe(repoId('/home/Me/my repo', 'win32', false))
+    expect(clashed).toEqual(['e--x-a-b'])
+    expect(repoIds([L('/home/Me/my repo')], 'linux').ids).toEqual(['-home-Me-my-repo'])
+  })
+
+  test('ids do not change when the list is reordered', () => {
+    const list = [W('E:/x/a-b'), W('E:/y'), W('E:/x/a_b'), W('E:/x/a b')]
+    const byPath = (repos: typeof list) => {
+      const { ids } = repoIds(repos, 'win32')
+      return Object.fromEntries(repos.map((r, i) => [r.path, ids[i]]))
+    }
+    expect(byPath([...list].reverse())).toEqual(byPath(list))
+    expect(byPath([list[2]!, list[0]!, list[3]!, list[1]!])).toEqual(byPath(list))
+  })
+
+  test('a member’s id does not depend on the other members', () => {
+    const three = repoIds([W('E:/x/a-b'), W('E:/x/a_b'), W('E:/x/a b')], 'win32').ids
+    const two = repoIds([W('E:/x/a_b'), W('E:/x/a b')], 'win32').ids
+    expect(two).toEqual([three[1], three[2]])
+  })
+
+  test('the suffix ignores case where the file system does, and keeps it where it does not', () => {
+    const one = repoIds([W('E:/X/Chess-Web'), W('E:/x/chess_web')], 'win32').ids
+    const other = repoIds([W('e:/x/CHESS-WEB/'), W('e:/X/CHESS_web')], 'win32').ids
+    expect(other).toEqual(one)
+    const a = repoIds([L('/x/Chess-Web'), L('/x/Chess_Web')], 'linux').ids
+    const b = repoIds([L('/x/chess-web'), L('/x/chess_web')], 'linux').ids
+    expect(a[0]!.slice(-6)).not.toBe(b[0]!.slice(-6))
+  })
+
+  test('two paths that differ only in case on a case-sensitive file system are no clash', () => {
+    expect(repoIds([L('/x/Repo'), L('/x/repo')], 'linux')).toEqual({ ids: ['-x-Repo', '-x-repo'], clashed: [] })
+  })
+
+  test('every id stays inside the id characters', () => {
+    for (const id of repoIds([W('E:/x/é-b'), W('E:/x/é_b')], 'win32').ids) expect(id).toMatch(/^[A-Za-z0-9-]+$/)
+  })
+
+  test('a hash collision lengthens the suffix of the colliding repos only', () => {
+    // The first 6 characters tie for a-b and a_b; the members of another set keep 6.
+    const hash = (key: string) => ({ 'a-b': 'abcdef111111', a_b: 'abcdef222222', 'c-d': 'c0c0c0c0c0c0', c_d: 'd0d0d0d0d0d0' })[key.slice(-3)]!
+    const { ids } = repoIds([W('E:/x/a-b'), W('E:/x/a_b'), W('E:/x/c-d'), W('E:/x/c_d')], 'win32', hash)
+    expect(ids[0]).toBe('e--x-a-b-abcdef111111')
+    expect(ids[1]).toBe('e--x-a-b-abcdef222222')
+    expect(ids[2]).toBe('e--x-c-d-c0c0c0')
+    expect(ids[3]).toBe('e--x-c-d-d0d0d0')
+  })
+
+  test('a suffixed id that equals another repo’s plain id: the plain repo keeps its id', () => {
+    const hash = (key: string) => (key.endsWith('a-b') ? 'abcdef111111' : 'fedcba222222')
+    const { ids, clashed } = repoIds([W('E:/x/a-b'), W('E:/x/a_b'), W('E:/x/a-b-abcdef')], 'win32', hash)
+    expect(ids[2]).toBe('e--x-a-b-abcdef')
+    expect(ids[0]).toBe('e--x-a-b-abcdef111111')
+    expect(new Set(ids).size).toBe(3)
+    expect(clashed).toEqual(['e--x-a-b'])
+  })
+
+  test('one spelling read two ways by mixed file-system rules still gets two ids', () => {
+    // A case-sensitive folder beside a path that couldn't be probed: both fold to one key.
+    const { ids } = repoIds([L('E:/x/repo'), W('E:/x/Repo')], 'win32')
+    expect(ids[0]).not.toBe(ids[1])
   })
 })

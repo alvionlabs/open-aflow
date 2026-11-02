@@ -80,6 +80,14 @@ export function resolveSelection(
   return { run, view, slice, agent, hash: hashFor(run, view, view === 'agent' ? agent : slice) }
 }
 
+/** Stub. */
+export function rememberRepoPaths(_known: Map<string, string>, _repos: readonly { id: string; path: string }[]): void {}
+
+/** Stub. */
+export function followRepoId(hash: string, _known: ReadonlyMap<string, string>, _repos: readonly { id: string; path: string }[]): string {
+  return hash
+}
+
 /** Calls `onNow` with the time every `every` ms until the returned stop is called. */
 export function startClock(onNow: (now: number) => void, every = LIVE_TICK_MS): () => void {
   const id = setInterval(() => onNow(Date.now()), every)

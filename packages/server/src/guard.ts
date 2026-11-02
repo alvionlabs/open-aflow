@@ -122,6 +122,11 @@ export function repoId(p: string, platform: NodeJS.Platform, ignoresCase: boolea
   return ignoresCase ? id.toLowerCase() : id
 }
 
+/** One id per repo, in order, and the plain ids two or more repos clashed on. */
+export function repoIds(repos: readonly { path: string; caseless: boolean }[], platform: NodeJS.Platform, _hash?: (key: string) => string): { ids: string[]; clashed: string[] } {
+  return { ids: repos.map((r) => repoId(r.path, platform, r.caseless)), clashed: [] }
+}
+
 /**
  * Whether the file system holding an existing folder ignores case. It flips
  * the case of the last path part with an ASCII letter and checks that the
