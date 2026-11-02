@@ -79,11 +79,27 @@ describe('urgent banner', () => {
     expect(text(linked)).toMatch(/Autopilot held PR #80 for you to merge/)
   })
 
-  it('open run is a named secondary link', () => {
+  it('tints by the item status: blocked, needs you and ready only', () => {
+    // Rendered status class to CSS tone. The root stays exactly class="urgent" (runs-screen.test.ts pins it).
+    const toneOf = (status: NextItem['status']) => {
+      const cls = /^<div class="urgent"><span class="status (s-[a-z]+)"/.exec(html(at({ item: { ...item, status } })))?.[1]
+      expect(cls, status).toBeDefined()
+      return styleOf(`.urgent:has(> .status.${cls})`, desktop)['--tone']
+    }
+    expect(toneOf('blocked')).toBe('var(--blocked)')
+    expect(toneOf('needs-you')).toBe('var(--needs-you)')
+    expect(toneOf('ready')).toBe('var(--ready)')
+    // Any other status: the plain box, no tone.
+    expect(toneOf('running')).toBeUndefined()
+    expect(toneOf('idle')).toBeUndefined()
+  })
+
+  it('open run is a named quiet text link', () => {
     const a = openOf(html(at()))
     expect(a).toMatch(/href="#\/chess\/sparring-ladder"/)
     expect(a).toMatch(/aria-label="Open run Sparring ladder"/)
-    expect(a).toMatch(/class="btn sm trail urgent-open"/)
+    // A text button: quiet, so no box until hover.
+    expect(a).toMatch(/class="btn sm quiet trail urgent-open"/)
     expect(a).not.toMatch(/primary/)
     // The shared arrow-right icon, after the label.
     expect(a).toMatch(/>Open run<svg[^>]*aria-hidden="true"[^>]*><path d="M3 8h9.5M8 3.5L12.5 8 8 12.5"/)
@@ -157,25 +173,48 @@ const phone = (m?: string) => m !== undefined && /^\(\s*max-width:\s*480px\s*\)$
 
 describe('urgent banner css', () => {
   it('css tokens, radius and phone button', () => {
-    // Only the Look's tokens (and the type and radius scale), no raw colours.
-    expect(CSS).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|oklch|color-mix)\(|(?<![-\w])(red|orange|green|white|black|transparent)(?![-\w])/i)
+    // Only tokens, no raw colours: color-mix() and transparent are allowed, but each colour in a mix is a token or transparent.
+    expect(CSS).not.toMatch(/#[0-9a-f]{3,8}|(rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\(|(?<![-\w])(red|orange|green|white|black|currentcolor)(?![-\w])/i)
+    const mixes = [...CSS.matchAll(/color-mix\(\s*in srgb\s*,([^()]*(?:\([^()]*\)[^()]*)*)\)/g)].map((m) => m[1]!)
+    expect(mixes.length).toBeGreaterThan(0)
+    expect(CSS.match(/color-mix\(/g)).toHaveLength(mixes.length)
+    for (const args of mixes) {
+      for (const part of args.split(',')) expect(part.trim(), `color-mix(${args})`).toMatch(/^(var\(--[a-z-]+\)|transparent)( \d+%)?$/)
+    }
     const used = new Set([...CSS.matchAll(/var\((--[a-z-]+)/g)].map((m) => m[1]))
-    const allowed = new Set(['--border-strong', '--bg', '--fg', '--muted', '--font', '--mono', '--size-dense', '--size-small', '--size-micro', '--radius-md'])
+    const allowed = new Set(['--border-strong', '--bg', '--fg', '--muted', '--font', '--mono', '--size-dense', '--size-small', '--size-micro', '--radius-md', '--tone', '--blocked', '--needs-you', '--ready'])
     expect([...used].filter((t) => !allowed.has(t!))).toEqual([])
-    // No status colour anywhere: the dot takes it from .status.
-    expect(CSS).not.toMatch(/--(blocked|needs-you|ready|running|idle|focus)\b/)
+    // Running and idle never tint, and the focus ring stays the base one.
+    expect(CSS).not.toMatch(/--(running|idle|focus)/)
+    // The plain box: no tone.
     const box = styleOf('.urgent', desktop)
     expect(box.border).toBe('1px solid var(--border-strong)')
     expect(box.background).toBe('var(--bg)')
     expect(['8px', 'var(--radius-md)']).toContain(box['border-radius'])
-    // Every background and border in the file is the box's own.
+    expect(box.padding).toBe('12px 8px 12px 16px')
+    expect(styleOf('.urgent', phone).padding).toBe('12px')
+    // Each tone sets --tone from its status token.
+    const TONES: [string, string][] = [['s-bad', 'blocked'], ['s-you', 'needs-you'], ['s-ok', 'ready']]
+    for (const [cls, token] of TONES) {
+      const t = `.urgent:has(> .status.${cls})`
+      expect(styleOf(t, desktop)['--tone'], t).toBe(`var(--${token})`)
+      // A toned box: 10 % fill on the page, 50 % border.
+      expect(styleOf(t, desktop).background, t).toBe('color-mix(in srgb, var(--tone) 10%, var(--bg))')
+      expect(styleOf(t, desktop)['border-color'], t).toBe('color-mix(in srgb, var(--tone) 50%, transparent)')
+      expect(styleOf(`${t} .urgent-open.btn.quiet:hover`, desktop).background, t).toBe('color-mix(in srgb, var(--tone) 16%, transparent)')
+    }
+    // Only those three tint: never running or idle.
+    expect(CSS).not.toMatch(/s-(run|idle)/)
+    expect(styleOf('.urgent-title', desktop)['font-weight']).toBe('500')
+    // Every background and border uses the box's own tokens or the tone; nothing else.
     for (const r of all) {
-      const d = decls(r.body)
-      for (const [p, v] of Object.entries(d)) {
-        if (/^background/.test(p)) expect(v, `${r.selectors.join(',')} ${p}`).toBe('var(--bg)')
-        if (/^border(-(top|right|bottom|left))?(-color)?$/.test(p)) expect(v, `${r.selectors.join(',')} ${p}`).toMatch(/var\(--border-strong\)/)
+      for (const [p, v] of Object.entries(decls(r.body))) {
+        if (/^background/.test(p) || /^border(-(top|right|bottom|left))?(-color)?$/.test(p)) expect(v, `${r.selectors.join(',')} ${p}`).toMatch(/^(var\(--bg\)|1px solid var\(--border-strong\)|color-mix\(in srgb, var\(--tone\) \d+%, (var\(--bg\)|transparent)\))$/)
       }
     }
+    // The quiet text button: the label in --fg (base quiet is muted), no box until hover.
+    const open = styleOf('.urgent-open.btn.quiet', desktop)
+    expect(open.color).toBe('var(--fg)')
     // An empty slot takes no space.
     const slot = Object.assign({}, ...all.filter((r) => r.selectors.includes('.urgent-slot')).map((r) => decls(r.body))) as Record<string, string>
     for (const p of Object.keys(slot)) expect(p, `.urgent-slot ${p}`).not.toMatch(/^(padding|margin|border|gap|row-gap|column-gap|min-height|height)/)
@@ -191,5 +230,45 @@ describe('urgent banner css', () => {
     const btn = styleOf('.urgent-open', phone)
     expect(btn.width).toBe('100%')
     expect(Number(/^(\d+)px$/.exec(btn['min-height'] ?? '')?.[1] ?? 0)).toBeGreaterThanOrEqual(44)
+  })
+
+  it('status word keeps its tone and reaches 4.5:1 on the tint, in both themes', () => {
+    const TOKENS = readFileSync(join(here, '../../theme/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    const tokensOf = (sel: string) => Object.assign({}, ...rules(TOKENS).filter((r) => r.media === undefined && r.selectors.includes(sel)).map((r) => decls(r.body))) as Record<string, string>
+    const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    const themes: [string, Record<string, string>][] = [
+      ['light', tokensOf(':root')],
+      ['dark', tokensOf(':root[data-theme="dark"]')],
+    ]
+    const STATUSES: [string, string, number][] = [
+      ['s-bad', 'blocked', 95],
+      ['s-you', 'needs-you', 90],
+      ['s-ok', 'ready', 85],
+    ]
+    for (const [theme, tokens] of themes) {
+      for (const [cls, token, percent] of STATUSES) {
+        const where = `${theme} ${cls}`
+        const sel = `.urgent:has(> .status.${cls})`
+        // The value the CSS really declares, resolved through this theme's tokens.
+        const paint = (value: string | undefined): number[] => {
+          const name = (v: string) => (v === '--tone' ? `--${token}` : v)
+          const plain = /^var\((--[a-z-]+)\)$/.exec(value ?? '')
+          if (plain) return rgb(tokens[name(plain[1]!)]!)
+          const mix = /^color-mix\(in srgb, var\((--[a-z-]+)\) (\d+)%, var\((--[a-z-]+)\)\)$/.exec(value ?? '')
+          expect(mix, `${where}: ${value}`).not.toBeNull()
+          const a = rgb(tokens[name(mix![1]!)]!)
+          const b = rgb(tokens[name(mix![3]!)]!)
+          const p = Number(mix![2]) / 100
+          return a.map((v, i) => v * p + b[i]! * (1 - p))
+        }
+        const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+        const lum = (c: number[]) => 0.2126 * lin(c[0]!) + 0.7152 * lin(c[1]!) + 0.0722 * lin(c[2]!)
+        const declared = styleOf(`${sel} > .status`, desktop).color
+        const [hi, lo] = [lum(paint(declared)), lum(paint(styleOf(sel, desktop).background))].sort((x, y) => y - x)
+        expect((hi! + 0.05) / (lo! + 0.05), `${where}: ${declared}`).toBeGreaterThanOrEqual(4.5)
+        // Toned, not plain --fg: the tone stays the larger part of the mix.
+        expect(declared, where).toBe(`color-mix(in srgb, var(--tone) ${percent}%, var(--fg))`)
+      }
+    }
   })
 })

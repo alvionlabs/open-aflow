@@ -33,7 +33,7 @@ export function UrgentBanner({ at, onOpen }: Props) {
           </>
         )}
       </span>
-      <a className="btn sm trail urgent-open" href={at.href} aria-label={`Open run ${at.name}`} onClick={(e) => opensHere(e) && onOpen?.(at.href)}>
+      <a className="btn sm quiet trail urgent-open" href={at.href} aria-label={`Open run ${at.name}`} onClick={(e) => opensHere(e) && onOpen?.(at.href)}>
         Open run
         <Icon name="arrow-right" />
       </a>
