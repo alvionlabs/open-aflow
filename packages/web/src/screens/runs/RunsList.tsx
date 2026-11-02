@@ -47,11 +47,13 @@ export function RunsList({ runs, selected, repos, removable, onRemove, panelFor 
             const card = runCard(r, repoOfRun(repos, r))
             const fix = r.fix !== undefined
             const more = onRemove && removable?.(r)
+            // In plain text: a <wbr> would read as a space in the link's accessible name.
+            const label = [card.name, state.label, card.repo, fix ? 'fix' : undefined].filter((part) => part !== undefined).join(' ')
             return (
               // Two repos can share an id (and so a hash); the repo name keeps the keys apart.
               <li key={`${href}|${r.repo}`} className="run-item">
                 <div className="run-wrap">
-                  <a className="run" href={href} aria-current={r === selected ? 'true' : undefined}>
+                  <a className="run" href={href} aria-current={r === selected ? 'true' : undefined} aria-label={label}>
                     <span className="run-body">
                       <b>
                         {card.name.split(' ').map((word, i) => (

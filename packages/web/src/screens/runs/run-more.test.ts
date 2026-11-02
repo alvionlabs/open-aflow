@@ -149,6 +149,7 @@ describe("the card link's accessible name", () => {
   })
 
   it('ends with the fix tag on a fix run, where the card shows it', () => {
-    expect(link({ title: 'gh pr list times out', repo: 'chess-web', state: 'running', fix: 'x' })).toContain('aria-label="gh pr list times out running chess-web fix"')
+    // With no PR on the Board, a fix run is named from its slug, as on the card.
+    expect(link({ repo: 'chess-web', state: 'running', fix: 'list-timeouts' })).toContain('aria-label="List timeouts running chess-web fix"')
   })
 })
