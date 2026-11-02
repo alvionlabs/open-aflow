@@ -130,6 +130,8 @@ describe('sidebar run card', () => {
     expect(wrap.position).toBe('absolute')
     expect(wrap.bottom).toBeDefined()
     expect(wrap.top).toBeUndefined()
+    // An inline button would sit on a text baseline, a few px above the wrapper's bottom.
+    expect(wrap.display).toBe('flex')
     expect(style(runs(), '.run-wrap').position).toBe('relative')
   })
 

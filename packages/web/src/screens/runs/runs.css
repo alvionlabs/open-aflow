@@ -241,7 +241,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 12px;
-  align-items: baseline;
+  align-items: start;
 }
 
 .run b {
@@ -260,6 +260,8 @@
   flex: none;
   flex-direction: row-reverse;
   justify-self: end;
+  /* On the name's first line: 3 px centres its 13 px text in the name's line. */
+  margin-top: 3px;
 }
 
 /*
@@ -297,6 +299,7 @@
   .run .status {
     flex-direction: row;
     justify-self: start;
+    margin-top: 0;
   }
 }
 
@@ -306,8 +309,9 @@
  * on a touch screen always, with a 44 px target around its 24 px box. The look is .btn.ghost's.
  */
 .run-more-wrap {
+  display: flex;
   position: absolute;
-  right: 10px;
+  right: 11px;
   bottom: 9px;
 }
 

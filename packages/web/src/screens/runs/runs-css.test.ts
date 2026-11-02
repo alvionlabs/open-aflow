@@ -316,7 +316,8 @@ describe('runs.css run cards and Add repo', () => {
 
   it('puts the status in the top-right corner, on the name line, with the repo and the fix tag under the name', () => {
     const body = stylesAt(1280).get('.run-body')
-    expect(body?.['align-items']).toBe('baseline')
+    // Top, not baseline: a hyphenated word's box takes its last line's baseline when it wraps, which would drop the status.
+    expect(body?.['align-items']).toBe('start')
     expect(body?.['grid-template-columns']).toBe('minmax(0, 1fr) auto')
     // The muted repo and the tag share the line under the name, across both columns.
     const line = stylesAt(1280).get('.run-line')
