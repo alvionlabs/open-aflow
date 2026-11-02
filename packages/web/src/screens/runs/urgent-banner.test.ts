@@ -195,7 +195,7 @@ const styleOf = (sel: string, match: (media?: string) => boolean) =>
   Object.assign({}, ...all.filter((r) => match(r.media) && r.selectors.includes(sel)).map((r) => decls(r.body))) as Record<string, string>
 const desktop = (m?: string) => m === undefined
 /** The banner's slot is the container: the switch follows the banner's own width, not the viewport's. */
-const stacked = (m?: string) => m === '@container urgent (max-width: 600px)'
+const stacked = (m?: string) => m === '@container urgent (max-width: 620px)'
 const noRepo = (m?: string) => m === '@container urgent (max-width: 760px)'
 const TOKENS = readFileSync(join(here, '../../theme/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
 const tokensOf = (sel: string) => Object.assign({}, ...rules(TOKENS).filter((r) => r.media === undefined && r.selectors.includes(sel)).map((r) => decls(r.body))) as Record<string, string>
@@ -384,9 +384,9 @@ describe('urgent banner css', () => {
     expect(styleOf('.urgent-where', noRepo)['max-width']).toBe('40%')
     // Wide: the run may take half.
     expect(styleOf('.urgent-where', desktop)['max-width']).toBe('50%')
-    // The narrow rules come later, so they win: 760 px holds 600 px.
+    // The narrow rules come later, so they win: 760 px holds 620 px.
     expect(CSS.indexOf('(max-width: 760px)')).toBeGreaterThan(-1)
-    expect(CSS.indexOf('(max-width: 600px)')).toBeGreaterThan(CSS.indexOf('(max-width: 760px)'))
+    expect(CSS.indexOf('(max-width: 620px)')).toBeGreaterThan(CSS.indexOf('(max-width: 760px)'))
   })
 
   it('status word keeps its tone and reaches 4.5:1 on the tint, in both themes', () => {
