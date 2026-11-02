@@ -10,6 +10,13 @@ export type AgentRun = {
   id: string
   session: string
   type: string
+  /** The first `cwd` its transcript recorded. From the parser only: the server reads it and never puts it on the Board. */
+  cwd?: string
+  /**
+   * Set when its transcript doesn't show the session started in this repo: no readable `cwd`, or one outside
+   * the repo. The agent stays listed, but the board offers no send on its session (`replySession`).
+   */
+  sessionUnproven?: true
   /**
    * Never set: the dispatcher's Task description is assistant-written text, and no page shows it,
    * so it stays off the Board. Optional only until the test helpers that still write it drop it.
@@ -70,6 +77,8 @@ export type BoardRepo = {
   id: string
   name: string
   path: string
+  /** Set when the repo's file system ignores case: `repoPathKey` folds the path, as `sameRepoPath` does. */
+  caseless?: true
   source: 'registered' | 'claim' | 'both'
   error?: string
   model: RepoModel

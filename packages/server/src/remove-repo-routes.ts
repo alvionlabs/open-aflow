@@ -3,7 +3,7 @@
 // the repo's files, claims, or transcripts. The repo comes from the current Board by id and path. The rules
 // and why are in pod-docs/feature-details/server.md.
 
-import type { Board, NewActionEntry, RemoveRepoResult } from '@pod-board/model'
+import { repoPathKey, type Board, type NewActionEntry, type RemoveRepoResult } from '@pod-board/model'
 import { Hono } from 'hono'
 import type { RemoveRepoError } from './repos-config.ts'
 
@@ -14,6 +14,8 @@ export type RemoveRepoRouteDeps = {
   removeRepo(path: string): Promise<{ path: string } | { error: RemoveRepoError }>
   /** Rebuilds the Board and sends it to every client (the watcher's `rebuild`). */
   rebuild(): Promise<void>
+  /** Forgets the repo's auto-continue toggles (the store's `forgetPath`). */
+  forgetToggles(pathKey: string): Promise<void>
   log: { append(entry: NewActionEntry): Promise<boolean> }
 }
 
@@ -46,7 +48,10 @@ export function createRemoveRepoRoutes(deps: RemoveRepoRouteDeps): Hono {
     // A refusal changed nothing, so it isn't logged.
     if ('error' in result) return c.json({ error: result.error }, STATUS[result.error])
 
-    const logged = await settle(() => deps.log.append({ ...base, result: 'removed' }))
+    // A repo that leaves the Board loses its toggles: adding the folder again must send nothing until you turn it on.
+    // A repo a port claim still lists stays on the Board, and nothing about it changes.
+    const forgot = repo.source === 'registered' ? await settle(async () => (await deps.forgetToggles(repoPathKey(repo)), true)) : true
+    const logged = await settle(() => deps.log.append({ ...base, result: 'removed', ...(forgot ? {} : { message: "Couldn't clear its auto-continue toggle." }) }))
     // The Board drops the repo, and carries the log entry, before the response.
     await settle(deps.rebuild)
     return c.json({ outcome: 'removed', path: result.path, logged: logged === true } satisfies RemoveRepoResult)

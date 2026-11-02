@@ -355,19 +355,17 @@ describe('repoIds', () => {
   const SUFFIX = /^e--x-chess-web-[0-9a-f]{6}$/
 
   test('two paths that differ only in symbols get distinct ids, each with a 6-hex suffix', () => {
-    const { ids, clashed } = repoIds([W('E:/x/chess-web'), W('E:/x/chess_web')], 'win32')
+    const { ids } = repoIds([W('E:/x/chess-web'), W('E:/x/chess_web')], 'win32')
     expect(ids[0]).toMatch(SUFFIX)
     expect(ids[1]).toMatch(SUFFIX)
     expect(ids[0]).not.toBe(ids[1])
-    expect(clashed).toEqual(['e--x-chess-web'])
   })
 
   test('a repo with no clash keeps today’s id, byte for byte, beside a clash', () => {
-    const { ids, clashed } = repoIds([W('E:/Projects/Pod-Board'), W('E:/x/a-b'), W('E:/x/a_b'), L('/home/Me/my repo')], 'win32')
+    const { ids } = repoIds([W('E:/Projects/Pod-Board'), W('E:/x/a-b'), W('E:/x/a_b'), L('/home/Me/my repo')], 'win32')
     expect(ids[0]).toBe('e--projects-pod-board')
     expect(ids[0]).toBe(repoId('E:/Projects/Pod-Board', 'win32', true))
     expect(ids[3]).toBe(repoId('/home/Me/my repo', 'win32', false))
-    expect(clashed).toEqual(['e--x-a-b'])
     expect(repoIds([L('/home/Me/my repo')], 'linux').ids).toEqual(['-home-Me-my-repo'])
   })
 
@@ -397,7 +395,7 @@ describe('repoIds', () => {
   })
 
   test('two paths that differ only in case on a case-sensitive file system are no clash', () => {
-    expect(repoIds([L('/x/Repo'), L('/x/repo')], 'linux')).toEqual({ ids: ['-x-Repo', '-x-repo'], clashed: [] })
+    expect(repoIds([L('/x/Repo'), L('/x/repo')], 'linux')).toEqual({ ids: ['-x-Repo', '-x-repo'] })
   })
 
   test('every id stays inside the id characters', () => {
@@ -416,11 +414,10 @@ describe('repoIds', () => {
 
   test('a suffixed id that equals another repo’s plain id: the plain repo keeps its id', () => {
     const hash = (key: string) => (key.endsWith('a-b') ? 'abcdef111111' : 'fedcba222222')
-    const { ids, clashed } = repoIds([W('E:/x/a-b'), W('E:/x/a_b'), W('E:/x/a-b-abcdef')], 'win32', hash)
+    const { ids } = repoIds([W('E:/x/a-b'), W('E:/x/a_b'), W('E:/x/a-b-abcdef')], 'win32', hash)
     expect(ids[2]).toBe('e--x-a-b-abcdef')
     expect(ids[0]).toBe('e--x-a-b-abcdef111111')
     expect(new Set(ids).size).toBe(3)
-    expect(clashed).toEqual(['e--x-a-b'])
   })
 
   test('one spelling read two ways by mixed file-system rules still gets two ids', () => {

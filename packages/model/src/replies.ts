@@ -137,7 +137,7 @@ function runAgents(repo: BoardRepo, run: string, now: number): AgentRun[] {
 /**
  * The chat to paste a reply in: the session of the run's agent that wrote last (ties: the newer
  * start, then the smaller agent id). Its start is the earliest of any repo agent in that session;
- * the main chat is never read. `resume` only for an id safe in a shell command.
+ * the main chat is never read. `resume` only for an id safe in a shell command and a session that is provably this repo's.
  */
 export function replySession(repo: BoardRepo, run: string, now: number): ReplySession | undefined {
   const newest = runAgents(repo, run, now)
@@ -148,6 +148,6 @@ export function replySession(repo: BoardRepo, run: string, now: number): ReplySe
   const out: ReplySession = { id, repoPath: repo.path }
   const starts = repo.agents.filter((a) => a.session === id && a.startedAt !== undefined).map((a) => a.startedAt!)
   if (starts.length > 0) out.startedAt = Math.min(...starts)
-  if (SESSION_ID.test(id)) out.resume = `claude --resume ${id}`
+  if (SESSION_ID.test(id) && !newest.sessionUnproven) out.resume = `claude --resume ${id}`
   return out
 }

@@ -39,6 +39,7 @@ export function parseAgentTranscript({ id, session, meta, jsonl }: AgentFile): A
   let startedAt: number | undefined
   let lastAt: number | undefined
   let model: string | undefined
+  let cwd: string | undefined
   const active: [number, number][] = []
   // Tool calls the agent waits on: their ids, from tool_use blocks, until a tool_result answers them.
   const calls = new Set<string>()
@@ -51,6 +52,7 @@ export function parseAgentTranscript({ id, session, meta, jsonl }: AgentFile): A
   for (const line of jsonl.split('\n')) {
     const record = parseJson(line)
     if (!isObject(record)) continue
+    if (cwd === undefined && typeof record.cwd === 'string' && record.cwd !== '') cwd = record.cwd
     const message = isObject(record.message) ? record.message : undefined
     // A prompt after a hand-back: the agent works again. Only the coordinator's resume (SendMessage)
     // starts a new turn; a task notification or a nudge re-opens the turn it answers.
@@ -97,6 +99,7 @@ export function parseAgentTranscript({ id, session, meta, jsonl }: AgentFile): A
     }
   }
   if (model !== undefined) run.model = model
+  if (cwd !== undefined) run.cwd = cwd
   if (startedAt !== undefined) run.startedAt = startedAt
   if (lastAt !== undefined) run.lastAt = lastAt
   if (active.length > 0) run.active = active

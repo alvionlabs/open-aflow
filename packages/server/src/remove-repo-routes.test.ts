@@ -67,7 +67,7 @@ afterEach(async () => {
 
 const ghExec = (async (args: string[]) => (args[0] === 'auth' ? { status: 'ok', stdout: '' } : { status: 'ok', stdout: '[]' })) as GhExec
 
-type SetupOpts = { append?: (e: NewActionEntry) => Promise<boolean>; removeRepo?: RemoveRepoRouteDeps['removeRepo']; mapBoard?: (b: Board) => Board }
+type SetupOpts = { append?: (e: NewActionEntry) => Promise<boolean>; removeRepo?: RemoveRepoRouteDeps['removeRepo']; forgetToggles?: RemoveRepoRouteDeps['forgetToggles']; mapBoard?: (b: Board) => Board }
 
 /** The remove route behind the real app and guard, over a real board service, config file, and temp repos. */
 async function setup(opts: SetupOpts = {}) {
@@ -96,6 +96,7 @@ async function setup(opts: SetupOpts = {}) {
     board: source.board,
     removeRepo: opts.removeRepo ?? ((p) => removeRepo(cfgFile, p, platform)),
     rebuild: source.rebuild,
+    forgetToggles: opts.forgetToggles ?? (async () => {}),
     log: {
       append: async (e) => {
         events.push('log')
@@ -122,6 +123,17 @@ async function setup(opts: SetupOpts = {}) {
 const config = async () => JSON.parse(await readFile(cfgFile, 'utf8')) as { version: number; repos: { path: string }[] }
 
 describe('remove-repo route', () => {
+  test('a failed toggle clear still removes the repo, and the log says so', async () => {
+    const s = await setup({
+      forgetToggles: async () => {
+        throw new Error('disk full')
+      },
+    })
+    const res = await s.post({ repoId: s.idOf(regPath) })
+    expect(await res.json()).toMatchObject({ outcome: 'removed' })
+    expect(s.logged[0]).toMatchObject({ result: 'removed', message: "Couldn't clear its auto-continue toggle." })
+  })
+
   test('removes a registered repo from the config and the Board, logs it, and leaves its folder alone', async () => {
     const s = await setup()
     const id = s.idOf(regPath)

@@ -1,6 +1,8 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
+import type { AgentRun } from '@pod-board/model'
 import { envValue, type Env } from './config.ts'
+import { isInsideRepo } from './guard.ts'
 
 /** One subagent's transcript files: `<session>/subagents/agent-<id>.jsonl` and its `.meta.json`. */
 export type AgentFile = { id: string; session: string; jsonlPath: string; metaPath: string }
@@ -30,6 +32,23 @@ export function transcriptDays(env: Env): number {
 /** Claude's folder name for a project: each character outside `[A-Za-z0-9]` becomes `-`. */
 export function projectDirName(repoPath: string): string {
   return repoPath.replace(/[^A-Za-z0-9]/g, '-')
+}
+
+/**
+ * A parsed agent as a repo lists it, by the first `cwd` its transcript recorded, with the `cwd` taken off. Claude's
+ * project folder name folds symbols, so `chess-web` and `chess_web` read one folder, also with no sibling on the board.
+ * In the repo (its worktrees too) → listed, and its session can be sent to. In a folder that folds to this project's
+ * name (a sibling or its worktree) → not this repo's, so undefined. No `cwd`, or anywhere else → listed as before,
+ * but `sessionUnproven`, so nothing is sent.
+ */
+export function agentOfRepo(run: AgentRun, repo: { path: string; caseless: boolean }, platform: NodeJS.Platform): AgentRun | undefined {
+  const { cwd, ...agent } = run
+  if (cwd === undefined) return { ...agent, sessionUnproven: true }
+  if (isInsideRepo(cwd, repo.path, platform, repo.caseless)) return agent
+  const fold = (s: string) => projectDirName(repo.caseless ? s.toLowerCase() : s)
+  const name = fold(repo.path)
+  const there = fold(cwd)
+  return there === name || there.startsWith(`${name}-`) ? undefined : { ...agent, sessionUnproven: true }
 }
 
 /**

@@ -59,7 +59,7 @@ const log = createActionLog({ file: join(dirname(configFile), 'actions.jsonl'), 
 const store = createAutoContinueStore({ file: join(dirname(configFile), 'auto-continue.json') })
 const runner = createClaudeRunner({ bin: settings.claudeBin, logDir: join(dirname(configFile), 'resume-logs') })
 const gh = createGhReader({ exec: defaultGhExec })
-const service = createBoardService({ ...settings, platform, gh, actions: log.recent, autoContinue: store.list, retireRepoIds: store.dropRepoIds })
+const service = createBoardService({ ...settings, platform, gh, actions: log.recent, autoContinue: store.list })
 const watcher = createBoardWatcher({ service, ...settings, poll: env.POD_BOARD_POLL === '1' })
 await watcher.start()
 
@@ -107,6 +107,7 @@ const app = createApp({
         board: () => watcher.board(),
         removeRepo: (p) => removeRepo(configFile, p, platform),
         rebuild: () => watcher.rebuild(),
+        forgetToggles: store.forgetPath,
         log,
       }),
     ),

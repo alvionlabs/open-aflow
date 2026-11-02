@@ -2,7 +2,7 @@
 // comes from the current Board by id, never a path. The rules and why are in
 // pod-docs/feature-details/resume.md.
 
-import { listRuns, replySession, sendableReply } from '@pod-board/model'
+import { listRuns, replySession, repoPathKey, sendableReply } from '@pod-board/model'
 import { Hono } from 'hono'
 import { isResuming, runResume, type ResumeDeps } from './auto-continue.ts'
 
@@ -30,8 +30,9 @@ export function createResumeRoutes(deps: ResumeDeps): Hono {
     try {
       // A continue marks this stop sent, so the automatic check won't send it again. A failed save
       // doesn't stop a resume you asked for.
-      if (word === 'continue' && deps.store.list().some((t) => t.repoId === repoId && t.run === run)) {
-        await settle(() => deps.store.saveKey(repoId, run, sendable.key))
+      const key = repoPathKey(repo)
+      if (word === 'continue' && deps.store.list().some((t) => t.path === key && t.run === run)) {
+        await settle(() => deps.store.saveKey(key, run, sendable.key))
       }
       const result = await runResume(deps, { repo, run, session: session.id, word, auto: false })
       // The Board carries the new log entry before the response.
@@ -46,9 +47,10 @@ export function createResumeRoutes(deps: ResumeDeps): Hono {
     const body = (await c.req.json()) as Record<string, unknown>
     const { repoId, run, on } = body
     if (typeof repoId !== 'string' || typeof run !== 'string' || typeof on !== 'boolean') return c.json({ error: 'bad request' }, 400)
-    if (!listRuns(deps.board(), now()).some((r) => r.repoId === repoId && r.plan === run)) return c.json({ error: 'not a run' }, 404)
+    const repo = deps.board().repos.find((r) => r.id === repoId)
+    if (!repo || !listRuns(deps.board(), now()).some((r) => r.repoId === repoId && r.plan === run)) return c.json({ error: 'not a run' }, 404)
     try {
-      await deps.store.set(repoId, run, on)
+      await deps.store.set(repoPathKey(repo), run, on)
     } catch {
       return c.json({ error: "Couldn't save the toggle." }, 500)
     }

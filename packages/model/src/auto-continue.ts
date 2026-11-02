@@ -5,14 +5,15 @@ import type { Board, BoardRepo } from './board.ts'
 import { SEND_SIGNALS, replySession, runReplies, type RunReply } from './replies.ts'
 
 /**
- * A run whose auto-continue toggle is on. `lastKey` is the stop it last sent for; `answeredKeys` the
+ * A run whose auto-continue toggle is on. `path` is its repo's `repoPathKey`, not its id: an id changes when
+ * a clash with another repo forms or ends, and another repo can take it. `lastKey` is the stop it last sent for; `answeredKeys` the
  * `answered` keys it sent (newest last, at most `ANSWERED_KEYS_MAX`), so a pod that never rewrites an
  * answered entry's Resolution doesn't get the same answers sent again after another stop.
  */
-export type AutoToggle = { repoId: string; run: string; lastKey?: string; answeredKeys?: string[] }
+export type AutoToggle = { path: string; run: string; lastKey?: string; answeredKeys?: string[] }
 
-/** Stub. */
-export const repoPathKey = (repo: { path: string; caseless?: boolean }): string => repo.path
+/** How a toggle names a repo: its normalized path, case-folded where its file system ignores case (the `sameRepoPath` rule). */
+export const repoPathKey = (repo: { path: string; caseless?: boolean }): string => (repo.caseless ? repo.path.toLowerCase() : repo.path)
 
 /** How many sent `answered` keys a toggle remembers. */
 export const ANSWERED_KEYS_MAX = 20
@@ -52,7 +53,7 @@ export function autoSends(board: Board, toggles: AutoToggle[], now: number, idle
   const out: AutoSend[] = []
   const taken = new Set<string>()
   for (const t of toggles) {
-    const repo = board.repos.find((r) => r.id === t.repoId)
+    const repo = board.repos.find((r) => repoPathKey(r) === t.path)
     if (!repo) continue
     const reply = sendableFrom(runReplies(repo, t.run, now), 'continue')
     if (!reply || reply.reply !== 'continue' || reply.key === t.lastKey) continue

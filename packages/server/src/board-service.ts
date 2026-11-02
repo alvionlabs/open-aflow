@@ -19,13 +19,14 @@ import {
   type Claim,
   type PrStatus,
   type RepoModel,
+  repoPathKey,
 } from '@pod-board/model'
 import { readClaims } from './claims.ts'
 import type { GhReader } from './gh.ts'
 import { ignoresCase as probeIgnoresCase, normalizeRepoPath, repoIds, sameRepoPath } from './guard.ts'
 import { readRepoFiles } from './repo-files.ts'
 import { loadRepos } from './repos-config.ts'
-import { createAgentFileCache, listAgentFiles, type AgentFile } from './transcript-files.ts'
+import { agentOfRepo, createAgentFileCache, listAgentFiles, type AgentFile } from './transcript-files.ts'
 
 export type BoardServiceDeps = {
   configFile: string
@@ -40,11 +41,6 @@ export type BoardServiceDeps = {
   actions?: () => ActionEntry[]
   /** The auto-continue toggles, read on every build. No dep, no `autoContinue` on the Board. */
   autoContinue?: () => AutoToggle[]
-  /**
-   * Called on each build with the plain ids repos clash on, before the toggles are read. A toggle under such
-   * an id could be any member's, and a member takes the id again when the clash ends, so the store forgets it.
-   */
-  retireRepoIds?: (ids: string[]) => Promise<void>
 }
 
 export type BoardService = {
@@ -100,14 +96,15 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
   }
 
   /** The repo's pod agents. Adds its listed files to `listed`, so the build keeps their cache. */
-  async function agentsOf(repoPath: string, listed: AgentFile[]): Promise<AgentRun[]> {
-    const files = await listAgentFiles(deps.claudeDir, repoPath, deps.transcriptDays, now())
+  async function agentsOf(entry: RepoEntry, listed: AgentFile[]): Promise<AgentRun[]> {
+    const files = await listAgentFiles(deps.claudeDir, entry.path, deps.transcriptDays, now())
     listed.push(...files)
     const runs: AgentRun[] = []
     for (const file of files) {
       try {
         const run = await agentRuns.read(file)
-        if (run) runs.push(run)
+        const agent = run && agentOfRepo(run, entry, deps.platform)
+        if (agent) runs.push(agent)
       } catch {
         // A transcript deleted between listing and reading is left out.
       }
@@ -120,6 +117,7 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
       id,
       name: pathFor(deps.platform).basename(entry.path) || entry.path,
       path: entry.path,
+      ...(entry.caseless ? { caseless: true as const } : {}),
       source: entry.registered ? (entry.claims.length > 0 ? 'both' : 'registered') : 'claim',
       claims: entry.claims,
     } as const
@@ -144,21 +142,14 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
       .map((b) => deps.gh.getBranch(entry.path, b))
       .filter((pr): pr is PrStatus => pr !== undefined && !byBranch.some((p) => p.number === pr.number))
     const prs = [...found.filter((p) => !staging.some((s) => s.number === p.number)), ...staging]
-    return { ...base, model, agents: await agentsOf(entry.path, listed), prs }
+    return { ...base, model, agents: await agentsOf(entry, listed), prs }
   }
 
   return {
     async build() {
       const { entries, configUnreadable } = await repoEntries()
       const listed: AgentFile[] = []
-      const { ids, clashed } = repoIds(entries, deps.platform)
-      if (clashed.length > 0) {
-        try {
-          await deps.retireRepoIds?.(clashed)
-        } catch {
-          // A failed save keeps the toggle; the next build tries again, and no repo holds its id during the clash.
-        }
-      }
+      const { ids } = repoIds(entries, deps.platform)
       const repos = await Promise.all(entries.map((e, i) => buildRepo(e, ids[i]!, listed)))
       // Forget transcripts no repo listed this time: out of the day window, deleted, or their repo gone.
       agentRuns.retain(listed)
@@ -168,8 +159,13 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
       if (checkedAt !== undefined) board.ghCheckedAt = checkedAt
       if (configUnreadable) board.configError = 'config unreadable'
       if (deps.actions) board.actions = deps.actions()
-      // The stop keys stay in the store; the Board only says which toggles are on.
-      if (deps.autoContinue) board.autoContinue = deps.autoContinue().map(({ repoId, run }) => ({ repoId, run }))
+      // The stop keys stay in the store; the Board only says which toggles are on, under each repo's id now.
+      if (deps.autoContinue) {
+        board.autoContinue = deps.autoContinue().flatMap(({ path, run }) => {
+          const repo = repos.find((r) => repoPathKey(r) === path)
+          return repo ? [{ repoId: repo.id, run }] : []
+        })
+      }
       return board
     },
     async refreshGh(board) {

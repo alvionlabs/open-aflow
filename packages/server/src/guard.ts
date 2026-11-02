@@ -131,8 +131,7 @@ function repeated(values: readonly string[]): Set<string> {
 }
 
 /**
- * One unique id per repo, in order, from the whole list of repos, and the plain ids two or more repos
- * clashed on. A repo with no clash keeps its plain id. Every member of a clash gets `-` and 6 hex
+ * One unique id per repo, in order, from the whole list of repos. A repo with no clash keeps its plain id. Every member of a clash gets `-` and 6 hex
  * characters of a hash of its path, so an id depends only on the path and the set, never on list order,
  * and removing one member passes its id to nobody who still clashes. Suffixed ids that still collide
  * (with each other, or with another repo's plain id) double their suffix until they differ.
@@ -141,7 +140,7 @@ export function repoIds(
   repos: readonly { path: string; caseless: boolean }[],
   platform: NodeJS.Platform,
   hash: (key: string) => string = sha256,
-): { ids: string[]; clashed: string[] } {
+): { ids: string[] } {
   const plain = repos.map((r) => repoId(r.path, platform, r.caseless))
   const clashed = repeated(plain)
   const hex = repos.map((r, i) => {
@@ -155,14 +154,19 @@ export function repoIds(
     const ids = plain.map((id, i) => (sizes[i] === 0 ? id : `${id}-${hex[i]!.slice(0, sizes[i])}`))
     const collide = repeated(ids)
     const grow = ids.flatMap((id, i) => (sizes[i]! > 0 && sizes[i]! < hex[i]!.length && collide.has(id) ? [i] : []))
-    if (grow.length === 0) return { ids, clashed: [...clashed] }
+    if (grow.length === 0) return { ids }
     for (const i of grow) sizes[i]! *= 2
   }
 }
 
-/** Stub. */
-export function isInsideRepo(_p: string, _repo: string, _platform: NodeJS.Platform, _ignoresCase: boolean): boolean {
-  return false
+/** Whether an absolute path is the repo's folder or under it, by the same case rule as `sameRepoPath`. A relative path isn't. */
+export function isInsideRepo(p: string, repo: string, platform: NodeJS.Platform, ignoresCase: boolean): boolean {
+  const { isAbsolute, sep } = pathFor(platform)
+  if (!isAbsolute(p)) return false
+  const fold = (s: string) => (ignoresCase ? s.toLowerCase() : s)
+  const x = fold(normalizeRepoPath(p, platform))
+  const y = fold(normalizeRepoPath(repo, platform))
+  return x === y || x.startsWith(y.endsWith(sep) ? y : y + sep)
 }
 
 /**

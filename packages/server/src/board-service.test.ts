@@ -157,11 +157,15 @@ describe('board service', () => {
     let toggles: model.AutoToggle[] = []
     const withToggles = createBoardService({ ...deps(), autoContinue: () => toggles })
     expect((await withToggles.build()).autoContinue).toEqual([])
-    toggles = [{ repoId: 'id-r', run: 'alpha', lastKey: 'sprint-done:one' }, { repoId: 'id-x', run: 'fix-scroll' }]
-    // Read on every build; the stop keys stay in the store, off the Board.
+    const repo = copyFixture()
+    await register(repo)
+    const key = caseless ? normalizeRepoPath(repo, platform).toLowerCase() : normalizeRepoPath(repo, platform)
+    toggles = [{ path: key, run: 'alpha', lastKey: 'sprint-done:one' }, { path: key, run: 'fix-scroll' }, { path: '/not/on/the/board', run: 'alpha' }]
+    // Read on every build, under the repo's id now; the stop keys stay in the store, off the Board. A repo that isn't on the Board reads off.
+    const id = repoId(repo, platform, caseless)
     expect((await withToggles.build()).autoContinue).toEqual([
-      { repoId: 'id-r', run: 'alpha' },
-      { repoId: 'id-x', run: 'fix-scroll' },
+      { repoId: id, run: 'alpha' },
+      { repoId: id, run: 'fix-scroll' },
     ])
     expect(await createBoardService(deps()).build()).not.toHaveProperty('autoContinue')
   })

@@ -200,7 +200,7 @@ describe('sendableReply', () => {
 })
 
 describe('autoSends', () => {
-  const toggle = (run: string, lastKey?: string, repoId = 'id-r'): AutoToggle => (lastKey === undefined ? { repoId, run } : { repoId, run, lastKey })
+  const toggle = (run: string, lastKey?: string, path = '/r'): AutoToggle => (lastKey === undefined ? { path, run } : { path, run, lastKey })
 
   it('a toggle acts only on the repo at its path, whatever the repo’s id is now', () => {
     const repo = planRepo(BETWEEN)
@@ -305,7 +305,7 @@ describe('autoSends', () => {
     const repo = planRepo({ docs: { one: WORK }, queue: [answered(HALT)] })
     const key = keyOf('answered')
     // It sent the answered key, then another stop (lastKey moved on): still not sent again.
-    const sent: AutoToggle = { repoId: 'id-r', run: 'alpha', lastKey: 'sprint-done:one', answeredKeys: [key] }
+    const sent: AutoToggle = { path: '/r', run: 'alpha', lastKey: 'sprint-done:one', answeredKeys: [key] }
     expect(autoSends(board(repo), [sent], NOW, always)).toEqual([])
     // Another answered key on record doesn't stop this one.
     expect(autoSends(board(repo), [{ ...sent, answeredKeys: ['answered:alpha:1:00000000'] }], NOW, always)).toEqual([
@@ -313,7 +313,7 @@ describe('autoSends', () => {
     ])
     // Other signals don't read the record.
     const merged = BY_SIGNAL['wave-merged']
-    expect(autoSends(board(merged.repo), [{ repoId: 'id-r', run: 'alpha', answeredKeys: ['wave-merged:7'] }], NOW, always)).toHaveLength(1)
+    expect(autoSends(board(merged.repo), [{ path: '/r', run: 'alpha', answeredKeys: ['wave-merged:7'] }], NOW, always)).toHaveLength(1)
   })
 
   it('skips busy or unknown sessions', () => {
@@ -345,15 +345,15 @@ describe('autoSends', () => {
   it('one send per session', () => {
     // Two repos' runs on one session: the first toggle wins.
     const a = BY_SIGNAL['wave-merged'].repo
-    const b = { ...planRepo(BETWEEN), id: 'id-b' }
-    const out = autoSends(board(a, b), [toggle('alpha'), toggle('alpha', undefined, 'id-b')], NOW, always)
+    const b = { ...planRepo(BETWEEN), id: 'id-b', path: '/b' }
+    const out = autoSends(board(a, b), [toggle('alpha'), toggle('alpha', undefined, '/b')], NOW, always)
     expect(out).toEqual([{ repoId: 'id-r', run: 'alpha', session: 'sess-1', key: 'wave-merged:7' }])
     // The same run toggled twice: one send.
     expect(autoSends(board(a), [toggle('alpha'), toggle('alpha')], NOW, always)).toHaveLength(1)
     // Different sessions: one each.
-    const c = { ...planRepo(BETWEEN, {}, 'sess-2'), id: 'id-b' }
-    expect(autoSends(board(a, c), [toggle('alpha'), toggle('alpha', undefined, 'id-b')], NOW, always).map((x) => x.session)).toEqual(['sess-1', 'sess-2'])
+    const c = { ...planRepo(BETWEEN, {}, 'sess-2'), id: 'id-b', path: '/b' }
+    expect(autoSends(board(a, c), [toggle('alpha'), toggle('alpha', undefined, '/b')], NOW, always).map((x) => x.session)).toEqual(['sess-1', 'sess-2'])
     // A busy first session doesn't stop the second.
-    expect(autoSends(board(a, c), [toggle('alpha'), toggle('alpha', undefined, 'id-b')], NOW, (_r, s) => s === 'sess-2').map((x) => x.session)).toEqual(['sess-2'])
+    expect(autoSends(board(a, c), [toggle('alpha'), toggle('alpha', undefined, '/b')], NOW, (_r, s) => s === 'sess-2').map((x) => x.session)).toEqual(['sess-2'])
   })
 })

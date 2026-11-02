@@ -61,7 +61,7 @@ function setup(o: SetupOpts) {
   // The rebuild fills autoContinue from the store, as the board service does.
   const rebuild = async () => {
     events.push('rebuild')
-    board = { ...board, autoContinue: store.list().map(({ repoId, run }) => ({ repoId, run })) }
+    board = { ...board, autoContinue: store.list().flatMap(({ path, run }) => board.repos.filter((r) => r.path === path).map((r) => ({ repoId: r.id, run }))) }
   }
   const routes = createResumeRoutes({
     board: () => board,
@@ -172,7 +172,7 @@ describe('resume route', () => {
     // go on a fresh plan is sent.
     const res = await s.resume({ repoId: 'id-f', run: 'alpha', reply: 'go' })
     expect(res.status).toBe(200)
-    expect(s.starts).toEqual([{ session: 'sess-1', word: 'go', cwd: '/r' }])
+    expect(s.starts).toEqual([{ session: 'sess-1', word: 'go', cwd: '/id-f' }])
   })
 
   test('sends continue on an answered stop, only when idle', async () => {
@@ -185,7 +185,7 @@ describe('resume route', () => {
     expect(busy.starts).toEqual([])
     // Answered and idle: sent, and the toggle's lastKey is the answered key.
     const s = setup({ board: boardOf(planRepo(ANSWERED)) })
-    await s.store.set('id-r', 'alpha', true)
+    await s.store.set('/r', 'alpha', true)
     await expectRes(await s.resume({ repoId: 'id-r', run: 'alpha', reply: 'continue' }), 200, { outcome: 'started', logged: true })
     expect(s.starts).toEqual([{ session: 'sess-1', word: 'continue', cwd: '/r' }])
     expect(s.store.list()[0]?.lastKey).toMatch(/^answered:alpha:1:[0-9a-f]{8}$/)
@@ -195,7 +195,7 @@ describe('resume route', () => {
 
   test('starts and logs a resume', async () => {
     const s = setup({ board: boardOf(planRepo(SPRINT_DONE)) })
-    await s.store.set('id-r', 'alpha', true)
+    await s.store.set('/r', 'alpha', true)
     const res = await s.resume({ repoId: 'id-r', run: 'alpha', reply: 'continue' })
     expect(res.status).toBe(200)
     expect(await json<ResumeResult>(res)).toEqual({ outcome: 'started', logged: true })
@@ -204,16 +204,16 @@ describe('resume route', () => {
     // The Board was rebuilt (with the new entry) before the response.
     expect(s.events).toEqual(['start', 'log', 'rebuild'])
     // A continue sets the toggle's lastKey, so the automatic check won't send this stop again.
-    expect(s.store.list()).toEqual([{ repoId: 'id-r', run: 'alpha', lastKey: 'sprint-done:one' }])
+    expect(s.store.list()).toEqual([{ path: '/r', run: 'alpha', lastKey: 'sprint-done:one' }])
     // The session is free again.
     expect(s.inFlight.size).toBe(0)
 
     // No toggle → none is added. go never sets a lastKey.
     const t = setup({ board: boardOf(planRepo(SPRINT_DONE), planRepo(FRESH, { id: 'id-f', session: 'sess-2' })), store: createAutoContinueStore({ file: join(root, 'other.json') }) })
-    await t.store.set('id-f', 'alpha', true)
+    await t.store.set('/id-f', 'alpha', true)
     expect((await t.resume({ repoId: 'id-r', run: 'alpha', reply: 'continue' })).status).toBe(200)
     expect((await t.resume({ repoId: 'id-f', run: 'alpha', reply: 'go' })).status).toBe(200)
-    expect(t.store.list()).toEqual([{ repoId: 'id-f', run: 'alpha' }])
+    expect(t.store.list()).toEqual([{ path: '/id-f', run: 'alpha' }])
     expect(t.logged.map((e) => e.target)).toEqual(['alpha · continue', 'alpha · go'])
   })
 
@@ -268,11 +268,11 @@ describe('resume route', () => {
 
   test('a lastKey that fails to save still sends the resume', async () => {
     const real = createAutoContinueStore({ file })
-    await real.set('id-r', 'alpha', true)
+    await real.set('/r', 'alpha', true)
     const store: AutoContinueStore = {
       list: () => real.list(),
       set: (...a) => real.set(...a),
-      dropRepoIds: (...a) => real.dropRepoIds(...a),
+      forgetPath: (...a) => real.forgetPath(...a),
       saveKey: async () => {
         throw new Error('disk full')
       },
@@ -281,7 +281,7 @@ describe('resume route', () => {
     const res = await s.resume({ repoId: 'id-r', run: 'alpha', reply: 'continue' })
     expect(await json(res)).toEqual({ outcome: 'started', logged: true })
     expect(s.starts).toHaveLength(1)
-    expect(real.list()).toEqual([{ repoId: 'id-r', run: 'alpha' }])
+    expect(real.list()).toEqual([{ path: '/r', run: 'alpha' }])
   })
 
   test('sits behind the action guard', async () => {
@@ -304,8 +304,8 @@ describe('auto-continue route', () => {
     expect(s.board().autoContinue).toBeUndefined()
 
     await expectRes(await s.toggle({ repoId: 'id-r', run: 'alpha', on: true }), 200, { on: true })
-    expect(s.store.list()).toEqual([{ repoId: 'id-r', run: 'alpha' }])
-    expect(createAutoContinueStore({ file }).list()).toEqual([{ repoId: 'id-r', run: 'alpha' }])
+    expect(s.store.list()).toEqual([{ path: '/r', run: 'alpha' }])
+    expect(createAutoContinueStore({ file }).list()).toEqual([{ path: '/r', run: 'alpha' }])
     expect(s.board().autoContinue).toEqual([{ repoId: 'id-r', run: 'alpha' }])
 
     // A fix run is a run too.
@@ -328,12 +328,12 @@ describe('auto-continue route', () => {
     for (const body of [{}, { repoId: 'id-r', run: 'alpha' }, { repoId: 'id-r', run: 'alpha', on: 'true' }, { repoId: 1, run: 'alpha', on: true }, { repoId: 'id-r', on: true }]) {
       await expectRes(await s.toggle(body), 400, { error: 'bad request' }, JSON.stringify(body))
     }
-    expect(s.store.list()).toEqual([{ repoId: 'id-x', run: FIX }])
+    expect(s.store.list()).toEqual([{ path: '/x', run: FIX }])
   })
 
   test('keeps the toggle when saving fails', async () => {
     const real = createAutoContinueStore({ file })
-    await real.set('id-r', 'alpha', true)
+    await real.set('/r', 'alpha', true)
     const failing = createAutoContinueStore({
       file,
       write: async () => {
@@ -342,8 +342,8 @@ describe('auto-continue route', () => {
     })
     const s = setup({ board: boardOf(planRepo(SPRINT_DONE)), store: failing })
     await expectRes(await s.toggle({ repoId: 'id-r', run: 'alpha', on: false }), 500, { error: "Couldn't save the toggle." })
-    expect(failing.list()).toEqual([{ repoId: 'id-r', run: 'alpha' }])
-    expect(createAutoContinueStore({ file }).list()).toEqual([{ repoId: 'id-r', run: 'alpha' }])
+    expect(failing.list()).toEqual([{ path: '/r', run: 'alpha' }])
+    expect(createAutoContinueStore({ file }).list()).toEqual([{ path: '/r', run: 'alpha' }])
     await expectRes(await s.toggle({ repoId: 'id-r', run: 'alpha', on: true }), 500, { error: "Couldn't save the toggle." })
     expect(s.events).toEqual([])
   })
@@ -456,7 +456,7 @@ function planRepo(stop: Stop, o: { session?: string; id?: string; path?: string 
   return {
     id: o.id ?? 'id-r',
     name: 'r',
-    path: o.path ?? '/r',
+    path: o.path ?? (o.id === undefined || o.id === 'id-r' ? '/r' : `/${o.id}`),
     source: 'registered',
     model: buildRepoModel(files),
     agents: session === '' ? [] : [agent({ plan: 'alpha', session })],
