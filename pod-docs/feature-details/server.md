@@ -94,3 +94,4 @@ flowchart TD
 - 2026-11-02 · fix-repo-id · fixed: repos whose paths differ only in symbols get unique ids, so every action reaches the repo you targeted and the page offers Remove for them.
 - 2026-11-02 · fix-repo-id review round 1 · fixed: a repo lists an agent by a `cwd`, so a sibling's session is never offered or sent, and no readable `cwd` sends nothing. Remove forgets the repo's auto-continue toggles.
 - 2026-11-02 · fix-repo-id review round 2 · fixed: the owner comes from the session's own file, not the agent's transcript; only an exact fold of the project name hides an agent; Remove forgets toggles also for a repo a port claim still lists.
+- 2026-11-02 · fix-repo-id review round 3 · fixed: a failed read of a session file (a lock, say) is no longer kept as "no `cwd`"; the session stays unproven only until a later build can read it.

@@ -68,7 +68,7 @@ const SESSION_CHUNK_BYTES = 64 * 1024
 /** How far into a session file to look for its `cwd`. Claude writes one on its first real record; a main chat can run to many MB. */
 const SESSION_HEAD_BYTES = 1024 * 1024
 
-/** The first non-empty string `cwd` of a JSON-lines file, from its head only. A missing file, or none in the head → undefined. Never throws. */
+/** The first non-empty string `cwd` of a JSON-lines file, from its head only. A missing file, or none in the head → undefined. A file it could not read (a lock, say) rejects. */
 export async function firstCwdOfFile(file: string): Promise<string | undefined> {
   try {
     const handle = await open(file, 'r')
@@ -90,8 +90,9 @@ export async function firstCwdOfFile(file: string): Promise<string | undefined> 
     } finally {
       await handle.close()
     }
-  } catch {
-    return undefined
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw err
   }
 }
 
@@ -106,7 +107,7 @@ function cwdOfLine(line: string): string | undefined {
 
 /**
  * Each session file's `cwd`, read again only when the file's size or mtime changes. Stamped before the read, so a
- * write during it is seen on the next call. `retain` forgets files no longer listed.
+ * write during it is seen on the next call. A failed read gives undefined and is not kept, so the next call tries again. `retain` forgets files no longer listed.
  */
 export function createSessionCwdCache(read: (file: string) => Promise<string | undefined> = firstCwdOfFile): {
   read(file: string): Promise<string | undefined>
@@ -119,7 +120,13 @@ export function createSessionCwdCache(read: (file: string) => Promise<string | u
       if (!stamp) return undefined
       const hit = cache.get(file)
       if (hit && same(hit.stamp, stamp)) return hit.cwd
-      const cwd = await read(file)
+      let cwd: string | undefined
+      try {
+        cwd = await read(file)
+      } catch {
+        // Could not read (a lock, say): no cwd for now, so nothing is sent, and the next build tries again.
+        return undefined
+      }
       cache.set(file, { stamp, cwd })
       return cwd
     },
