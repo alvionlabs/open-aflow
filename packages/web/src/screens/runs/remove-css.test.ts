@@ -121,7 +121,7 @@ describe('ghost icon button', () => {
 
 describe('sidebar run card', () => {
   it('reserves no right column: nothing pads the card for the ⋯', () => {
-    expect(runs()).not.toMatch(/:has\(> ?\.run-more-wrap\)/)
+    expect(runs()).not.toMatch(/:has\(> ?\.run-more-wrap\) > \.run\b/)
     expect(style(runs(), '.run')['padding-right']).toBeUndefined()
   })
 
@@ -135,7 +135,7 @@ describe('sidebar run card', () => {
     expect(style(runs(), '.run-wrap').position).toBe('relative')
   })
 
-  it('keeps the second line tall enough for the ⋯ on every card, repo line or not, with room beside the text', () => {
+  it('keeps the repo line tall enough for the ⋯, with room beside the text', () => {
     const line = style(runs(), '.run-line')
     expect(parseInt(line['min-height']!, 10)).toBeGreaterThanOrEqual(24)
     expect(parseInt(line['padding-right']!, 10)).toBeGreaterThanOrEqual(24)
@@ -228,3 +228,44 @@ describe('sidebar cards stack by default', () => {
     expect(style(runs(), '.run .status').flex).toBeUndefined()
   })
 })
+
+describe('a card with no repo line has no empty row', () => {
+  const CARD_WITH_MORE = '.run-wrap:has(> .run-more-wrap) .run-line:empty'
+  const stacked = () => rules(/@container run-card \(max-width: \d+px\) \{([\s\S]*?)\n\}/.exec(runs())![1]!)
+
+  it('hides the empty line, so the card is just its name and status', () => {
+    expect(style(runs(), '.run-line:empty').display).toBe('none')
+  })
+
+  it('in two columns, keeps the line for a card with a ⋯, so the ⋯ cannot reach the status line', () => {
+    expect(style(runs(), CARD_WITH_MORE).display).toBe('flex')
+  })
+
+  it('stacked, drops that line too: the ⋯ sits at the right of the status line', () => {
+    const d = Object.assign({}, ...stacked().filter((r) => r.selectors.includes(CARD_WITH_MORE)).map((r) => decls(r.body))) as Record<string, string>
+    expect(d.display).toBe('none')
+  })
+})
+
+describe('the ⋯ offsets and the word limit', () => {
+  it('puts the ⋯ on the 4 px scale', () => {
+    const wrap = style(runs(), '.run-more-wrap')
+    expect(parseInt(wrap.right!, 10) % 4, wrap.right).toBe(0)
+    expect(parseInt(wrap.bottom!, 10) % 4, wrap.bottom).toBe(0)
+  })
+
+  it('no longer says the status column has the ⋯ on its right edge', () => {
+    expect(readFileSync(join(here, 'runs.css'), 'utf8')).not.toContain("status column's right edge")
+  })
+
+  it('states the two-column limit for a token with no separator', () => {
+    expect(readFileSync(join(here, 'runs.css'), 'utf8')).toMatch(/single token over 157 px with no separator/)
+  })
+
+  it('fits the first part of internationalization_settings in the 157 px name column', () => {
+    // Measured in the browser at 14 px / 500, rounded up; the whole word is 186 px.
+    expect(WIDTH_BEFORE_THE_BREAK).toBeLessThanOrEqual(157)
+    expect(186).toBeGreaterThan(157)
+  })
+})
+const WIDTH_BEFORE_THE_BREAK = 140

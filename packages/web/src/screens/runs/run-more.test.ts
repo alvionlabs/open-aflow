@@ -96,11 +96,36 @@ describe('sidebar card wording', () => {
     expect(readFileSync(new URL('./RunsList.tsx', import.meta.url), 'utf8')).toMatch(/its state as a dot and a word/)
   })
 
-  it('leaves a long word with no hyphen as plain text, for the card to fit whole', () => {
-    for (const title of ['authentication', 'skyscraperviewpanel', 'pod_board_long_repo']) {
+  it('leaves a long word with no separator as plain text, for the card to fit whole', () => {
+    for (const title of ['authentication', 'skyscraperviewpanel']) {
       const r = { ...run('ra', 'alpha-repo', 'x'), title }
       const html = renderToStaticMarkup(createElement(RunsList, { runs: [r], selected: r, repos: [repo({})] }))
       expect(html).toContain(`<b>${title}</b>`)
     }
+  })
+})
+
+describe('underscores in the sidebar card', () => {
+  const listed = (over: Partial<RunSummary>) => {
+    const r = { ...run('ra', 'alpha-repo', 'x'), ...over }
+    return renderToStaticMarkup(createElement(RunsList, { runs: [r], selected: r, repos: [repo({})] }))
+  }
+
+  it('gives a name word a line break opportunity after each underscore, and keeps it in its own box', () => {
+    const html = listed({ title: 'internationalization_settings run' })
+    expect(/<b>([\s\S]*?)<\/b>/.exec(html)![1]).toBe('<span class="run-word">internationalization_<wbr/>settings</span> run')
+  })
+
+  it('does the same on the repo line, whose text stays the same', () => {
+    expect(listed({ repo: 'pod_board' })).toContain('<span class="run-repo muted">pod_<wbr/>board</span>')
+    expect(listed({ repo: 'chess-web' })).toContain('<span class="run-repo muted">chess-web</span>')
+  })
+})
+
+describe('a card with no repo line', () => {
+  it('renders an empty second line, for the card to hide or keep by its layout', () => {
+    const r = { repoId: 'ra', repo: 'alpha-repo', where: '', state: 'idle' } as RunSummary
+    const html = renderToStaticMarkup(createElement(RunsList, { runs: [r], selected: r, repos: [repo({})] }))
+    expect(html).toContain('<span class="run-line"></span>')
   })
 })
