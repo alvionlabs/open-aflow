@@ -17,10 +17,23 @@ type Props = {
   panelFor?: (run: RunSummary) => ReactNode
 }
 
+/** A line break opportunity after each `_`, which browsers don't give; a hyphen already has one. */
+const breakAfterUnderscores = (text: string) =>
+  text.split('_').map((part, i, all) => (
+    <Fragment key={i}>
+      {part}
+      {i < all.length - 1 && (
+        <>
+          _<wbr />
+        </>
+      )}
+    </Fragment>
+  ))
+
 /**
  * The runs: one card each with the run header's name, its state as a dot and a word, and its repo as a muted
  * line with the `fix` tag. Beside each card's link, never inside it, a ⋯ button when its repo can be removed. A
- * hyphen is a line break opportunity, so a hyphenated word gets its own box to stay whole.
+ * hyphen or an underscore is a line break opportunity, so such a word gets its own box to stay whole when it fits.
  */
 export function RunsList({ runs, selected, repos, removable, onRemove, panelFor }: Props) {
   return (
@@ -44,13 +57,13 @@ export function RunsList({ runs, selected, repos, removable, onRemove, panelFor 
                         {card.name.split(' ').map((word, i) => (
                           <Fragment key={i}>
                             {i > 0 && ' '}
-                            {word.includes('-') ? <span className="run-word">{word}</span> : word}
+                            {/[-_]/.test(word) ? <span className="run-word">{breakAfterUnderscores(word)}</span> : word}
                           </Fragment>
                         ))}
                       </b>
                       <span className={`status ${state.cls}`}>{state.label}</span>
                       <span className="run-line">
-                        {card.repo !== undefined && <span className="run-repo muted">{card.repo}</span>}
+                        {card.repo !== undefined && <span className="run-repo muted">{breakAfterUnderscores(card.repo)}</span>}
                         {fix && <span className="chip tag">fix</span>}
                       </span>
                     </span>

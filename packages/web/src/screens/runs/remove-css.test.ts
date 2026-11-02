@@ -268,4 +268,4 @@ describe('the ⋯ offsets and the word limit', () => {
     expect(186).toBeGreaterThan(157)
   })
 })
-const WIDTH_BEFORE_THE_BREAK = 140
+const WIDTH_BEFORE_THE_BREAK = 134
