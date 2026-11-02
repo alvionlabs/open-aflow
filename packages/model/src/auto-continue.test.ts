@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as model from './index.ts'
 import type { AgentRun, Board, BoardRepo, Claim, PrStatus } from './board.ts'
-import { autoSends, sendableFrom, sendableReply, type AutoToggle } from './auto-continue.ts'
+import { autoSends, sendableFrom, sendableReply, type AutoToggle, repoPathKey } from './auto-continue.ts'
 import { SEND_SIGNALS, runReplies, type ReplySignal, type ReplyWord, type RunReply } from './replies.ts'
 import { buildRepoModel, type RepoFiles } from './run-model.ts'
 
@@ -201,6 +201,23 @@ describe('sendableReply', () => {
 
 describe('autoSends', () => {
   const toggle = (run: string, lastKey?: string, repoId = 'id-r'): AutoToggle => (lastKey === undefined ? { repoId, run } : { repoId, run, lastKey })
+
+  it('a toggle acts only on the repo at its path, whatever the repo’s id is now', () => {
+    const repo = planRepo(BETWEEN)
+    expect(autoSends(board(repo), [{ path: '/r', run: 'alpha' }], NOW, always).map((s) => s.repoId)).toEqual(['id-r'])
+    expect(autoSends(board({ ...repo, id: 'other-id' }), [{ path: '/r', run: 'alpha' }], NOW, always).map((s) => s.repoId)).toEqual(['other-id'])
+    expect(autoSends(board({ ...repo, path: '/r_2' }), [{ path: '/r', run: 'alpha' }], NOW, always)).toEqual([])
+  })
+
+  it('repoPathKey folds case only where the file system ignores it', () => {
+    expect(repoPathKey({ path: 'E:\\X', caseless: true })).toBe('e:\\x')
+    expect(repoPathKey({ path: '/X' })).toBe('/X')
+  })
+
+  it('sends nothing on a session the board cannot prove is the repo’s', () => {
+    const repo = planRepo(BETWEEN, { agents: [ended({ plan: 'alpha', session: 'sess-1', sessionUnproven: true })] })
+    expect(autoSends(board(repo), [{ path: '/r', run: 'alpha' }], NOW, always)).toEqual([])
+  })
 
   it('never sends go', () => {
     // Every signal, every kind of lastKey (none, its own key, another key, a go or try key): only send-signal continues.

@@ -18,6 +18,7 @@ export type AutoContinueStore = {
    * toggle is gone; throws when the save fails, and nothing changes.
    */
   saveKey(repoId: string, run: string, key: string): Promise<boolean>
+  forgetPath(path: string): Promise<void>
   /** Forgets every toggle stored under these repo ids. Throws when the save fails, and nothing changes. */
   dropRepoIds(ids: readonly string[]): Promise<void>
 }
@@ -59,6 +60,7 @@ export function createAutoContinueStore(o: { file: string; write?: (file: string
     },
     saveKey: (repoId, run, key) =>
       update((current) => (current.some((t) => same(t, repoId, run)) ? current.map((t) => (same(t, repoId, run) ? saved(t, key) : t)) : undefined)),
+    forgetPath: async () => {},
     async dropRepoIds(ids) {
       await update((current) => {
         const rest = current.filter((t) => !ids.includes(t.repoId))

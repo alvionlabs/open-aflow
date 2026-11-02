@@ -594,40 +594,6 @@ describe('repo ids', () => {
     expect(board.repos.map((r) => r.source)).toEqual(['both'])
     expect(board.repos[0]!.id).toBe(repoId(repo, platform, true))
   })
-
-  test('a clash retires its plain id before the Board reads the toggles', async () => {
-    const order: string[] = []
-    const hyphen = copyFixture('chess-web')
-    const underscore = copyFixture('chess_web')
-    const solo = copyFixture('plain')
-    await register(hyphen, underscore, solo)
-    await createBoardService({
-      ...deps(),
-      retireRepoIds: async (ids) => {
-        order.push(`retire ${ids.join()}`)
-      },
-      autoContinue: () => {
-        order.push('read')
-        return []
-      },
-    }).build()
-    expect(order).toEqual([`retire ${repoId(hyphen, platform, caseless)}`, 'read'])
-  })
-
-  test('no clash retires nothing, and a failed retire still builds the Board', async () => {
-    const asked: string[][] = []
-    await register(copyFixture('plain'))
-    await createBoardService({ ...deps(), retireRepoIds: async (ids) => void asked.push(ids) }).build()
-    expect(asked).toEqual([])
-    await register(copyFixture('chess-web'), copyFixture('chess_web'))
-    const board = await createBoardService({
-      ...deps(),
-      retireRepoIds: async () => {
-        throw new Error('disk full')
-      },
-    }).build()
-    expect(board.repos).toHaveLength(2)
-  })
 })
 
 describe('transcript cache', () => {

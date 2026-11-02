@@ -11,6 +11,9 @@ import { SEND_SIGNALS, replySession, runReplies, type RunReply } from './replies
  */
 export type AutoToggle = { repoId: string; run: string; lastKey?: string; answeredKeys?: string[] }
 
+/** Stub. */
+export const repoPathKey = (repo: { path: string; caseless?: boolean }): string => repo.path
+
 /** How many sent `answered` keys a toggle remembers. */
 export const ANSWERED_KEYS_MAX = 20
 

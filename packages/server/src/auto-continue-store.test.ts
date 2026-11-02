@@ -24,20 +24,20 @@ const put = (text: string) => {
 }
 
 describe('auto-continue store', () => {
-  test('dropRepoIds forgets every toggle under those ids, saved, and keeps the rest', async () => {
+  test('forgetPath forgets every toggle of that path, saved, and keeps the rest', async () => {
     const store = createAutoContinueStore({ file })
-    await store.set('old', 'alpha', true)
-    await store.set('old', 'beta', true)
-    await store.set('keep', 'alpha', true)
-    await store.dropRepoIds(['old', 'none'])
-    expect(store.list()).toEqual([{ repoId: 'keep', run: 'alpha' }])
-    expect(saved()).toEqual({ runs: [{ repoId: 'keep', run: 'alpha' }] })
-    expect(createAutoContinueStore({ file }).list()).toEqual([{ repoId: 'keep', run: 'alpha' }])
+    await store.set('/old', 'alpha', true)
+    await store.set('/old', 'beta', true)
+    await store.set('/keep', 'alpha', true)
+    await store.forgetPath('/old')
+    expect(store.list()).toEqual([{ path: '/keep', run: 'alpha' }])
+    expect(saved()).toEqual({ runs: [{ path: '/keep', run: 'alpha' }] })
+    expect(createAutoContinueStore({ file }).list()).toEqual([{ path: '/keep', run: 'alpha' }])
   })
 
-  test('dropRepoIds with nothing to drop writes nothing, and a failed write changes nothing', async () => {
+  test('forgetPath with nothing to forget writes nothing, and a failed write changes nothing', async () => {
     let writes = 0
-    put(JSON.stringify({ runs: [{ repoId: 'r1', run: 'alpha' }] }))
+    put(JSON.stringify({ runs: [{ path: '/r1', run: 'alpha' }] }))
     const store = createAutoContinueStore({
       file,
       write: async () => {
@@ -45,10 +45,15 @@ describe('auto-continue store', () => {
         throw new Error('disk full')
       },
     })
-    await store.dropRepoIds(['none'])
+    await store.forgetPath('/none')
     expect(writes).toBe(0)
-    await expect(store.dropRepoIds(['r1'])).rejects.toThrow('disk full')
-    expect(store.list()).toEqual([{ repoId: 'r1', run: 'alpha' }])
+    await expect(store.forgetPath('/r1')).rejects.toThrow('disk full')
+    expect(store.list()).toEqual([{ path: '/r1', run: 'alpha' }])
+  })
+
+  test('a toggle with no path reads off', () => {
+    put(JSON.stringify({ runs: [{ repoId: 'old', run: 'alpha' }, { path: '/r', run: 'alpha' }, { path: 7, run: 'beta' }] }))
+    expect(createAutoContinueStore({ file }).list()).toEqual([{ path: '/r', run: 'alpha' }])
   })
 
   test('reads fail closed and writes atomically', async () => {

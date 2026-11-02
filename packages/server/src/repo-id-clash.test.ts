@@ -29,7 +29,9 @@ const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, '
 const NOW = Date.parse('2026-11-02T12:00:00Z')
 const platform = process.platform
 const SHA = 'a'.repeat(40)
-const SESSION = 'sess-1'
+const caseless = platform === 'win32' || platform === 'darwin'
+/** How a toggle names a repo: its normalized path, case-folded where the file system ignores case. */
+const keyOf = (p: string) => (caseless ? p.toLowerCase() : p)
 
 const ANSWER = '- `[2026-11-01 · PENDING · engineer → human · plan: alpha]` which colour? **Resolution:** pending'
 const KEEP = '- `[2026-11-01 · PENDING · engineer → human · plan: alpha]` decision: badge colour? value in use: `white`. Answer to change. **Resolution:** pending'
@@ -59,18 +61,25 @@ async function makeRepo(path: string) {
   await writeFile(join(path, 'pod-docs', 'handoff-queue.md'), ['# Handoff Queue', '', ANSWER, KEEP, ''].join('\n'))
 }
 
-/** One stale engineer of sprint one, with a Read of `file`. Both repos list it: Claude's project folder name is the same for both. */
-async function engineer(file: string) {
-  const sub = join(root, 'claude', 'projects', projectDirName(hyphen), SESSION, 'subagents')
+/**
+ * One stale engineer of sprint one in the Claude project folder both repos map to, as Claude writes it: every
+ * record has the `cwd`, unless `cwd` is undefined. `age` is how many minutes ago it last wrote.
+ */
+async function engineer(o: { session: string; cwd: string | undefined; id?: string; age?: number; file?: string }) {
+  const id = o.id ?? 'eng1'
+  const sub = join(root, 'claude', 'projects', projectDirName(hyphen), o.session, 'subagents')
   await mkdir(sub, { recursive: true })
-  await writeFile(join(sub, 'agent-eng1.meta.json'), JSON.stringify({ agentType: 'pod:engineer', description: 'Build A1' }))
-  const at = (min: number) => new Date(NOW - 120 * 60_000 + min * 60_000).toISOString()
+  await writeFile(join(sub, `agent-${id}.meta.json`), JSON.stringify({ agentType: 'pod:engineer', description: 'Build A1' }))
+  const at = (min: number) => new Date(NOW - (o.age ?? 120) * 60_000 + min * 60_000).toISOString()
+  const where = o.cwd === undefined ? {} : { cwd: o.cwd }
   const lines = [
-    { type: 'user', timestamp: at(0), message: { role: 'user', content: '- **sprint slug:** one\n- **slice code:** A1\n- **branch name:** one-A1\n' } },
-    { type: 'assistant', timestamp: at(1), message: { id: 'm1', role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'Read', input: { file_path: file } }] } },
+    { type: 'user', ...where, timestamp: at(-1), message: { role: 'user', content: '- **sprint slug:** one\n- **slice code:** A1\n- **branch name:** one-A1\n' } },
+    { type: 'assistant', ...where, timestamp: at(0), message: { id: 'm1', role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'Read', input: { file_path: o.file ?? 'x.ts' } }] } },
   ]
-  await writeFile(join(sub, 'agent-eng1.jsonl'), lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+  await writeFile(join(sub, `agent-${id}.jsonl`), lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
 }
+
+const clearAgents = () => rm(join(root, 'claude'), { recursive: true, force: true })
 
 const writeConfig = (...paths: string[]) => writeFile(cfgFile, JSON.stringify({ version: 1, repos: paths.map((path) => ({ path })) }))
 
@@ -84,7 +93,7 @@ beforeEach(async () => {
   await mkdir(join(root, 'cfg'), { recursive: true })
   await mkdir(join(root, 'ports'))
   await writeConfig(hyphen, underscore)
-  await engineer(join(underscore, 'src', 'deep', 'x.ts'))
+  await engineer({ session: 'sess-u', cwd: underscore, file: join(underscore, 'src', 'deep', 'x.ts') })
 })
 
 afterEach(async () => {
@@ -123,7 +132,6 @@ async function setup() {
     gh,
     now: () => NOW,
     autoContinue: store.list,
-    retireRepoIds: store.dropRepoIds,
   })
   let board: Board = await service.build()
   await service.refreshGh(board)
@@ -152,7 +160,7 @@ async function setup() {
       .route('/', createActionRoutes({ board: source.board, gh, exec, refreshGh: (b) => service.refreshGh(b), rebuild, log, now: () => NOW }))
       .route('/', createAnswerRoutes({ board: source.board, rebuild, log }))
       .route('/', createResumeRoutes(resume))
-      .route('/', createRemoveRepoRoutes({ board: source.board, removeRepo: (p) => removeRepo(cfgFile, p, platform), rebuild, log })),
+      .route('/', createRemoveRepoRoutes({ board: source.board, removeRepo: (p) => removeRepo(cfgFile, p, platform), rebuild, log, forgetToggles: store.forgetPath })),
   })
   const post = (path: string, body: unknown) => app.request(`/api/actions/${path}`, { method: 'POST', headers: HEADERS, body: JSON.stringify(body) })
   /** The id of the repo at `path` on the current Board. */
@@ -200,7 +208,7 @@ describe('two repos whose paths differ only in a symbol', () => {
     const s = await setup()
     const res = await s.post('auto-continue', { repoId: s.idOf(underscore), run: 'alpha', on: true })
     expect(await res.json()).toEqual({ on: true })
-    expect(s.store.list().map((t) => t.repoId)).toEqual([s.idOf(underscore)])
+    expect(s.store.list().map((t) => t.path)).toEqual([keyOf(underscore)])
     await s.auto.check()
     expect(s.starts.map((x) => x.cwd)).toEqual([underscore])
   })
@@ -213,59 +221,194 @@ describe('two repos whose paths differ only in a symbol', () => {
     expect(s.board().repos.map((r) => r.path)).toEqual([hyphen])
   })
 
-  test('the timeline route reads with the targeted repo as root', async () => {
+  test('the timeline route serves the targeted repo’s agent, and not to its sibling', async () => {
     const s = await setup()
-    const get = async (id: string) => {
-      const res = await s.app.request(`/api/agents/${id}/eng1/timeline`, { headers: HEADERS })
-      expect(res.status).toBe(200)
-      return ((await res.json()) as { events: { summary: string }[] }).events.map((e) => e.summary).join('\n')
-    }
+    const get = (id: string) => s.app.request(`/api/agents/${id}/eng1/timeline`, { headers: HEADERS })
+    const own = await get(s.idOf(underscore))
+    expect(own.status).toBe(200)
     // The file sits in chess_web: only that root gives its path inside the repo, not its bare name.
-    expect(await get(s.idOf(underscore))).toContain('src/deep/x.ts')
-    expect(await get(s.idOf(hyphen))).not.toContain('src/deep/x.ts')
+    expect(((await own.json()) as { events: { summary: string }[] }).events.map((e) => e.summary).join('\n')).toContain('src/deep/x.ts')
+    expect((await get(s.idOf(hyphen))).status).toBe(404)
   })
 })
 
-describe('a toggle stored under the plain id before a clash', () => {
-  const plainId = () => repoId(hyphen, platform, platform === 'win32' || platform === 'darwin')
+describe('sessions in the Claude project folder two repos share', () => {
+  beforeEach(clearAgents)
 
-  test('never reaches the repo that takes the plain id after the clash ends', async () => {
+  test('resume and auto-continue pick the repo’s own session, not its sibling’s newer one', async () => {
+    await engineer({ session: 'sess-u', cwd: underscore, age: 300 })
+    await engineer({ session: 'sess-h', cwd: hyphen, age: 120, id: 'eng2' })
+    const s = await setup()
+    await s.post('auto-continue', { repoId: s.idOf(underscore), run: 'alpha', on: true })
+    await s.auto.check()
+    expect(s.starts).toEqual([{ session: 'sess-u', word: 'continue', cwd: underscore }])
+    s.starts.length = 0
+    await s.post('resume', { repoId: s.idOf(hyphen), run: 'alpha', reply: 'continue' })
+    expect(s.starts).toEqual([{ session: 'sess-h', word: 'continue', cwd: hyphen }])
+  })
+
+  test('a sibling’s session never starts: the repo lists no such agent, and nothing is sent', async () => {
+    await engineer({ session: 'sess-h', cwd: hyphen })
+    const s = await setup()
+    expect(s.board().repos.find((r) => r.path === underscore)!.agents).toEqual([])
+    expect(s.board().repos.find((r) => r.path === hyphen)!.agents.map((a) => a.session)).toEqual(['sess-h'])
+    await s.post('auto-continue', { repoId: s.idOf(underscore), run: 'alpha', on: true })
+    await s.auto.check()
+    const res = await s.post('resume', { repoId: s.idOf(underscore), run: 'alpha', reply: 'continue' })
+    expect(res.status).toBe(404)
+    expect(s.starts).toEqual([])
+  })
+
+  test('a sibling’s worktree session never starts either', async () => {
+    await engineer({ session: 'sess-u', cwd: join(underscore, '.claude', 'worktrees', 'w') })
+    const s = await setup()
+    expect(s.board().repos.find((r) => r.path === hyphen)!.agents).toEqual([])
+    expect(s.board().repos.find((r) => r.path === underscore)!.agents).toHaveLength(1)
+  })
+
+  test('a transcript with no cwd stays listed and fails closed: no send, by hand or automatic', async () => {
+    await writeConfig(hyphen)
+    await engineer({ session: 'sess-h', cwd: undefined })
+    const s = await setup()
+    expect(s.board().repos[0]!.agents.map((a) => a.session)).toEqual(['sess-h'])
+    await s.post('auto-continue', { repoId: s.idOf(hyphen), run: 'alpha', on: true })
+    await s.auto.check()
+    const res = await s.post('resume', { repoId: s.idOf(hyphen), run: 'alpha', reply: 'continue' })
+    expect(await res.json()).toEqual({ error: 'no session' })
+    expect(s.starts).toEqual([])
+  })
+
+  test('an agent that started outside any sibling stays listed, and sends nothing', async () => {
+    await writeConfig(hyphen)
+    await engineer({ session: 'sess-h', cwd: join(root, 'elsewhere') })
+    const s = await setup()
+    expect(s.board().repos[0]!.agents).toHaveLength(1)
+    const res = await s.post('resume', { repoId: s.idOf(hyphen), run: 'alpha', reply: 'continue' })
+    expect(await res.json()).toEqual({ error: 'no session' })
+  })
+
+  test('sessions in the repo’s own worktrees and subfolders still belong to it', async () => {
+    await writeConfig(hyphen)
+    await engineer({ session: 'sess-w', cwd: join(hyphen, '.claude', 'worktrees', 'w', 'packages') })
+    const s = await setup()
+    expect(s.board().repos[0]!.agents).toHaveLength(1)
+    await s.post('resume', { repoId: s.idOf(hyphen), run: 'alpha', reply: 'continue' })
+    expect(s.starts).toEqual([{ session: 'sess-w', word: 'continue', cwd: hyphen }])
+  })
+
+  test('the Board carries no cwd', async () => {
+    const s = await setup()
+    expect(s.board().repos.flatMap((r) => r.agents).every((a) => !('cwd' in a))).toBe(true)
+  })
+})
+
+describe('an auto-continue toggle belongs to the repo at its path', () => {
+  beforeEach(async () => {
+    await clearAgents()
+    // Both repos have a sendable stop and their own session, so a wrong toggle would send.
+    await engineer({ session: 'sess-h', cwd: hyphen, id: 'eng1' })
+    await engineer({ session: 'sess-u', cwd: underscore, id: 'eng2' })
+  })
+  const plainId = () => repoId(hyphen, platform, caseless)
+  const saved = async () => JSON.parse(await readFile(join(root, 'cfg', 'auto-continue.json'), 'utf8')) as { runs: unknown[] }
+
+  test('a same-id repo registered after the toggled one left never sends, with no clash between them', async () => {
     await writeConfig(hyphen)
     const s = await setup()
     await s.post('auto-continue', { repoId: plainId(), run: 'alpha', on: true })
-    expect(s.store.list().map((t) => t.repoId)).toEqual([plainId()])
-
-    // chess_web joins: a clash. Then chess-web, the repo that turned the toggle on, leaves.
-    await writeConfig(hyphen, underscore)
+    await s.post('remove-repo', { repoId: plainId(), path: hyphen })
+    await writeConfig(underscore)
     await s.rebuild()
-    await s.post('remove-repo', { repoId: s.idOf(hyphen), path: hyphen })
-
     expect(s.idOf(underscore)).toBe(plainId())
     await s.auto.check()
     expect(s.starts).toEqual([])
     expect(s.board().autoContinue).toEqual([])
-    expect(JSON.parse(await readFile(join(root, 'cfg', 'auto-continue.json'), 'utf8')).runs).toEqual([])
   })
 
-  test('stays off when the repo that turned it on is the one left', async () => {
+  test('a clash forming and ending does not touch the toggle, and it never moves to the sibling', async () => {
     await writeConfig(hyphen)
     const s = await setup()
     await s.post('auto-continue', { repoId: plainId(), run: 'alpha', on: true })
+
     await writeConfig(hyphen, underscore)
     await s.rebuild()
+    expect(s.idOf(hyphen)).not.toBe(plainId())
+    expect(s.board().autoContinue).toEqual([{ repoId: s.idOf(hyphen), run: 'alpha' }])
+
     await s.post('remove-repo', { repoId: s.idOf(underscore), path: underscore })
-    expect(s.idOf(hyphen)).toBe(plainId())
+    expect(s.board().autoContinue).toEqual([{ repoId: plainId(), run: 'alpha' }])
+    await s.auto.check()
+    expect(s.starts).toEqual([{ session: 'sess-h', word: 'continue', cwd: hyphen }])
+  })
+
+  test('when the toggled repo leaves a clash, the sibling that takes the plain id gets nothing', async () => {
+    const s = await setup()
+    await s.post('auto-continue', { repoId: s.idOf(hyphen), run: 'alpha', on: true })
+    await s.post('remove-repo', { repoId: s.idOf(hyphen), path: hyphen })
+    expect(s.idOf(underscore)).toBe(plainId())
     await s.auto.check()
     expect(s.starts).toEqual([])
     expect(s.board().autoContinue).toEqual([])
   })
 
-  test('a toggle under a suffixed id stays through a rebuild and a restart', async () => {
+  test('a toggle that reads off stays off when a clash comes back', async () => {
     const s = await setup()
-    await s.post('auto-continue', { repoId: s.idOf(underscore), run: 'alpha', on: true })
+    await s.post('auto-continue', { repoId: s.idOf(hyphen), run: 'alpha', on: true })
+    await writeConfig(hyphen)
     await s.rebuild()
-    expect(s.store.list().map((t) => t.repoId)).toEqual([s.idOf(underscore)])
-    const again = createAutoContinueStore({ file: join(root, 'cfg', 'auto-continue.json') })
-    expect(again.list().map((t) => t.repoId)).toEqual([s.idOf(underscore)])
+    await s.post('auto-continue', { repoId: s.idOf(hyphen), run: 'alpha', on: false })
+    await writeConfig(hyphen, underscore)
+    await s.rebuild()
+    expect(s.board().autoContinue).toEqual([])
+    await s.auto.check()
+    expect(s.starts).toEqual([])
+  })
+
+  test('a toggle stored with no path reads off and sends nothing, and pressing the switch saves a path', async () => {
+    await writeConfig(hyphen)
+    await writeFile(join(root, 'cfg', 'auto-continue.json'), JSON.stringify({ runs: [{ repoId: plainId(), run: 'alpha' }] }))
+    const s = await setup()
+    expect(s.board().autoContinue).toEqual([])
+    await s.auto.check()
+    expect(s.starts).toEqual([])
+    await s.post('auto-continue', { repoId: plainId(), run: 'alpha', on: true })
+    expect((await saved()).runs).toEqual([{ path: keyOf(hyphen), run: 'alpha' }])
+    expect(s.board().autoContinue).toEqual([{ repoId: plainId(), run: 'alpha' }])
+  })
+
+  test('Remove forgets the toggle, so adding the same folder again sends nothing', async () => {
+    await writeConfig(hyphen)
+    const s = await setup()
+    await s.post('auto-continue', { repoId: plainId(), run: 'alpha', on: true })
+    await s.post('remove-repo', { repoId: plainId(), path: hyphen })
+    expect((await saved()).runs).toEqual([])
+    await writeConfig(hyphen)
+    await s.rebuild()
+    expect(s.board().autoContinue).toEqual([])
+    await s.auto.check()
+    expect(s.starts).toEqual([])
+  })
+
+  test('Remove keeps the toggle of a repo a port claim still lists', async () => {
+    await writeConfig(hyphen)
+    await writeFile(join(root, 'ports', '3100'), `${hyphen} alpha`)
+    const s = await setup()
+    await s.post('auto-continue', { repoId: plainId(), run: 'alpha', on: true })
+    await s.post('remove-repo', { repoId: plainId(), path: hyphen })
+    expect(s.board().repos.map((r) => r.source)).toEqual(['claim'])
+    expect(s.board().autoContinue).toEqual([{ repoId: plainId(), run: 'alpha' }])
+  })
+
+  test('a repo whose claim ends and comes back keeps its toggle', async () => {
+    await writeConfig()
+    await writeFile(join(root, 'ports', '3100'), `${hyphen} alpha`)
+    const s = await setup()
+    await s.post('auto-continue', { repoId: plainId(), run: 'alpha', on: true })
+    await rm(join(root, 'ports', '3100'))
+    await s.rebuild()
+    expect(s.board().autoContinue).toEqual([])
+    await writeFile(join(root, 'ports', '3100'), `${hyphen} alpha`)
+    await s.rebuild()
+    expect(s.board().autoContinue).toEqual([{ repoId: plainId(), run: 'alpha' }])
   })
 })

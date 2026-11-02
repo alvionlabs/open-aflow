@@ -413,6 +413,14 @@ describe('answered stop', () => {
   })
 })
 describe('replySession', () => {
+  it('a session the board cannot prove is the repo’s gives no resume, so nothing can send it', () => {
+    const a = { id: 'a', session: 'sess-1', type: 'pod:engineer', tokens: 0, ended: true, plan: 'alpha', lastAt: NOW - 90 * MIN, sessionUnproven: true as const }
+    const repo = pushed({ agents: [a] })
+    const s = replySession(repo, 'alpha', NOW)
+    expect(s?.id).toBe('sess-1')
+    expect(s?.resume).toBeUndefined()
+  })
+
   it('finds the chat to paste in', () => {
     const old = ended({ plan: 'alpha', session: 'sess-old', startedAt: NOW - 90 * MIN, lastAt: NOW - 30 * MIN })
     const newest = ended({ sprint: 'one', slice: 'B1', session: 'sess-new', startedAt: NOW - 20 * MIN, lastAt: NOW - 5 * MIN })

@@ -51,6 +51,12 @@ const clock = (ms: number) => {
 }
 
 describe('reply panel', () => {
+  it('offers no send button for a session the board cannot prove is the repo’s', () => {
+    const view = replyPanel(run(), repo([agent({ session: 's1', lastAt: NOW - 40 * MIN, sessionUnproven: true })]), NOW)
+    expect(view?.rows.every((r) => r.send === undefined)).toBe(true)
+    expect(view?.session?.resume).toBeUndefined()
+  })
+
   describe('the copied cd command', () => {
     const cdFor = (path: string) => replyPanel(run(), repo([agent({ session: 's1', lastAt: NOW - 40 * MIN })], path), NOW)?.session?.cd
 

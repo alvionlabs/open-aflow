@@ -160,6 +160,11 @@ export function repoIds(
   }
 }
 
+/** Stub. */
+export function isInsideRepo(_p: string, _repo: string, _platform: NodeJS.Platform, _ignoresCase: boolean): boolean {
+  return false
+}
+
 /**
  * Whether the file system holding an existing folder ignores case. It flips
  * the case of the last path part with an ASCII letter and checks that the

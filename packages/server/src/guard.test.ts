@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
 import { describe, expect, test } from 'vitest'
-import { actionGuard, ignoresCase, normalizeRepoPath, readGuard, repoId, repoIds, requestGuard, sameRepoPath } from './guard.ts'
+import { actionGuard, ignoresCase, isInsideRepo, normalizeRepoPath, readGuard, repoId, repoIds, requestGuard, sameRepoPath } from './guard.ts'
 
 function guarded(): Hono {
   const app = new Hono()
@@ -327,6 +327,25 @@ describe('ignoresCase probe', () => {
   test('a missing folder falls back to the OS default and never throws', async () => {
     const gone = join(tmpdir(), 'pod-board-case-gone-' + Date.now(), 'Nope')
     expect(await ignoresCase(gone)).toBe(process.platform === 'win32' || process.platform === 'darwin')
+  })
+})
+
+describe('isInsideRepo', () => {
+  test('the repo itself and anything under it, by the same case rule as sameRepoPath', () => {
+    expect(isInsideRepo('E:/x/chess-web', 'E:/x/chess-web', 'win32', true)).toBe(true)
+    expect(isInsideRepo('e:/X/CHESS-WEB/.claude/worktrees/w', 'E:/x/chess-web', 'win32', true)).toBe(true)
+    expect(isInsideRepo('/x/Repo/sub', '/x/repo', 'linux', false)).toBe(false)
+    expect(isInsideRepo('/x/repo/sub', '/x/repo', 'linux', false)).toBe(true)
+  })
+
+  test('a sibling, a longer name, and a relative path are not inside', () => {
+    expect(isInsideRepo('E:/x/chess_web', 'E:/x/chess-web', 'win32', true)).toBe(false)
+    expect(isInsideRepo('E:/x/chess-web-2', 'E:/x/chess-web', 'win32', true)).toBe(false)
+    expect(isInsideRepo('chess-web', 'E:/x/chess-web', 'win32', true)).toBe(false)
+  })
+
+  test('a repo at a drive root holds what is on the drive', () => {
+    expect(isInsideRepo('E:/x', 'E:/', 'win32', true)).toBe(true)
   })
 })
 
