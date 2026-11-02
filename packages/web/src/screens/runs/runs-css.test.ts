@@ -318,7 +318,7 @@ describe('runs.css run cards and Add repo', () => {
     const body = stylesAt(1280).get('.run-body')
     // Top, not baseline: a hyphenated word's box takes its last line's baseline when it wraps, which would drop the status.
     expect(body?.['align-items']).toBe('start')
-    expect(body?.['grid-template-columns']).toBe('minmax(0, 1fr) auto')
+    expect(body?.['grid-template-columns']).toBe('minmax(0, 1fr) 88px')
     // The muted repo and the tag share the line under the name, across both columns.
     const line = stylesAt(1280).get('.run-line')
     expect(line?.['flex-wrap']).toBe('wrap')
@@ -645,7 +645,7 @@ describe('runs.css log tab', () => {
 })
 
 /**
- * The CLAUDE.md Spacing rules on screen 1 and the sidebar: runs.css, the tabs and the ⋯ menu, and the
+ * The DESIGN.md Spacing rules on screen 1 and the sidebar: runs.css, the tabs and the ⋯ menu, and the
  * shared controls in base.css. The Add repo dialog's picker (picker.css) and screens 2 and 3 have their own files.
  */
 describe('spacing scale', () => {

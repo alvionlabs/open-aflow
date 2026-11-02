@@ -142,21 +142,35 @@ describe('sidebar run card', () => {
     expect(style(runs(), '.run-body')['grid-template-rows']).toBeUndefined()
   })
 
-  it('puts each status dot on one rail: after the label, at the right edge', () => {
-    expect(style(runs(), '.run .status')['flex-direction']).toBe('row-reverse')
-    expect(style(runs(), '.run .status')['justify-self']).toBe('end')
+  it('puts each status in a fixed-width column on the 4 px scale, dot first, so every dot sits on one x', () => {
+    const columns = style(runs(), '.run-body')['grid-template-columns']!
+    const column = /^minmax\(0, 1fr\) (\d+)px$/.exec(columns)
+    expect(column, columns).not.toBeNull()
+    // `update pod`, the longest label the sidebar shows, measures 84.9 px with its dot.
+    expect(Number(column![1])).toBeGreaterThanOrEqual(85)
+    expect(Number(column![1]) % 4).toBe(0)
+    const status = style(runs(), '.run .status')
+    expect(status['flex-direction']).toBeUndefined()
+    expect(status['justify-self']).toBe('start')
+    expect(runs()).not.toContain('row-reverse')
+    // Never wraps: the shared .status rule keeps it on one line.
+    expect(style(base(), '.status')['white-space']).toBe('nowrap')
   })
 
   it('stacks by a named container query on the card, not a media query', () => {
     expect(style(runs(), '.run').container).toBe('run-card / inline-size')
     const m = /@container run-card \(max-width: (\d+)px\) \{([\s\S]*?)\n\}/.exec(runs())
     expect(m, 'the container rule').not.toBeNull()
+    // Just above the threshold, the name column still fits `claim-only` (70 px at 14 px / 500) beside the status.
+    const threshold = Number(m![1])
+    const column = Number(/(\d+)px$/.exec(style(runs(), '.run-body')['grid-template-columns']!)![1])
+    expect(threshold % 4).toBe(0)
+    expect(threshold - column - parseInt(style(runs(), '.run-body')['column-gap']!, 10)).toBeGreaterThanOrEqual(70)
     const stacked = rules(m![2]!)
     const of = (sel: string) => Object.assign({}, ...stacked.filter((r) => r.selectors.includes(sel)).map((r) => decls(r.body))) as Record<string, string>
     expect(of('.run-body')['grid-template-columns']).toBe('minmax(0, 1fr)')
     // Name, then status, then the repo line: the document's order in one column.
-    expect(of('.run .status')['justify-self']).toBe('start')
-    expect(of('.run .status')['flex-direction']).toBe('row')
+    expect(of('.run .status')['min-height']).toBe('0')
   })
 
   it('never breaks a word in the middle while it can wrap between words', () => {
