@@ -196,6 +196,9 @@ const styleOf = (sel: string, match: (media?: string) => boolean) =>
 const desktop = (m?: string) => m === undefined
 /** The banner's slot is the container: the switch follows the banner's own width, not the viewport's. */
 const stacked = (m?: string) => m === '@container urgent (max-width: 620px)'
+const stackedPlain = (m?: string) => m === '@container urgent (max-width: 520px)'
+/** The banner with a count: only it has the 620 and 760 px switches. */
+const COUNTED = '.urgent:has(> .urgent-more)'
 const noRepo = (m?: string) => m === '@container urgent (max-width: 760px)'
 const TOKENS = readFileSync(join(here, '../../theme/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
 const tokensOf = (sel: string) => Object.assign({}, ...rules(TOKENS).filter((r) => r.media === undefined && r.selectors.includes(sel)).map((r) => decls(r.body))) as Record<string, string>
@@ -244,7 +247,8 @@ describe('urgent banner css', () => {
     expect(box.background).toBe('var(--bg)')
     expect(['8px', 'var(--radius-md)']).toContain(box['border-radius'])
     expect(box.padding).toBe('12px 8px 12px 16px')
-    expect(styleOf('.urgent', stacked).padding).toBe('12px')
+    expect(styleOf(COUNTED, stacked).padding).toBe('12px')
+    expect(styleOf('.urgent', stackedPlain).padding).toBe('12px')
     // Each tone sets --tone from its status token.
     const TONES: [string, string][] = [['s-bad', 'blocked'], ['s-you', 'needs-you'], ['s-ok', 'ready']]
     for (const [cls, token] of TONES) {
@@ -313,7 +317,8 @@ describe('urgent banner css', () => {
     expect(one).toBeGreaterThan(-1)
     expect(CSS.indexOf('.urgent:has(> .urgent-layer-2)')).toBeGreaterThan(one)
     // The narrow layout doesn't undo them.
-    for (const sel of ['.urgent', '.urgent:has(> .urgent-layer-1)', '.urgent:has(> .urgent-layer-2)']) expect(styleOf(sel, stacked).margin, sel).toBeUndefined()
+    for (const sel of [COUNTED, '.urgent:has(> .urgent-layer-1)', '.urgent:has(> .urgent-layer-2)']) expect(styleOf(sel, stacked).margin, sel).toBeUndefined()
+    expect(styleOf('.urgent', stackedPlain).margin).toBeUndefined()
   })
 
   it('the count pill keeps its shape and never gives way', () => {
@@ -351,42 +356,74 @@ describe('urgent banner css', () => {
     expect(slot.display).toBe('block')
     // The switch reads the banner's width: the sidebar can take 400 px from the column at any viewport above 820 px.
     expect(CSS).not.toMatch(/@media/)
-    expect(CSS).toMatch(/@container urgent \(max-width: 620px\)/)
+    expect(CSS).toMatch(/@container urgent \(max-width: 520px\)/)
   })
 
-  it('stacked: status and pill, then the text, then a 44 px open run', () => {
-    const box = styleOf('.urgent', stacked)
+  it('stacked with a count: status and pill, then the text, then a 44 px open run', () => {
+    const box = styleOf(COUNTED, stacked)
     expect(box.display).toBe('grid')
     expect(box['grid-template-columns']).toBe('minmax(0, 1fr) auto')
     expect(box['grid-template-areas']).toBe('"status more" "text text" "open open"')
     expect(box.gap).toBe('8px 12px')
-    expect(styleOf('.urgent > .status', stacked)['grid-area']).toBe('status')
-    expect(styleOf('.urgent-text', stacked)['grid-area']).toBe('text')
+    expect(styleOf(`${COUNTED} > .status`, stacked)['grid-area']).toBe('status')
+    expect(styleOf(`${COUNTED} > .urgent-text`, stacked)['grid-area']).toBe('text')
     expect(styleOf('.urgent-more', stacked)['grid-area']).toBe('more')
-    expect(styleOf('.urgent-open', stacked)['grid-area']).toBe('open')
+    expect(styleOf(`${COUNTED} > .urgent-open`, stacked)['grid-area']).toBe('open')
     // Row 1's two ends: never on top of each other.
-    expect(styleOf('.urgent > .status', stacked)['justify-self']).toBe('start')
+    expect(styleOf(`${COUNTED} > .status`, stacked)['justify-self']).toBe('start')
     expect(styleOf('.urgent-more', stacked)['justify-self']).toBe('end')
     // The text wraps, even a title with no spaces.
-    expect(styleOf('.urgent-text', stacked).display).toBe('block')
-    for (const sel of ['.urgent-title', '.urgent-where']) {
+    expect(styleOf(`${COUNTED} > .urgent-text`, stacked).display).toBe('block')
+    for (const sel of [`${COUNTED} .urgent-title`, `${COUNTED} .urgent-where`]) {
       expect(styleOf(sel, stacked)['white-space'], sel).toBe('normal')
       expect(styleOf(sel, stacked)['overflow-wrap'], sel).toBe('anywhere')
     }
     // Full width, at least 44 px tall.
-    const btn = styleOf('.urgent-open', stacked)
+    const btn = styleOf(`${COUNTED} > .urgent-open`, stacked)
     expect(btn.width).toBe('100%')
     expect(Number(/^(\d+)px$/.exec(btn['min-height'] ?? '')?.[1] ?? 0)).toBeGreaterThanOrEqual(44)
   })
 
-  it('short of room on one line, the repo goes first and the title keeps most of the text', () => {
-    expect(styleOf('.urgent-at', noRepo).display).toBe('none')
-    expect(styleOf('.urgent-where', noRepo)['max-width']).toBe('40%')
+  it('with a count, short of room on one line, the repo goes first and the title keeps most of the text', () => {
+    expect(styleOf(`${COUNTED} .urgent-at`, noRepo).display).toBe('none')
+    expect(styleOf(`${COUNTED} .urgent-where`, noRepo)['max-width']).toBe('40%')
     // Wide: the run may take half.
     expect(styleOf('.urgent-where', desktop)['max-width']).toBe('50%')
     // The narrow rules come later, so they win: 760 px holds 620 px.
     expect(CSS.indexOf('(max-width: 760px)')).toBeGreaterThan(-1)
     expect(CSS.indexOf('(max-width: 620px)')).toBeGreaterThan(CSS.indexOf('(max-width: 760px)'))
+  })
+
+  it('with no count, the 620 and 760 px switches change nothing', () => {
+    // Every rule in those two blocks is for a banner with a pill, so a banner with none keeps its one line and its repo.
+    const blocks = all.filter((r) => stacked(r.media) || noRepo(r.media))
+    expect(blocks.length).toBeGreaterThan(0)
+    for (const r of blocks) for (const sel of r.selectors) expect(sel, r.media).toMatch(/urgent-more/)
+    // And the only other switch is the narrow one.
+    const media = new Set(all.map((r) => r.media).filter(Boolean))
+    expect([...media].sort()).toEqual(['@container urgent (max-width: 520px)', '@container urgent (max-width: 620px)', '@container urgent (max-width: 760px)'])
+  })
+
+  it('with no count, it stacks at 520 px, in the same rows as a banner with a count', () => {
+    // Below this the title drops under about 20 characters. Above it, 528 px (viewport 1024, sidebar 400) stays on one line.
+    const PAIRS: [string, string][] = [
+      ['.urgent', COUNTED],
+      ['.urgent > .status', `${COUNTED} > .status`],
+      ['.urgent-text', `${COUNTED} > .urgent-text`],
+      ['.urgent-title', `${COUNTED} .urgent-title`],
+      ['.urgent-where', `${COUNTED} .urgent-where`],
+      ['.urgent-open', `${COUNTED} > .urgent-open`],
+    ]
+    // Two blocks with the same body: they can't drift apart.
+    for (const [plain, counted] of PAIRS) {
+      const body = styleOf(plain, stackedPlain)
+      expect(Object.keys(body).length, plain).toBeGreaterThan(0)
+      expect(body, plain).toEqual(styleOf(counted, stacked))
+    }
+    // The repo hides here, as it does on phones today.
+    expect(styleOf('.urgent-at', stackedPlain).display).toBe('none')
+    // The 44 px target stays.
+    expect(Number(/^(\d+)px$/.exec(styleOf('.urgent-open', stackedPlain)['min-height'] ?? '')?.[1] ?? 0)).toBeGreaterThanOrEqual(44)
   })
 
   it('status word keeps its tone and reaches 4.5:1 on the tint, in both themes', () => {

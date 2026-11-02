@@ -688,6 +688,12 @@ describe('spacing scale', () => {
     return out
   }
 
+  it('reads the rules inside @container blocks too', () => {
+    // The urgent banner's narrow layout sits in @container blocks: the check must see its gap.
+    const urgent = rules(stripComments(readFileSync(join(here, 'urgent-banner.css'), 'utf8')))
+    expect(urgent.filter((r) => r.media?.startsWith('@container') && decls(r.body).gap !== undefined).map((r) => decls(r.body).gap)).toContain('8px 12px')
+  })
+
   it('puts every gap, padding and margin on the 4 px scale, but for the listed exceptions', () => {
     expect(offScale()).toEqual([])
   })
