@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Urgent banner — stack A with a clearer count (draft 4)</title>
+<style>
+  @font-face { font-family: "Geist"; font-weight: 400; src: url("../../packages/web/public/fonts/geist-400.woff2") format("woff2"); }
+  @font-face { font-family: "Geist"; font-weight: 500; src: url("../../packages/web/public/fonts/geist-500.woff2") format("woff2"); }
+  @font-face { font-family: "Geist"; font-weight: 600; src: url("../../packages/web/public/fonts/geist-600.woff2") format("woff2"); }
+  @font-face { font-family: "Geist Mono"; font-weight: 400; src: url("../../packages/web/public/fonts/geist-mono-400.woff2") format("woff2"); }
+  @font-face { font-family: "Geist Mono"; font-weight: 500; src: url("../../packages/web/public/fonts/geist-mono-500.woff2") format("woff2"); }
+
+  .dark  { --bg:#000; --fg:#ededed; --muted:#a1a1a1; --blocked:#ff5f5f; }
+  .light { --bg:#fff; --fg:#171717; --muted:#666; --blocked:#d0262f; }
+  :root { --font:"Geist","Segoe UI",system-ui,sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace; }
+  *, *::before, *::after { box-sizing:border-box; }
+
+  body { margin:0; background:#111; color:#ededed; font:16px/1.5 var(--font); }
+  .page { max-width:1320px; margin:0 auto; padding:32px 24px 64px; }
+  h1 { font-size:24px; margin:0 0 8px; letter-spacing:-0.02em; }
+  .lead { color:#a1a1a1; max-width:80ch; margin:0 0 8px; }
+  h2 { font-size:18px; margin:40px 0 4px; }
+  h2 small { font-weight:400; color:#a1a1a1; font-size:14px; margin-left:8px; }
+  .why { color:#a1a1a1; font-size:14px; margin:0 0 12px; max-width:90ch; }
+  .row { display:grid; grid-template-columns:1fr 375px; gap:16px; margin-bottom:16px; }
+  .frame { background:var(--bg); color:var(--fg); border-radius:12px; padding:24px; border:1px solid #2a2a2a; min-width:0; }
+  .frame.phone { padding:16px; }
+  .tag { font:12px var(--mono); color:#8f8f8f; margin-bottom:8px; }
+
+  /* Banner as in PR #70, with stack A from draft 3 */
+  .stack { position:relative; isolation:isolate; margin-bottom:24px; --tone:var(--blocked); }
+  .urgent, .layer { border-radius:8px; border:1px solid color-mix(in srgb, var(--tone) 50%, var(--bg)); background:color-mix(in srgb, var(--tone) 10%, var(--bg)); }
+  .urgent { position:relative; z-index:3; display:flex; align-items:center; gap:12px; padding:12px 8px 12px 16px; font:14px/1.4 var(--font); }
+  .status { display:inline-flex; align-items:center; gap:8px; flex:none; font:500 13px/1.2 var(--mono); white-space:nowrap; color:color-mix(in srgb, var(--tone) 95%, var(--fg)); }
+  .status::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--tone); }
+  .text { display:flex; flex:1; align-items:baseline; gap:8px; min-width:0; }
+  .title { font-weight:500; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .where { flex:none; font-size:13px; white-space:nowrap; color:var(--muted); }
+  .repo { font-family:var(--mono); }
+  .btn { display:inline-flex; align-items:center; gap:6px; flex:none; height:32px; padding:0 10px 0 12px; border-radius:6px; font:500 14px var(--font); color:var(--fg); text-decoration:none; }
+  .btn:hover { background:color-mix(in srgb, var(--tone) 16%, transparent); }
+  .btn svg { width:16px; height:16px; }
+
+  .layer { position:absolute; left:0; top:0; }
+  .layer.l1 { z-index:2; transform:translate(8px, 8px); }
+  .layer.l2 { z-index:1; transform:translate(16px, 16px); }
+  .n1 { padding:0 8px 8px 0; --off:8px; }
+  .n2 { padding:0 16px 16px 0; --off:16px; }
+  .layer { width:calc(100% - var(--off)); height:calc(100% - var(--off)); }
+
+  /* The count */
+  .more { flex:none; white-space:nowrap; }
+  .c-today .more { font:400 13px var(--mono); color:var(--muted); }
+  .c-strong .more { font:500 13px var(--mono); color:var(--fg); }
+  .c-pill .more, .c-right .more { display:inline-flex; align-items:center; height:24px; padding:0 8px; border-radius:12px; font:500 13px var(--mono); color:var(--fg); background:color-mix(in srgb, var(--tone) 24%, var(--bg)); }
+  .c-right .text { flex:1; }
+
+  /* Run header, for context */
+  .head { display:flex; justify-content:space-between; align-items:flex-start; }
+  .head b { font:600 24px/1.2 var(--font); letter-spacing:-0.02em; }
+  .head p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+  .head .q { color:var(--muted); font-size:14px; padding-top:6px; }
+
+  /* Phone */
+  .phone .urgent { flex-wrap:wrap; align-items:baseline; gap:8px 12px; padding:12px; }
+  .phone .at { display:none; }
+  .phone .text { display:block; flex-basis:0; }
+  .phone .title, .phone .where { white-space:normal; }
+  .phone .btn { width:100%; min-height:44px; justify-content:center; }
+  .phone .head b { font-size:22px; }
+  .phone .head .q { display:none; }
+</style>
+</head>
+<body>
+<main class="page">
+  <h1>Urgent banner — stack A with a clearer count</h1>
+  <p class="lead">You picked stack A and said the <code>+1</code> is too subtle: "I barely see it". Each row shows <code>+1</code> and <code>+5</code> on the stack, under the same run header.</p>
+  <div id="out"></div>
+</main>
+
+<script>
+  const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  const variants = [
+    { c:'c-today', right:false, name:'1 · Today', small:'for comparison', why:'Muted, thin, the last thing in the text.' },
+    { c:'c-strong', right:false, name:'2 · Stronger text', small:'smallest change', why:'Same place, full text colour, 500 weight. No new shape.' },
+    { c:'c-pill', right:false, name:'3 · Pill in the text', small:'', why:'A tinted pill right after the run name. It stands out, but where it sits moves with the title\'s length.' },
+    { c:'c-right', right:true, name:'4 · Pill beside Open run', small:'recommended', why:'The pill sits at the right end, always in the same place, next to the button and the stack\'s edge. It reads as "this pile has one more".' },
+  ];
+  function banner(more, right) {
+    const n = Math.min(more, 2);
+    const layers = Array.from({ length:n }, (_, i) => `<div class="layer l${i + 1}" aria-hidden="true"></div>`).join('');
+    const count = `<span class="more">+${more} more</span>`;
+    return `<div class="stack n${n}">${layers}<div class="urgent">
+      <span class="status">Blocked</span>
+      <span class="text"><span class="title">Autopilot stopped: the wave check failed</span>
+        <span class="where"><span class="at">· <span class="repo">repo-a</span> </span>· Run A</span>
+        ${right ? '' : count}</span>
+      ${right ? count : ''}
+      <a class="btn" href="#" onclick="return false">Open run ${arrow}</a>
+    </div></div>`;
+  }
+  const head = '<div class="head"><div><b>Run C</b><p>repo-c · Plan · started 3 days ago</p></div><span class="q">Open the wave board</span></div>';
+  const out = document.getElementById('out');
+  for (const v of variants) {
+    let html = `<section><h2>${v.name}<small>${v.small}</small></h2><p class="why">${v.why}</p>`;
+    for (const theme of ['dark', 'light']) {
+      html += `<div class="row"><div class="frame ${theme} ${v.c}"><div class="tag">${theme} · desktop</div>`
+        + banner(1, v.right) + banner(5, v.right) + head
+        + `</div><div class="frame phone ${theme} ${v.c}"><div class="tag">${theme} · 375 px</div>`
+        + banner(1, v.right) + head + '</div></div>';
+    }
+    out.insertAdjacentHTML('beforeend', html + '</section>');
+  }
+</script>
+</body>
+</html>

@@ -101,6 +101,7 @@ The human picked **B · Banner above the run**: "If it's urgent, I think the B s
 - **Signature detail:** it exists only while another run truly outranks the one you're on; otherwise screen 1 is exactly today's.
 - **Rules out:** a colored fill or colored border on the banner; action buttons in it; a close button; animation beyond the existing breathing dot; text glyphs as icons.
 - **Draft:** [`pod-docs/design-drafts/next-step-across-runs-look.html`](../design-drafts/next-step-across-runs-look.html) (direction B picked).
+- **Later picks:** stack A of [draft 3](../design-drafts/next-step-across-runs-look-3.html) and count option 4 of [draft 4](../design-drafts/next-step-across-runs-look-4.html), with the narrow layout following the banner's own width.
 - **Changed 2026-11-01:** after this plan, the human picked look B of [draft 2](../design-drafts/next-step-across-runs-look-2.html): the banner is tinted by status and "Open run" is a text button. This replaces "Rules out: a colored fill or colored border" and the 8 px by 16 px padding, for the banner only. See [decisions.md](../decisions.md#2026-11-01--urgent-banner-tinted-by-status-human-reversed-no-coloured-fill-or-border-for-the-banner-only).
 
 ## Key decisions

@@ -2,9 +2,23 @@
 
 ## What it is
 
-One line at the top of screen 1's main column. It shows when another listed run's Next step card is more urgent than the selected run's card. It names that item and its run, adds `+N more` when other runs also outrank, and has one control: "Open run". When nothing outranks the selected run, it takes no space and screen 1 looks as before. Screen 1 views only (`pipeline` and a fix run's `agent` view), never the wave board or the engineer view.
+One line at the top of screen 1's main column. It shows when another listed run's Next step card is more urgent than the selected run's card. It names that item and its run, adds a `+N more` pill and a stack behind it when other runs also outrank, and has one control: "Open run". When nothing outranks the selected run, it takes no space and screen 1 looks as before. Screen 1 views only (`pipeline` and a fix run's `agent` view), never the wave board or the engineer view.
 
-**Look:** the banner takes its item's status colour: a 10 % fill and a 50 % border (red for `Blocked`, amber for `Needs you`, green for `Ready`). The status word takes the same colour with a little `--fg` mixed in, and the title is weight 500. Any other status keeps the plain box. "Open run" is a text button with no box until hover; on a phone it is full width and 44 px tall.
+**Look:** the banner takes its item's status colour: a 10 % fill and a 50 % border (red for `Blocked`, amber for `Needs you`, green for `Ready`). The status word takes the same colour with a little `--fg` mixed in, and the title is weight 500. Any other status keeps the plain box. "Open run" is a text button with no box until hover.
+
+**Stack:** with `more` ≥ 1, empty `aria-hidden` layers sit behind the banner, stepped 8 px down and right: one layer for `more` = 1, two for `more` ≥ 2, never more. Each layer copies the card's fill, border and height. The card gives up 8 or 16 px on the right, so the stack's right edge stays on the column's edge. The 24 px gap to the run header is measured from the lowest layer. With `more` = 0 there is no layer and no margin change.
+
+**Count:** `+N more` is a pill right before "Open run": 24 px tall, 500-weight Geist Mono 13 px, `--fg` text on `color-mix(in srgb, var(--tone) 24%, var(--bg))`. It still reads as text in the status region. It counts every other outranking item, not only the same tier.
+
+**Narrow layout:** the layout follows the banner's own width, through a container query on `.urgent-slot`, because the 400 px sidebar stays beside the column down to an 821 px viewport (a 325 px column).
+
+| Column width | Layout |
+| --- | --- |
+| Above 760 px | One line. The title gives way first; the run and repo take up to 50 % of the text. |
+| 621–760 px | One line, repo hidden. The run takes up to 40 % of the text. |
+| 620 px and below | Stacked. Row 1: the status and the pill. Row 2: the text, wrapping, repo hidden. Row 3: "Open run", full width and 44 px tall. |
+
+The 620 px switch is measured with `Needs you`, `+99 more` and a long run name: at 621 px the title still shows 21 characters, and at 601 px only 19. The status, the pill and the button never shrink.
 
 ## How it works
 
@@ -36,7 +50,7 @@ flowchart TD
 
 **Worked example** (mock repo `pod-trial-mock`). Selected: `no-sprints`, card "Nothing to do", so the floor is 0. `old-plan` has a `BLOCKED` halt dated 2026-10-30 (rank 4). `three-sprints` has a `BLOCKED` halt dated 2026-10-31 (rank 4). `all-done` is "Nothing to do" (rank 0, can't raise). Both blocked cards outrank; the older date wins. Result: `Blocked · Autopilot stopped: the wave check failed · pod-trial-mock · An old finished plan +1 more [Open run]`. On `old-plan`, `three-sprints` is the same tier, so the slot is empty.
 
-**Logic lives in:** `elsewhere.ts` (pick), `open-focus.ts` (`opensHere`, `focusOnArrival`), `UrgentBanner.tsx` (line), `urgent-banner.css` (layout, and the tone from the status class), `RunsScreen.tsx` (slot, focus effect).
+**Logic lives in:** `elsewhere.ts` (pick), `open-focus.ts` (`opensHere`, `focusOnArrival`), `UrgentBanner.tsx` (line and layers), `urgent-banner.css` (layout, stack, and the tone from the status class), `RunsScreen.tsx` (slot, focus effect).
 
 ## Why it's this way
 
@@ -44,6 +58,8 @@ flowchart TD
 - **Only each run's card, ranked by `nextSteps` tiers.** The banner, the card and the sidebar dots can't disagree on what is next. Turned down: ranking every waiting item, which would surface items the run's own card doesn't lead with.
 - **Navigation only, no dismiss.** Actions stay on the target run's card. A dismiss could hide a real block; it is parked as [an idea](../ideas/urgent-banner-dismiss.md).
 - **Tinted by status, with a text button.** The human found the plain box too subtle and the boxed button nested, and picked look B of [draft 2](../design-drafts/next-step-across-runs-look-2.html). Turned down: half the tint (C) and a left edge (D). See [decisions.md](../decisions.md#2026-11-01--urgent-banner-tinted-by-status-human-reversed-no-coloured-fill-or-border-for-the-banner-only).
+- **A stack and a pill for the others.** The human on the muted count: "the plus one is too subtle to notice". The human picked stack A of [draft 3](../design-drafts/next-step-across-runs-look-3.html) and option 4 of [draft 4](../design-drafts/next-step-across-runs-look-4.html). See [decisions.md](../decisions.md#2026-11-01--urgent-banner-stacks-other-items-and-shows-the-count-as-a-pill).
+- **A container query, not a viewport rule.** The column can be narrower than a phone's at a viewport far above 480 px. The trade-off: with `more` = 0, a column of 620 px or less now stacks too, where it stayed on one line before.
 - **A link, not a button.** Ctrl+click and middle click open a new tab, and Back works. The trade-off is the focus rule below.
 - Agent defaults, each with its turned-down option, in decisions.md: [repo hidden on phones](../decisions.md#2026-11-01--urgent-banner-hides-the-repo-on-phones-agent-default--override-anytime), [`+N more` counts distinct items](../decisions.md#2026-11-01--urgent-banner-n-more-counts-distinct-items-agent-default--override-anytime), [a selected someday card ranks as pending](../decisions.md#2026-11-01--a-selected-someday-card-still-ranks-as-pending-agent-default--override-anytime), [the title gives way first at 800–1024 px](../decisions.md#2026-11-01--urgent-banner-cuts-the-title-first-on-mid-width-screens-agent-default--override-anytime).
 
@@ -53,7 +69,11 @@ flowchart TD
 - Screen 1 keeps one `btn primary`, on the Next step card. "Open run" is `btn sm quiet trail`, not primary.
 - A sidebar dot can read `needs you` for a run with only `someday` entries, and that run raises no banner. That is correct: the dot follows state, the banner follows urgency.
 - `.urgent-slot` needs `min-width: 0`. It is a grid item of `.main`; without it a long title widens the column and the page scrolls sideways.
-- `.urgent-slot` must have no padding, margin, border, gap or min-height, so an empty slot takes no space.
+- `.urgent-slot` must have no padding, margin, border, gap or min-height, so an empty slot takes no space. It is the `urgent` container with inline size only, so its height stays 0 when empty.
+- The layers use a negative `z-index`, so `.urgent-slot` holds the stacking context (`isolation: isolate`). `.urgent` must never become a stacking context (no `isolation`, `transform`, `opacity`, `filter` or `z-index`): its own layers would then paint over its fill.
+- The layers sit inside `.urgent`, not in a wrapper, so `--tone` reaches them and `<div class="urgent">` stays the root. They copy the card with `inherit`; don't give them their own colours.
+- `.urgent` sets `--tone: var(--muted)` as the default. Without it, a status with no tone leaves the pill's `color-mix` invalid, and the pill has no fill.
+- Change the 620 px or 760 px switch only after you measure again with the worst case: `Needs you`, `+99 more` and a long title and run name.
 - Don't reuse `.banner` or `.banners`: those are the error notices.
 - The focus target is a hash, not a flag. Set it only when `opensHere(e)` is true. A boolean set on every click let a Ctrl+click steal focus on the next run change (review round 1).
 - The selected run is matched by `hashFor`, not object identity.
@@ -65,3 +85,4 @@ flowchart TD
 
 - 2026-11-01 · next-step-across-runs · added: the elsewhere picker, the one-line banner above the run header, and focus on the opened run's title; Ctrl+click no longer moves focus (review fix) · [report](../reports/next-step-across-runs.html), [PR #67](https://github.com/iamphduc/pod-board/pull/67)
 - 2026-11-01 · fix-urgent-tint · changed: the banner is tinted by status, and "Open run" is a text button (look B of draft 2) · [PR #70](https://github.com/iamphduc/pod-board/pull/70)
+- 2026-11-01 · fix-urgent-stack · changed: other items stack behind the banner, the count is a pill beside "Open run", and the narrow layout follows the banner's own width (stack A of draft 3, option 4 of draft 4)
