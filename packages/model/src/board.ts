@@ -10,11 +10,9 @@ export type AgentRun = {
   id: string
   session: string
   type: string
-  /** The first `cwd` its transcript recorded. From the parser only: the server reads it and never puts it on the Board. */
-  cwd?: string
   /**
-   * Set when its transcript doesn't show the session started in this repo: no readable `cwd`, or one outside
-   * the repo. The agent stays listed, but the board offers no send on its session (`replySession`).
+   * Set when its session's own file doesn't show the session started in this repo: no readable `cwd`, or one
+   * outside the repo. The agent stays listed, but the board offers no send on its session (`replySession`).
    */
   sessionUnproven?: true
   /**

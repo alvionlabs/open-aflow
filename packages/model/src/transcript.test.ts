@@ -283,17 +283,3 @@ describe('continued agents (SendMessage after a hand-back)', () => {
     expect(JSON.stringify(r)).not.toMatch(/SECRET/)
   })
 })
-
-describe('the cwd of a transcript', () => {
-  const parse = (...lines: unknown[]) => parseAgentTranscript({ id: 'a', session: 's', meta: JSON.stringify({ agentType: 'pod:engineer' }), jsonl: lines.map((l) => JSON.stringify(l)).join('\n') })
-
-  it('is the first one it recorded; a later cd does not change it', () => {
-    expect(parse({ type: 'user', cwd: 'E:/a', message: { content: 'x' } }, { type: 'assistant', cwd: 'E:/b', message: { content: [] } })?.cwd).toBe('E:/a')
-    expect(parse({ type: 'user', message: { content: 'x' } }, { type: 'assistant', cwd: 'E:/b', message: { content: [] } })?.cwd).toBe('E:/b')
-  })
-
-  it('is missing when no record has a usable one', () => {
-    expect(parse({ type: 'user', message: { content: 'x' } })).not.toHaveProperty('cwd')
-    expect(parse({ type: 'user', cwd: 7, message: { content: 'x' } }, { type: 'user', cwd: '', message: { content: 'y' } })).not.toHaveProperty('cwd')
-  })
-})

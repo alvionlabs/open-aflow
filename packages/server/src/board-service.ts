@@ -26,7 +26,7 @@ import type { GhReader } from './gh.ts'
 import { ignoresCase as probeIgnoresCase, normalizeRepoPath, repoIds, sameRepoPath } from './guard.ts'
 import { readRepoFiles } from './repo-files.ts'
 import { loadRepos } from './repos-config.ts'
-import { agentOfRepo, createAgentFileCache, listAgentFiles, type AgentFile } from './transcript-files.ts'
+import { agentOfRepo, createAgentFileCache, createSessionCwdCache, listAgentFiles, sessionFileOf, type AgentFile } from './transcript-files.ts'
 
 export type BoardServiceDeps = {
   configFile: string
@@ -57,6 +57,8 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
   const ignoresCase = deps.ignoresCase ?? probeIgnoresCase
   // Each transcript's AgentRun (or undefined for a non-pod agent), never its text.
   const agentRuns = createAgentFileCache((text) => parseAgentTranscript(text))
+  // Which folder each session started in, from the head of its own file: its agents are placed by it.
+  const sessionCwds = createSessionCwdCache()
   // An unreadable config (a half-saved edit, say) keeps the last list it read.
   let lastRegistered: string[] = []
 
@@ -96,14 +98,26 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
   }
 
   /** The repo's pod agents. Adds its listed files to `listed`, so the build keeps their cache. */
-  async function agentsOf(entry: RepoEntry, listed: AgentFile[]): Promise<AgentRun[]> {
+  async function agentsOf(entry: RepoEntry, listed: AgentFile[], sessionFiles: string[]): Promise<AgentRun[]> {
     const files = await listAgentFiles(deps.claudeDir, entry.path, deps.transcriptDays, now())
     listed.push(...files)
+    // One stat per session this build, however many agents it has.
+    const cwdOf = new Map<string, Promise<string | undefined>>()
+    const sessionCwd = (session: string) => {
+      let cwd = cwdOf.get(session)
+      if (!cwd) {
+        const file = sessionFileOf(deps.claudeDir, entry.path, session)
+        sessionFiles.push(file)
+        cwd = sessionCwds.read(file)
+        cwdOf.set(session, cwd)
+      }
+      return cwd
+    }
     const runs: AgentRun[] = []
     for (const file of files) {
       try {
         const run = await agentRuns.read(file)
-        const agent = run && agentOfRepo(run, entry, deps.platform)
+        const agent = run && agentOfRepo(run, await sessionCwd(file.session), entry, deps.platform)
         if (agent) runs.push(agent)
       } catch {
         // A transcript deleted between listing and reading is left out.
@@ -112,7 +126,7 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
     return runs
   }
 
-  async function buildRepo(entry: RepoEntry, id: string, listed: AgentFile[]): Promise<BoardRepo> {
+  async function buildRepo(entry: RepoEntry, id: string, listed: AgentFile[], sessionFiles: string[]): Promise<BoardRepo> {
     const base = {
       id,
       name: pathFor(deps.platform).basename(entry.path) || entry.path,
@@ -142,17 +156,19 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
       .map((b) => deps.gh.getBranch(entry.path, b))
       .filter((pr): pr is PrStatus => pr !== undefined && !byBranch.some((p) => p.number === pr.number))
     const prs = [...found.filter((p) => !staging.some((s) => s.number === p.number)), ...staging]
-    return { ...base, model, agents: await agentsOf(entry, listed), prs }
+    return { ...base, model, agents: await agentsOf(entry, listed, sessionFiles), prs }
   }
 
   return {
     async build() {
       const { entries, configUnreadable } = await repoEntries()
       const listed: AgentFile[] = []
+      const sessionFiles: string[] = []
       const { ids } = repoIds(entries, deps.platform)
-      const repos = await Promise.all(entries.map((e, i) => buildRepo(e, ids[i]!, listed)))
+      const repos = await Promise.all(entries.map((e, i) => buildRepo(e, ids[i]!, listed, sessionFiles)))
       // Forget transcripts no repo listed this time: out of the day window, deleted, or their repo gone.
       agentRuns.retain(listed)
+      sessionCwds.retain(sessionFiles)
       repos.sort((a, b) => compare(a.name.toLowerCase(), b.name.toLowerCase()) || compare(a.path, b.path))
       const board: Board = { generatedAt: now(), gh: deps.gh.status(), repos, transcriptDays: deps.transcriptDays }
       const checkedAt = deps.gh.checkedAt()

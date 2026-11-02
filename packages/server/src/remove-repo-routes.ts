@@ -48,9 +48,8 @@ export function createRemoveRepoRoutes(deps: RemoveRepoRouteDeps): Hono {
     // A refusal changed nothing, so it isn't logged.
     if ('error' in result) return c.json({ error: result.error }, STATUS[result.error])
 
-    // A repo that leaves the Board loses its toggles: adding the folder again must send nothing until you turn it on.
-    // A repo a port claim still lists stays on the Board, and nothing about it changes.
-    const forgot = repo.source === 'registered' ? await settle(async () => (await deps.forgetToggles(repoPathKey(repo)), true)) : true
+    // Remove always forgets the repo's toggles, also when a port claim still lists it, so none comes back on by itself.
+    const forgot = await settle(async () => (await deps.forgetToggles(repoPathKey(repo)), true))
     const logged = await settle(() => deps.log.append({ ...base, result: 'removed', ...(forgot ? {} : { message: "Couldn't clear its auto-continue toggle." }) }))
     // The Board drops the repo, and carries the log entry, before the response.
     await settle(deps.rebuild)
