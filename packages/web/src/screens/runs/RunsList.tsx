@@ -18,7 +18,7 @@ type Props = {
 }
 
 /**
- * The runs: one card each with the run header's name, its state as a word and a dot, and its repo as a muted
+ * The runs: one card each with the run header's name, its state as a dot and a word, and its repo as a muted
  * line with the `fix` tag. Beside each card's link, never inside it, a ⋯ button when its repo can be removed. A
  * hyphen is a line break opportunity, so a hyphenated word gets its own box to stay whole.
  */

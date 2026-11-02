@@ -258,7 +258,6 @@
 }
 
 .run .status {
-  flex: none;
   justify-self: start;
   /* As tall as the name's first line (14 px at 1.55), so its word and dot centre on that line. */
   min-height: calc(var(--size-dense) * 1.55);
@@ -287,11 +286,11 @@
 }
 
 /*
- * Stacked: name, status, then the repo line. At 172 px of content or less (a card of 206 px, a sidebar of 238 px)
- * the status column would leave the name under 72 px, too narrow for a word such as `claim-only` (70 px). The
- * default 260 px sidebar stays on two columns.
+ * Stacked by default: name at full width, status, then the repo line. At 256 px of content or less (a card of
+ * 290 px, a sidebar of 323 px, so the default 260 px too) a two-column name is under 156 px, and a long word such
+ * as `pod_board_long_repo` would break. Only a word wider than the whole stacked line may break.
  */
-@container run-card (max-width: 172px) {
+@container run-card (max-width: 256px) {
   .run-body {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 4px;
