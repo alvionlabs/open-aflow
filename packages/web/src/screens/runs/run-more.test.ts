@@ -129,3 +129,26 @@ describe('a card with no repo line', () => {
     expect(html).toContain('<span class="run-line"></span>')
   })
 })
+
+describe("the card link's accessible name", () => {
+  const link = (over: Partial<RunSummary>) => {
+    const r = { ...run('ra', 'alpha-repo', 'x'), ...over }
+    return /<a class="run"[^>]*>/.exec(renderToStaticMarkup(createElement(RunsList, { runs: [r], selected: r, repos: [repo({})] })))![0]
+  }
+
+  it('holds name, status, then repo as plain text, with no space after an underscore', () => {
+    expect(link({ title: 'Three sprints in flight', repo: 'pod_trial_mock', state: 'blocked' })).toContain('aria-label="Three sprints in flight blocked pod_trial_mock"')
+  })
+
+  it('keeps an underscored name whole, and leaves out a repo line the card does not have', () => {
+    const r = { repoId: 'ra', repo: 'internationalization_settings', where: '', state: 'unsupported' } as RunSummary
+    const html = renderToStaticMarkup(createElement(RunsList, { runs: [r], selected: r, repos: [repo({ name: 'internationalization_settings' })] }))
+    expect(html).toContain('aria-label="internationalization_settings update pod"')
+    // The visual break stays.
+    expect(html).toContain('internationalization_<wbr/>settings')
+  })
+
+  it('ends with the fix tag on a fix run, where the card shows it', () => {
+    expect(link({ title: 'gh pr list times out', repo: 'chess-web', state: 'running', fix: 'x' })).toContain('aria-label="gh pr list times out running chess-web fix"')
+  })
+})
