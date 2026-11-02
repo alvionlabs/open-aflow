@@ -180,3 +180,44 @@ describe('sidebar run card', () => {
     expect(word['max-width']).toBe('100%')
   })
 })
+
+describe('sidebar cards stack by default', () => {
+  // Sidebar → card: 16 px of padding each side and its 1 px border. Card → content: 16 px of padding and a 1 px border each side.
+  const contentOf = (sidebar: number) => sidebar - 33 - 34
+  const threshold = () => Number(/@container run-card \(max-width: (\d+)px\)/.exec(runs())![1])
+  const stacks = (sidebar: number) => contentOf(sidebar) <= threshold()
+
+  it('stacks at the default 260 px sidebar and up to 320 px, and uses two columns from 324 px', () => {
+    for (const sidebar of [200, 240, 260, 300, 320]) expect(stacks(sidebar), `sidebar ${sidebar}`).toBe(true)
+    for (const sidebar of [324, 360, 400]) expect(stacks(sidebar), `sidebar ${sidebar}`).toBe(false)
+  })
+
+  // Measured at 14 px / 500 in the app's own font.
+  const WORDS = { authentication: 97, skyscraperviewpanel: 137, pod_board_long_repo: 145 }
+
+  it('fits real long words whole on the stacked line at the default width, so none breaks', () => {
+    for (const [word, width] of Object.entries(WORDS)) expect(contentOf(260), word).toBeGreaterThanOrEqual(width)
+  })
+
+  it('fits them whole in the name column just above the threshold too', () => {
+    const column = Number(/(\d+)px$/.exec(style(runs(), '.run-body')['grid-template-columns']!)![1])
+    const gap = parseInt(style(runs(), '.run-body')['column-gap']!, 10)
+    for (const [word, width] of Object.entries(WORDS)) expect(contentOf(324) - column - gap, word).toBeGreaterThanOrEqual(width)
+  })
+
+  it('breaks inside a word only as a last resort, for a word wider than its line', () => {
+    expect(style(runs(), '.run b')['overflow-wrap']).toBe('break-word')
+    expect(style(runs(), '.run-repo')['overflow-wrap']).toBe('break-word')
+    expect(style(runs(), '.run b')['word-break']).toBeUndefined()
+    expect(style(runs(), '.run-word')['overflow-wrap']).toBe('break-word')
+  })
+
+  it('says the real threshold in the comment above the rule', () => {
+    const at = runs().length && readFileSync(join(here, 'runs.css'), 'utf8')
+    expect(at).toContain(`At ${threshold()} px of content or less`)
+  })
+
+  it('has no dead flex rule on the status, which is a grid item', () => {
+    expect(style(runs(), '.run .status').flex).toBeUndefined()
+  })
+})

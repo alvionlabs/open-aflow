@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
@@ -87,5 +88,19 @@ describe('run name in the list', () => {
 
   it('leaves a name with no hyphen as plain text', () => {
     expect(nameOf('Three sprints in flight')).toBe('Three sprints in flight')
+  })
+})
+
+describe('sidebar card wording', () => {
+  it('the list comment says dot then word, as the card shows it', () => {
+    expect(readFileSync(new URL('./RunsList.tsx', import.meta.url), 'utf8')).toMatch(/its state as a dot and a word/)
+  })
+
+  it('leaves a long word with no hyphen as plain text, for the card to fit whole', () => {
+    for (const title of ['authentication', 'skyscraperviewpanel', 'pod_board_long_repo']) {
+      const r = { ...run('ra', 'alpha-repo', 'x'), title }
+      const html = renderToStaticMarkup(createElement(RunsList, { runs: [r], selected: r, repos: [repo({})] }))
+      expect(html).toContain(`<b>${title}</b>`)
+    }
   })
 })
