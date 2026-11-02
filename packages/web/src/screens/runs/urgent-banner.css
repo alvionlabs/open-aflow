@@ -186,22 +186,61 @@
 }
 
 /*
- * Short of room on one line: the repo goes first, and the title keeps most of the text.
- * Both widths are measured with `Needs you`, `+99 more` and a long run name, so the title keeps about
- * 20 characters at the narrowest one-line width (the table is in feature-details/urgent-banner.md).
+ * With a count, short of room on one line: the repo goes first, and the title keeps most of the text.
+ * A banner with no count needs less room, and keeps its one line and repo. Every width here is measured
+ * (the numbers are in feature-details/urgent-banner.md); change one only after you measure again.
  */
 @container urgent (max-width: 760px) {
-  .urgent-at {
+  .urgent:has(> .urgent-more) .urgent-at {
     display: none;
   }
 
-  .urgent-where {
+  .urgent:has(> .urgent-more) .urgent-where {
     max-width: 40%;
   }
 }
 
-/* Narrow: the status and the count, then the text, wrapping, then Open run full width as a 44 px target. */
+/* Narrow, with a count: the status and the count, then the text, wrapping, then Open run full width as a 44 px target. */
 @container urgent (max-width: 620px) {
+  .urgent:has(> .urgent-more) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "status more" "text text" "open open";
+    align-items: center;
+    gap: 8px 12px;
+    padding: 12px;
+  }
+
+  .urgent:has(> .urgent-more) > .status {
+    grid-area: status;
+    justify-self: start;
+  }
+
+  .urgent-more {
+    grid-area: more;
+    justify-self: end;
+  }
+
+  .urgent:has(> .urgent-more) > .urgent-text {
+    grid-area: text;
+    display: block;
+  }
+
+  .urgent:has(> .urgent-more) .urgent-title,
+  .urgent:has(> .urgent-more) .urgent-where {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .urgent:has(> .urgent-more) > .urgent-open {
+    grid-area: open;
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* Narrow, with no count: the same rows, with the repo hidden. urgent-banner.test.ts keeps the two blocks the same. */
+@container urgent (max-width: 520px) {
   .urgent {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -216,9 +255,8 @@
     justify-self: start;
   }
 
-  .urgent-more {
-    grid-area: more;
-    justify-self: end;
+  .urgent-at {
+    display: none;
   }
 
   .urgent-text {

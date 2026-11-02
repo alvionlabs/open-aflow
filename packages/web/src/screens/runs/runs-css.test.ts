@@ -24,6 +24,7 @@ function rules(css: string, media?: string): Rule[] {
     }
     const body = css.slice(open + 1, close)
     if (prelude.startsWith('@media')) out.push(...rules(body, prelude.replace(/^@media\s*/, '').trim()))
+    else if (prelude.startsWith('@container')) out.push(...rules(body, prelude))
     else if (!prelude.startsWith('@')) out.push({ selectors: prelude.split(',').map((s) => s.trim()), body, media })
     i = close + 1
   }
