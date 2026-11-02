@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildFixPipeline, listRuns, type Board, type RunSummary } from '@pod-board/model'
 import { ErrorBoundary } from './ErrorBoundary.tsx'
 import { createBoardStream, healthProbe, type StreamState } from './board-stream.ts'
 import { boardSlices } from './screens/board/board-view.ts'
 import { RunsScreen } from './screens/runs/RunsScreen.tsx'
-import { resolveSelection, startClock } from './selection.ts'
+import { followRepoId, rememberRepoPaths, resolveSelection, startClock } from './selection.ts'
 
 export function App() {
   const [board, setBoard] = useState<Board>()
@@ -52,7 +52,11 @@ function BoardView({ board, stream, now, hash, setHash }: BoardViewProps) {
   }
   // While a remove is in flight, the run it planned to go to; the new Board can arrive before the reply.
   const [fallback, setFallback] = useState<string>()
-  const selection = resolveSelection(runs, hash, slicesOf, agentsOf, fallback)
+  // Every repo id this page has seen, so a hash follows a repo whose id changed. Each Board only adds to it.
+  const knownRepos = useRef(new Map<string, string>())
+  rememberRepoPaths(knownRepos.current, board?.repos ?? [])
+  const follow = (h: string) => followRepoId(h, knownRepos.current, board?.repos ?? [])
+  const selection = resolveSelection(runs, follow(hash), slicesOf, agentsOf, fallback === undefined ? undefined : follow(fallback))
   const navigate = (h: string) => {
     window.history.replaceState(null, '', h === '' ? window.location.pathname + window.location.search : h)
     setHash(h)
