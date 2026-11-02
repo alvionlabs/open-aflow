@@ -56,11 +56,11 @@ describe('urgent banner', () => {
     expect(h).toMatch(/<span class="status s-bad">Blocked<\/span>/)
     expect(text(h)).toBe('Blocked Autopilot stopped: a slice is blocked · chess-web · Sparring ladder +2 more Open run')
     expect(h).toMatch(/class="urgent-title">Autopilot stopped: a slice is blocked</)
-    const whereOf = (x: string) => text(/class="urgent-where muted">([\s\S]*?)<\/span>(?= <span class="urgent-more|<\/span><a )/.exec(x)?.[1] ?? '')
+    const whereOf = (x: string) => text(/class="urgent-where muted">([\s\S]*?)<\/span>(?=<\/span> <span class="urgent-more|<\/span><a )/.exec(x)?.[1] ?? '')
     expect(whereOf(h)).toBe('· chess-web · Sparring ladder')
     // The repo in mono, as the Look says.
     expect(h).toMatch(/<span class="urgent-repo">chess-web<\/span>/)
-    expect(h).toMatch(/class="urgent-more muted">\+2 more</)
+    expect(h).toMatch(/class="urgent-more">\+2 more</)
     // No count at 0.
     const none = html(at())
     expect(none).not.toMatch(/urgent-more|more</)
@@ -77,6 +77,31 @@ describe('urgent banner', () => {
     expect(linked.match(/<a /g)).toHaveLength(1)
     expect(linked).not.toMatch(/github\.com/)
     expect(text(linked)).toMatch(/Autopilot held PR #80 for you to merge/)
+  })
+
+  it('stacks one layer for one other item, two for two or more, none for none', () => {
+    const layersOf = (more: number) => [...html(at({ more })).matchAll(/<span class="urgent-layer urgent-layer-(\d)"([^>]*)>/g)]
+    expect(layersOf(0).map((m) => m[1])).toEqual([])
+    expect(layersOf(1).map((m) => m[1])).toEqual(['1'])
+    expect(layersOf(2).map((m) => m[1])).toEqual(['1', '2'])
+    expect(layersOf(5).map((m) => m[1])).toEqual(['1', '2'])
+    // Decoration only: hidden from screen readers and empty, so the status region's text doesn't change.
+    for (const m of layersOf(5)) expect(m[2]).toMatch(/aria-hidden="true"/)
+    expect(html(at({ more: 5 }))).toMatch(/<span class="urgent-layer urgent-layer-2" aria-hidden="true"><\/span>/)
+    // The root stays exactly class="urgent": the tones and runs-screen.test.ts read it.
+    for (const more of [0, 1, 2, 5]) expect(html(at({ more }))).toMatch(/^<div class="urgent">/)
+    // No other item: nothing is added to the markup.
+    expect(html(at())).not.toMatch(/urgent-layer/)
+  })
+
+  it('the count is a pill right before open run, and stays in the status text', () => {
+    const h = html(at({ more: 99 }))
+    // A child of the banner, not of the text, immediately before the link.
+    expect(h).toMatch(/Sparring ladder<\/span><\/span> <span class="urgent-more">\+99 more<\/span><a [^>]*urgent-open/)
+    // A real space, so a screen reader doesn't read "Sparring ladder+99 more".
+    expect(h.replace(/<[^>]*>/g, '')).toBe('BlockedAutopilot stopped: a slice is blocked · chess-web · Sparring ladder +99 moreOpen run')
+    // Not muted: the pill's text is --fg.
+    expect(h).not.toMatch(/urgent-more[^"]*muted/)
   })
 
   it('tints by the item status: blocked, needs you and ready only', () => {
@@ -153,7 +178,7 @@ function rules(css: string, media?: string): Rule[] {
       else if (css[close] === '}' && --depth === 0) break
     }
     const body = css.slice(open + 1, close)
-    if (prelude.startsWith('@media')) out.push(...rules(body, prelude.replace(/^@media\s*/, '').trim()))
+    if (/^@(media|container)/.test(prelude)) out.push(...rules(body, prelude.trim()))
     else if (!prelude.startsWith('@')) out.push({ selectors: prelude.split(',').map((s) => s.trim()), body, media })
     i = close + 1
   }
@@ -169,10 +194,37 @@ const all = rules(CSS)
 const styleOf = (sel: string, match: (media?: string) => boolean) =>
   Object.assign({}, ...all.filter((r) => match(r.media) && r.selectors.includes(sel)).map((r) => decls(r.body))) as Record<string, string>
 const desktop = (m?: string) => m === undefined
-const phone = (m?: string) => m !== undefined && /^\(\s*max-width:\s*480px\s*\)$/.test(m)
+/** The banner's slot is the container: the switch follows the banner's own width, not the viewport's. */
+const stacked = (m?: string) => m === '@container urgent (max-width: 600px)'
+const noRepo = (m?: string) => m === '@container urgent (max-width: 760px)'
+const TOKENS = readFileSync(join(here, '../../theme/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const tokensOf = (sel: string) => Object.assign({}, ...rules(TOKENS).filter((r) => r.media === undefined && r.selectors.includes(sel)).map((r) => decls(r.body))) as Record<string, string>
+const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+const THEMES: [string, Record<string, string>][] = [
+  ['light', tokensOf(':root')],
+  ['dark', tokensOf(':root[data-theme="dark"]')],
+]
+/** The WCAG ratio of two declared CSS values, resolved through a theme's tokens with --tone as `tone`. */
+function ratio(tokens: Record<string, string>, tone: string, fore: string | undefined, back: string | undefined, where: string): number {
+  const paint = (value: string | undefined): number[] => {
+    const name = (v: string) => (v === '--tone' ? `--${tone}` : v)
+    const plain = /^var\((--[a-z-]+)\)$/.exec(value ?? '')
+    if (plain) return rgb(tokens[name(plain[1]!)]!)
+    const mix = /^color-mix\(in srgb, var\((--[a-z-]+)\) (\d+)%, var\((--[a-z-]+)\)\)$/.exec(value ?? '')
+    expect(mix, `${where}: ${value}`).not.toBeNull()
+    const a = rgb(tokens[name(mix![1]!)]!)
+    const b = rgb(tokens[name(mix![3]!)]!)
+    const p = Number(mix![2]) / 100
+    return a.map((v, i) => v * p + b[i]! * (1 - p))
+  }
+  const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+  const lum = (c: number[]) => 0.2126 * lin(c[0]!) + 0.7152 * lin(c[1]!) + 0.0722 * lin(c[2]!)
+  const [hi, lo] = [lum(paint(fore)), lum(paint(back))].sort((x, y) => y - x)
+  return (hi! + 0.05) / (lo! + 0.05)
+}
 
 describe('urgent banner css', () => {
-  it('css tokens, radius and phone button', () => {
+  it('css tokens, radius and tones', () => {
     // Only tokens, no raw colours: color-mix() and transparent are allowed, but each colour in a mix is a token or transparent.
     expect(CSS).not.toMatch(/#[0-9a-f]{3,8}|(rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\(|(?<![-\w])(red|orange|green|white|black|currentcolor)(?![-\w])/i)
     const mixes = [...CSS.matchAll(/color-mix\(\s*in srgb\s*,([^()]*(?:\([^()]*\)[^()]*)*)\)/g)].map((m) => m[1]!)
@@ -182,7 +234,7 @@ describe('urgent banner css', () => {
       for (const part of args.split(',')) expect(part.trim(), `color-mix(${args})`).toMatch(/^(var\(--[a-z-]+\)|transparent)( \d+%)?$/)
     }
     const used = new Set([...CSS.matchAll(/var\((--[a-z-]+)/g)].map((m) => m[1]))
-    const allowed = new Set(['--border-strong', '--bg', '--fg', '--muted', '--font', '--mono', '--size-dense', '--size-small', '--size-micro', '--radius-md', '--tone', '--blocked', '--needs-you', '--ready'])
+    const allowed = new Set(['--border-strong', '--bg', '--fg', '--muted', '--font', '--mono', '--size-dense', '--size-small', '--size-micro', '--radius-md', '--radius-pill', '--tone', '--blocked', '--needs-you', '--ready'])
     expect([...used].filter((t) => !allowed.has(t!))).toEqual([])
     // Running and idle never tint, and the focus ring stays the base one.
     expect(CSS).not.toMatch(/--(running|idle|focus)/)
@@ -192,7 +244,7 @@ describe('urgent banner css', () => {
     expect(box.background).toBe('var(--bg)')
     expect(['8px', 'var(--radius-md)']).toContain(box['border-radius'])
     expect(box.padding).toBe('12px 8px 12px 16px')
-    expect(styleOf('.urgent', phone).padding).toBe('12px')
+    expect(styleOf('.urgent', stacked).padding).toBe('12px')
     // Each tone sets --tone from its status token.
     const TONES: [string, string][] = [['s-bad', 'blocked'], ['s-you', 'needs-you'], ['s-ok', 'ready']]
     for (const [cls, token] of TONES) {
@@ -209,6 +261,11 @@ describe('urgent banner css', () => {
     // Every background and border uses the box's own tokens or the tone; nothing else.
     for (const r of all) {
       for (const [p, v] of Object.entries(decls(r.body))) {
+        // A layer copies the card it sits behind.
+        if (r.selectors.includes('.urgent-layer') && (/^background/.test(p) || p === 'border')) {
+          expect(v, `.urgent-layer ${p}`).toBe('inherit')
+          continue
+        }
         if (/^background/.test(p) || /^border(-(top|right|bottom|left))?(-color)?$/.test(p)) expect(v, `${r.selectors.join(',')} ${p}`).toMatch(/^(var\(--bg\)|1px solid var\(--border-strong\)|color-mix\(in srgb, var\(--tone\) \d+%, (var\(--bg\)|transparent)\))$/)
       }
     }
@@ -224,48 +281,127 @@ describe('urgent banner css', () => {
     const title = styleOf('.urgent-title', desktop)
     expect(title['text-overflow']).toBe('ellipsis')
     expect(title['white-space']).toBe('nowrap')
-    // Phone: the text wraps, the button is full width and at least 44 px tall.
-    expect(styleOf('.urgent', phone)['flex-wrap']).toBe('wrap')
-    expect(styleOf('.urgent-title', phone)['white-space']).toBe('normal')
-    const btn = styleOf('.urgent-open', phone)
+  })
+
+  it('layers follow the card, and the stack stays on the column', () => {
+    const layer = styleOf('.urgent-layer', desktop)
+    // Empty boxes on the card's own border box, so they follow its height when its text wraps.
+    expect(layer.position).toBe('absolute')
+    expect(layer.inset).toBe('-1px')
+    expect(layer.width).toBeUndefined()
+    expect(layer.height).toBeUndefined()
+    expect(layer.background).toBe('inherit')
+    expect(layer.border).toBe('inherit')
+    expect(layer['border-radius']).toBe('inherit')
+    expect(layer['pointer-events']).toBe('none')
+    expect(styleOf('.urgent', desktop).position).toBe('relative')
+    // Stepped 8 px down and right per layer, behind the card and in order.
+    expect(styleOf('.urgent-layer-1', desktop).transform).toBe('translate(8px, 8px)')
+    expect(styleOf('.urgent-layer-2', desktop).transform).toBe('translate(16px, 16px)')
+    expect(styleOf('.urgent-layer-1', desktop)['z-index']).toBe('-1')
+    expect(styleOf('.urgent-layer-2', desktop)['z-index']).toBe('-2')
+    // Negative layers need a stacking context on the slot, and none on the card: on the card they would paint over its fill.
+    expect(styleOf('.urgent-slot', desktop).isolation).toBe('isolate')
+    for (const p of ['isolation', 'transform', 'opacity', 'filter', 'z-index', 'contain', 'container']) expect(styleOf('.urgent', desktop)[p], p).toBeUndefined()
+    // The card gives up the layers' room on the right; the gap below is measured from the lowest layer.
+    expect(styleOf('.urgent', desktop)['margin-bottom']).toBe('24px')
+    expect(styleOf('.urgent', desktop)['margin-right']).toBeUndefined()
+    expect(styleOf('.urgent:has(> .urgent-layer-1)', desktop).margin).toBe('0 8px 32px 0')
+    expect(styleOf('.urgent:has(> .urgent-layer-2)', desktop).margin).toBe('0 16px 40px 0')
+    // Same specificity, so the later rule wins: the two-layer stack comes after the one-layer stack.
+    const one = CSS.indexOf('.urgent:has(> .urgent-layer-1)')
+    expect(one).toBeGreaterThan(-1)
+    expect(CSS.indexOf('.urgent:has(> .urgent-layer-2)')).toBeGreaterThan(one)
+    // The narrow layout doesn't undo them.
+    for (const sel of ['.urgent', '.urgent:has(> .urgent-layer-1)', '.urgent:has(> .urgent-layer-2)']) expect(styleOf(sel, stacked).margin, sel).toBeUndefined()
+  })
+
+  it('the count pill keeps its shape and never gives way', () => {
+    const pill = styleOf('.urgent-more', desktop)
+    expect(pill.height).toBe('24px')
+    expect(pill.padding).toBe('0 8px')
+    expect(pill['border-radius']).toBe('var(--radius-pill)')
+    expect(pill.font).toBe('500 var(--size-small) / 1 var(--mono)')
+    expect(pill.color).toBe('var(--fg)')
+    expect(pill.background).toBe('color-mix(in srgb, var(--tone) 24%, var(--bg))')
+    expect(pill.flex).toBe('none')
+    expect(pill['white-space']).toBe('nowrap')
+    // Status and button never shrink either; the title gives way first.
+    expect(styleOf('.urgent > .status', desktop).flex).toBe('none')
+    expect(styleOf('.urgent-open', desktop).flex).toBe('none')
+    expect(styleOf('.urgent-title', desktop)['min-width']).toBe('0')
+    // A status with no tone still gets a fill for the pill: a mix of an unset --tone is invalid and paints nothing.
+    expect(styleOf('.urgent', desktop)['--tone']).toBe('var(--muted)')
+  })
+
+  it('pill text reaches 4.5:1 on its fill, for every tone and theme', () => {
+    const pill = styleOf('.urgent-more', desktop)
+    for (const [theme, tokens] of THEMES) {
+      for (const tone of ['blocked', 'needs-you', 'ready', 'muted']) {
+        const where = `${theme} ${tone}`
+        expect(ratio(tokens, tone, pill.color, pill.background, where), where).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  it('the slot is the container, and an empty one takes no space', () => {
+    const slot = styleOf('.urgent-slot', desktop)
+    expect(slot.container).toBe('urgent / inline-size')
+    expect(slot['min-width']).toBe('0')
+    expect(slot.display).toBe('block')
+    // The switch reads the banner's width: the sidebar can take 400 px from the column at any viewport above 820 px.
+    expect(CSS).not.toMatch(/@media/)
+    expect(CSS).toMatch(/@container urgent \(max-width: 600px\)/)
+  })
+
+  it('stacked: status and pill, then the text, then a 44 px open run', () => {
+    const box = styleOf('.urgent', stacked)
+    expect(box.display).toBe('grid')
+    expect(box['grid-template-columns']).toBe('minmax(0, 1fr) auto')
+    expect(box['grid-template-areas']).toBe('"status more" "text text" "open open"')
+    expect(box.gap).toBe('8px 12px')
+    expect(styleOf('.urgent > .status', stacked)['grid-area']).toBe('status')
+    expect(styleOf('.urgent-text', stacked)['grid-area']).toBe('text')
+    expect(styleOf('.urgent-more', stacked)['grid-area']).toBe('more')
+    expect(styleOf('.urgent-open', stacked)['grid-area']).toBe('open')
+    // Row 1's two ends: never on top of each other.
+    expect(styleOf('.urgent > .status', stacked)['justify-self']).toBe('start')
+    expect(styleOf('.urgent-more', stacked)['justify-self']).toBe('end')
+    // The text wraps, even a title with no spaces.
+    expect(styleOf('.urgent-text', stacked).display).toBe('block')
+    for (const sel of ['.urgent-title', '.urgent-where']) {
+      expect(styleOf(sel, stacked)['white-space'], sel).toBe('normal')
+      expect(styleOf(sel, stacked)['overflow-wrap'], sel).toBe('anywhere')
+    }
+    // Full width, at least 44 px tall.
+    const btn = styleOf('.urgent-open', stacked)
     expect(btn.width).toBe('100%')
     expect(Number(/^(\d+)px$/.exec(btn['min-height'] ?? '')?.[1] ?? 0)).toBeGreaterThanOrEqual(44)
   })
 
+  it('short of room on one line, the repo goes first and the title keeps most of the text', () => {
+    expect(styleOf('.urgent-at', noRepo).display).toBe('none')
+    expect(styleOf('.urgent-where', noRepo)['max-width']).toBe('40%')
+    // Wide: the run may take half.
+    expect(styleOf('.urgent-where', desktop)['max-width']).toBe('50%')
+    // The narrow rules come later, so they win: 760 px holds 600 px.
+    expect(CSS.indexOf('(max-width: 760px)')).toBeGreaterThan(-1)
+    expect(CSS.indexOf('(max-width: 600px)')).toBeGreaterThan(CSS.indexOf('(max-width: 760px)'))
+  })
+
   it('status word keeps its tone and reaches 4.5:1 on the tint, in both themes', () => {
-    const TOKENS = readFileSync(join(here, '../../theme/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-    const tokensOf = (sel: string) => Object.assign({}, ...rules(TOKENS).filter((r) => r.media === undefined && r.selectors.includes(sel)).map((r) => decls(r.body))) as Record<string, string>
-    const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
-    const themes: [string, Record<string, string>][] = [
-      ['light', tokensOf(':root')],
-      ['dark', tokensOf(':root[data-theme="dark"]')],
-    ]
     const STATUSES: [string, string, number][] = [
       ['s-bad', 'blocked', 95],
       ['s-you', 'needs-you', 90],
       ['s-ok', 'ready', 85],
     ]
-    for (const [theme, tokens] of themes) {
+    for (const [theme, tokens] of THEMES) {
       for (const [cls, token, percent] of STATUSES) {
         const where = `${theme} ${cls}`
         const sel = `.urgent:has(> .status.${cls})`
         // The value the CSS really declares, resolved through this theme's tokens.
-        const paint = (value: string | undefined): number[] => {
-          const name = (v: string) => (v === '--tone' ? `--${token}` : v)
-          const plain = /^var\((--[a-z-]+)\)$/.exec(value ?? '')
-          if (plain) return rgb(tokens[name(plain[1]!)]!)
-          const mix = /^color-mix\(in srgb, var\((--[a-z-]+)\) (\d+)%, var\((--[a-z-]+)\)\)$/.exec(value ?? '')
-          expect(mix, `${where}: ${value}`).not.toBeNull()
-          const a = rgb(tokens[name(mix![1]!)]!)
-          const b = rgb(tokens[name(mix![3]!)]!)
-          const p = Number(mix![2]) / 100
-          return a.map((v, i) => v * p + b[i]! * (1 - p))
-        }
-        const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
-        const lum = (c: number[]) => 0.2126 * lin(c[0]!) + 0.7152 * lin(c[1]!) + 0.0722 * lin(c[2]!)
         const declared = styleOf(`${sel} > .status`, desktop).color
-        const [hi, lo] = [lum(paint(declared)), lum(paint(styleOf(sel, desktop).background))].sort((x, y) => y - x)
-        expect((hi! + 0.05) / (lo! + 0.05), `${where}: ${declared}`).toBeGreaterThanOrEqual(4.5)
+        expect(ratio(tokens, token, declared, styleOf(sel, desktop).background, where), `${where}: ${declared}`).toBeGreaterThanOrEqual(4.5)
         // Toned, not plain --fg: the tone stays the larger part of the mix.
         expect(declared, where).toBe(`color-mix(in srgb, var(--tone) ${percent}%, var(--fg))`)
       }
