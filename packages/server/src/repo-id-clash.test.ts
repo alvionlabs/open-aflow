@@ -62,16 +62,25 @@ async function makeRepo(path: string) {
 }
 
 /**
- * One stale engineer of sprint one in the Claude project folder both repos map to, as Claude writes it: every
- * record has the `cwd`, unless `cwd` is undefined. `age` is how many minutes ago it last wrote.
+ * One stale engineer of sprint one in the Claude project folder both repos map to, as Claude writes it: every record
+ * has a `cwd`. `cwd` is where the session started, in `<session>.jsonl` (undefined: its records have none;
+ * `sessionFile: false`: no such file). `agentCwd` is where the agent started, by default the same.
+ * `age` is how many minutes ago it last wrote.
  */
-async function engineer(o: { session: string; cwd: string | undefined; id?: string; age?: number; file?: string }) {
+async function engineer(o: { session: string; cwd: string | undefined; agentCwd?: string; sessionFile?: boolean; id?: string; age?: number; file?: string }) {
   const id = o.id ?? 'eng1'
-  const sub = join(root, 'claude', 'projects', projectDirName(hyphen), o.session, 'subagents')
+  const project = join(root, 'claude', 'projects', projectDirName(hyphen))
+  const sub = join(project, o.session, 'subagents')
   await mkdir(sub, { recursive: true })
   await writeFile(join(sub, `agent-${id}.meta.json`), JSON.stringify({ agentType: 'pod:engineer', description: 'Build A1' }))
   const at = (min: number) => new Date(NOW - (o.age ?? 120) * 60_000 + min * 60_000).toISOString()
-  const where = o.cwd === undefined ? {} : { cwd: o.cwd }
+  const agentCwd = o.agentCwd ?? o.cwd
+  const where = agentCwd === undefined ? {} : { cwd: agentCwd }
+  if (o.sessionFile !== false) {
+    // A first record with no cwd, as Claude's main chat can start.
+    const main = [{ type: 'summary', summary: 's' }, { type: 'user', ...(o.cwd === undefined ? {} : { cwd: o.cwd }), message: { role: 'user', content: 'go' } }]
+    await writeFile(join(project, `${o.session}.jsonl`), main.map((l) => JSON.stringify(l)).join('\n') + '\n')
+  }
   const lines = [
     { type: 'user', ...where, timestamp: at(-1), message: { role: 'user', content: '- **sprint slug:** one\n- **slice code:** A1\n- **branch name:** one-A1\n' } },
     { type: 'assistant', ...where, timestamp: at(0), message: { id: 'm1', role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'Read', input: { file_path: o.file ?? 'x.ts' } }] } },
@@ -302,6 +311,68 @@ describe('sessions in the Claude project folder two repos share', () => {
   })
 })
 
+describe('a session belongs to the folder it started in, not to where its agents work', () => {
+  beforeEach(clearAgents)
+  const agentsOf = (s: Awaited<ReturnType<typeof setup>>, path: string) => s.board().repos.find((r) => r.path === path)!.agents
+
+  test('a session of chess-web with its engineer in chess_web is chess-web’s', async () => {
+    await engineer({ session: 'sess-h', cwd: hyphen, agentCwd: underscore })
+    const s = await setup()
+    expect(agentsOf(s, underscore)).toEqual([])
+    expect(agentsOf(s, hyphen).map((a) => a.session)).toEqual(['sess-h'])
+    expect((await s.post('resume', { repoId: s.idOf(underscore), run: 'alpha', reply: 'continue' })).status).toBe(404)
+    const res = await s.post('resume', { repoId: s.idOf(hyphen), run: 'alpha', reply: 'continue' })
+    expect(res.status).toBe(200)
+    expect(s.starts).toEqual([{ session: 'sess-h', word: 'continue', cwd: hyphen }])
+  })
+
+  test('every agent of a session is placed the same way', async () => {
+    await engineer({ session: 'sess-h', cwd: hyphen, agentCwd: hyphen, id: 'eng1' })
+    await engineer({ session: 'sess-h', cwd: hyphen, agentCwd: underscore, id: 'eng2' })
+    await engineer({ session: 'sess-h', cwd: hyphen, agentCwd: join(root, 'elsewhere'), id: 'eng3' })
+    const s = await setup()
+    expect(agentsOf(s, hyphen).map((a) => a.id).sort()).toEqual(['eng1', 'eng2', 'eng3'])
+    expect(agentsOf(s, hyphen).every((a) => a.sessionUnproven === undefined)).toBe(true)
+    expect(agentsOf(s, underscore)).toEqual([])
+  })
+
+  test('the repo’s own engineers in its worktrees and next-door folders stay listed, and their session can be sent to', async () => {
+    await writeConfig(hyphen)
+    for (const agentCwd of [join(hyphen, '.claude', 'worktrees', 'one-A1'), `${hyphen}-A1`, join(`${hyphen}-worktrees`, 'one-A1')]) {
+      await clearAgents()
+      await engineer({ session: 'sess-h', cwd: hyphen, agentCwd })
+      const s = await setup()
+      expect(s.board().repos[0]!.agents.map((a) => a.sessionUnproven), agentCwd).toEqual([undefined])
+      expect((await s.post('resume', { repoId: s.idOf(hyphen), run: 'alpha', reply: 'continue' })).status, agentCwd).toBe(200)
+    }
+  })
+
+  test('a session that started in a folder with a longer name stays listed, and sends nothing', async () => {
+    await writeConfig(hyphen)
+    for (const cwd of [`${hyphen}-A1`, join(`${hyphen}-worktrees`, 'one-A1')]) {
+      await clearAgents()
+      await engineer({ session: 'sess-h', cwd })
+      const s = await setup()
+      expect(s.board().repos[0]!.agents.map((a) => a.sessionUnproven), cwd).toEqual([true])
+      expect(await (await s.post('resume', { repoId: s.idOf(hyphen), run: 'alpha', reply: 'continue' })).json(), cwd).toEqual({ error: 'no session' })
+    }
+  })
+
+  test('a session file with no cwd, or no session file, fails closed whatever the agent recorded', async () => {
+    await writeConfig(hyphen)
+    for (const o of [{ cwd: undefined, agentCwd: hyphen }, { cwd: hyphen, sessionFile: false }]) {
+      await clearAgents()
+      await engineer({ session: 'sess-h', ...o })
+      const s = await setup()
+      expect(s.board().repos[0]!.agents.map((a) => a.sessionUnproven)).toEqual([true])
+      await s.post('auto-continue', { repoId: s.idOf(hyphen), run: 'alpha', on: true })
+      await s.auto.check()
+      expect(await (await s.post('resume', { repoId: s.idOf(hyphen), run: 'alpha', reply: 'continue' })).json()).toEqual({ error: 'no session' })
+      expect(s.starts).toEqual([])
+    }
+  })
+})
+
 describe('an auto-continue toggle belongs to the repo at its path', () => {
   beforeEach(async () => {
     await clearAgents()
@@ -389,14 +460,20 @@ describe('an auto-continue toggle belongs to the repo at its path', () => {
     expect(s.starts).toEqual([])
   })
 
-  test('Remove keeps the toggle of a repo a port claim still lists', async () => {
+  test('Remove forgets the toggle of a repo a port claim still lists too, so it stays off when the claim ends and the folder returns', async () => {
     await writeConfig(hyphen)
     await writeFile(join(root, 'ports', '3100'), `${hyphen} alpha`)
     const s = await setup()
     await s.post('auto-continue', { repoId: plainId(), run: 'alpha', on: true })
     await s.post('remove-repo', { repoId: plainId(), path: hyphen })
     expect(s.board().repos.map((r) => r.source)).toEqual(['claim'])
-    expect(s.board().autoContinue).toEqual([{ repoId: plainId(), run: 'alpha' }])
+    expect(s.board().autoContinue).toEqual([])
+    await rm(join(root, 'ports', '3100'))
+    await writeConfig(hyphen)
+    await s.rebuild()
+    expect(s.board().autoContinue).toEqual([])
+    await s.auto.check()
+    expect(s.starts).toEqual([])
   })
 
   test('a repo whose claim ends and comes back keeps its toggle', async () => {

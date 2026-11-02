@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import {
   claudeDir,
   createAgentFileCache,
+  createSessionCwdCache,
+  firstCwdOfFile,
   listAgentFiles,
   projectDirName,
   readAgentFile,
@@ -181,5 +183,59 @@ describe('finds agent transcripts', () => {
     await rm(file!.jsonlPath)
     await expect(cache.read(file!)).rejects.toThrow()
     await expect(readAgentFile(file!)).rejects.toThrow()
+  })
+})
+
+describe('the cwd of a session file', () => {
+  let dir: string
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'pod-board-session-cwd-'))
+  })
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true })
+  })
+  const file = () => join(dir, 's.jsonl')
+
+  test('is the first readable one, past records with none and a line that is not JSON', async () => {
+    await writeFile(file(), ['not json', '{"type":"summary"}', '{"cwd":7}', '{"cwd":""}', '{"cwd":"E:/a"}', '{"cwd":"E:/b"}'].join('\n'))
+    expect(await firstCwdOfFile(file())).toBe('E:/a')
+  })
+
+  test('a file with none, a missing file, or a half-written last line gives none', async () => {
+    await writeFile(file(), '{"type":"summary"}\n')
+    expect(await firstCwdOfFile(file())).toBeUndefined()
+    expect(await firstCwdOfFile(join(dir, 'none.jsonl'))).toBeUndefined()
+    await writeFile(file(), '{"cwd":"E:/a"')
+    expect(await firstCwdOfFile(file())).toBeUndefined()
+  })
+
+  test('a long first line still gives its cwd, across read chunks', async () => {
+    await writeFile(file(), JSON.stringify({ text: 'x'.repeat(300_000), cwd: 'E:/a' }) + '\n')
+    expect(await firstCwdOfFile(file())).toBe('E:/a')
+  })
+
+  test('reads only the head: a cwd past the limit gives none', async () => {
+    await writeFile(file(), JSON.stringify({ text: 'x'.repeat(2_000_000) }) + '\n' + JSON.stringify({ cwd: 'E:/a' }) + '\n')
+    expect(await firstCwdOfFile(file())).toBeUndefined()
+  })
+
+  test('the cache reads a file once until its size or mtime changes, and forgets what it does not retain', async () => {
+    let reads = 0
+    const cache = createSessionCwdCache(async () => {
+      reads += 1
+      return 'E:/a'
+    })
+    await writeFile(file(), 'one')
+    expect(await cache.read(file())).toBe('E:/a')
+    expect(await cache.read(file())).toBe('E:/a')
+    expect(reads).toBe(1)
+    await writeFile(file(), 'three')
+    await cache.read(file())
+    expect(reads).toBe(2)
+    cache.retain([])
+    await cache.read(file())
+    expect(reads).toBe(3)
+    expect(await cache.read(join(dir, 'none.jsonl'))).toBeUndefined()
+    expect(reads).toBe(3)
   })
 })
