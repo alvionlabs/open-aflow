@@ -219,6 +219,37 @@ describe('the cwd of a session file', () => {
     expect(await firstCwdOfFile(file())).toBeUndefined()
   })
 
+  test('a file it can open but not read rejects, so "could not read" stays apart from "no cwd"', async () => {
+    await expect(firstCwdOfFile(dir)).rejects.toThrow()
+  })
+
+  test('a failed read reads as no cwd and is not cached: the next call tries again and gets the cwd', async () => {
+    let reads = 0
+    const cache = createSessionCwdCache(async () => {
+      reads += 1
+      if (reads === 1) throw new Error('locked')
+      return 'E:/a'
+    })
+    await writeFile(file(), 'one')
+    await expect(cache.read(file())).resolves.toBeUndefined()
+    await expect(cache.read(file())).resolves.toBe('E:/a')
+    expect(reads).toBe(2)
+    await cache.read(file())
+    expect(reads).toBe(2)
+  })
+
+  test('a file read with no cwd stays cached', async () => {
+    let reads = 0
+    const cache = createSessionCwdCache(async () => {
+      reads += 1
+      return undefined
+    })
+    await writeFile(file(), 'one')
+    await cache.read(file())
+    await cache.read(file())
+    expect(reads).toBe(1)
+  })
+
   test('the cache reads a file once until its size or mtime changes, and forgets what it does not retain', async () => {
     let reads = 0
     const cache = createSessionCwdCache(async () => {
