@@ -3,15 +3,26 @@
  * (plan next-step-across-runs, direction B). Look B of draft 2: tinted by its item's status (blocked, needs you,
  * ready); any other status keeps the plain box.
  * .urgent-slot is the live region; it has no box of its own, so an empty one takes no space.
+ * Other items stack behind the banner (stack A of draft 3), and the count is a pill (option 4 of draft 4).
  */
 
-/* A grid item of .main: min-width 0, so a long title ends in an ellipsis instead of widening the column. */
+/*
+ * A grid item of .main: min-width 0, so a long title ends in an ellipsis instead of widening the column.
+ * The container: the banner's layout follows its own width, since the sidebar can take 400 px from the
+ * column at any viewport above 820 px. Inline size only, so an empty slot still has no height.
+ * Its stacking context holds the layers' negative z-index, so they sit above the page and below the card.
+ */
 .urgent-slot {
   display: block;
   min-width: 0;
+  container: urgent / inline-size;
+  isolation: isolate;
 }
 
 .urgent {
+  position: relative;
+  /* A status with no tone of its own: the layers keep the plain box, and the pill still gets a fill. */
+  --tone: var(--muted);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -23,6 +34,41 @@
   background: var(--bg);
   color: var(--fg);
   font: var(--size-dense) / 1.4 var(--font);
+}
+
+/*
+ * The stack. The card gives up the layers' room on the right, so the stack's right edge stays on the
+ * column's edge, and the 24 px gap below is measured from the lowest layer.
+ */
+.urgent:has(> .urgent-layer-1) {
+  margin: 0 8px 32px 0;
+}
+
+.urgent:has(> .urgent-layer-2) {
+  margin: 0 16px 40px 0;
+}
+
+/*
+ * Each layer copies the card, on the card's border box, so it takes the tone and follows the card's height.
+ * The card must not be a stacking context: its own layers would then paint over its fill.
+ */
+.urgent-layer {
+  position: absolute;
+  inset: -1px;
+  border: inherit;
+  border-radius: inherit;
+  background: inherit;
+  pointer-events: none;
+}
+
+.urgent-layer-1 {
+  z-index: -1;
+  transform: translate(8px, 8px);
+}
+
+.urgent-layer-2 {
+  z-index: -2;
+  transform: translate(16px, 16px);
 }
 
 /*
@@ -71,7 +117,7 @@
   white-space: nowrap;
 }
 
-/* The title gives way first: it ends in an ellipsis, the run and the count stay whole. */
+/* The title gives way first: it ends in an ellipsis; the status, the count and the button never shrink. */
 .urgent-text {
   display: flex;
   flex: 1;
@@ -89,17 +135,29 @@
   white-space: nowrap;
 }
 
-.urgent-where,
-.urgent-more {
+.urgent-where {
   flex: none;
   font-size: var(--size-small);
   white-space: nowrap;
 }
 
 /* The status word and the repo in Geist Mono, as the Look says; the run's name in Geist. */
-.urgent-repo,
-.urgent-more {
+.urgent-repo {
   font-family: var(--mono);
+}
+
+/* The count, at the right end beside the button. urgent-banner.test.ts computes its contrast from tokens.css. */
+.urgent-more {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--tone) 24%, var(--bg));
+  color: var(--fg);
+  font: 500 var(--size-small) / 1 var(--mono);
+  white-space: nowrap;
 }
 
 .urgent-where {
@@ -127,13 +185,74 @@
   background: color-mix(in srgb, var(--tone) 16%, transparent);
 }
 
-/* Phone: the text wraps on one or two lines, then Open run full width as a 44 px target. */
-@media (max-width: 480px) {
-  .urgent {
-    flex-wrap: wrap;
-    align-items: baseline;
+/*
+ * With a count, short of room on one line: the repo goes first, and the title keeps most of the text.
+ * A banner with no count needs less room, and keeps its one line and repo. Every width here is measured
+ * (the numbers are in feature-details/urgent-banner.md); change one only after you measure again.
+ */
+@container urgent (max-width: 760px) {
+  .urgent:has(> .urgent-more) .urgent-at {
+    display: none;
+  }
+
+  .urgent:has(> .urgent-more) .urgent-where {
+    max-width: 40%;
+  }
+}
+
+/* Narrow, with a count: the status and the count, then the text, wrapping, then Open run full width as a 44 px target. */
+@container urgent (max-width: 620px) {
+  .urgent:has(> .urgent-more) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "status more" "text text" "open open";
+    align-items: center;
     gap: 8px 12px;
     padding: 12px;
+  }
+
+  .urgent:has(> .urgent-more) > .status {
+    grid-area: status;
+    justify-self: start;
+  }
+
+  .urgent-more {
+    grid-area: more;
+    justify-self: end;
+  }
+
+  .urgent:has(> .urgent-more) > .urgent-text {
+    grid-area: text;
+    display: block;
+  }
+
+  .urgent:has(> .urgent-more) .urgent-title,
+  .urgent:has(> .urgent-more) .urgent-where {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .urgent:has(> .urgent-more) > .urgent-open {
+    grid-area: open;
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* Narrow, with no count: the same rows, with the repo hidden. urgent-banner.test.ts keeps the two blocks the same. */
+@container urgent (max-width: 520px) {
+  .urgent {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "status more" "text text" "open open";
+    align-items: center;
+    gap: 8px 12px;
+    padding: 12px;
+  }
+
+  .urgent > .status {
+    grid-area: status;
+    justify-self: start;
   }
 
   .urgent-at {
@@ -141,18 +260,18 @@
   }
 
   .urgent-text {
+    grid-area: text;
     display: block;
   }
 
-  .urgent-title {
-    white-space: normal;
-  }
-
+  .urgent-title,
   .urgent-where {
     white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .urgent-open {
+    grid-area: open;
     width: 100%;
     min-height: 44px;
   }
