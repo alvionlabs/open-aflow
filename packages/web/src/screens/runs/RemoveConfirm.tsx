@@ -43,14 +43,20 @@ export function RemoveConfirmView({ view, onRemove, onCancel, onKey, panelRef }:
   )
 }
 
-export function giveFocusBack(_panel: { isConnected: boolean } | null, returnTo: string, doc: Pick<Document, 'getElementById' | 'activeElement' | 'body'>) {
+/**
+ * Runs once the confirm has closed and the page has settled. A panel still on the page wasn't closed (StrictMode
+ * runs the cleanup once on mount). Focus that something else took stays there, such as Open run's on the run title.
+ * Else focus fell to the body with the panel, so it goes to the ⋯ button, or the header's when that left with its card.
+ */
+export function giveFocusBack(panel: { isConnected: boolean } | null, returnTo: string, doc: Pick<Document, 'getElementById' | 'activeElement' | 'body'>) {
+  if (panel?.isConnected) return
+  if (doc.activeElement !== null && doc.activeElement !== doc.body) return
   ;(doc.getElementById(returnTo) ?? doc.getElementById(MENU_TRIGGER_ID))?.focus()
 }
 
 /**
  * The confirm, under the run header or under a sidebar card. Focus moves into it when it opens and back
- * to the ⋯ button it came from (`returnTo`) when it closes; when that button left with its card, to the
- * header's ⋯.
+ * to the ⋯ button it came from (`returnTo`) when it closes, unless something else took focus (`giveFocusBack`).
  */
 export function RemoveConfirm({ returnTo, ...props }: Omit<ViewProps, 'panelRef'> & { returnTo: string }) {
   const ref = useRef<HTMLElement>(null)
@@ -58,12 +64,8 @@ export function RemoveConfirm({ returnTo, ...props }: Omit<ViewProps, 'panelRef'
     const panel = ref.current
     panel?.focus()
     // After a removal the page settles first (the menu remounts, the card leaves), so look the button up then.
-    // A panel still on the page wasn't closed (StrictMode runs this cleanup once on mount): keep focus.
     return () => {
-      setTimeout(() => {
-        if (panel?.isConnected) return
-        ;(document.getElementById(returnTo) ?? document.getElementById(MENU_TRIGGER_ID))?.focus()
-      }, 0)
+      setTimeout(() => giveFocusBack(panel, returnTo, document), 0)
     }
   }, [])
   // Buttons go disabled while removing; keep focus in the panel so Escape still reaches it.
