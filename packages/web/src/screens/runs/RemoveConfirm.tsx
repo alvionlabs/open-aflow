@@ -43,6 +43,10 @@ export function RemoveConfirmView({ view, onRemove, onCancel, onKey, panelRef }:
   )
 }
 
+export function giveFocusBack(_panel: { isConnected: boolean } | null, returnTo: string, doc: Pick<Document, 'getElementById' | 'activeElement' | 'body'>) {
+  ;(doc.getElementById(returnTo) ?? doc.getElementById(MENU_TRIGGER_ID))?.focus()
+}
+
 /**
  * The confirm, under the run header or under a sidebar card. Focus moves into it when it opens and back
  * to the ⋯ button it came from (`returnTo`) when it closes; when that button left with its card, to the

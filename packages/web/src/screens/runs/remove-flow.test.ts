@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { BoardRepo, RemoveRepoResult, RunSummary } from '@pod-board/model'
 import type { ActionReply } from '../../actions-client.ts'
-import { RemoveConfirmView } from './RemoveConfirm.tsx'
+import { RemoveConfirmView, giveFocusBack } from './RemoveConfirm.tsx'
 import { HEADER_PLACE, REMOVE_ITEM, confirmView, createRemoveFlow, hashAfterRemove, moreName, navigateAfterRemove, removeTarget, repoOfRun, type Post, type RemoveState, type RemoveTarget } from './remove-flow.ts'
 
 const A: RemoveTarget = { repoId: 'ra', name: 'alpha-repo', path: 'C:/code/alpha-repo', alsoClaimed: false, runs: 2, place: HEADER_PLACE, returnTo: 'run-menu-trigger' }
@@ -314,5 +314,50 @@ describe('moreName: the sidebar ⋯ label', () => {
 
   it('drops the brackets when the run is named after its repo', () => {
     expect(moreName('ytb-feed', 'ytb-feed')).toBe('ytb-feed')
+  })
+})
+
+describe('giveFocusBack: when the confirm has left the page', () => {
+  const setup = (active: 'body' | 'none' | 'elsewhere', present: string[] = ['run-more-x', 'run-menu-trigger']) => {
+    const focused: string[] = []
+    const el = (id: string) => ({ focus: () => focused.push(id) })
+    const body = el('body')
+    const doc = {
+      body,
+      activeElement: active === 'body' ? body : active === 'none' ? null : el('h1.run-name'),
+      getElementById: (id: string) => (present.includes(id) ? el(id) : null),
+    } as unknown as Pick<Document, 'getElementById' | 'activeElement' | 'body'>
+    return { doc, focused }
+  }
+  const gone = { isConnected: false }
+
+  it('a plain Cancel or Escape: focus fell to the body, so it goes back to the button', () => {
+    const t = setup('body')
+    giveFocusBack(gone, 'run-more-x', t.doc)
+    expect(t.focused).toEqual(['run-more-x'])
+  })
+
+  it('no active element at all: it goes back to the button', () => {
+    const t = setup('none')
+    giveFocusBack(gone, 'run-more-x', t.doc)
+    expect(t.focused).toEqual(['run-more-x'])
+  })
+
+  it('focus already moved elsewhere (Open run on the run title): it stays there', () => {
+    const t = setup('elsewhere')
+    giveFocusBack(gone, 'run-more-x', t.doc)
+    expect(t.focused).toEqual([])
+  })
+
+  it('the button left with its card: it goes to the header button', () => {
+    const t = setup('body', ['run-menu-trigger'])
+    giveFocusBack(gone, 'run-more-x', t.doc)
+    expect(t.focused).toEqual(['run-menu-trigger'])
+  })
+
+  it('a panel still on the page was not closed (StrictMode runs the cleanup once on mount): focus stays', () => {
+    const t = setup('body')
+    giveFocusBack({ isConnected: true }, 'run-more-x', t.doc)
+    expect(t.focused).toEqual([])
   })
 })
