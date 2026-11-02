@@ -57,7 +57,7 @@ function chess(edits: Edit[] = [], extra: Partial<BoardRepo> = {}): BoardRepo {
   for (const e of edits) e(files)
   return { id: 'chess', name: 'chess-web', path: '/c', source: 'registered', model: buildRepoModel(files), agents: [], prs: [], claims: [], ...extra }
 }
-const boardOf = (repo: BoardRepo): Board => ({ generatedAt: NOW, gh: 'ok', repos: [repo], actions: [] })
+const boardOf = (...repos: BoardRepo[]): Board => ({ generatedAt: NOW, gh: 'ok', repos, actions: [] })
 
 /** A tab store holding `value`; writes are kept so a test could read them. */
 function storage(value: string | null = null): TabStorage {
@@ -73,13 +73,13 @@ function storage(value: string | null = null): TabStorage {
   }
 }
 
-type Render = { repo: BoardRepo; run?: RunSummary; plan?: string; view?: View; stream?: StreamState; tab?: string | null; agent?: string }
+type Render = { repo: BoardRepo; others?: BoardRepo[]; run?: RunSummary; plan?: string; view?: View; stream?: StreamState; tab?: string | null; agent?: string }
 
-/** The screen's markup for a Board of one repo, the run picked by plan (or given). */
-function render({ repo, run, plan = PLAN, view = 'pipeline', stream = 'live', tab = null, agent }: Render): { html: string; run: RunSummary } {
-  const board = boardOf(repo)
+/** The screen's markup for a Board of `repo` (then `others`), the run of `repo` picked by plan (or given). */
+function render({ repo, others = [], run, plan = PLAN, view = 'pipeline', stream = 'live', tab = null, agent }: Render): { html: string; run: RunSummary } {
+  const board = boardOf(repo, ...others)
   const runs = listRuns(board, NOW)
-  const selected = run ?? runs.find((r) => r.plan === plan)
+  const selected = run ?? runs.find((r) => r.repoId === repo.id && r.plan === plan)
   if (!selected) throw new Error(`no run ${plan}`)
   const html = renderToStaticMarkup(
     createElement(RunsScreen, { board, stream, runs, selected, view, slice: undefined, agent, now: NOW, storage: storage(tab) }),
@@ -373,7 +373,7 @@ describe('sidebar', () => {
     // `fix` once: the tag, never also in the name.
     expect(count(text(card), /\bfix\b/)).toBe(1)
     // The same name as the run header.
-    expect(headerOf(html)).toMatch(/<h1 class="run-name">gh pr list times out<\/h1>/)
+    expect(headerOf(html)).toMatch(/<h1 class="run-name" tabindex="-1">gh pr list times out<\/h1>/)
   })
 
   it('shows lost · retrying beside the title only while lost', () => {
@@ -394,7 +394,7 @@ describe('sidebar', () => {
 
   it('heads the run with a plain title and one muted meta line, no crumb', () => {
     const header = headerOf(render({ repo: chess([onlyQueue()]) }).html)
-    expect(header).toMatch(/<h1 class="run-name">Sparring ladder to Liem<\/h1><p class="run-sub muted">chess-web · Plan · started 2 days ago<\/p>/)
+    expect(header).toMatch(/<h1 class="run-name" tabindex="-1">Sparring ladder to Liem<\/h1><p class="run-sub muted">chess-web · Plan · started 2 days ago<\/p>/)
     // No slash crumb and no eyebrow above the title.
     expect(header).not.toMatch(/run-crumb|eyebrow/)
     expect(text(header)).not.toMatch(/\//)
@@ -406,7 +406,7 @@ describe('sidebar', () => {
     const name = 'fix-sprint-column'
     const claim: Claim = { portBase: 3100, repoPath: '/c', plan: name }
     const header = headerOf(render({ repo: chess([], { claims: [claim] }), plan: name }).html)
-    expect(header).toMatch(/<h1 class="run-name">Sprint column<\/h1><p class="run-sub muted">chess-web · Fix<\/p>/)
+    expect(header).toMatch(/<h1 class="run-name" tabindex="-1">Sprint column<\/h1><p class="run-sub muted">chess-web · Fix<\/p>/)
     expect(header).not.toMatch(/fix · /)
   })
 
@@ -502,5 +502,57 @@ describe('sibling keys', () => {
     expect(keyOf('Flow')).toBeDefined()
     expect(keyOf('NextStepCard')).toBeDefined()
     expect(keyOf('Flow')).not.toBe(keyOf('NextStepCard'))
+  })
+})
+
+describe('urgent banner', () => {
+  // X (selected) waits on a decision; another repo's run waits on a halt or on less.
+  const decision = entry('PENDING', 'engineer → human', `plan: ${PLAN}`, 'decision: pick the port.')
+  const someday = entry('PENDING', 'engineer → human', `plan: ${PLAN}`, 'someday: trim the cache.')
+  const x = () => chess([onlyQueue(decision), manual])
+  /** A second repo from the same fixture, with its own id, name and queue. */
+  function other(...lines: string[]): BoardRepo {
+    return { ...chess([onlyQueue(...lines), manual]), id: 'other', name: 'other-web', path: '/o' }
+  }
+  const mainOf = (html: string) => /<main class="main[^"]*">([\s\S]*)<\/main>/.exec(html)?.[1] ?? ''
+  const slotOf = (html: string) => /<div class="urgent-slot" role="status">([\s\S]*?)<\/div><\/div>|<div class="urgent-slot" role="status"><\/div>/.exec(html)
+
+  it('urgent banner shows another run\'s halt above the header', () => {
+    const { html } = render({ repo: x(), others: [other(HALT)], stream: 'lost' })
+    const main = mainOf(html)
+    // The live region is the first child of main; the banner sits in it, before the error notices and the header.
+    expect(main).toMatch(/^<div class="urgent-slot" role="status"><div class="urgent">/)
+    expect(main.indexOf('class="urgent"')).toBeLessThan(main.indexOf('class="banners"'))
+    expect(main.indexOf('class="banners"')).toBeLessThan(main.indexOf('class="run-header"'))
+    const slot = slotOf(main)?.[0] ?? ''
+    expect(text(slot).replace(/\s+/g, ' ').trim()).toBe('Blocked Autopilot stopped: a slice is blocked · other-web · Sparring ladder to Liem Open run')
+    expect(slot).toMatch(/href="#\/other\/sparring-ladder"/)
+    expect(slot).toMatch(/aria-label="Open run Sparring ladder to Liem"/)
+    // X's own card is still the decision, with the page's one primary button.
+    expect(text(cardOf(html))).toMatch(/pick the port/)
+    expect(count(html, /class="btn primary[^"]*"/)).toBe(1)
+  })
+
+  it('no banner when nothing outranks', () => {
+    const { html } = render({ repo: x(), others: [other(someday)], stream: 'lost' })
+    const main = mainOf(html)
+    // The region stays, empty, so a later item is announced; then today's order.
+    expect(main).toMatch(/^<div class="urgent-slot" role="status"><\/div><div class="banners">/)
+    expect(main).not.toMatch(/class="urgent"/)
+    expect(main.indexOf('class="banners"')).toBeLessThan(main.indexOf('class="run-header"'))
+    // With no error notice, the header follows the empty region.
+    expect(mainOf(render({ repo: x(), others: [other(someday)] }).html)).toMatch(/^<div class="urgent-slot" role="status"><\/div><header class="run-header"/)
+  })
+
+  it('banner only on screen 1 views', () => {
+    const board = render({ repo: x(), others: [other(HALT)], view: 'board' }).html
+    expect(board).toMatch(/class="wave-board"/)
+    expect(board).not.toMatch(/urgent/)
+    // A fix run's Log on screen 1 (the agent view) has it.
+    const name = 'fix-scroll'
+    const claim: Claim = { portBase: 3100, repoPath: '/c', plan: name }
+    const agent = render({ repo: chess([onlyQueue(), manual], { claims: [claim] }), others: [other(HALT)], plan: name, view: 'agent', agent: 'f1' }).html
+    expect(mainOf(agent)).toMatch(/^<div class="urgent-slot" role="status"><div class="urgent">/)
+    expect(text(slotOf(agent)?.[0] ?? '')).toMatch(/other-web/)
   })
 })

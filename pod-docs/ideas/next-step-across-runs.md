@@ -1,6 +1,6 @@
 # Idea: Next step across runs
 
-Status: parked
+Status: planned — pod-docs/plans/next-step-across-runs.md
 
 ## The idea
 One Next step card that points to the most urgent thing in any repo, not just the selected run. It uses the same order as the `calm-dashboard` card: `BLOCKED`, a PR to merge, a reply to send, then other `PENDING` entries. A click on the card selects the run it came from.

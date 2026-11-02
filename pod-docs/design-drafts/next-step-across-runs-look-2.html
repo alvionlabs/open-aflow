@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Urgent banner — stronger look (draft 2)</title>
+<style>
+  @font-face { font-family: "Geist"; font-weight: 400; src: url("../../packages/web/public/fonts/geist-400.woff2") format("woff2"); }
+  @font-face { font-family: "Geist"; font-weight: 500; src: url("../../packages/web/public/fonts/geist-500.woff2") format("woff2"); }
+  @font-face { font-family: "Geist"; font-weight: 600; src: url("../../packages/web/public/fonts/geist-600.woff2") format("woff2"); }
+  @font-face { font-family: "Geist Mono"; font-weight: 400; src: url("../../packages/web/public/fonts/geist-mono-400.woff2") format("woff2"); }
+  @font-face { font-family: "Geist Mono"; font-weight: 500; src: url("../../packages/web/public/fonts/geist-mono-500.woff2") format("woff2"); }
+
+  /* Board tokens (packages/web/src/theme/tokens.css) */
+  .dark  { --bg:#000; --surface:#0a0a0a; --hover:#1a1a1a; --border:#262626; --border-strong:#3a3a3a; --fg:#ededed; --muted:#a1a1a1;
+           --blocked:#ff5f5f; --needs-you:#f5a623; --ready:#3ecf72; --idle:#8f8f8f; }
+  .light { --bg:#fff; --surface:#fafafa; --hover:#f2f2f2; --border:#eaeaea; --border-strong:#d4d4d4; --fg:#171717; --muted:#666;
+           --blocked:#d0262f; --needs-you:#b25d00; --ready:#1a8a45; --idle:#7d7d7d; }
+  :root { --font:"Geist","Segoe UI",system-ui,sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace; }
+
+  *, *::before, *::after { box-sizing:border-box; }
+  body { margin:0; background:#111; color:#ededed; font:16px/1.5 var(--font); }
+  .page { max-width:1320px; margin:0 auto; padding:32px 24px 64px; }
+  h1 { font-size:24px; margin:0 0 8px; letter-spacing:-0.02em; }
+  .lead { color:#a1a1a1; max-width:80ch; margin:0 0 24px; }
+  h2 { font-size:18px; margin:40px 0 4px; }
+  h2 small { font-weight:400; color:#a1a1a1; font-size:14px; margin-left:8px; }
+  .why { color:#a1a1a1; font-size:14px; margin:0 0 12px; max-width:90ch; }
+  .row { display:grid; grid-template-columns: 1fr 375px; gap:16px; margin-bottom:16px; }
+  .frame { background:var(--bg); color:var(--fg); border-radius:12px; padding:24px; border:1px solid #2a2a2a; min-width:0; }
+  .frame.phone { padding:16px; }
+  .tag { font:12px var(--mono); color:#8f8f8f; margin-bottom:8px; }
+
+  /* The banner, as built (urgent-banner.css) */
+  .urgent { display:flex; align-items:center; gap:12px; margin-bottom:24px; padding:8px 8px 8px 16px;
+            border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); color:var(--fg);
+            font:14px/1.4 var(--font); }
+  .status { display:inline-flex; align-items:center; gap:8px; font:500 13px/1.2 var(--mono); white-space:nowrap; flex:none; color:var(--fg); }
+  .status::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--dot); }
+  .s-bad { --dot:var(--blocked); } .s-you { --dot:var(--needs-you); } .s-ok { --dot:var(--ready); }
+  .text { display:flex; flex:1; align-items:baseline; gap:8px; min-width:0; }
+  .title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .where, .more { flex:none; font-size:13px; white-space:nowrap; color:var(--muted); }
+  .repo, .more { font-family:var(--mono); }
+  .btn { display:inline-flex; align-items:center; gap:6px; flex:none; height:32px; padding:0 8px 0 12px; border-radius:6px;
+         font:500 14px var(--font); color:var(--fg); text-decoration:none; border:1px solid var(--border-strong); background:var(--bg); cursor:pointer; }
+  .btn svg { width:16px; height:16px; }
+  .btn.quiet { border-color:transparent; background:transparent; }
+  .btn.quiet:hover { background:color-mix(in srgb, var(--tone, var(--fg)) 16%, transparent); }
+
+  /* Run header under it, for context */
+  .head { display:flex; justify-content:space-between; align-items:flex-start; }
+  .head b { font:600 24px/1.2 var(--font); letter-spacing:-0.02em; }
+  .head p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+  .head .q { color:var(--muted); font-size:14px; padding-top:6px; }
+
+  /* Variants */
+  .urgent:has(> .s-bad) { --tone:var(--blocked); }
+  .urgent:has(> .s-you) { --tone:var(--needs-you); }
+  .urgent:has(> .s-ok)  { --tone:var(--ready); }
+
+  .v-tint .urgent  { padding:12px 8px 12px 16px; border-color:color-mix(in srgb, var(--tone) 50%, transparent);
+                     background:color-mix(in srgb, var(--tone) 10%, var(--bg)); }
+  .v-soft .urgent  { padding:12px 8px 12px 16px; border-color:color-mix(in srgb, var(--tone) 32%, transparent);
+                     background:color-mix(in srgb, var(--tone) 5%, var(--bg)); }
+  .v-edge .urgent  { padding:12px 8px 12px 16px; border-color:var(--border-strong); border-left:4px solid var(--tone);
+                     padding-left:12px; background:var(--surface); }
+  .v-tint .status, .v-soft .status, .v-edge .status { color:var(--tone); }
+  .v-tint .title, .v-soft .title, .v-edge .title { font-weight:500; }
+
+  /* Phone (≤ 480 px): text wraps, the repo hides, the button is a full-width 44 px target */
+  .phone .urgent { flex-wrap:wrap; align-items:baseline; gap:8px 12px; padding:8px 12px; }
+  .phone.v-tint .urgent, .phone.v-soft .urgent { padding:12px; }
+  .phone.v-edge .urgent { padding:12px 12px 12px 12px; }
+  .phone .at { display:none; }
+  .phone .text { display:block; }
+  .phone .title, .phone .where { white-space:normal; }
+  .phone .btn { width:100%; min-height:44px; justify-content:center; padding:0 12px; }
+  .phone .head b { font-size:22px; }
+  .phone .head .q { display:none; }
+</style>
+</head>
+<body>
+<main class="page">
+  <h1>Urgent banner — make it stand out</h1>
+  <p class="lead">Your note: "too subtle, and the Open run button is nested inside; use the text button." Each row shows the banner above the run header at desktop (left) and at 375 px (right). Hover "Open run" to see its hover state. B is what the live preview on <code>127.0.0.1:3001</code> shows now.</p>
+
+  <template id="banner">
+    <div class="urgent">
+      <span class="status s-bad">Blocked</span>
+      <span class="text"><span class="title">Autopilot stopped: the wave check failed</span>
+        <span class="where"><span class="at">· <span class="repo">pod-trial-mock</span> </span>· An old finished plan</span>
+        <span class="more">+1 more</span></span>
+      <a class="btn" href="#">Open run <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    </div>
+    <div class="head"><div><b>No sprints yet</b><p>pod-trial-mock · Plan · started 3 days ago</p></div><span class="q">Open the wave board</span></div>
+  </template>
+
+  <section data-v="" data-quiet="0">
+    <h2>A · Today<small>as merged (#67)</small></h2>
+    <p class="why">Neutral border, no fill, only the dot has colour; "Open run" is a boxed button inside the box.</p>
+  </section>
+
+  <section data-v="v-tint" data-quiet="1">
+    <h2>B · Tinted<small>the live preview</small></h2>
+    <p class="why">Status-coloured fill (10 %) and border (50 %), status word in its colour, title 500 weight, "Open run" a text button like "Open the wave board".</p>
+  </section>
+
+  <section data-v="v-soft" data-quiet="1">
+    <h2>C · Soft tint<small>half the strength of B</small></h2>
+    <p class="why">Fill 5 %, border 32 %. Reads as coloured, stays closer to the calm look.</p>
+  </section>
+
+  <section data-v="v-edge" data-quiet="1">
+    <h2>D · Edge only<small>no fill colour</small></h2>
+    <p class="why">Neutral surface box with a 4 px status-coloured left edge. Colour only on the edge, the dot and the word.</p>
+  </section>
+
+  <section data-v="v-tint" data-quiet="1" data-states="1">
+    <h2>B in every state<small>blocked · needs you · merge</small></h2>
+    <p class="why">The tint follows the item's status: red for blocked, amber for a decision or reply, green for a PR ready to merge.</p>
+  </section>
+</main>
+
+<script>
+  const tpl = document.getElementById('banner');
+  const states = [
+    ['s-bad', 'Blocked', 'Autopilot stopped: the wave check failed'],
+    ['s-you', 'Needs you', 'decision: the run card accent colour'],
+    ['s-ok', 'Ready', 'Merge PR #78'],
+  ];
+  function frame(v, quiet, theme, phone, st) {
+    const f = document.createElement('div');
+    f.className = `frame ${theme} ${v} ${phone ? 'phone' : ''}`;
+    const tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.textContent = `${theme} · ${phone ? '375 px' : 'desktop'}`;
+    f.append(tag, tpl.content.cloneNode(true));
+    if (quiet) f.querySelector('.btn').classList.add('quiet');
+    if (st) {
+      const s = f.querySelector('.status');
+      s.className = 'status ' + st[0]; s.textContent = st[1];
+      f.querySelector('.title').textContent = st[2];
+    }
+    return f;
+  }
+  for (const sec of document.querySelectorAll('section')) {
+    const v = sec.dataset.v, quiet = sec.dataset.quiet === '1';
+    if (sec.dataset.states) {
+      for (const theme of ['dark', 'light']) for (const st of states) {
+        const row = document.createElement('div'); row.className = 'row';
+        row.append(frame(v, quiet, theme, false, st), frame(v, quiet, theme, true, st));
+        sec.append(row);
+      }
+      continue;
+    }
+    for (const theme of ['dark', 'light']) {
+      const row = document.createElement('div'); row.className = 'row';
+      row.append(frame(v, quiet, theme, false), frame(v, quiet, theme, true));
+      sec.append(row);
+    }
+  }
+</script>
+</body>
+</html>

@@ -8,8 +8,10 @@ import { AddRepoDialog } from './AddRepoDialog.tsx'
 import { BarMenu } from './BarMenu.tsx'
 import { Flow } from './Flow.tsx'
 import { Chip } from './Chip.tsx'
+import { elsewhere } from './elsewhere.ts'
 import { LogTab } from './LogTab.tsx'
 import { NextStepCard } from './NextStepCard.tsx'
+import { focusOnArrival } from './open-focus.ts'
 import { nextSteps } from './next-step.ts'
 import { runHeader } from './plan-view.ts'
 import { switchView } from './resume-flow.ts'
@@ -30,6 +32,7 @@ import {
 import { RunHeader } from './RunHeader.tsx'
 import { RunsList } from './RunsList.tsx'
 import { SideHandle } from './SideHandle.tsx'
+import { UrgentBanner } from './UrgentBanner.tsx'
 import { readWidth, saveWidth } from './sidebar-width.ts'
 import { readTab, saveTab, shownTab, type Tab, type TabStorage } from './tab-memory.ts'
 import { WaitingTab } from './WaitingTab.tsx'
@@ -72,6 +75,9 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   const [picking, setPicking] = useState(false)
   const [sideWidth, setSideWidth] = useState(() => readWidth(store.current))
   const repoButton = useRef<HTMLButtonElement>(null)
+  const runTitle = useRef<HTMLHeadingElement>(null)
+  // The hash the urgent banner's Open run went to, so focus lands on that run's title.
+  const focusFor = useRef<string | undefined>(undefined)
 
   const repo = repoOfRun(board?.repos ?? [], selected)
   const isFix = selected?.fix !== undefined
@@ -84,6 +90,15 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   const lost = connectionStatus(stream)
   const autoSwitch = switchView(selected, board)
   const runKey = selected ? hashFor(selected) : 'none'
+  // Screen 1 only: the wave board and the engineer view have no urgent banner.
+  const urgentSlot = board !== undefined && selected !== undefined && repo !== undefined && view !== 'board'
+  const urgent = urgentSlot ? elsewhere(runs, board, selected, now) : undefined
+
+  useEffect(() => {
+    const pending = focusFor.current
+    focusFor.current = undefined
+    if (focusOnArrival(pending, runKey)) runTitle.current?.focus()
+  }, [runKey])
   // A plan's full flow (Think → You → sprints → Check → Ship); a fix run's Build, Review, Ship.
   const stages = fixPipeline?.stages ?? (repo && pipeline && selected?.plan !== undefined ? (buildFlow(repo, selected.plan, now) ?? []) : [])
 
@@ -191,6 +206,11 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
         </aside>
         <SideHandle width={sideWidth} onResize={setSideWidth} onCommit={commitWidth} />
         <main className={view === 'board' ? 'main wide' : 'main'}>
+          {urgentSlot && (
+            <div className="urgent-slot" role="status">
+              {urgent && <UrgentBanner at={urgent} onOpen={(href) => (focusFor.current = href)} />}
+            </div>
+          )}
           {notices.length > 0 && (
             <div className="banners">
               {notices.map((b) => (
@@ -225,6 +245,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
               {header && (
                 <RunHeader
                   header={header}
+                  titleRef={runTitle}
                   actions={
                     <div className="run-actions">
                       {pipeline && (

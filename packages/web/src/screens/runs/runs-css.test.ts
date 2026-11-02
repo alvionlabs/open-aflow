@@ -24,6 +24,7 @@ function rules(css: string, media?: string): Rule[] {
     }
     const body = css.slice(open + 1, close)
     if (prelude.startsWith('@media')) out.push(...rules(body, prelude.replace(/^@media\s*/, '').trim()))
+    else if (prelude.startsWith('@container')) out.push(...rules(body, prelude))
     else if (!prelude.startsWith('@')) out.push({ selectors: prelude.split(',').map((s) => s.trim()), body, media })
     i = close + 1
   }
@@ -649,7 +650,7 @@ describe('runs.css log tab', () => {
  * shared controls in base.css. The Add repo dialog's picker (picker.css) and screens 2 and 3 have their own files.
  */
 describe('spacing scale', () => {
-  const SCREEN_ONE = ['runs.css', 'tabs.css', 'menu.css', '../../theme/base.css']
+  const SCREEN_ONE = ['runs.css', 'tabs.css', 'menu.css', 'urgent-banner.css', '../../theme/base.css']
   const SPACING = /^(padding|margin|gap|row-gap|column-gap)(-[a-z-]+)?$/
   /**
    * Values off the 4 px scale on purpose, each with its reason. 2 px is the tight-row allowance: the
@@ -687,6 +688,12 @@ describe('spacing scale', () => {
     }
     return out
   }
+
+  it('reads the rules inside @container blocks too', () => {
+    // The urgent banner's narrow layout sits in @container blocks: the check must see its gap.
+    const urgent = rules(stripComments(readFileSync(join(here, 'urgent-banner.css'), 'utf8')))
+    expect(urgent.filter((r) => r.media?.startsWith('@container') && decls(r.body).gap !== undefined).map((r) => decls(r.body).gap)).toContain('8px 12px')
+  })
 
   it('puts every gap, padding and margin on the 4 px scale, but for the listed exceptions', () => {
     expect(offScale()).toEqual([])
