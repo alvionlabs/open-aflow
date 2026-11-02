@@ -15,7 +15,7 @@ describe('menu contents', () => {
     const open = render({ open: true })
     expect(open).toMatch(/<button[^>]*aria-label="Menu"/)
     expect(open).toMatch(/aria-expanded="true"/)
-    expect(open).toContain('class="btn sm icon"')
+    expect(open).toContain('class="btn sm icon ghost"')
     expect(open).toMatch(/<svg[^>]*aria-hidden="true"/)
     expect(text(open)).not.toContain('⋯')
     expect(render({ open: false })).toMatch(/aria-expanded="false"/)

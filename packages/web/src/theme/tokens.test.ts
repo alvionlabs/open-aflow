@@ -191,6 +191,24 @@ describe('tokens', () => {
     expect(darkAttr()['--danger-fg']).toBe(darkMedia()['--danger-fg'])
   })
 
+  it('Remove repo stays 4.5 to 1 on its hover, focus, and press tints', () => {
+    const menuCss = stripComments(readFileSync(join(srcDir, 'screens/runs/menu.css'), 'utf8'))
+    const percents = [...menuCss.matchAll(/color-mix\(in srgb, var\(--danger\) (\d+)%, transparent\)/g)].map((m) => Number(m[1]))
+    expect(percents.length).toBeGreaterThanOrEqual(2)
+    const hex = (n: number) => Math.round(n).toString(16).padStart(2, '0')
+    const mix = (fg: string, bg: string, pct: number) => {
+      const [f, b] = [parseColor(fg), parseColor(bg)]
+      return `#${f.map((v, i) => hex((v * pct + b[i]! * (100 - pct)) / 100)).join('')}`
+    }
+    for (const [theme, t] of themes()) {
+      for (const pct of percents) {
+        // The menu's own background is --surface; the tint is see-through over it.
+        const ratio = contrast(t['--danger']!, mix(t['--danger']!, t['--surface']!, pct))
+        expect(ratio, `${theme} danger on its ${pct}% tint = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
   it('no token is declared twice in one block', () => {
     const blocks: [string, string][] = [
       ['light', blockAfter(tokensCss(), ':root {')],

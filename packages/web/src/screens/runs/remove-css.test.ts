@@ -58,12 +58,23 @@ describe('danger style', () => {
     expect(style(menu(), '.mi-danger').color).toBe('var(--danger)')
     expect(style(menu(), '.mi-danger:hover').color).toBe('var(--danger)')
   })
+
+  it('the Remove repo menu item gets a red tint on hover and keyboard focus, and a stronger one on press', () => {
+    const tint = (pct: number) => `color-mix(in srgb, var(--danger) ${pct}%, transparent)`
+    expect(style(menu(), '.mi-danger:hover').background).toBe(tint(14))
+    expect(style(menu(), '.mi-danger:focus-visible').background).toBe(tint(14))
+    expect(style(menu(), '.mi-danger:active').background).toBe(tint(18))
+    expect(style(menu(), '.mi-danger:active').color).toBe('var(--danger)')
+    // After .mi-action:hover, so the tint wins at the same specificity.
+    const css = menu()
+    expect(css.indexOf('.mi-danger:hover')).toBeGreaterThan(css.indexOf('.mi-action:hover'))
+  })
 })
 
 describe('sidebar ⋯ button', () => {
   it('is hidden until the card is hovered or holds focus, or its menu is open', () => {
     expect(style(runs(), '.run-more').opacity).toBe('0')
-    for (const sel of ['.run-item:hover .run-more', '.run-item:focus-within .run-more', '.run-more[aria-expanded="true"]']) {
+    for (const sel of ['.run-wrap:hover .run-more', '.run-wrap:focus-within .run-more', '.run-more[aria-expanded="true"]']) {
       expect(style(runs(), sel).opacity, sel).toBe('1')
     }
   })
@@ -76,5 +87,80 @@ describe('sidebar ⋯ button', () => {
     expect(style(runs(), '.run-more', touch).opacity).toBe('1')
     expect(parseInt(style(runs(), '.run-more::after', touch).width!, 10)).toBeGreaterThanOrEqual(44)
     expect(parseInt(style(runs(), '.run-more::after', touch).height!, 10)).toBeGreaterThanOrEqual(44)
+  })
+})
+
+describe('ghost icon button', () => {
+  it('is transparent with no outline at rest', () => {
+    const d = style(base(), '.btn.ghost')
+    expect(d.background).toBe('transparent')
+    expect(d['border-color']).toBe('transparent')
+  })
+
+  it('gets a subtle background on hover, keyboard focus, and while its menu is open, seen on a hovered card too', () => {
+    for (const sel of ['.btn.ghost:hover', '.btn.ghost:focus-visible', '.btn.ghost[aria-expanded="true"]']) {
+      const d = style(base(), sel)
+      expect(d.background, sel).toBe('color-mix(in srgb, var(--fg) 10%, transparent)')
+      expect(d['border-color'], sel).toBe('transparent')
+    }
+  })
+
+  it('keeps the focus ring: no ghost or sidebar rule turns the outline off', () => {
+    for (const r of [...rules(base()), ...rules(runs())]) {
+      if (r.selectors.some((s) => s.includes('.ghost') || s.includes('.run-more'))) expect(decls(r.body).outline, r.selectors.join()).toBeUndefined()
+    }
+  })
+
+  it('is the sidebar ⋯ look too: the sidebar rule sets no background, border, or colour of its own', () => {
+    for (const sel of ['.run-more', '.btn.icon.run-more', '.run-more:hover', '.run-more[aria-expanded="true"]']) {
+      const d = style(runs(), sel)
+      for (const prop of ['background', 'border-color', 'color']) expect(d[prop], `${sel} ${prop}`).toBeUndefined()
+    }
+  })
+})
+
+describe('sidebar run card', () => {
+  it('reserves no right column: nothing pads the card for the ⋯', () => {
+    expect(runs()).not.toMatch(/:has\(> ?\.run-more-wrap\)/)
+    expect(style(runs(), '.run')['padding-right']).toBeUndefined()
+  })
+
+  it('holds the ⋯ on the second line at the right, clear of the status', () => {
+    const wrap = style(runs(), '.run-more-wrap')
+    expect(wrap.position).toBe('absolute')
+    expect(wrap.bottom).toBeDefined()
+    expect(wrap.top).toBeUndefined()
+    expect(style(runs(), '.run-wrap').position).toBe('relative')
+  })
+
+  it('keeps the second line tall enough for the ⋯ on every card, repo line or not, with room beside the text', () => {
+    const line = style(runs(), '.run-line')
+    expect(parseInt(line['min-height']!, 10)).toBeGreaterThanOrEqual(24)
+    expect(parseInt(line['padding-right']!, 10)).toBeGreaterThanOrEqual(24)
+    expect(style(runs(), '.run-body')['grid-template-rows']).toBeUndefined()
+  })
+
+  it('puts each status dot on one rail: after the label, at the right edge', () => {
+    expect(style(runs(), '.run .status')['flex-direction']).toBe('row-reverse')
+    expect(style(runs(), '.run .status')['justify-self']).toBe('end')
+  })
+
+  it('stacks by a named container query on the card, not a media query', () => {
+    expect(style(runs(), '.run').container).toBe('run-card / inline-size')
+    const m = /@container run-card \(max-width: (\d+)px\) \{([\s\S]*?)\n\}/.exec(runs())
+    expect(m, 'the container rule').not.toBeNull()
+    const stacked = rules(m![2]!)
+    const of = (sel: string) => Object.assign({}, ...stacked.filter((r) => r.selectors.includes(sel)).map((r) => decls(r.body))) as Record<string, string>
+    expect(of('.run-body')['grid-template-columns']).toBe('minmax(0, 1fr)')
+    // Name, then status, then the repo line: the document's order in one column.
+    expect(of('.run .status')['justify-self']).toBe('start')
+    expect(of('.run .status')['flex-direction']).toBe('row')
+  })
+
+  it('never breaks a word in the middle while it can wrap between words', () => {
+    expect(style(runs(), '.run b')['overflow-wrap']).toBe('break-word')
+    const word = style(runs(), '.run-word')
+    expect(word.display).toBe('inline-block')
+    expect(word['max-width']).toBe('100%')
   })
 })

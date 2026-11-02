@@ -18,7 +18,7 @@ describe('sidebar run ⋯ menu', () => {
     expect(closed).toMatch(/<button[^>]*id="run-more-#\/ra\/x"/)
     expect(closed).toMatch(/<button[^>]*aria-label="More for Sparring ladder"/)
     expect(closed).toMatch(/<button[^>]*aria-expanded="false"/)
-    expect(closed).toMatch(/<button[^>]*class="btn icon run-more"/)
+    expect(closed).toMatch(/<button[^>]*class="btn icon ghost run-more"/)
     expect(closed).toMatch(/<svg[^>]*aria-hidden="true"/)
     expect(text(closed)).not.toContain('⋯')
     expect(closed).not.toContain('Remove repo')
@@ -56,7 +56,7 @@ describe('runs list with the ⋯ button', () => {
     const items = html.match(/<li class="run-item">[\s\S]*?<\/li>/g)!
     expect(items).toHaveLength(2)
     // The link closes before the button opens: no button nested in the link.
-    expect(items[0]).toMatch(/<a class="run"[^>]*>(?:(?!<button)[\s\S])*<\/a><div class="run-more-wrap">\s*<button/)
+    expect(items[0]).toMatch(/<div class="run-wrap"><a class="run"[^>]*>(?:(?!<button)[\s\S])*<\/a><div class="run-more-wrap">\s*<button/)
     expect(items[0]).toContain(`id="${moreButtonId(runs[0]!)}"`)
     expect(items[0]).toContain('aria-label="More for x (alpha-repo)"')
   })
@@ -68,7 +68,24 @@ describe('runs list with the ⋯ button', () => {
 
   it('shows the confirm panel under the card it was opened from', () => {
     const items = render((r) => (r.plan === 'x' ? createElement('section', { className: 'inplace remove-confirm' }) : null)).match(/<li class="run-item">[\s\S]*?<\/li>/g)!
-    expect(items[0]).toMatch(/<\/div><section class="inplace remove-confirm"><\/section><\/li>$/)
+    expect(items[0]).toMatch(/<\/div><\/div><section class="inplace remove-confirm"><\/section><\/li>$/)
     expect(items[1]).not.toContain('remove-confirm')
+  })
+})
+
+describe('run name in the list', () => {
+  const nameOf = (title: string) => {
+    const r = { ...run('ra', 'alpha-repo', 'x'), title }
+    const html = renderToStaticMarkup(createElement(RunsList, { runs: [r], selected: r, repos: [repo({})] }))
+    return /<b>([\s\S]*?)<\/b>/.exec(html)![1]
+  }
+
+  it('keeps a hyphenated word whole, since a hyphen is a line break opportunity', () => {
+    expect(nameOf('claim-only run')).toBe('<span class="run-word">claim-only</span> run')
+    expect(nameOf('a fix-sprint-column b-c')).toBe('a <span class="run-word">fix-sprint-column</span> <span class="run-word">b-c</span>')
+  })
+
+  it('leaves a name with no hyphen as plain text', () => {
+    expect(nameOf('Three sprints in flight')).toBe('Three sprints in flight')
   })
 })

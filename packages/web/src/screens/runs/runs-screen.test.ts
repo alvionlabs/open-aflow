@@ -356,7 +356,7 @@ describe('sidebar', () => {
 
   it('names each card as its run header does, with the repo as a muted line; no sprint or wave', () => {
     const side = sideOf(render({ repo: chess([onlyQueue()]) }).html)
-    expect(side).toMatch(/<span class="run-head"><b>Sparring ladder to Liem<\/b><span class="run-repo muted">chess-web<\/span><\/span>/)
+    expect(side).toMatch(/<span class="run-body"><b>Sparring ladder to Liem<\/b><span class="status [^"]*">[^<]*<\/span><span class="run-line"><span class="run-repo muted">chess-web<\/span><\/span><\/span>/)
     expect(side).toMatch(/class="status /)
     expect(text(side)).not.toMatch(/sparring-ladder|wave/i)
   })
