@@ -22,7 +22,7 @@ export type RunMoreMenuViewProps = {
 export function RunMoreMenuView({ open, onToggle, onRemove, runName, triggerId, position, triggerRef, menuRef }: RunMoreMenuViewProps) {
   return (
     <div className="run-more-wrap">
-      <button ref={triggerRef} id={triggerId} type="button" className="btn icon run-more" aria-label={`More for ${runName}`} aria-expanded={open} onClick={onToggle}>
+      <button ref={triggerRef} id={triggerId} type="button" className="btn icon ghost run-more" aria-label={`More for ${runName}`} aria-expanded={open} onClick={onToggle}>
         <Icon name="more" />
       </button>
       {open && (

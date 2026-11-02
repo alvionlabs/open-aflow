@@ -34,7 +34,7 @@ export type BarMenuViewProps = {
 export function BarMenuView({ open, onToggle, onThemePick, onSwitchPress, autoContinue, portBase, remove, storage, triggerRef, menuRef }: BarMenuViewProps) {
   return (
     <div className="bar-menu">
-      <button ref={triggerRef} id={MENU_TRIGGER_ID} type="button" className="btn sm icon" aria-label="Menu" aria-expanded={open} onClick={onToggle}>
+      <button ref={triggerRef} id={MENU_TRIGGER_ID} type="button" className="btn sm icon ghost" aria-label="Menu" aria-expanded={open} onClick={onToggle}>
         <Icon name="more" />
       </button>
       {open && (

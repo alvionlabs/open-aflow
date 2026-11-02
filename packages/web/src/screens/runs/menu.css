@@ -66,10 +66,20 @@
   background: var(--hover);
 }
 
-/* Remove repo: the danger item, red in every state. */
+/* Remove repo: the danger item, red in every state, on a light red tint when hovered, focused, or pressed. */
 .mi-danger,
-.mi-danger:hover {
+.mi-danger:hover,
+.mi-danger:active {
   color: var(--danger);
+}
+
+.mi-danger:hover,
+.mi-danger:focus-visible {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.mi-danger:active {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
 }
 
 /* The sidebar card's ⋯ menu: fixed beside its button, so the sidebar's scroll box doesn't clip it. */

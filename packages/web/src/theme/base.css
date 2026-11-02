@@ -320,6 +320,28 @@ a:hover {
   opacity: 0.76;
 }
 
+/*
+ * Ghost icon button (the ⋯ buttons): no fill or outline at rest; a see-through fill on hover, keyboard
+ * focus, and while its menu is open, so it reads as its own target on a card that is hovered too.
+ */
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.btn.ghost:hover,
+.btn.ghost:focus-visible,
+.btn.ghost[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  border-color: transparent;
+  color: var(--fg);
+}
+
+.btn.ghost:active {
+  background: color-mix(in srgb, var(--fg) 16%, transparent);
+}
+
 /* Quiet button (the draft's ghost): no fill or frame until hovered, for the lesser choice (Cancel). */
 .btn.quiet {
   background: transparent;

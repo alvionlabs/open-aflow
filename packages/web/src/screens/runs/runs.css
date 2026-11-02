@@ -202,13 +202,22 @@
   gap: 12px;
 }
 
-/* Each run is its own card, as in the sidebar before plan calm-dashboard.
-   The status sits top right, on the name's line; the fix tag goes under the name. */
+/*
+ * Each run is its own card, as in the sidebar before plan calm-dashboard. The first line holds the name and
+ * the status; the second the muted repo, the fix tag, and the ⋯. Every card keeps both lines, so nothing jumps
+ * when the ⋯ appears, and every status ends on one rail, its dot last.
+ *
+ * The card is a named container (run-card): the sidebar is resizable while the viewport stays put, so the
+ * stacked layout below follows the card, not a media query. The ⋯ and its fixed menu sit outside the container.
+ */
+.run-wrap {
+  position: relative;
+  min-width: 0;
+}
+
 .run {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  display: block;
+  container: run-card / inline-size;
   padding: 12px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -228,52 +237,78 @@
   border-color: var(--border-strong);
 }
 
-.run b {
-  font-weight: 500;
-  overflow-wrap: anywhere;
+.run-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  align-items: baseline;
 }
 
-/* The run's name, then under it its repo, muted, and a kind tag (`fix`) for a /pod:fix run. */
-.run-head {
+.run b {
+  font-weight: 500;
+  overflow-wrap: break-word;
+}
+
+/* A hyphenated word stays whole, unless it alone is wider than the line. */
+.run-word {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.run .status {
+  flex: none;
+  flex-direction: row-reverse;
+  justify-self: end;
+}
+
+/*
+ * The second line: 24 px tall on every card, for the ⋯, and its text stops short of it. The ⋯'s box is taller
+ * than the text, so the line sits 4 px into the card's bottom padding, and the text keeps an even space below.
+ */
+.run-line {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
   min-width: 0;
-}
-
-.run-head b {
-  flex-basis: 100%;
+  min-height: 24px;
+  margin-bottom: -4px;
+  padding-right: 28px;
 }
 
 .run-repo {
   min-width: 0;
   font-size: var(--size-micro);
-  overflow-wrap: anywhere;
-}
-
-.run .status {
-  flex: none;
+  overflow-wrap: break-word;
 }
 
 /*
- * A card's ⋯ button: beside the card's link (never inside it), in a 40 px column at the card's right, on the
- * name's line after the status. It shows on hover, while the card holds keyboard focus, and while its menu
- * is open; on a touch screen always, with a 44 px target around its 24 px box.
+ * Stacked: name, status, then the repo line. Below 180 px of content (a card of 214 px, a sidebar of 246 px) the
+ * status squeezes the name to under one long word. The default 260 px sidebar stays on two columns.
  */
-.run-item {
-  position: relative;
-  min-width: 0;
+@container run-card (max-width: 180px) {
+  .run-body {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 4px;
+  }
+
+  .run .status {
+    flex-direction: row;
+    justify-self: start;
+  }
 }
 
-.run-item:has(> .run-more-wrap) > .run {
-  padding-right: 40px;
-}
-
+/*
+ * A card's ⋯ button: beside the card's link (never inside it), on the card's second line at the right, its dots
+ * under the status's dot. It shows on hover, while the card holds keyboard focus, and while its menu is open;
+ * on a touch screen always, with a 44 px target around its 24 px box. The look is .btn.ghost's.
+ */
 .run-more-wrap {
   position: absolute;
-  top: 10px;
-  right: 8px;
+  right: 10px;
+  bottom: 9px;
 }
 
 .run-more {
@@ -281,9 +316,6 @@
   width: 24px;
   height: 24px;
   padding: 0;
-  border-color: transparent;
-  background: transparent;
-  color: var(--muted);
   opacity: 0;
 }
 
@@ -298,17 +330,10 @@
   height: 16px;
 }
 
-.run-item:hover .run-more,
-.run-item:focus-within .run-more,
+.run-wrap:hover .run-more,
+.run-wrap:focus-within .run-more,
 .run-more[aria-expanded="true"] {
   opacity: 1;
-}
-
-.run-more:hover,
-.run-more[aria-expanded="true"] {
-  background: var(--hover);
-  border-color: var(--border-strong);
-  color: var(--fg);
 }
 
 /* The sidebar's confirm sits right under its card, at the sidebar's dense size. */
