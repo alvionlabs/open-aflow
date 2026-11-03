@@ -26,6 +26,8 @@ describe('window state', () => {
     // Missing, and bad JSON.
     expect(readWindowState(file, DISPLAYS)).toEqual(DEFAULT_STATE)
     expect(readWith('{not json')).toEqual(DEFAULT_STATE)
+    // Bad numbers. More cases are in the next test.
+    expect(readWith(saved({ width: 'wide' }))).toEqual(DEFAULT_STATE)
     // Off-screen.
     expect(readWith(saved({ x: 5000, y: 100 }))).toEqual(DEFAULT_STATE)
     // On a display: reads back.
