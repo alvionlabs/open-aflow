@@ -295,3 +295,7 @@ export function rollupChecks(rollup: unknown): PrStatus['checks'] {
   }
   return pending ? 'pending' : 'pass'
 }
+
+/** Stub: the tests in gh-exec.test.ts come first. */
+export const createFoundGhExec = (_found: { path(tool: 'gh'): string | undefined; env(): NodeJS.ProcessEnv }): GhExec => () =>
+  Promise.resolve({ status: 'not-found', stdout: '' })

@@ -613,6 +613,43 @@ describe('folder listing route', () => {
   })
 })
 
+describe('tool routes seam', () => {
+  const tools: NonNullable<AppDeps['tools']> = {
+    check: async () => [{ tool: 'git', state: 'missing' }],
+    setPath: async () => ({ tools: [] }),
+  }
+  const withDeps = (extra: Partial<AppDeps>) =>
+    createApp({
+      ports: [API, WEB],
+      token: TOKEN,
+      source: fakeSource().source,
+      addRepo: async () => ({ error: 'not a directory' }),
+      timeline: noTimeline,
+      ...extra,
+    })
+  const read = (app: Hono) => app.request('/api/tools', { headers: { ...HOST, 'x-pod-board-token': TOKEN } })
+  const write = (app: Hono) =>
+    app.request('/api/actions/tool-path', { method: 'POST', headers: ACTION_HEADERS, body: JSON.stringify({ tool: 'gh', path: null }) })
+
+  test('dev has no tool routes', async () => {
+    const dev = fakeApp()
+    expect((await read(dev)).status).toBe(404)
+    expect((await write(dev)).status).toBe(404)
+
+    // The same requests reach the routes once a finder is given.
+    const production = withDeps({ tools })
+    expect((await read(production)).status).toBe(200)
+    expect((await write(production)).status).toBe(200)
+  })
+
+  test('tool routes answer before the web app', async () => {
+    const web = new Hono().all('*', (c) => c.text('page'))
+    const res = await read(withDeps({ tools, web }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ tools: [{ tool: 'git', state: 'missing' }] })
+  })
+})
+
 describe('web seam', () => {
   /** A web app that answers everything, to show what reaches it. */
   const catchAll = () => new Hono().all('*', (c) => c.text('from web'))

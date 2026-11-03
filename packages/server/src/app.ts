@@ -6,6 +6,7 @@ import { AGENT_ID } from './agent-timeline.ts'
 import { actionGuard, readGuard, requestGuard } from './guard.ts'
 import type { FolderListError, FolderListing } from './folder-list.ts'
 import type { AddRepoError } from './repos-config.ts'
+import type { ToolRoutesDeps } from './tool-routes.ts'
 
 export const PING_MS = 15_000
 /** The largest request body `/api/actions/*` and `POST /api/repos` take. Every real one is under 1 KB. */
@@ -34,6 +35,8 @@ export type AppDeps = {
   folders?: (dir: string | undefined) => Promise<FolderListing | { error: FolderListError }>
   /** The built web app (production), mounted after every API route and behind the request guard. With none, a page route gets 404. */
   web?: Hono | undefined
+  /** The tool finder (production). Stub: the tests come first. */
+  tools?: ToolRoutesDeps | undefined
 }
 
 const FOLDER_STATUS = { 'not a local path': 400, 'not absolute': 400, 'bad request': 400, 'not a directory': 404 } as const
