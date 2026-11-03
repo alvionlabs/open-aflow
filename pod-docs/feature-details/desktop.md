@@ -2,11 +2,11 @@
 
 ## What it is
 
-`packages/desktop` (`@pod-board/desktop`) is the Electron main process. It runs the production server bundle in a `utilityProcess`, reads the port from the server's ready message, and owns the quit. Start it with `pnpm build`, then `pnpm desktop`. This file covers the shell's start, the server host, and the quit. Slices T1 (window, tray) and N1 (toasts) build on it.
+`packages/desktop` (`@pod-board/desktop`) is the Electron main process. It runs the production server bundle in a `utilityProcess`, reads the port from the server's ready message, and owns the quit. Start it with `pnpm build`, then `pnpm desktop`. This file covers the shell's start, the server host, the quit, the window, and the tray. Slice N1 (toasts) builds on it.
 
 ## How it works
 
-- **Layout.** Only `main.ts` and files named `*-main.ts` import `electron`. All logic sits in plain modules: `shell-config`, `server-launch`, `server-host`, `quit-flow`, `shell-bus`. `no-electron.test.ts` enforces this. `pnpm build` bundles `src/main.ts` into `dist/main.cjs`, with `electron` external.
+- **Layout.** Only `main.ts` and files named `*-main.ts` import `electron`. All logic sits in plain modules: `shell-config`, `server-launch`, `server-host`, `quit-flow`, `shell-bus`, `window-rules`, `window-state`, `tray-menu`, `login-item`. `no-electron.test.ts` enforces this. `pnpm build` bundles `src/main.ts` into `dist/main.cjs`, with `electron` external.
 - **Start order** (`startShell` in `shell-main.ts`): name, `APP_ID`, data folder, then the single-instance lock. A second launch exits here with no server, and the first gets `bus.showWindow()` through `second-instance`. Then the empty app menu, the keep-alive listener, the quit wiring, and on `ready` the window, the notifier, and the server.
 - **Folders.** The shell data folder (`POD_BOARD_DESKTOP_DATA_DIR`, else Electron's own) holds Chromium's data, the lock, and `window-state.json`. The server's config folder stays the server's own default, or `POD_BOARD_CONFIG_DIR`, so a shell and `pnpm dev` share `config.json` and the owner file.
 - **Port and token.** The shell sets no port. The server takes `POD_BOARD_API_PORT`, else 47800 with its fallback. The shell never holds the session token.
@@ -20,6 +20,17 @@
 - **Quit** (`quit-flow.ts`). `app.quit()` is the one way. The first `before-quit` prevents the quit, hides the windows, stops the host, then quits again. A repeat does nothing and never forces a quit. A second launch during a stop exits, and the first keeps stopping.
 - **Session end.** A Windows shutdown skips `before-quit`'s wait. `session-end` is a window's event, not `app`'s, so the shell attaches it to each created window. After it, the quit goes through, and the server's parent watch does the rest. With no window there's nothing to attach to, so a session end then relies on the parent watch alone.
 - **Shell bus** (`shell-bus.ts`). The slices of wave 2 meet here. A `showWindow` before any listener is kept, and the last one runs on the first attach. `setAttention` fires only on a change, and `onAttention` fires at once with the current value.
+- **Window** (`window-rules.ts`, glue in `window-main.ts`).
+  - The normal Windows frame, with no app menu, no preload, and the page isolated and sandboxed. 1280 × 800 by default, minimum 800 × 600, background `#000000`. It shows once it has painted.
+  - The first ready opens it. A failed start never opens it.
+  - **Close** hides it and the server keeps running. It closes only while quitting or after a session end.
+  - **A later ready** (a restart) loads the page again, so the page gets the new token, and keeps the hash. A new port is a `loadURL`. The same port is a `reload`, because a `loadURL` that only repeats a URL with a hash can stay in the same document.
+  - **`bus.showWindow`** restores, shows, and focuses it, and sets the hash in the page, which keeps the page's state. Before the first ready, it waits for the ready. Once a quit has begun, it does nothing, so a second launch during a stop brings nothing up.
+  - **A login start** (`--hidden`) opens no window: only the tray. The first show opens it.
+- **Links.** An off-origin `http` or `https` link opens in the system browser (`setWindowOpenHandler` and `will-navigate`). A same-origin new window, any other scheme, and an unreadable URL open nothing. Same-origin navigation stays. The origin follows the current port.
+- **Window state** (`window-state.ts`). `window-state.json` in the shell data folder holds the normal bounds and `maximized`. It saves on hide and at a close. Missing, bad JSON, bad numbers, or a window with less than 100 × 50 px on any display reads as the default. A size below the minimum rises to it. A failed save never throws.
+- **Tray.** It comes first, before the window. A left click is Open. The menu is Open, Start at login, Quit. `bus.onAttention` swaps the icon. The icons are in `packages/desktop/assets`, and `scripts/make-tray-icons.ts` makes them from the app icon and the dark `--needs-you`. `nativeImage` finds the `@2x` file beside each one.
+- **Start at login** (`login-item.ts`). The app writes only on the toggle, so it stays off by default. Unpackaged args are `[appPath, '--hidden']`, packaged `['--hidden']`, and a read uses the same args, because on Windows a read compares them. The checkbox shows what a read returns after the write.
 
 ## What this machine shows
 
@@ -47,4 +58,14 @@ Measured with `pnpm test:electron` on Windows 11 and Electron 45.2.1:
 - Inside a `utilityProcess`, `process.execPath` is Electron's exe. A `claude.cmd` that names a script needs a `node.exe` beside it or a `node` on the merged `Path`. The proof puts a `node.exe` beside the shim.
 - Spawn Electron's exe directly in a test, not `cli.js`, so the recorded process ID is the main process.
 - Temp paths in tests go through `realpathSync.native`: CI's temp paths have 8.3 names.
-- The shell has no window or tray in this slice, so the shell itself has no way to quit from the user's side until T1.
+- A plain module can't `import type` from `electron` either: `no-electron.test.ts` counts that. Each one declares its own shapes.
+- The guarded probe runs from a temp folder, so `app.getAppPath()` there has no `assets`. The tray then has an empty icon. It doesn't throw.
+- The tray icons are PNGs with stored, uncompressed data, because zlib's output differs between Node versions and `tray-assets.test.ts` compares bytes.
+- `win.maximize()` also shows a hidden window, so a maximized state applies at `ready-to-show`.
+- `win.restore()` on a maximized window can take it out of maximized, so call it only when the window is minimized.
+- A login start with the app already running comes in as a second launch, which shows the window. The login item only runs at login, so the app isn't running then.
+
+## History
+
+- 2026-11-03 · desktop-shell D1: the package, the server host, the quit, and the real exit proof.
+- 2026-11-03 · desktop-shell T1: the window, the tray, close to tray, the link rule, the window state, and Start at login.
