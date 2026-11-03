@@ -112,12 +112,17 @@ export function cmdPath(env: NodeJS.ProcessEnv): string | undefined {
   return resolveBin('cmd', env, 'win32', { exts: ['.exe'] })
 }
 
+type ShimRun = { file: string; pre: string[] }
+
+/** The node of last resort: the board's own, unless the board runs in Electron, whose exe would open an app. */
+const defaultFallbackNode = (): string | undefined => (process.versions.electron ? undefined : process.execPath)
+
 /**
  * What an npm `.cmd` shim runs, read from its text: the last quoted `%dp0%\…` path before `%*`.
  * A native `.exe` runs as is; a script runs with the shim's own `node.exe`, else `node` on
- * PATH, else the board's own node. Anything else → `undefined`.
+ * PATH, else `fallbackNode`. With none of these → `no node`. Anything else → `undefined`.
  */
-export function shimTarget(file: string, env: NodeJS.ProcessEnv): { file: string; pre: string[] } | undefined {
+function readShim(file: string, env: NodeJS.ProcessEnv, fallbackNode: string | undefined): ShimRun | 'no node' | undefined {
   let text: string
   try {
     text = readFileSync(file, 'utf8')
@@ -133,8 +138,14 @@ export function shimTarget(file: string, env: NodeJS.ProcessEnv): { file: string
   if (/\.exe$/i.test(target)) return { file: target, pre: [] }
   if (!/\.[cm]?js$/i.test(target)) return undefined
   const own = path.win32.join(dir, 'node.exe')
-  const node = isFile(own) ? own : (resolveBin('node', env, 'win32') ?? process.execPath)
-  return { file: node, pre: [target] }
+  const node = isFile(own) ? own : (resolveBin('node', env, 'win32') ?? fallbackNode)
+  return node === undefined ? 'no node' : { file: node, pre: [target] }
+}
+
+/** `readShim` with the default fallback, for callers that can't report a missing node. */
+export function shimTarget(file: string, env: NodeJS.ProcessEnv): ShimRun | undefined {
+  const run = readShim(file, env, defaultFallbackNode())
+  return run === 'no node' ? undefined : run
 }
 
 /** The tail of the child's stderr log: escape codes removed, at most 500 chars. */
@@ -153,8 +164,11 @@ export function createClaudeRunner(o: {
   logDir: string
   env?: NodeJS.ProcessEnv | (() => NodeJS.ProcessEnv)
   windowMs?: number
+  /** Runs a shim's script when no node is found. Left out: `defaultFallbackNode`. Given as `undefined`: none. */
+  fallbackNode?: string | undefined
 }): ClaudeRunner {
   const windowMs = o.windowMs ?? RESUME_WINDOW_MS
+  const fallbackNode = 'fallbackNode' in o ? o.fallbackNode : defaultFallbackNode()
   const live = new Map<string, number>()
   const track = (session: string, by: number) => {
     const n = (live.get(session) ?? 0) + by
@@ -183,7 +197,8 @@ export function createClaudeRunner(o: {
     const args = ['-p', '--resume', r.session, r.word]
     const isShim = process.platform === 'win32' && /\.(cmd|bat)$/i.test(file)
     // npm's shim names what it runs, so that runs directly; only an unknown shim needs cmd.exe.
-    const target = isShim ? shimTarget(file, env) : { file, pre: [] }
+    const target = isShim ? readShim(file, env, fallbackNode) : { file, pre: [] }
+    if (target === 'no node') return failed('node not found')
     const shim = target === undefined
     // Absolute, so cmd.exe's redirect can't land in the repo folder the run starts in.
     const logPath = path.resolve(o.logDir, `${r.session}-${Date.now()}.log`)
