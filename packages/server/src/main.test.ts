@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
@@ -53,7 +53,7 @@ let tmp: string
 let child: ChildProcess | undefined
 
 /** Starts main.ts on temp folders and resolves once it logs its listening line. */
-const boot = async (): Promise<{ child: ChildProcess; api: number; out: () => string }> => {
+const boot = async (o: { env?: Record<string, string>; ipc?: boolean } = {}): Promise<{ child: ChildProcess; api: number; out: () => string }> => {
   const api = await freePort()
   const web = await freePort()
   const env: NodeJS.ProcessEnv = { ...process.env }
@@ -65,10 +65,11 @@ const boot = async (): Promise<{ child: ChildProcess; api: number; out: () => st
     POD_BOARD_PORTS_DIR: join(tmp, 'ports'),
     POD_BOARD_CLAUDE_DIR: join(tmp, 'claude'),
     POD_BOARD_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
+    ...o.env,
   })
   const c = spawn(process.execPath, ['--import', TSX, MAIN], {
     env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: o.ipc ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
   })
   child = c // so teardown kills it even if boot fails
   let text = ''
@@ -185,6 +186,28 @@ describe('the dev entry', () => {
     const res = await fetch(`http://127.0.0.1:${b.api}/`)
     expect(res.status).toBe(404)
     expect(await res.text()).not.toContain('<html')
+  }, 60_000)
+
+  test('dev has no parent link', async () => {
+    // A value production would refuse, and a stop message production would obey.
+    const b = await boot({ env: { POD_BOARD_PARENT_PID: 'abc' }, ipc: true })
+    child = b.child
+    const messages: unknown[] = []
+    b.child.on('message', (m) => messages.push(m))
+    b.child.send({ type: 'pod-board:stop' })
+    await new Promise((r) => setTimeout(r, 3000))
+    expect(b.child.exitCode).toBeNull()
+    expect((await fetch(`http://127.0.0.1:${b.api}/api/health`)).status).toBe(200)
+    expect(messages).toEqual([])
+  }, 60_000)
+
+  test('dev ignores a parent that is gone', async () => {
+    const gone = spawnSync(process.execPath, ['-e', '0']).pid
+    const b = await boot({ env: { POD_BOARD_PARENT_PID: String(gone) } })
+    child = b.child
+    await new Promise((r) => setTimeout(r, 3000))
+    expect(b.child.exitCode).toBeNull()
+    expect((await fetch(`http://127.0.0.1:${b.api}/api/health`)).status).toBe(200)
   }, 60_000)
 
   test('a bad port stops the dev server', async () => {
