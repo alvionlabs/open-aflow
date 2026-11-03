@@ -2,8 +2,23 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createOwnerFile, OWNER_FILE } from './owner-file.ts'
+
+// Runs right after the owner file's removal of a stale file, so a test can lose the race.
+const afterRemove = vi.hoisted(() => ({ run: undefined as (() => void) | undefined }))
+vi.mock('node:fs', async (original) => {
+  const real = await original<typeof import('node:fs')>()
+  return {
+    ...real,
+    rmSync: (...args: Parameters<typeof real.rmSync>) => {
+      real.rmSync(...args)
+      const run = afterRemove.run
+      afterRemove.run = undefined
+      run?.()
+    },
+  }
+})
 
 let dir: string
 let file: string
@@ -81,20 +96,10 @@ describe('owner file', () => {
   })
 
   test('losing the take-over race reads as another holder', () => {
-    holder(1111)
-    // Between this server's read and its create, another server makes the file again.
-    const owner = createOwnerFile({
-      dir,
-      log,
-      alive: (pid) => {
-        if (pid === 1111) {
-          rmSync(file)
-          holder(2222, 'winner')
-          return false
-        }
-        return true
-      },
-    })
+    holder(exitedPid())
+    // Between this server's removal and its create, another server makes the file again.
+    afterRemove.run = () => holder(2222, 'winner')
+    const owner = createOwnerFile({ dir, log })
     expect(owner.take()).toBe(false)
     expect(read().id).toBe('winner')
     expect(logs).toHaveLength(1)

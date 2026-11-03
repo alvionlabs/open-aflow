@@ -131,7 +131,7 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
     writeFileSync(join(repo, 'pod-docs', 'plans', 'alpha.md'), plan(['| one | goal | active | — |', '| two | goal | planned | — |']))
   }
 
-  /** A registered repo, and one ended engineer of its session, quiet for two minutes. */
+  /** A registered repo, and one ended engineer of its session, quiet for two hours. */
   const writeFixture = (stopped: boolean) => {
     repo = join(tmp, 'repos', 'alpha-repo')
     mkdirSync(join(repo, 'pod-docs', 'plans'), { recursive: true })
@@ -145,7 +145,7 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
     const project = join(tmp, 'claude', 'projects', projectDirName(repo))
     const sub = join(project, SESSION, 'subagents')
     mkdirSync(sub, { recursive: true })
-    const old = new Date(Date.now() - 120_000)
+    const old = new Date(Date.now() - 7_200_000)
     const at = old.toISOString()
     const mainFile = join(project, `${SESSION}.jsonl`)
     writeFileSync(mainFile, JSON.stringify({ type: 'user', cwd: repo, message: { role: 'user', content: 'go' } }) + '\n')
@@ -235,7 +235,11 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
     return existsSync(file) ? readFileSync(file, 'utf8') : ''
   }
 
-  /** Starts a helper parent: `watch` spawns the bundle with piped output and the helper's own process ID; `plain` spawns it detached and exits. */
+  /**
+   * Starts a helper parent: `watch` spawns the bundle with piped output and the helper's own process ID; `plain`
+   * spawns it with no variable and exits. Both detach it: on Windows, libuv puts a plain child in a job that ends
+   * it with its parent, so a Node parent's death would end the server before any of its code ran.
+   */
   const startHelper = (mode: 'watch' | 'plain', port: number) => {
     const helper = join(tmp, 'helper.mjs')
     const serverPidFile = join(tmp, 'server.pid')
@@ -246,7 +250,7 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
         "import { writeFileSync } from 'node:fs'",
         'const [server, mode, pidFile] = process.argv.slice(2)',
         "const env = { ...process.env, ...(mode === 'watch' ? { POD_BOARD_PARENT_PID: String(process.pid) } : {}) }",
-        "const c = mode === 'watch' ? spawn(process.execPath, [server], { env, stdio: ['ignore', 'pipe', 'pipe'] }) : spawn(process.execPath, [server], { env, detached: true, stdio: 'ignore', windowsHide: true })",
+        "const c = mode === 'watch' ? spawn(process.execPath, [server], { env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }) : spawn(process.execPath, [server], { env, detached: true, stdio: 'ignore', windowsHide: true })",
         'writeFileSync(pidFile, String(c.pid))',
         "if (mode === 'watch') setInterval(() => {}, 1000)",
         'else { c.unref(); process.exit(0) }',
@@ -445,7 +449,8 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
       await toggleOn()
       const first = await running()
       const second = await running()
-      expect(second.out()).toContain(String(first.c.pid))
+      // The line follows the listening line.
+      await until("the holder's line", () => second.out().includes(`process ${first.c.pid}`), BOOT_MS, second.out)
       expect(second.out()).toContain(cfg)
       expect(first.out()).not.toContain(String(second.c.pid))
       expect(fakePids()).toEqual([])

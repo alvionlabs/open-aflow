@@ -25,6 +25,8 @@ import { createRemoveRepoRoutes } from './remove-repo-routes.ts'
 import { addRepo, removeRepo } from './repos-config.ts'
 import { createResumeRoutes } from './resume-routes.ts'
 import { createIdleCheck } from './session-activity.ts'
+import { createOwnerFile } from './owner-file.ts'
+import { createStopPath, guardOutput, linkParent } from './parent-link.ts'
 import { createSessionToken, writeSessionToken } from './session-token.ts'
 import { createShutdown, createWorkTracker } from './shutdown.ts'
 import { createToolFinder } from './tool-finder.ts'
@@ -101,7 +103,8 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
     idle: createIdleCheck({ claudeDir: settings.claudeDir, now: Date.now }),
     inFlight: new Set<string>(),
   }
-  const auto = createAutoContinue({ ...resume, subscribe: (fn) => watcher.subscribe(fn) })
+  const owner = createOwnerFile({ dir: configDir })
+  const auto = createAutoContinue({ ...resume, subscribe: (fn) => watcher.subscribe(fn), owner: owner.check })
 
   // Every action is counted while it runs, so Ctrl+C can wait for it.
   const work = createWorkTracker()
@@ -177,19 +180,34 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
   console.log(`pod-board API listening on http://${HOSTNAME}:${bound.port}`)
   console.log(`pod-board config: ${configFile}`)
 
-  // After the bind: a server that can't start sends no `continue` to anyone's run.
-  auto.start()
+  // After the bind: a server that can't start holds no file and sends no `continue` to anyone's run.
+  // A second server on this folder stays off until it restarts, also after the first exits.
+  if (owner.take()) auto.start()
 
-  const stop = createShutdown({ auto, server: bound.server, work, watcher, exit: o.exit ?? ((code) => process.exit(code)) })
+  const stop = createShutdown({ auto, server: bound.server, work, watcher, release: owner.release, exit: o.exit ?? ((code) => process.exit(code)) })
   return { port: bound.port, stop }
 }
 
-/** Calls startServer. On a rejection, prints `pod-board: <message>` and exits 1. Connects SIGINT and SIGTERM to `stop`. */
+/**
+ * Calls startServer. On a rejection, prints `pod-board: <message>` and exits 1. Connects SIGINT and
+ * SIGTERM to `stop`. Production also takes a parent's stop message and watches for the parent to go,
+ * from before the start. Dev does neither, so it reads no channel and no parent's process ID.
+ */
 export async function runMain(o: { production?: Production } = {}): Promise<void> {
   try {
-    const { stop } = await startServer(process.env, o)
-    process.on('SIGINT', stop)
-    process.on('SIGTERM', stop)
+    const stops = createStopPath()
+    let link: ReturnType<typeof linkParent> | undefined
+    if (o.production) {
+      guardOutput(process.stdout)
+      guardOutput(process.stderr)
+      link = linkParent({ env: process.env, stops })
+    }
+    const { port, stop } = await startServer(process.env, o)
+    // Ready first: a stop that waited for the start then exits after it.
+    link?.ready(port)
+    stops.attach(stop)
+    process.on('SIGINT', stops.signal)
+    process.on('SIGTERM', stops.signal)
   } catch (err) {
     console.error(`pod-board: ${err instanceof Error ? err.message : String(err)}`)
     process.exit(1)

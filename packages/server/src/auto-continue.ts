@@ -61,6 +61,8 @@ export function createAutoContinue(
   d: ResumeDeps & {
     subscribe(fn: (b: Board) => void): () => void
     tickMs?: number
+    /** Whether this server may send now (owner-file.ts). With none, it may. */
+    owner?: () => boolean
     /** Reports a check that threw; logs to the console unless a test passes one. */
     onError?: (err: unknown) => void
   },
@@ -83,6 +85,7 @@ export function createAutoContinue(
     let board: Board
     let due: ReturnType<typeof autoSends>
     try {
+      if (d.owner && !d.owner()) return Promise.resolve()
       board = d.board()
       due = autoSends(board, d.store.list(), now(), idle).filter((s) => !isResuming(d, s.session))
     } catch (err) {

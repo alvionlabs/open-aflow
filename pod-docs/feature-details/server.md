@@ -36,7 +36,15 @@ The API server (`packages/server`) finds the repos to show, reads their pod docs
   | `Host` and `Origin` | API port and `POD_BOARD_WEB_PORT` | The bound port only. `POD_BOARD_WEB_PORT` isn't read |
   | Page routes | 404 on the API port | See **Production answers** |
 
-- **Start order:** settings; the web app and config folder (production) or the token file (dev); the first tool check (production); the watcher; the bind; then the guards, the log line, and the automatic check. A failure at any step rejects, and a failed bind closes the watcher. Because the check starts after the bind, a server that can't start sends no `continue`.
+- **Start order:** settings; the web app and config folder (production) or the token file (dev); the first tool check (production); the watcher; the bind; then the guards, the log line, the owner file ([resume.md](resume.md)), and the automatic check. A failure at any step rejects, and a failed bind closes the watcher. Because the check starts after the bind, a server that can't start sends no `continue`.
+- **Clean stop** (`parent-link.ts`, production only; `runMain` connects it before `startServer`; dev attaches no channel and doesn't read the variable):
+  - **Channel:** `process.parentPort` (Electron's `utilityProcess`; the message is in `e.data`), else Node IPC (`process.send`), else none. A closed channel never throws.
+  - **Messages:** only an exact `{ type: 'pod-board:stop' }` counts. `{ type: 'pod-board:ready', port }` goes out once, after the bind. A stop that arrives during the start runs once the start ends. A failed start exits 1 with no ready message.
+  - **Parent watch:** `POD_BOARD_PARENT_PID` holds the parent's process ID, polled at once and then every 2 s. Unset or empty: no watch, so a plain `pnpm start` outlives whatever started it. A bad value stops the start, naming the variable. Gone → the same stop as the message.
+  - **One stop path:** the message and the watch run `createShutdown` at most once, so a repeat never turns into its "second press" `exit(1)`. A second signal quits at once, also after a message started the stop. A signal followed by a message doesn't force a quit.
+  - **The drain cap stays `DRAIN_CAP_MS` (70 s).** A parent's kill timeout must be longer.
+  - **Closed output:** `EPIPE` on stdout or stderr is ignored, so a dead parent's pipe doesn't end the drain. Other stream errors act as before.
+  - **A stop ends only its own process.** A resumed `claude` is detached and keeps running ([resume.md](resume.md)).
 - **Production port** (`listen.ts`): `POD_BOARD_API_PORT` unset or empty tries `APP_PORT` (47800). On `EADDRINUSE` or `EACCES` (Windows reserved ranges answer `EACCES`), the OS picks a free port for this launch, and the server logs `pod-board: port 47800 is busy; using <port> for this launch`. Set: that port only; busy stops the start, naming the variable and the port. Any other listen error stops the start. The guards are built with the port that was really bound.
 - **Production answers** (`web-app.ts`, mounted last in `createApp`, so a real API route wins and every answer sits behind the request guard). First match wins, on the path without its query:
   1. `/api`, `/api/`, or `/api/…`, any method → 404.
@@ -98,7 +106,6 @@ flowchart TD
 - Ctrl+C waits up to 70 s for running actions; don't wait for `server.close()` (open SSE streams keep it from finishing).
 - Tests never bind 47800: set `POD_BOARD_API_PORT` or pass `preferredPort`.
 - `/sw.js` differs by mode: production answers 404 JSON, and dev's web port still answers it with HTML from Vite. Only production's rules live in `web-app.ts`.
-- Until the owner file ships, production and dev on one config folder can both auto-continue. Use separate config folders in checks.
 - The finder stats `Path` entries with sync calls, as `resolveBin` always has: a dead mapped drive on `Path` blocks the server for that check.
 - After a Recheck finds `gh`, the Board's `gh` status can read `missing` until the next 30 s tick. A `missing` status with a found `gh` skips the 60 s auth cache, but nothing starts a tick early.
 - `reg.exe` prints in the console's code page. A literal non-ASCII folder in the registry `Path` can read wrong and not match. The inherited `Path`, the known folders, and a typed path still find the tool.
@@ -141,3 +148,4 @@ flowchart TD
 - 2026-11-02 · fix-repo-id review round 3 · fixed: a failed read of a session file (a lock, say) is no longer kept as "no `cwd`"; the session stays unproven only until a later build can read it.
 - 2026-11-02 · one-port-server S1: the wiring moved from `main.ts` to `startServer` and `runMain`; a production mode serves the web app and the API on one port, with the token in memory and a port fallback. A busy port now stops dev with an error naming the variable, and the automatic check starts after the bind.
 - 2026-11-02 · outside-terminal T1: the tool finder, `GET /api/tools`, and `POST /api/actions/tool-path`, in production only. `gh` and resumed `claude` read the finder at each call and get a merged `Path`.
+- 2026-11-02 · outside-terminal C1: production stops by a parent's message or when `POD_BOARD_PARENT_PID` is gone, and says `ready` after the bind. Dev and production share one auto-continue owner per config folder.
