@@ -44,14 +44,15 @@ describe('quit', () => {
     expect(last.preventDefault).not.toHaveBeenCalled()
     expect(s.stop).toHaveBeenCalledOnce()
     expect(s.quit).toHaveBeenCalledOnce()
-  })
 
-  test.each(['killed', 'not running'] as const)('%s also quits', async (result) => {
-    const s = setup()
-    s.flow.beforeQuit(s.event())
-    s.finish(result)
-    await settle()
-    expect(s.quit).toHaveBeenCalledOnce()
+    // Killed and not running quit too.
+    for (const result of ['killed', 'not running'] as const) {
+      const other = setup()
+      other.flow.beforeQuit(other.event())
+      other.finish(result)
+      await settle()
+      expect(other.quit).toHaveBeenCalledOnce()
+    }
   })
 
   test('a failed stop or a failed hide still quits', async () => {

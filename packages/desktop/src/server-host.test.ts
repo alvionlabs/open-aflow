@@ -116,26 +116,29 @@ describe('the server host', () => {
     expect(s.ready).toHaveBeenCalledTimes(2)
   })
 
-  test.each([0, 1, 3221225477])('restarts once (exit code %d)', (code) => {
-    const s = setup()
-    s.host.start()
-    expect(s.fork).toHaveBeenCalledOnce()
-    at(s.procs, 0).ready(3110)
+  test('restarts once', () => {
+    // Any exit code outside a stop is a failure.
+    for (const code of [0, 1, 3221225477]) {
+      const s = setup()
+      s.host.start()
+      expect(s.fork).toHaveBeenCalledOnce()
+      at(s.procs, 0).ready(3110)
 
-    at(s.procs, 0).exit(code)
-    expect(s.fork).toHaveBeenCalledTimes(2)
-    expect(s.host.port()).toBeUndefined()
-    expect(s.failed).not.toHaveBeenCalled()
+      at(s.procs, 0).exit(code)
+      expect(s.fork).toHaveBeenCalledTimes(2)
+      expect(s.host.port()).toBeUndefined()
+      expect(s.failed).not.toHaveBeenCalled()
 
-    at(s.procs, 1).ready(3111)
-    expect(s.host.port()).toBe(3111)
-    expect(s.ready.mock.calls).toEqual([[3110], [3111]])
+      at(s.procs, 1).ready(3111)
+      expect(s.host.port()).toBe(3111)
+      expect(s.ready.mock.calls).toEqual([[3110], [3111]])
 
-    // The old process has no say any more.
-    at(s.procs, 0).ready(3999)
-    at(s.procs, 0).exit(1)
-    expect(s.host.port()).toBe(3111)
-    expect(s.fork).toHaveBeenCalledTimes(2)
+      // The old process has no say any more.
+      at(s.procs, 0).ready(3999)
+      at(s.procs, 0).exit(1)
+      expect(s.host.port()).toBe(3111)
+      expect(s.fork).toHaveBeenCalledTimes(2)
+    }
   })
 
   test('a second failure reports the error', () => {
