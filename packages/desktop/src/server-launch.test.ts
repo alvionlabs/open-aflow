@@ -5,7 +5,7 @@ import { serverEntry, serverEnv } from './server-launch.ts'
 describe('server launch', () => {
   test('finds the bundle', () => {
     const appPath = join('E:', 'repo', 'packages', 'desktop')
-    const resourcesPath = join('C:', 'app', 'resources')
+    const resourcesPath = join('C:', 'pod', 'resources')
     expect(serverEntry({ packaged: false, appPath, resourcesPath })).toBe(join('E:', 'repo', 'packages', 'server', 'dist', 'app', 'server.mjs'))
 
     const packaged = serverEntry({ packaged: true, appPath: join(resourcesPath, 'app.asar'), resourcesPath })

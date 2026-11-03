@@ -13,6 +13,8 @@
     "test": "vitest run",
     "build": "pnpm -r build && pnpm --filter @pod-board/server bundle",
     "start": "node packages/server/dist/app/server.mjs",
+    "desktop": "pnpm --filter @pod-board/desktop start",
+    "test:electron": "node packages/desktop/scripts/real-tests.mjs",
     "verify": "pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
