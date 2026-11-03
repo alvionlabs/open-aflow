@@ -19,6 +19,7 @@
     "hono": "^4.13.13"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15"
   }
 }
