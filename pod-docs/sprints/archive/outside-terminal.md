@@ -1,16 +1,16 @@
 # Sprint: outside-terminal
 
-_From plan: pod-docs/plans/windows-app.md · Slug: outside-terminal · Status: active · Generated: 2026-11-02_
-<!-- autopilot-run: started=2026-11-03T05:06:41Z sprints=1 waves=3 -->
+_From plan: pod-docs/plans/windows-app.md · Slug: outside-terminal · Status: done · Generated: 2026-11-02_
+<!-- autopilot-run: started=2026-11-03T05:06:41Z sprints=1 waves=4 -->
 
 ## Status board
 
 | Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |
 |------|-------|-------|--------|----|--------|------------|------------|
-| 1 | T1 | Tool finder, tool routes, and a merged `Path` for children | outside-terminal-T1 | — | pending | — | — |
-| 1 | L1 | Look: the setup check's styles on the existing tokens | outside-terminal-L1 | — | pending | — | — |
-| 2 | C1 | Clean stop and one auto-continue owner | outside-terminal-C1 | — | pending | — | T1 |
-| 2 | U1 | Setup check screen | outside-terminal-U1 | — | pending | — | T1, L1 |
+| 1 | T1 | Tool finder, tool routes, and a merged `Path` for children | outside-terminal-T1 | [#75](https://github.com/iamphduc/pod-board/pull/75) merged | done | medium | — |
+| 1 | L1 | Look: the setup check's styles on the existing tokens | outside-terminal-L1 | [#75](https://github.com/iamphduc/pod-board/pull/75) merged | done | medium | — |
+| 2 | C1 | Clean stop and one auto-continue owner | outside-terminal-C1 | [#76](https://github.com/iamphduc/pod-board/pull/76) merged | done | medium | T1 |
+| 2 | U1 | Setup check screen | outside-terminal-U1 | [#76](https://github.com/iamphduc/pod-board/pull/76) merged | done | medium | T1, L1 |
 
 ## Shared contract
 
@@ -210,3 +210,24 @@ export function parentChannel(proc?: ProcessLike): ParentChannel | undefined
 - **Depends on:** T1, L1
 - **One-way door:** none
 - **Model:** opus
+
+## Sprint summary
+
+- **Synced with merge-target:** up to date
+- **Slices shipped:** T1, L1, C1, U1
+- **Queue entries:** resolved 0, deferred 2 — the Recheck `gh` delay (decision) and non-ASCII registry text (before hosting)
+- **Slice log:**
+  - T1: opus · medium · test-first yes · runtime detached bundle with an empty `Path`, `tool-path`, dev entry · 7 NOTEs, 2 PENDINGs · time lost none
+  - L1: opus · medium · test-first yes · runtime injected sample rows in the browser · 7 NOTEs · time lost none
+  - C1: opus · medium · test-first partly — three tests guard absent behavior, four first reds were test faults; all red by mutation · runtime `pnpm dev` and bundle on one folder, stop message, real IPC, `fake-claude.mjs` · 6 NOTEs, 2 PENDINGs (re-judged as NOTEs) · time lost a 337 s red run
+  - U1: opus · medium · test-first yes · runtime real bundle and browser, `pnpm dev` · 5 NOTEs, 5 PENDINGs (re-judged as NOTEs) · time lost none
+  - Wave fix w1: `gh-exec.test.ts` compared 8.3 and long temp paths on CI. Fixture only; a short-name `Path` entry finds and runs the tool.
+  - Stalls: none.
+- **Agent context at hand-back:** 882,390 tokens (planner, T1, L1, fix, C1, U1) — *each agent's final context size, not tokens billed*
+
+**For `desktop-shell`:**
+- On Windows, a child Node spawns without `detached: true` is in a libuv job and dies with its parent, so its parent watch never fires. Prove what `utilityProcess` does.
+- Set `POD_BOARD_PARENT_PID` when starting the server, and keep the kill timeout above `DRAIN_CAP_MS` (70 s).
+- `shimTarget` falls back to `process.execPath`, which is Electron's exe in a `utilityProcess`.
+- A detached `claude` child must outlive the app, and real `parentPort` isn't yet proved.
+- Install links use `target="_blank"`, so the shell needs a `setWindowOpenHandler` that sends them to the system browser.
