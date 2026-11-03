@@ -68,9 +68,9 @@ describe('link rules', () => {
     expect(navigateAction(`${ORIGIN}/`, ORIGIN)).toBe('allow')
     expect(navigateAction(`${ORIGIN}/x#/y`, ORIGIN)).toBe('allow')
     expect(navigateAction('https://cli.github.com/', ORIGIN)).toBe('external')
-    // A host that only starts with the board's origin is off-origin.
-    expect(navigateAction(`${ORIGIN}.evil.example/`, ORIGIN)).toBe('external')
-    for (const url of ['file:///C:/a.txt', 'javascript:alert(1)', 'pod://x', 'not a url']) expect(navigateAction(url, ORIGIN), url).toBe('deny')
+    // A host that only starts with the board's host is off-origin, and a port that isn't one reads as unreadable.
+    expect(navigateAction('http://127.0.0.1.evil.example:3130/', ORIGIN)).toBe('external')
+    for (const url of [`${ORIGIN}.evil.example/`, 'file:///C:/a.txt', 'javascript:alert(1)', 'pod://x', 'not a url']) expect(navigateAction(url, ORIGIN), url).toBe('deny')
     // The origin follows the current port: the old one is now off-origin.
     expect(navigateAction(`${ORIGIN}/`, originOf(3999))).toBe('external')
     expect(navigateAction(`${originOf(3999)}/`, originOf(3999))).toBe('allow')
