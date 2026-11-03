@@ -190,6 +190,11 @@ describe('the bundle, run alone', () => {
     const bin = join(tmp, 'empty-bin') // no gh and no claude: a run reaches nothing outside
     mkdirSync(cwd)
     mkdirSync(bin)
+    // The finder also searches the registry and known folders, past the empty PATH. A settings path
+    // wins over those searches, and one with no file means the tool isn't used, so this machine's real gh never runs.
+    const cfg = join(tmp, 'fresh', 'cfg')
+    mkdirSync(cfg, { recursive: true })
+    writeFileSync(join(cfg, 'tool-paths.json'), JSON.stringify({ git: join(tmp, 'missing', 'git.exe'), gh: join(tmp, 'missing', 'gh.exe') }))
     const port = await freePort()
     const env: NodeJS.ProcessEnv = { ...process.env }
     for (const k of Object.keys(env)) {
@@ -198,7 +203,7 @@ describe('the bundle, run alone', () => {
     Object.assign(env, {
       PATH: bin,
       POD_BOARD_API_PORT: String(port),
-      POD_BOARD_CONFIG_DIR: join(tmp, 'fresh', 'cfg'),
+      POD_BOARD_CONFIG_DIR: cfg,
       POD_BOARD_PORTS_DIR: join(tmp, 'ports'),
       POD_BOARD_CLAUDE_DIR: join(tmp, 'claude'),
       POD_BOARD_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
@@ -346,9 +351,8 @@ describe('the bundle, run alone', () => {
   test('the bundle writes no token file', async () => {
     const { base } = await runCopy()
     await tokenOf(base)
-    const cfg = join(tmp, 'fresh', 'cfg')
-    expect(existsSync(cfg)).toBe(true) // the start made it
-    expect(existsSync(join(cfg, 'session-token'))).toBe(false)
+    // start-server.test.ts › production makes the config folder covers a folder that doesn't exist yet.
+    expect(existsSync(join(tmp, 'fresh', 'cfg', 'session-token'))).toBe(false)
   }, RUN_MS)
 
   test('a missing web folder stops the bundle', async () => {
