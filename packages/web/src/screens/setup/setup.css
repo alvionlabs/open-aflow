@@ -1,0 +1,125 @@
+/*
+ * The setup check: a page with no sidebar, shown in place of the board when a tool isn't found
+ * (plan windows-app, ## Look). States come from .status in base.css (.s-ok, .s-bad), and controls
+ * from .btn and .input. setup-look.test.ts keeps this file on the existing tokens.
+ *
+ * Markup:
+ *   .setup
+ *     .setup-head       h1 and a line of .setup-intro
+ *     .setup-rows       the rows, in the order git, gh, claude
+ *       .setup-row      .status, .setup-name, .setup-what, then .setup-field for a tool not found
+ *         .setup-what   a path or what to do. .setup-path sets a path or command in mono
+ *         .setup-field  .input and a .btn.sm
+ *         .setup-error  the word a refused path got, under its row's text
+ *     .setup-actions    the one Recheck button, and .setup-error when a Recheck failed
+ *     .setup-note       the note on CLAUDE variables
+ */
+.setup {
+  display: grid;
+  align-content: start;
+  gap: 32px;
+  min-width: 0;
+  max-width: 880px;
+  margin-inline: auto;
+  padding: 48px 24px 64px;
+}
+
+.setup-head {
+  display: grid;
+  gap: 8px;
+}
+
+.setup-head h1 {
+  font-size: var(--size-h2);
+}
+
+.setup-intro {
+  color: var(--muted);
+  font: 400 var(--size-dense) / 1.55 var(--font);
+}
+
+.setup-rows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-block-start: 1px solid var(--border);
+}
+
+/* One grid per row with the same tracks, so each column lines up from row to row. */
+.setup-row {
+  display: grid;
+  grid-template-columns: 88px 56px minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 0;
+  border-block-end: 1px solid var(--border);
+}
+
+.setup-row .status {
+  justify-self: start;
+}
+
+.setup-name {
+  color: var(--fg);
+  font: 500 var(--size-dense) / 1.55 var(--mono);
+}
+
+.setup-what {
+  min-width: 0;
+  color: var(--muted);
+  font: 400 var(--size-dense) / 1.55 var(--font);
+  overflow-wrap: anywhere;
+}
+
+/* A found tool has no field: its path takes the field's room too. */
+.setup-what:last-child {
+  grid-column: 3 / -1;
+}
+
+.setup-path {
+  font: 400 var(--size-small) / 1.55 var(--mono);
+}
+
+.setup-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.setup-field .input {
+  flex: 1;
+  height: 32px;
+  font: 400 var(--size-small) / 1.3 var(--mono);
+}
+
+/* A reason is plain text with a dot before it, as the board's own errors are. */
+.setup-error {
+  grid-column: 3 / -1;
+  color: var(--fg);
+  font: 400 var(--size-small) / 1.55 var(--font);
+  overflow-wrap: anywhere;
+}
+
+.setup-error::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--blocked);
+}
+
+.setup-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.setup-note {
+  color: var(--muted);
+  font: 400 var(--size-small) / 1.55 var(--font);
+  max-width: 72ch;
+}
