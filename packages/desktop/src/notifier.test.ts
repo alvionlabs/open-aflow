@@ -154,7 +154,8 @@ describe('notifier', () => {
     const four = boardOf(repoWith([], { pr: prOf(78, 'open'), id: 'aaa' }), repoWith(['B', 'C', 'D'], { id: 'bbb' }))
     s.notifier.board(four)
     expect(s.toasts).toHaveLength(1)
-    expect(s.toasts[0]).toMatchObject({ title: '4 items need you', hash: `#/bbb/${PLAN}` })
+    const run = repoWith([]).model.plans.find((p) => p.slug === PLAN)?.title
+    expect(s.toasts[0]).toEqual({ title: '4 items need you', body: run, hash: `#/bbb/${PLAN}` })
     // All are seen now.
     s.notifier.board(four)
     vi.advanceTimersByTime(LIVE_TICK_MS)

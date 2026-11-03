@@ -37,6 +37,16 @@ The Electron shell's notifier reads the live Board in the main process. It sends
 - **Each item gets one try.** An item is marked seen before its send, so a send that throws can't repeat on every tick.
 - **A throw stops at the notifier.** A throw in a timer would end the main process with an error box. The notifier logs it, and the dot keeps its value.
 
+## What this machine shows
+
+Measured on Windows 11 and an unpackaged Electron 45.2.1, on a temp copy of the mock repo:
+
+- A new `BLOCKED → human` line gives one `toast sent` line in the shell's log, and the bus's attention value goes on. The log holds no entry text.
+- `Notification.isSupported()` is true, and Electron's `show` event fires on an unpackaged toast. That event doesn't prove the toast was on the screen. No agent can see it, so it stays a check for a person.
+- Firing the `click` event on the real `Notification` object calls `bus.showWindow` with the run's hash. A real click isn't proved.
+- Answering an entry that joins no plan, on the page, sets the attention value off.
+- Answering a plan's `BLOCKED` doesn't set it off. See **Watch out**.
+
 ## Checks that wait for `installer-and-updates`
 
 An unpackaged Electron has no Start-menu shortcut with `APP_ID`, so it can't prove these. The plan's Verification **Toast** row stays open until that sprint.
@@ -48,6 +58,8 @@ An unpackaged Electron has no Start-menu shortcut with `APP_ID`, so it can't pro
 
 ## Watch out
 
+- **Answering a plan's entry raises a reply.** pod reads an answer only when it resumes, so the model then offers `continue`. The `BLOCKED` item goes, and a new reply item comes in the same pass: the dot stays on, and a `Send continue` toast follows the answer at once. On a toggled run with a session, the board sends it, so there is no item.
+- **A repo added after the start isn't in the baseline.** Its open items are new, so they send, or give one summary toast.
 - **A repo id change sends again.** A repo's id changes when a name clash forms or ends. Its items then have new identities, so each one sends once more.
 - **An edited queue line sends again.** An entry's identity is its whole line, so a line someone rewrites is a new item.
 - **A PR that only `gh` can name arrives after the baseline.** The first Board at a start can come before `gh` answers. A fix PR or a merged-PR reply first shows on a later Board, so it sends once after each start, also when it is old. A wave PR isn't affected: an unknown state counts as open.
