@@ -106,6 +106,7 @@ flowchart TD
 - Ctrl+C waits up to 70 s for running actions; don't wait for `server.close()` (open SSE streams keep it from finishing).
 - Tests never bind 47800: set `POD_BOARD_API_PORT` or pass `preferredPort`.
 - `/sw.js` differs by mode: production answers 404 JSON, and dev's web port still answers it with HTML from Vite. Only production's rules live in `web-app.ts`.
+- On Windows, Node's `spawn` puts a child that isn't `detached` in a libuv job that ends it with its parent. A Node parent that dies then ends the server at once, with no drain and a stale owner file. The parent watch can't help there. To test the watch, start the server with `detached: true`.
 - The finder stats `Path` entries with sync calls, as `resolveBin` always has: a dead mapped drive on `Path` blocks the server for that check.
 - After a Recheck finds `gh`, the Board's `gh` status can read `missing` until the next 30 s tick. A `missing` status with a found `gh` skips the 60 s auth cache, but nothing starts a tick early.
 - `reg.exe` prints in the console's code page. A literal non-ASCII folder in the registry `Path` can read wrong and not match. The inherited `Path`, the known folders, and a typed path still find the tool.
