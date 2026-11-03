@@ -6,6 +6,7 @@ import path, { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { childEnv, claudeBin, createClaudeRunner, MAX_RESUME_LOGS, pruneLogs, RESUME_WINDOW_MS } from './claude-runner.ts'
+import { createToolFinder } from './tool-finder.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const FAKE = join(here, '..', 'test', 'fake-claude.mjs')
@@ -385,6 +386,52 @@ describe('createClaudeRunner', () => {
     expect(fresh).toHaveLength(1)
     expect(logs.filter((n) => n.startsWith('old-')).sort()).toEqual(seeded.slice(seeded.length - (MAX_RESUME_LOGS - 1)).sort())
     expect(statSync(join(logDir, fresh[0]!)).mtimeMs).toBeGreaterThan(1_000_000)
+  })
+})
+
+describe.runIf(WIN)('the runner with the tool finder', () => {
+  test('a stripped Path still starts the found claude', async () => {
+    const env: NodeJS.ProcessEnv = { ...envWith(), Path: '', CLAUDE_CONFIG_DIR: join(tmp, 'claude-home'), CLAUDE_CODE_ENTRYPOINT: 'x', CLAUDECODE: '1', claude_pid: '7' }
+    delete env.PATH
+    const finder = createToolFinder({
+      env,
+      platform: 'win32',
+      settingsFile: join(tmp, 'tool-paths.json'),
+      readRegistryPath: async (hive) => (hive === 'HKCU' ? `\r\nHKEY\r\n    Path    REG_EXPAND_SZ    ${binDir}\r\n` : ''),
+    })
+    await finder.check()
+    expect(finder.path('claude')).toBe(join(binDir, 'claude.cmd'))
+
+    const runner = createClaudeRunner({ bin: () => finder.path('claude'), env: () => finder.env(), logDir, windowMs: 3000 })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
+
+    const record = await readRecord()
+    const pathKey = Object.keys(record.env).find((k) => k.toUpperCase() === 'PATH')
+    expect(record.env[pathKey!]!.split(';')).toContain(binDir)
+    expect(Object.keys(record.env).filter((k) => k.toUpperCase().startsWith('CLAUDE'))).toEqual(['CLAUDE_CONFIG_DIR'])
+  })
+
+  test('the runner reads the finder at each start', async () => {
+    let bin: string | undefined
+    const env = envWith({ PATH: '' })
+    const runner = createClaudeRunner({ bin: () => bin, env: () => env, logDir, windowMs: 3000 })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'failed', message: 'claude not found' })
+    bin = join(binDir, 'claude.cmd')
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
+  })
+
+  test('a found claude that has since gone is a failed start', async () => {
+    const runner = createClaudeRunner({ bin: () => join(tmp, 'gone', 'claude.cmd'), env: () => envWith(), logDir, windowMs: 3000 })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'failed', message: 'claude not found' })
+  })
+
+  test('no found claude fails the start', async () => {
+    const runner = createClaudeRunner({ bin: () => undefined, env: () => envWith(), logDir, windowMs: 3000 })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'failed', message: 'claude not found' })
+    expect(startedPids()).toEqual([])
+    expect(existsSync(recordFile)).toBe(false)
+    expect(existsSync(logDir)).toBe(false)
+    expect(runner.isRunning(SESSION)).toBe(false)
   })
 })
 

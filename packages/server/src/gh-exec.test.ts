@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import path, { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { createGhExec, ghBin } from './gh.ts'
+import { createFoundGhExec, createGhExec, createGhReader, ghBin } from './gh.ts'
+import { createToolFinder } from './tool-finder.ts'
 
 const WIN = process.platform === 'win32'
 const SEP = WIN ? ';' : ':'
@@ -112,5 +113,72 @@ describe('gh exec', () => {
     writeFileSync(join(pathDir, 'gh.bat'), '@echo off\r\n')
     writeFileSync(join(pathDir, 'gh.cmd'), '@echo off\r\n')
     expect(ghBin(envWithPath(pathDir))).toBeUndefined()
+  })
+})
+
+describe.runIf(WIN)('gh from the finder', () => {
+  /** A finder with an empty inherited Path, whose only way to anything is the fake registry. */
+  const finderWith = (...regDirs: string[]) =>
+    createToolFinder({
+      env: { Path: '', SystemRoot: process.env.SystemRoot },
+      platform: 'win32',
+      settingsFile: join(tmp, 'tool-paths.json'),
+      readRegistryPath: async (hive) => (hive === 'HKLM' ? `\r\nHKEY\r\n    Path    REG_SZ    ${regDirs.join(';')}\r\n` : ''),
+    })
+
+  test('gh runs from the finder with the merged Path', async () => {
+    // A copy of where.exe as gh.exe finds a file through the child's Path, so it shows the registry folder got there.
+    const toolDir = join(tmp, 'tool')
+    const markerDir = join(tmp, 'markers')
+    mkdirSync(toolDir)
+    mkdirSync(markerDir)
+    copyFileSync(join(SYS32, 'where.exe'), join(toolDir, 'gh.exe'))
+    writeFileSync(join(markerDir, 'marker-file.txt'), '')
+    const finder = finderWith(toolDir, markerDir)
+    await finder.check()
+    const r = await createFoundGhExec(finder)(['marker-file.txt'], emptyDir)
+    expect(r.status).toBe('ok')
+    expect(r.stdout.trim().toLowerCase()).toBe(join(markerDir, 'marker-file.txt').toLowerCase())
+  })
+
+  test('gh follows a recheck', async () => {
+    mkdirSync(pathDir)
+    const finder = finderWith(pathDir)
+    await finder.check()
+    const exec = createFoundGhExec(finder)
+    expect((await exec([], emptyDir)).status).toBe('not-found')
+
+    // Installed later: the file alone changes nothing until a check sees it, and no restart is needed.
+    plantGh(pathDir, 'from-path')
+    expect((await exec([], emptyDir)).status).toBe('not-found')
+    await finder.check()
+    const r = await exec([], emptyDir)
+    expect(r.status).toBe('ok')
+    expect(r.stdout.trim()).toBe(fromPathOutput())
+
+    // Gone with no check in between: not-found, and no throw.
+    rmSync(join(pathDir, 'gh.exe'))
+    expect((await exec([], emptyDir)).status).toBe('not-found')
+  })
+
+  test('a recheck that finds gh ends a missing status with no 60 s wait', async () => {
+    mkdirSync(pathDir)
+    const finder = finderWith(pathDir)
+    await finder.check()
+    const now = 1000 // the clock stands still, so the 60 s cache never ends by itself
+    const reader = createGhReader({ exec: createFoundGhExec(finder), ghFound: () => finder.path('gh') !== undefined, now: () => now })
+    await reader.refresh(emptyDir, [])
+    expect(reader.status()).toBe('missing')
+
+    // Still not found: the cache holds, and nothing is asked again.
+    const askedAt = reader.checkedAt()
+    expect(await reader.refresh(emptyDir, [])).toBe(false)
+    expect(reader.checkedAt()).toBe(askedAt)
+
+    plantGh(pathDir, 'from-path')
+    await finder.check()
+    expect(await reader.refresh(emptyDir, [])).toBe(true)
+    // It ran: the stand-in answers `auth status` with an error, which reads as logged out.
+    expect(reader.status()).toBe('logged-out')
   })
 })
