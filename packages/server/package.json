@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     "./config": "./src/config.ts",
-    "./session-token": "./src/session-token.ts"
+    "./parent-link": "./src/parent-link.ts",
+    "./session-token": "./src/session-token.ts",
+    "./shutdown": "./src/shutdown.ts"
   },
   "scripts": {
     "dev": "tsx watch src/main.ts",
