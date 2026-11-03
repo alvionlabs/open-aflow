@@ -44,6 +44,8 @@ Measured on Windows 11 and an unpackaged Electron 45.2.1, on a temp copy of the 
 - A new `BLOCKED → human` line gives one `toast sent` line in the shell's log, and the bus's attention value goes on. The log holds no entry text.
 - `Notification.isSupported()` is true, and Electron's `show` event fires on an unpackaged toast. That event doesn't prove the toast was on the screen. No agent can see it, so it stays a check for a person.
 - Firing the `click` event on the real `Notification` object calls `bus.showWindow` with the run's hash. A real click isn't proved.
+- A start with a registered repo and an open `BLOCKED → human` sends nothing, and the attention value goes on. The server builds its first Board before it listens, so that Board is never empty.
+- After a `taskkill /F` on the server, `onReady` fires again. The old item stays quiet, and a new line sends one toast.
 - Answering an entry that joins no plan, on the page, sets the attention value off.
 - Answering a plan's `BLOCKED` doesn't set it off. See **Watch out**.
 
