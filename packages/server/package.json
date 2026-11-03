@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
+    "bundle": "tsx scripts/bundle.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
     "hono": "^4.13.13"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15"
   }
 }
