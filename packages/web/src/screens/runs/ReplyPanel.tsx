@@ -72,7 +72,10 @@ function ResumeOutcome({ view, flow }: { view: ResumeView; flow: ResumeFlow }) {
   )
 }
 
-/** The chat to paste a reply in: the session line, `cd` and `claude --resume`, each with Copy; or the no-session note. */
+/**
+ * The chat to paste a reply in: the session line, `cd` and `claude --resume`, each with Copy; or the
+ * no-session note. A folder with no safe `cd` shows as plain text, with no Copy.
+ */
 export function ReplyChat({ view }: { view: ReplyPanelView }) {
   const s = view.session
   if (!s) return <p className="note reply-chat">{view.noSession}</p>
@@ -82,10 +85,16 @@ export function ReplyChat({ view }: { view: ReplyPanelView }) {
         Paste it in <span className="mono">{s.line}</span>
         {s.time && <span> · {s.time}</span>}
       </p>
-      <div className="reply-cmd">
-        <code className="mono">{s.cd}</code>
-        <CopyButton text={s.cd} what="cd command" />
-      </div>
+      {s.cd ? (
+        <div className="reply-cmd">
+          <code className="mono">{s.cd}</code>
+          <CopyButton text={s.cd} what="cd command" />
+        </div>
+      ) : (
+        <p className="note reply-folder">
+          Open this folder yourself: <span className="mono">{s.path}</span>
+        </p>
+      )}
       {s.resume && (
         <div className="reply-cmd">
           <code className="mono">{s.resume}</code>

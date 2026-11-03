@@ -7,7 +7,7 @@ The API server (`packages/server`) finds the repos to show, reads their pod docs
 ## How it works
 
 - **Repos:** paths in the config file plus every repo a claim file names, merged by normalized path (case-blind where the file system is). `source` is `registered`, `claim`, or `both`.
-- **Each repo:** pod docs → the model (a doc whose real path leaves the repo's real path is skipped); recent pod-agent transcripts → parsed runs through a cache keyed by size and mtime, never text; PRs from a `gh` cache refreshed every 30 s. One bad repo sets its `error`; the others still build.
+- **Each repo:** pod docs → the model (a doc whose real path leaves the repo's real path is skipped); recent pod-agent transcripts → parsed runs through a cache keyed by size and mtime, never text; PRs from a `gh` cache refreshed every 30 s (a head branch with no open or merged PR for 2 hours: every 30 minutes). One bad repo sets its `error`; the others still build.
 - **`gh`:** run by the absolute path of the first `gh.exe` / `gh.com` (`gh` on POSIX) in an absolute `PATH` entry; asked only about live PRs (current-sprint PRs, hand-back PRs, a fix claim's or a plan's PR by head branch).
 - **Watching:** one watcher per folder; a rebuild after 300 ms of quiet, never later than 1.5 s after a burst starts. Clients get a Board over SSE only when its JSON changed.
 - **Guards,** in order, the first failure answers:
@@ -56,6 +56,7 @@ flowchart TD
 - Claude's project folder name (`projectDirName`) uses the same character rule as the plain id, so `chess-web` and `chess_web` read one transcript folder, even with only one of them on the board. Only the `cwd` in the session's own file tells them apart: never give a repo a session by project folder alone, by an agent's own `cwd`, or by a name prefix (`chess-web-A1` is not a sibling of `chess-web`), and never send on a session marked `sessionUnproven`.
 - Compare real paths with `path.relative`, never a string prefix: `C:\x-other` starts with `C:\x`.
 - Never spawn a child by a bare name with a repo as its working folder: use `resolveBin` and `safeChildEnv` (`bin-path.ts`).
+- A head branch with no open or merged PR slows after 2 hours of asking (`NO_PR_LIMIT_MS`) to once per 30 minutes (`NO_PR_SLOW_MS`), never to a stop: a final PR can open later. This covers plan, fix-run, and staging heads alike, so a PR on such a branch can take up to 30 minutes and one tick to show. An open PR gives the branch 30 s again. A restart, `forget`, or the branch leaving the asked list starts the 2 hours again. A staging branch with a merged PR stays at 30 s.
 - Keep Vite's dev `cors: false`. Through the proxy, a stopped API answers `502` with an empty body.
 - Point `POD_BOARD_CONFIG_DIR` and `POD_BOARD_PORTS_DIR` at temp folders in tests and smoke runs. From Git Bash, send a UNC test path URL-encoded.
 - The rebuild chain must never stay rejected; keep the cap timer apart from the quiet timer.
@@ -95,3 +96,4 @@ flowchart TD
 - 2026-11-02 · fix-repo-id review round 1 · fixed: a repo lists an agent by a `cwd`, so a sibling's session is never offered or sent, and no readable `cwd` sends nothing. Remove forgets the repo's auto-continue toggles.
 - 2026-11-02 · fix-repo-id review round 2 · fixed: the owner comes from the session's own file, not the agent's transcript; only an exact fold of the project name hides an agent; Remove forgets toggles also for a repo a port claim still lists.
 - 2026-11-02 · fix-repo-id review round 3 · fixed: a failed read of a session file (a lock, say) is no longer kept as "no `cwd`"; the session stays unproven only until a later build can read it.
+- 2026-11-03 · fix-ship-blockers · fixed: a plan with every sprint done and no PR cost one `gh pr list` every 30 s with no end; a head branch with no open or merged PR now slows to one per 30 minutes after 2 hours.

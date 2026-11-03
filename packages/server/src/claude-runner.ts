@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 import type { ReplyWord } from '@pod-board/model'
-import { envKey, isFile, resolveBin, safeChildEnv } from './bin-path.ts'
+import { envKey, isAbsoluteFor, isFile, resolveBin, safeChildEnv } from './bin-path.ts'
 import { envValue, type Env } from './config.ts'
 
 export { resolveBin }
@@ -28,8 +28,12 @@ const TAIL_CHARS = 500
  */
 const SESSION = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/
 const WORDS: readonly string[] = ['continue', 'go']
-/** Env names passed on although they match a dropped prefix, compared upper-cased. */
-const KEPT_ENV = new Set(['CLAUDE_CONFIG_DIR'])
+const BASH_PATH_ENV = 'CLAUDE_CODE_GIT_BASH_PATH'
+/**
+ * Env names passed on although they match a dropped prefix, compared upper-cased. Exact names
+ * only, never a prefix: `CLAUDE_CODE_*` also holds `CLAUDE_CODE_OAUTH_TOKEN` and session state.
+ */
+const KEPT_ENV = new Set(['CLAUDE_CONFIG_DIR', BASH_PATH_ENV, 'CLAUDE_CODE_MAX_OUTPUT_TOKENS'])
 /** Characters cmd.exe would act on even inside quotes, or that end the quoting. */
 const CMD_UNSAFE = /["%!^&|<>\r\n]/
 // CSI sequences, OSC sequences, and other two-byte escapes.
@@ -76,15 +80,22 @@ export function claudeBin(env: Env): string {
  * `ANTHROPIC_*` variable (keys, tokens, base URL, model) and every `CLAUDE*` one (Claude
  * Code's own session state: `CLAUDECODE`, `CLAUDE_CODE_*`, `CLAUDE_PID`, `CLAUDE_EFFORT`,
  * the Bedrock and Vertex switches) is dropped, so the run uses the human's own login and
- * settings, not those of a session that happened to launch the board. `CLAUDE_CONFIG_DIR`
- * is kept: it names where the human's login and sessions live, the same folder the board
- * reads transcripts from, and without it `--resume` couldn't find the session.
+ * settings, not those of a session that happened to launch the board. `KEPT_ENV` names the
+ * exceptions, which are machine settings and not credentials or session state:
+ * `CLAUDE_CONFIG_DIR` names where the human's login and sessions live, the same folder the
+ * board reads transcripts from, and without it `--resume` couldn't find the session;
+ * `CLAUDE_CODE_GIT_BASH_PATH` and `CLAUDE_CODE_MAX_OUTPUT_TOKENS` may be set only in the
+ * shell, and a run can fail to start without them on a machine that needs them.
  */
 const passesOn = (name: string): boolean => {
   const u = name.toUpperCase()
   if (KEPT_ENV.has(u)) return true
   return !u.startsWith('ANTHROPIC_') && !u.startsWith('CLAUDE')
 }
+
+/** A relative bash path would resolve in the repo folder the run starts in, so a cloned repo could plant it. */
+const safeValue = (name: string, value: string | undefined, win: boolean): boolean =>
+  name.toUpperCase() !== BASH_PATH_ENV || isAbsoluteFor(value ?? '', win)
 
 /**
  * The board's env for a resumed run: see `passesOn`, then `safeChildEnv` (absolute PATH
@@ -93,7 +104,7 @@ const passesOn = (name: string): boolean => {
  */
 export function childEnv(env: NodeJS.ProcessEnv, platform: NodeJS.Platform = process.platform): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = {}
-  for (const [k, v] of Object.entries(env)) if (passesOn(k)) out[k] = v
+  for (const [k, v] of Object.entries(env)) if (passesOn(k) && safeValue(k, v, platform === 'win32')) out[k] = v
   return safeChildEnv(out, platform)
 }
 
