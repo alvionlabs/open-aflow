@@ -157,3 +157,51 @@ describe('main.ts', () => {
     expect(await exitOf(b.child)).toBe(0)
   }, 60_000)
 })
+
+/** Runs an entry on temp folders with `over` on top, until it exits. */
+const runToExit = async (entry: string, over: Record<string, string>): Promise<{ code: number | null; text: string }> => {
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  for (const k of Object.keys(env)) if (k.startsWith('POD_BOARD_')) delete env[k]
+  Object.assign(env, {
+    POD_BOARD_CONFIG_DIR: join(tmp, 'cfg'),
+    POD_BOARD_PORTS_DIR: join(tmp, 'ports'),
+    POD_BOARD_CLAUDE_DIR: join(tmp, 'claude'),
+    POD_BOARD_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
+    ...over,
+  })
+  const c = spawn(process.execPath, ['--import', TSX, entry], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+  child = c
+  let text = ''
+  c.stdout!.on('data', (d) => (text += String(d)))
+  c.stderr!.on('data', (d) => (text += String(d)))
+  const code = await new Promise<number | null>((resolve) => c.once('close', (n) => resolve(n)))
+  return { code, text }
+}
+
+describe('the dev entry', () => {
+  test('the dev API serves no page', async () => {
+    const b = await boot()
+    child = b.child
+    const res = await fetch(`http://127.0.0.1:${b.api}/`)
+    expect(res.status).toBe(404)
+    expect(await res.text()).not.toContain('<html')
+  }, 60_000)
+
+  test('a bad port stops the dev server', async () => {
+    const { code, text } = await runToExit(MAIN, { POD_BOARD_API_PORT: 'abc' })
+    expect(code).toBe(1)
+    expect(text).toContain('pod-board: POD_BOARD_API_PORT')
+    expect(text).not.toContain('listening')
+  }, 60_000)
+})
+
+describe('the production entry', () => {
+  // No web build sits beside the source file, so the entry stops and names its own folder.
+  test('with no web folder beside it, it stops naming the folder', async () => {
+    const { code, text } = await runToExit(join(here, 'main-production.ts'), { POD_BOARD_API_PORT: String(await freePort()) })
+    expect(code).toBe(1)
+    expect(text).toContain('pod-board: ')
+    expect(text).toContain(join(here, 'web'))
+    expect(text).not.toContain('listening')
+  }, 60_000)
+})
