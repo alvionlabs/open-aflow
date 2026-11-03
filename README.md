@@ -42,12 +42,35 @@ $env:POD_BOARD_API_PORT = '3010'; $env:POD_BOARD_WEB_PORT = '3011'; pnpm dev
 A port must be an integer from 1 to 65535, or the server stops with an error
 that names the variable.
 
+### Run the production build
+
+```sh
+pnpm build
+pnpm start
+```
+
+This serves the web app and the API on one port, on `127.0.0.1` only:
+`http://127.0.0.1:47800`. If that port is busy, the server takes a free one for
+this launch and logs it. The log line `pod-board API listening on
+http://127.0.0.1:<port>` shows the port in use. With no build, `pnpm start`
+fails with Node's own error.
+
+To use one fixed port, set `POD_BOARD_API_PORT`. If that port is busy, the server
+stops with an error. `POD_BOARD_WEB_PORT` has no effect in production.
+
+The build is in `packages/server/dist/app`: `server.mjs`, with every dependency
+inside, and `web/`. You can move that folder anywhere and run `node server.mjs`.
+
+Don't run `pnpm start` and `pnpm dev` on one config folder if you use
+auto-continue: both can send `continue`. Set `POD_BOARD_CONFIG_DIR` to a different
+folder for one of them.
+
 ## Add repos
 
 The board shows every repo you register, plus every repo with a live pod run
 (pod writes a claim file per run). To register one, use the Add a repo form on
-the runs screen, or send its absolute path with the session token the API
-writes at each start to `session-token` next to its config file:
+the runs screen, or (under `pnpm dev`) send its absolute path with the session
+token the API writes at each start to `session-token` next to its config file:
 
 ```sh
 curl -s -X POST http://127.0.0.1:3000/api/repos   -H "Origin: http://127.0.0.1:3000" -H "Content-Type: application/json"   -H "X-Pod-Board-Token: $(cat ~/.config/pod-board/session-token)"   -d '{"path":"/home/you/code/my-repo"}'
@@ -71,7 +94,8 @@ All optional, set as environment variables:
 
 | Variable | What it does | Default |
 |---|---|---|
-| `POD_BOARD_API_PORT`, `POD_BOARD_WEB_PORT` | Ports of the two servers | `3000`, `3001` |
+| `POD_BOARD_API_PORT` | Port of the API server. In production, the one port, with no fallback | `3000`. In production, `47800`, or a free port if it's busy |
+| `POD_BOARD_WEB_PORT` | Port of the web app. Only `pnpm dev` reads it | `3001` |
 | `POD_BOARD_CONFIG_DIR` | Folder for `config.json` | per OS, as above |
 | `POD_BOARD_PORTS_DIR` | Where pod writes its run claims | `<temp>/pod-ports` |
 | `POD_BOARD_CLAUDE_DIR` | Claude's folder, for agent transcripts (read only) | `CLAUDE_CONFIG_DIR`, else `~/.claude` |
@@ -80,8 +104,8 @@ All optional, set as environment variables:
 | `POD_BOARD_POLL` | `1` watches files by polling, for network drives | off |
 
 The board only accepts requests to `127.0.0.1` or `localhost` on its two
-ports; any other `Host` gets a 403, and so does a write from another site's
-page (`Origin`).
+ports (in production, on its one port); any other `Host` gets a 403, and so does
+a write from another site's page (`Origin`).
 
 ## Verify
 
@@ -97,3 +121,7 @@ runs the same command on Windows only; macOS and Linux aren't checked.
 - `packages/model`: pod docs parsers and the run model. Pure functions, no I/O.
 - `packages/server`: Hono API server: finds repos, watches their files, and serves the board.
 - `packages/web`: React and Vite web app.
+
+## License
+
+[MIT](LICENSE).

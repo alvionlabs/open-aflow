@@ -1,6 +1,7 @@
 {
   "name": "pod-board",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@11.1.2",
   "engines": {
@@ -10,7 +11,8 @@
     "dev": "pnpm --parallel --filter @pod-board/server --filter @pod-board/web dev",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
-    "build": "pnpm -r build",
+    "build": "pnpm -r build && pnpm --filter @pod-board/server bundle",
+    "start": "node packages/server/dist/app/server.mjs",
     "verify": "pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
