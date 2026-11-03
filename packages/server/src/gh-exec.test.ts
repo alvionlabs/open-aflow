@@ -1,5 +1,5 @@
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import path, { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -33,6 +33,10 @@ function plantGh(dir: string, says: 'planted' | 'from-path'): void {
 /** What the PATH stand-in prints when it runs. */
 const fromPathOutput = () => (WIN ? execFileSync(join(SYS32, 'whoami.exe'), { encoding: 'utf8' }).trim() : 'from-path')
 
+/** The 8.3 short form of `file`, or `file` itself when the volume keeps no short name for it. */
+const shortName = (file: string): string =>
+  spawnSync(join(SYS32, 'cmd.exe'), ['/d', '/s', '/c', `for %I in ("${file}") do @echo %~sI`], { encoding: 'utf8', windowsVerbatimArguments: true }).stdout.trim()
+
 /** The test process's env with PATH replaced (SystemRoot kept, which Windows tools need). */
 const envWithPath = (...dirs: string[]): NodeJS.ProcessEnv => {
   const env: NodeJS.ProcessEnv = {}
@@ -41,7 +45,8 @@ const envWithPath = (...dirs: string[]): NodeJS.ProcessEnv => {
 }
 
 beforeEach(() => {
-  tmp = mkdtempSync(join(tmpdir(), 'gh-exec-'))
+  // The native form, because the temp folder can be an 8.3 short name (CI's is) and only it expands one.
+  tmp = realpathSync.native(mkdtempSync(join(tmpdir(), 'gh-exec-')))
   repo = join(tmp, 'repo')
   pathDir = join(tmp, 'bin')
   emptyDir = join(tmp, 'empty')
@@ -139,6 +144,34 @@ describe.runIf(WIN)('gh from the finder', () => {
     const r = await createFoundGhExec(finder)(['marker-file.txt'], emptyDir)
     expect(r.status).toBe('ok')
     expect(r.stdout.trim().toLowerCase()).toBe(join(markerDir, 'marker-file.txt').toLowerCase())
+  })
+
+  test.for(['path', 'registry'] as const)('a short-name folder from the %s still finds and runs gh', async (source, { skip }) => {
+    const toolDir = join(tmp, 'tool-folder-with-a-long-name')
+    const markerDir = join(tmp, 'marker-folder-with-a-long-name')
+    mkdirSync(toolDir)
+    mkdirSync(markerDir)
+    copyFileSync(join(SYS32, 'where.exe'), join(toolDir, 'gh.exe'))
+    writeFileSync(join(markerDir, 'marker-file.txt'), '')
+    const shortTool = shortName(toolDir)
+    const shortMarker = shortName(markerDir)
+    if (shortTool === toolDir || shortMarker === markerDir) return skip('this volume keeps no 8.3 names')
+
+    const finder = createToolFinder({
+      env: { Path: source === 'path' ? [shortTool, shortMarker].join(SEP) : '', SystemRoot: process.env.SystemRoot },
+      platform: 'win32',
+      settingsFile: join(tmp, 'tool-paths.json'),
+      readRegistryPath: async (hive) => (hive === 'HKLM' && source === 'registry' ? `
+HKEY
+    Path    REG_SZ    ${shortTool};${shortMarker}
+` : ''),
+    })
+    await finder.check()
+    expect(finder.states().find((s) => s.tool === 'gh')).toEqual({ tool: 'gh', state: 'found', path: join(shortTool, 'gh.exe'), source })
+
+    const r = await createFoundGhExec(finder)(['marker-file.txt'], emptyDir)
+    expect(r.status).toBe('ok')
+    expect(realpathSync.native(r.stdout.trim())).toBe(join(markerDir, 'marker-file.txt'))
   })
 
   test('gh follows a recheck', async () => {
