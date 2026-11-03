@@ -439,6 +439,53 @@ describe('production', () => {
   })
 })
 
+describe('the owner file', () => {
+  const ownerFile = () => join(cfg, 'auto-continue-owner.json')
+
+  test('a failed start holds nothing', async () => {
+    const busy = await holdPort()
+    await expect(start(envFor({ POD_BOARD_API_PORT: String(busy) }))).rejects.toThrow(/POD_BOARD_API_PORT/)
+    expect(existsSync(ownerFile())).toBe(false)
+    await expect(start(envFor({ POD_BOARD_API_PORT: String(busy) }), { webDir })).rejects.toThrow(/POD_BOARD_API_PORT/)
+    expect(existsSync(ownerFile())).toBe(false)
+    expect(spies.autoStarts).toBe(0)
+  })
+
+  test('both modes use the owner file', async () => {
+    // Dev first: it takes the file and starts the check.
+    const dev = await start(envFor({ POD_BOARD_API_PORT: String(await freePort()), POD_BOARD_WEB_PORT: String(await freePort()) }))
+    const held = JSON.parse(await readFile(ownerFile(), 'utf8')) as { pid: number; id: string }
+    expect(held.pid).toBe(process.pid)
+    expect(spies.autoStarts).toBe(1)
+    expect(logs.join('\n')).not.toContain('auto-continue')
+
+    // Production on the same folder keeps serving, and starts no check.
+    const prod = await startProduction()
+    expect(spies.autoStarts).toBe(1)
+    expect(JSON.parse(await readFile(ownerFile(), 'utf8'))).toEqual(expect.objectContaining({ id: held.id }))
+    expect(logs.filter((l) => l.includes(String(process.pid)) && l.includes(cfg))).toHaveLength(1)
+    expect((await send(prod.started.port, '/api/health')).status).toBe(200)
+
+    // The second's stop leaves the first's file; the first's stop removes it.
+    prod.started.stop()
+    expect(await prod.exited).toBe(0)
+    expect(existsSync(ownerFile())).toBe(true)
+    dev.started.stop()
+    expect(await dev.exited).toBe(0)
+    expect(existsSync(ownerFile())).toBe(false)
+    running.splice(0)
+
+    // Production alone takes it too.
+    const again = await startProduction()
+    expect(existsSync(ownerFile())).toBe(true)
+    expect(spies.autoStarts).toBe(2)
+    again.started.stop()
+    expect(await again.exited).toBe(0)
+    expect(existsSync(ownerFile())).toBe(false)
+    running.splice(0)
+  })
+})
+
 describe('stop', () => {
   test('stop uses the shared shutdown', async () => {
     const entry = await startProduction()

@@ -61,6 +61,13 @@ stops with an error. `POD_BOARD_WEB_PORT` has no effect in production.
 The build is in `packages/server/dist/app`: `server.mjs`, with every dependency
 inside, and `web/`. You can move that folder anywhere and run `node server.mjs`.
 
+When you open the production page, the board checks for `git`, `gh`, and `claude`.
+If it can't find one, a setup check replaces the board. It shows how to install
+the tool, and has a field for the path to the tool. `pnpm dev` has no setup check.
+
+Set `CLAUDE*` variables in the `env` block of Claude's `settings.json`. Resumed
+runs drop those set only in a shell.
+
 Don't run `pnpm start` and `pnpm dev` on one config folder if you use
 auto-continue: both can send `continue`. Set `POD_BOARD_CONFIG_DIR` to a different
 folder for one of them.

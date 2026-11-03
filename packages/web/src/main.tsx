@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './theme/index.css'
 import { applyTheme, readChoice } from './theme/theme.ts'
 import { App } from './App.tsx'
+import { SetupGate } from './screens/setup/SetupScreen.tsx'
 
 const storage = (() => {
   try {
@@ -18,6 +19,8 @@ if (!root) throw new Error('#root is missing from index.html')
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <SetupGate>
+      <App />
+    </SetupGate>
   </StrictMode>,
 )
