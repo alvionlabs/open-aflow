@@ -65,6 +65,48 @@ describe('reply panel', () => {
       expect(cdFor('C:/work/repo')).toBe('cd "C:/work/repo"')
     })
 
+    it('a Windows path a shell could run part of gets no cd line', () => {
+      for (const ch of ['$', '(', ')', '`']) {
+        expect(cdFor(`E:\\Projects\\a${ch}b`), ch).toBeUndefined()
+      }
+      expect(cdFor('E:\\Projects\\$(calc)')).toBeUndefined()
+      expect(cdFor('C:/work/a$b')).toBeUndefined()
+    })
+
+    it('a Windows path with a curly double quote gets no cd line: PowerShell reads it as closing the string', () => {
+      for (const ch of ['\u201C', '\u201D', '\u201E']) {
+        expect(cdFor(`E:\\Projects\\x${ch}; calc; ${ch}y`), ch).toBeUndefined()
+      }
+    })
+
+    it('other characters that are plain inside the quotes keep the cd line', () => {
+      for (const p of ['E:\\a&b', 'E:\\a;b', 'E:\\a%b', 'E:\\a%USERNAME%b', "E:\\it's", 'E:\\a!b', 'E:\\a\u2019b']) {
+        expect(cdFor(p), p).toBe(`cd "${p}"`)
+      }
+    })
+
+    it('an unsafe Windows path shows the folder, no cd in any row, and no empty row', () => {
+      const unsafe = 'E:\\Projects\\a$(calc)'
+      const panel = (id: string) => replyPanel(run(), repo([agent({ session: id, lastAt: NOW - 40 * MIN })], unsafe), NOW)!
+      const withResume = renderToStaticMarkup(createElement(ReplyChat, { view: panel('s1') }))
+      expect(withResume).not.toContain('aria-label="Copy cd command"')
+      expect(withResume).not.toContain('cd &quot;')
+      expect(withResume).toContain(unsafe)
+      expect(withResume).toContain('claude --resume s1')
+      // One row per command that exists: the resume line only.
+      expect(withResume.match(/class="reply-cmd"/g)).toHaveLength(1)
+      // Neither command: no row at all, only the session line and the folder.
+      const bare = renderToStaticMarkup(createElement(ReplyChat, { view: panel('odd id') }))
+      expect(bare).not.toContain('class="reply-cmd"')
+      expect(bare).toContain(unsafe)
+    })
+
+    it('a safe path keeps its cd row and shows no extra folder line', () => {
+      const chat = renderToStaticMarkup(createElement(ReplyChat, { view: replyPanel(run(), repo([agent({ session: 's1', lastAt: NOW - 40 * MIN })]), NOW)! }))
+      expect(chat).toContain('aria-label="Copy cd command"')
+      expect(chat).not.toContain('reply-folder')
+    })
+
     it('a POSIX path is single-quoted, so the shell runs nothing in it', () => {
       expect(cdFor('/home/me/some repo')).toBe("cd '/home/me/some repo'")
       // `$(x)`, a backtick, `"` and `!` are plain text inside single quotes; a `'` closes, escapes, and reopens.
