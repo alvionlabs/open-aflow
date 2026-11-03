@@ -14,7 +14,28 @@ The API server (`packages/server`) finds the repos to show, reads their pod docs
   - every route: a loopback `Host` on the API or web port (`403 forbidden host`), and an exact `Origin` on writes. No CORS headers; both ports bind `127.0.0.1`.
   - `/api/actions/*` (remove-repo included) and `POST /api/repos` (`actionGuard`): Origin, a body over 64 KB (`413`), POST, `application/json`, the token, a JSON object.
   - `/api/fs/*` (`readGuard`): the token only, no `Origin`.
-  - The token is a fresh random value per API start in `<config dir>/session-token`; Vite puts it in the page's `<meta name="pod-board-token">`, and the page sends it as `X-Pod-Board-Token`. Compared in constant time. Never in the Board, a URL, a cookie, or `pnpm build` output.
+  - The token is a fresh random value per API start. In dev it's in `<config dir>/session-token`, and Vite puts it in the page's `<meta name="pod-board-token">`. In production it stays in memory, and the server puts it in the page. The page sends it as `X-Pod-Board-Token`. Compared in constant time. Never in the Board, a URL, a cookie, a log, or `pnpm build` output.
+- **Two modes, one wiring** (`startServer` in `start-server.ts`; `runMain` prints a rejection as `pod-board: <message>`, exits 1, and connects the signals). `main.ts` runs dev. `main-production.ts` runs production and finds its `web` folder from `import.meta.url`, never from the working folder.
+
+  | | Dev | Production |
+  |---|---|---|
+  | Token | Written to `<config dir>/session-token` before anything listens | In memory only. An existing file stays as it is, so a dev page on the same config folder keeps working |
+  | Config folder | Created by the token write | Created at start; a failure stops the start, naming the folder |
+  | Port | `POD_BOARD_API_PORT`, default 3000, no fallback | See **Production port** |
+  | `Host` and `Origin` | API port and `POD_BOARD_WEB_PORT` | The bound port only. `POD_BOARD_WEB_PORT` isn't read |
+  | Page routes | 404 on the API port | See **Production answers** |
+
+- **Start order:** settings; the web app and config folder (production) or the token file (dev); the watcher; the bind; then the guards, the log line, and the automatic check. A failure at any step rejects, and a failed bind closes the watcher. Because the check starts after the bind, a server that can't start sends no `continue`.
+- **Production port** (`listen.ts`): `POD_BOARD_API_PORT` unset or empty tries `APP_PORT` (47800). On `EADDRINUSE` or `EACCES` (Windows reserved ranges answer `EACCES`), the OS picks a free port for this launch, and the server logs `pod-board: port 47800 is busy; using <port> for this launch`. Set: that port only; busy stops the start, naming the variable and the port. Any other listen error stops the start. The guards are built with the port that was really bound.
+- **Production answers** (`web-app.ts`, mounted last in `createApp`, so a real API route wins and every answer sits behind the request guard). First match wins, on the path without its query:
+  1. `/api`, `/api/`, or `/api/…`, any method → 404.
+  2. A method other than GET or HEAD → 404. The request guard checks `Origin` first.
+  3. `/` or `/index.html` → 200, the page with the token, `no-store`.
+  4. A file listed at start, by exact path → 200 with its type. `/assets/…` is `public, max-age=31536000, immutable`; any other file is `no-cache`. A listed file that has since gone → 404.
+  5. A last path part that holds a dot (`/sw.js`, `/INDEX.HTML`, `/index.html::$DATA`) → 404.
+  6. Anything else → the same answer as rule 3.
+
+  Every 404 is `{"error":"not found"}`, never HTML. HEAD gets GET's status and headers with no body. The page text and the file list are read once at start; a file added later isn't served, and a missing folder, a missing `index.html`, or an `index.html` with no `</head>` stops the start, naming the folder.
 - **Repo ids** (`repoIds` in `guard.ts`, one call per build, over config and claim repos together): a repo's plain id is its normalized path with each non-alphanumeric character as `-`, lowercased when its file system ignores case. Two spellings of one repo on such a file system are one entry (`sameRepoPath`), so they never clash. A repo with no clash keeps its plain id. Every member of a clash (`chess-web`, `chess_web`) gets `-` and 6 hex characters of the SHA-256 of its normalized path (case-folded where case is ignored), so an id depends only on the path and the set, never on list order. Suffixed ids that still collide, with each other or with another repo's plain id, double their suffix; the plain repo keeps its id.
 - **Agents of a repo** (`agentOfRepo` in `transcript-files.ts`, per build, on the cached parse): by the first `cwd` in the session's own `<session>.jsonl`, never the agent's: an agent can work anywhere, and every agent of a session is placed the same way. Session in the repo (`isInsideRepo`, the `sameRepoPath` case rule) → listed, and it can be sent to. In a folder that, or a parent of which, folds exactly to this repo's Claude project name (a sibling or the sibling's worktree) → not listed. No session file, no `cwd` in the file's first 1 MB, or anywhere else (`chess-web-A1`) → listed, marked `sessionUnproven`, and no send. The `cwd` never reaches the Board. Each build stats each listed session file once per repo; a file whose size or mtime changed is read again, from its head only, 64 KB at a time.
 - **Add repo:** a local absolute path only; a Windows path starting with two separators → `400 not a local path` before any file system call.
@@ -45,6 +66,10 @@ flowchart TD
 - **Add repo needs the token:** a registered repo is a folder the board reads and runs `gh` in.
 - **`gh` by absolute path from absolute `PATH` entries:** a `gh.exe` planted in a cloned repo could otherwise run on the 30 s refresh.
 - **A new token per launch** keeps `dist` free of it. Trade-off: a page from before a restart must reload.
+- **Production's token stays in memory:** writing the file would break a `pnpm dev` page open on the same config folder ([plan](../plans/windows-app.md#key-decisions)). The page response is `no-store`, and nothing on disk holds the token.
+- **A missing web file answers 404, not the page:** a fallback to `index.html` would answer `/sw.js` with `200` and HTML ([plan](../plans/windows-app.md#key-decisions)).
+- **The app is built after the bind:** port 0 has no number until the OS picks one, and the guards need the real port. The server binds first, with a handler that the listening callback fills in before any connection can arrive.
+- **URL text is only a key into the file list:** it never becomes a disk path, so no spelling (`%2e%2e`, `%2f`, `%5c`, `%00`, `::$DATA`) can reach a file outside the folder.
 - **Quiet spell plus a cap** ([decision](../decisions.md#2026-10-19--fix-live-update-starvation-before-the-final-review)); **parsed runs, not text, in the cache** (the text cache held about 1 GB); **no transcript size cap** ([decision](../decisions.md#2026-10-23--no-size-cap-on-transcripts)).
 
 ## Watch out
@@ -60,6 +85,10 @@ flowchart TD
 - Point `POD_BOARD_CONFIG_DIR` and `POD_BOARD_PORTS_DIR` at temp folders in tests and smoke runs. From Git Bash, send a UNC test path URL-encoded.
 - The rebuild chain must never stay rejected; keep the cap timer apart from the quiet timer.
 - Ctrl+C waits up to 70 s for running actions; don't wait for `server.close()` (open SSE streams keep it from finishing).
+- Tests never bind 47800: set `POD_BOARD_API_PORT` or pass `preferredPort`.
+- `/sw.js` differs by mode: production answers 404 JSON, and dev's web port still answers it with HTML from Vite. Only production's rules live in `web-app.ts`.
+- Until the owner file ships, production and dev on one config folder can both auto-continue. Use separate config folders in checks.
+- `main-production.ts` run from source looks for `packages/server/src/web/`, which doesn't exist, so it exits 1. The bundle puts `web/` beside the entry.
 
 ## History
 
@@ -95,3 +124,4 @@ flowchart TD
 - 2026-11-02 · fix-repo-id review round 1 · fixed: a repo lists an agent by a `cwd`, so a sibling's session is never offered or sent, and no readable `cwd` sends nothing. Remove forgets the repo's auto-continue toggles.
 - 2026-11-02 · fix-repo-id review round 2 · fixed: the owner comes from the session's own file, not the agent's transcript; only an exact fold of the project name hides an agent; Remove forgets toggles also for a repo a port claim still lists.
 - 2026-11-02 · fix-repo-id review round 3 · fixed: a failed read of a session file (a lock, say) is no longer kept as "no `cwd`"; the session stays unproven only until a later build can read it.
+- 2026-11-02 · one-port-server S1: the wiring moved from `main.ts` to `startServer` and `runMain`; a production mode serves the web app and the API on one port, with the token in memory and a port fallback. A busy port now stops dev with an error naming the variable, and the automatic check starts after the bind.

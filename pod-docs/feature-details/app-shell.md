@@ -6,7 +6,7 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 
 ## How it works
 
-- **Serving.** Vite serves the React app on the web port and proxies `/api` to the API port; both bind `127.0.0.1`.
+- **Serving.** In dev, Vite serves the React app on the web port and proxies `/api` to the API port; both bind `127.0.0.1`. In production, the API server also serves the web build on its one port, with the token in the page (rules in [server.md](server.md)). A page route gets the page in both modes. `/sw.js` differs: production answers 404 JSON, and dev still answers it with HTML from Vite.
 - **Theme.** `pod-board-theme` in `localStorage`: `dark`, `light`, or `system`. Nothing stored, an unknown value, or storage that throws reads as `dark` (`readChoice`). `light` and `dark` set `data-theme` on `<html>`; `system` removes it so `prefers-color-scheme` decides. The ⋯ menu's `.seg` shows the choice with `aria-pressed`.
 - **Theme boot.** An inline script before the module script applies the same rule, and a `color-scheme` meta plus `:root[data-theme]` rules make the browser canvas follow. `theme-color` metas are `#000000` / `#ffffff`; the manifest's colors are `#000000`.
 - **Tokens.** Only theme files define colors and fonts. One token per Look palette entry: `--bg --surface --hover --border --border-strong --fg --muted --faint --primary-bg --primary-fg --focus`, status `--blocked --needs-you --running --ready --idle`, and `--shadow` (the menu only). `:root` holds light values; `[data-theme="dark"]` and the dark media query hold dark ones.
@@ -58,3 +58,4 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - 2026-11-01 · fix-remove-repo review round 4 · fixed: a run the user opens while a remove is in flight stays when the reply comes (the page moves only while it still shows the removed repo's run, the planned run, or none); the sidebar ⋯ label drops the bracketed repo when the run is named after it.
 - 2026-11-01 · fix-remove-repo human review · one ghost icon button style (`.btn.ghost`) for the header and sidebar ⋯: transparent at rest, a see-through fill on hover, focus, and while open. `Remove repo` gets a red tint on hover and focus, and a stronger one on press. `--danger` in light goes from #d0262f to #b81d25, since #d0262f is only 4.04:1 on its own 14% tint; #b81d25 is 4.91:1 at 14% and 4.58:1 at 18%.
 - 2026-11-01 · fix-remove-repo review round 10 · fixed: the remove confirm gives focus back only when nothing else took it, so `Open run` keeps focus on the run title.
+- 2026-11-02 · one-port-server S1: the production server can serve the web build on the API's port; `/sw.js` answers 404 there. Dev serving doesn't change.
