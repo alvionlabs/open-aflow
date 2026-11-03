@@ -93,23 +93,23 @@ const sprint = (row: string) =>
 /** An npm-style shim the runner reads and runs directly. */
 const npmShim = (rel: string) => ['@ECHO off', 'SET dp0=%~dp0', `"%dp0%\\${rel}" %*`, ''].join('\r\n')
 
-let built: string
-let root: string
-
-beforeAll(async () => {
-  root = tempDir('clean-stop')
-  const web = join(root, 'web-dist')
-  mkdirSync(web)
-  writeFileSync(join(web, 'index.html'), '<!doctype html><html><head><title>fake board</title></head><body></body></html>')
-  built = join(root, 'out', 'server.mjs')
-  await bundleApp({ webDist: web, outDir: join(root, 'out') })
-}, RUN_MS)
-
-afterAll(async () => {
-  await removeWithRetry(root)
-})
-
 describe.runIf(WIN)('the bundle stops cleanly', () => {
+  let built: string
+  let root: string
+
+  beforeAll(async () => {
+    root = tempDir('clean-stop')
+    const web = join(root, 'web-dist')
+    mkdirSync(web)
+    writeFileSync(join(web, 'index.html'), '<!doctype html><html><head><title>fake board</title></head><body></body></html>')
+    built = join(root, 'out', 'server.mjs')
+    await bundleApp({ webDist: web, outDir: join(root, 'out') })
+  }, RUN_MS)
+
+  afterAll(async () => {
+    await removeWithRetry(root)
+  })
+
   let tmp: string
   let cfg: string
   let repo: string
