@@ -107,6 +107,7 @@ const app = createApp({
         board: () => watcher.board(),
         removeRepo: (p) => removeRepo(configFile, p, platform),
         rebuild: () => watcher.rebuild(),
+        forgetToggles: store.forgetPath,
         log,
       }),
     ),

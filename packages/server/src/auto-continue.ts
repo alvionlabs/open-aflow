@@ -3,7 +3,7 @@
 // route, so the two never start a second run on one session. The rules and why are in
 // pod-docs/feature-details/resume.md.
 
-import { autoSends, type Board, type BoardRepo, type NewActionEntry, type ResumeResult } from '@pod-board/model'
+import { autoSends, repoPathKey, type Board, type BoardRepo, type NewActionEntry, type ResumeResult } from '@pod-board/model'
 import type { AutoContinueStore } from './auto-continue-store.ts'
 import type { ClaudeRunner, ResumeWord, StartResult } from './claude-runner.ts'
 
@@ -97,7 +97,7 @@ export function createAutoContinue(
         try {
           const repo = board.repos.find((r) => r.id === s.repoId)!
           // The key first: a failed save sends nothing, and the next check tries again.
-          const saved = await settle(() => d.store.saveKey(s.repoId, s.run, s.key))
+          const saved = await settle(() => d.store.saveKey(repoPathKey(repo), s.run, s.key))
           if (saved !== true) return
           await runResume(d, { repo, run: s.run, session: s.session, word: 'continue', auto: true })
           await settle(d.rebuild)

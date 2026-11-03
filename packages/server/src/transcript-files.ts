@@ -1,6 +1,8 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { open, readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
+import type { AgentRun } from '@pod-board/model'
 import { envValue, type Env } from './config.ts'
+import { isInsideRepo, normalizeRepoPath } from './guard.ts'
 
 /** One subagent's transcript files: `<session>/subagents/agent-<id>.jsonl` and its `.meta.json`. */
 export type AgentFile = { id: string; session: string; jsonlPath: string; metaPath: string }
@@ -30,6 +32,109 @@ export function transcriptDays(env: Env): number {
 /** Claude's folder name for a project: each character outside `[A-Za-z0-9]` becomes `-`. */
 export function projectDirName(repoPath: string): string {
   return repoPath.replace(/[^A-Za-z0-9]/g, '-')
+}
+
+/**
+ * A parsed agent as a repo lists it, by the `cwd` of its session's own file, never the agent's: an agent can work
+ * anywhere, and every agent of a session is placed the same way. Claude's project folder name folds symbols, so
+ * `chess-web` and `chess_web` read one folder, also with no sibling on the board.
+ * In the repo → listed, and its session can be sent to. In a folder that, or a parent of which, folds exactly to this
+ * project's name (a sibling or its worktree) → not this repo's, so undefined. No `cwd`, or anywhere else → listed
+ * as before, but `sessionUnproven`, so nothing is sent.
+ */
+export function agentOfRepo(run: AgentRun, sessionCwd: string | undefined, repo: { path: string; caseless: boolean }, platform: NodeJS.Platform): AgentRun | undefined {
+  if (sessionCwd === undefined) return { ...run, sessionUnproven: true }
+  if (isInsideRepo(sessionCwd, repo.path, platform, repo.caseless)) return run
+  return isUnderProjectName(sessionCwd, repo, platform) ? undefined : { ...run, sessionUnproven: true }
+}
+
+/** Whether a folder, or one of its parents, folds exactly to the repo's project name. */
+function isUnderProjectName(dir: string, repo: { path: string; caseless: boolean }, platform: NodeJS.Platform): boolean {
+  const { dirname, isAbsolute } = platform === 'win32' ? path.win32 : path.posix
+  if (!isAbsolute(dir)) return false
+  const fold = (s: string) => projectDirName(repo.caseless ? s.toLowerCase() : s)
+  const name = fold(repo.path)
+  for (let p = normalizeRepoPath(dir, platform); ; p = dirname(p)) {
+    if (fold(p) === name) return true
+    if (dirname(p) === p) return false
+  }
+}
+
+/** A session's main chat file, beside its folder. */
+export const sessionFileOf = (claudeDir: string, repoPath: string, session: string): string =>
+  path.join(claudeDir, 'projects', projectDirName(repoPath), `${session}.jsonl`)
+
+const SESSION_CHUNK_BYTES = 64 * 1024
+/** How far into a session file to look for its `cwd`. Claude writes one on its first real record; a main chat can run to many MB. */
+const SESSION_HEAD_BYTES = 1024 * 1024
+
+/** The first non-empty string `cwd` of a JSON-lines file, from its head only. A missing file, or none in the head → undefined. A file it could not read (a lock, say) rejects. */
+export async function firstCwdOfFile(file: string): Promise<string | undefined> {
+  try {
+    const handle = await open(file, 'r')
+    try {
+      const chunk = Buffer.alloc(SESSION_CHUNK_BYTES)
+      let pending = Buffer.alloc(0)
+      for (let at = 0; at < SESSION_HEAD_BYTES; ) {
+        const { bytesRead } = await handle.read(chunk, 0, chunk.length, at)
+        if (bytesRead === 0) return undefined
+        at += bytesRead
+        pending = Buffer.concat([pending, chunk.subarray(0, bytesRead)])
+        for (let end = pending.indexOf(10); end !== -1; end = pending.indexOf(10)) {
+          const cwd = cwdOfLine(pending.subarray(0, end).toString('utf8'))
+          if (cwd !== undefined) return cwd
+          pending = pending.subarray(end + 1)
+        }
+      }
+      return undefined
+    } finally {
+      await handle.close()
+    }
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw err
+  }
+}
+
+function cwdOfLine(line: string): string | undefined {
+  try {
+    const cwd = (JSON.parse(line) as { cwd?: unknown } | null)?.cwd
+    return typeof cwd === 'string' && cwd !== '' ? cwd : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Each session file's `cwd`, read again only when the file's size or mtime changes. Stamped before the read, so a
+ * write during it is seen on the next call. A failed read gives undefined and is not kept, so the next call tries again. `retain` forgets files no longer listed.
+ */
+export function createSessionCwdCache(read: (file: string) => Promise<string | undefined> = firstCwdOfFile): {
+  read(file: string): Promise<string | undefined>
+  retain(files: readonly string[]): void
+} {
+  const cache = new Map<string, { stamp: Stamp; cwd: string | undefined }>()
+  return {
+    async read(file) {
+      const stamp = await stampOf(file)
+      if (!stamp) return undefined
+      const hit = cache.get(file)
+      if (hit && same(hit.stamp, stamp)) return hit.cwd
+      let cwd: string | undefined
+      try {
+        cwd = await read(file)
+      } catch {
+        // Could not read (a lock, say): no cwd for now, so nothing is sent, and the next build tries again.
+        return undefined
+      }
+      cache.set(file, { stamp, cwd })
+      return cwd
+    },
+    retain(files) {
+      const keep = new Set(files)
+      for (const key of cache.keys()) if (!keep.has(key)) cache.delete(key)
+    },
+  }
 }
 
 /**

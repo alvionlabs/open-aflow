@@ -42,7 +42,7 @@ export function replyPanel(run: RunSummary | undefined, repo: BoardRepo | undefi
   if (replies.length === 0) return undefined
   const plan = run.plan
   const s = replySession(repo, plan, now)
-  const canSend = s !== undefined && SENDABLE_SESSION.test(s.id)
+  const canSend = s?.resume !== undefined && SENDABLE_SESSION.test(s.id)
   const rows = replies.map((r): ReplyRowView => {
     const row: ReplyRowView = { key: r.reply, word: r.reply, why: r.why }
     if (canSend && r.reply !== 'try' && sendableReply(repo, plan, r.reply, now)?.key === r.key) row.send = r.reply

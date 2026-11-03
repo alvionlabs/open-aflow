@@ -157,11 +157,15 @@ describe('board service', () => {
     let toggles: model.AutoToggle[] = []
     const withToggles = createBoardService({ ...deps(), autoContinue: () => toggles })
     expect((await withToggles.build()).autoContinue).toEqual([])
-    toggles = [{ repoId: 'id-r', run: 'alpha', lastKey: 'sprint-done:one' }, { repoId: 'id-x', run: 'fix-scroll' }]
-    // Read on every build; the stop keys stay in the store, off the Board.
+    const repo = copyFixture()
+    await register(repo)
+    const key = caseless ? normalizeRepoPath(repo, platform).toLowerCase() : normalizeRepoPath(repo, platform)
+    toggles = [{ path: key, run: 'alpha', lastKey: 'sprint-done:one' }, { path: key, run: 'fix-scroll' }, { path: '/not/on/the/board', run: 'alpha' }]
+    // Read on every build, under the repo's id now; the stop keys stay in the store, off the Board. A repo that isn't on the Board reads off.
+    const id = repoId(repo, platform, caseless)
     expect((await withToggles.build()).autoContinue).toEqual([
-      { repoId: 'id-r', run: 'alpha' },
-      { repoId: 'id-x', run: 'fix-scroll' },
+      { repoId: id, run: 'alpha' },
+      { repoId: id, run: 'fix-scroll' },
     ])
     expect(await createBoardService(deps()).build()).not.toHaveProperty('autoContinue')
   })
@@ -549,6 +553,52 @@ async function snapshot(dir: string): Promise<Record<string, { bytes?: string; m
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms))])
 }
+
+describe('repo ids', () => {
+  const idsByPath = (board: Board) => Object.fromEntries(board.repos.map((r) => [r.path, r.id]))
+
+  test('a config repo and a claim repo that clash get distinct ids', async () => {
+    const hyphen = copyFixture('chess-web')
+    const underscore = copyFixture('chess_web')
+    await register(hyphen)
+    await claim(3100, underscore, 'sparring-ladder')
+    const board = await createBoardService(deps()).build()
+    expect(board.repos.map((r) => [r.name, r.source])).toEqual([['chess-web', 'registered'], ['chess_web', 'claim']])
+    const [a, b] = board.repos.map((r) => r.id)
+    expect(a).not.toBe(b)
+    expect(a).toMatch(/-[0-9a-f]{6}$/)
+    expect(b).toMatch(/-[0-9a-f]{6}$/)
+  })
+
+  test('a repo with no clash has today’s id, byte for byte', async () => {
+    const repo = copyFixture('chess-web')
+    const other = copyFixture('plain')
+    const underscore = copyFixture('plain_two')
+    const hyphen = copyFixture('plain-two')
+    await register(repo, other, underscore, hyphen)
+    const ids = idsByPath(await createBoardService(deps()).build())
+    expect(ids[normalizeRepoPath(repo, platform)]).toBe(repoId(repo, platform, caseless))
+    expect(ids[normalizeRepoPath(other, platform)]).toBe(repoId(other, platform, caseless))
+  })
+
+  test('ids do not change when the config is reordered', async () => {
+    const paths = [copyFixture('chess-web'), copyFixture('chess_web'), copyFixture('plain')]
+    await register(...paths)
+    const before = idsByPath(await createBoardService(deps()).build())
+    expect(new Set(Object.values(before)).size).toBe(3)
+    await register(...[...paths].reverse())
+    expect(idsByPath(await createBoardService(deps()).build())).toEqual(before)
+  })
+
+  test('two spellings of one repo on a file system that ignores case are one repo, with no suffix', async () => {
+    const repo = copyFixture('chess-web')
+    await register(repo)
+    await claim(3100, repo.toUpperCase(), 'sparring-ladder')
+    const board = await createBoardService({ ...deps(), ignoresCase: async () => true }).build()
+    expect(board.repos.map((r) => r.source)).toEqual(['both'])
+    expect(board.repos[0]!.id).toBe(repoId(repo, platform, true))
+  })
+})
 
 describe('transcript cache', () => {
   const parsed = vi.mocked(model.parseAgentTranscript)
