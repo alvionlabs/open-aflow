@@ -9,6 +9,17 @@ The API server (`packages/server`) finds the repos to show, reads their pod docs
 - **Repos:** paths in the config file plus every repo a claim file names, merged by normalized path (case-blind where the file system is). `source` is `registered`, `claim`, or `both`.
 - **Each repo:** pod docs → the model (a doc whose real path leaves the repo's real path is skipped); recent pod-agent transcripts → parsed runs through a cache keyed by size and mtime, never text; PRs from a `gh` cache refreshed every 30 s. One bad repo sets its `error`; the others still build.
 - **`gh`:** run by the absolute path of the first `gh.exe` / `gh.com` (`gh` on POSIX) in an absolute `PATH` entry; asked only about live PRs (current-sprint PRs, hand-back PRs, a fix claim's or a plan's PR by head branch).
+- **Tool finder** (`tool-finder.ts`, production only; dev keeps its `PATH` lookups): finds `git`, `gh`, and `claude` when the app doesn't start from a terminal. A check only looks for a file, so it starts no tool and shows no window. First match wins, per tool:
+  1. `claude` only: `POD_BOARD_CLAUDE_BIN`, with no search. No file → `bad-path`, `source: 'env'`.
+  2. A path in `<config dir>/tool-paths.json`. It wins over every search. A path that fails the rules → `bad-path`, `source: 'settings'`, with no search.
+  3. The inherited `Path`, absolute entries only.
+  4. The registry `Path`, HKLM then HKCU, read by `reg.exe` from `SystemRoot` with no window and a 5 s limit per hive. `%VAR%` expands from the env. An entry with an unknown variable, a relative entry, or a UNC entry is dropped. A failed read counts as empty.
+  5. Known folders, each skipped when its variable is unset: `Git\cmd` and `GitHub CLI` under both Program Files and `%LOCALAPPDATA%\Programs`, `%LOCALAPPDATA%\Microsoft\WinGet\Links`, `%USERPROFILE%\scoop\shims`, `\.local\bin`, and `\.claude\local`, and `%APPDATA%\npm`.
+
+  Steps 4 and 5 run on Windows only. Extensions: `.com` and `.exe` for `git` and `gh`, also `.cmd` and `.bat` for `claude`. The first check runs before the watcher starts, and a finder failure never stops the start.
+- **Path rules** (the settings file and the route), in order: no NUL (`bad request`); not two leading separators, refused before any file system call (`not a local path`); an absolute drive path (`not absolute`); a file (`not a file`); and a base name of the tool's name plus an allowed extension (`wrong tool`). The file is read at each check. Missing, unreadable, or bad JSON reads as nothing set, and a value that isn't a string is ignored.
+- **Tool routes** (`tool-routes.ts`, only with the `tools` dep, so dev answers 404): `GET /api/tools`, behind the read guard, runs a new check and answers `{ tools }`, always in the order git, gh, claude. Calls during a running check share its result. `POST /api/actions/tool-path`, behind the action guard, takes `{ tool, path }` (`path: null` clears), saves through a temp file and a rename, and answers `{ tools }` from a new check. A refused path gets `400` with its word and saves nothing; a failed write gets `500 settings unwritable`. It isn't in the action log.
+- **Child `Path`:** `gh` and resumed `claude` get the inherited env with `Path` = inherited absolute entries, then registry entries, then the folders of found tools, with duplicates removed (case-blind on Windows). `safeChildEnv` and `childEnv` still apply on top. Both `gh` uses read the finder at each call, so a Recheck takes effect with no restart.
 - **Watching:** one watcher per folder; a rebuild after 300 ms of quiet, never later than 1.5 s after a burst starts. Clients get a Board over SSE only when its JSON changed.
 - **Guards,** in order, the first failure answers:
   - every route: a loopback `Host` on the API or web port (`403 forbidden host`), and an exact `Origin` on writes. No CORS headers; both ports bind `127.0.0.1`.
@@ -25,7 +36,7 @@ The API server (`packages/server`) finds the repos to show, reads their pod docs
   | `Host` and `Origin` | API port and `POD_BOARD_WEB_PORT` | The bound port only. `POD_BOARD_WEB_PORT` isn't read |
   | Page routes | 404 on the API port | See **Production answers** |
 
-- **Start order:** settings; the web app and config folder (production) or the token file (dev); the watcher; the bind; then the guards, the log line, and the automatic check. A failure at any step rejects, and a failed bind closes the watcher. Because the check starts after the bind, a server that can't start sends no `continue`.
+- **Start order:** settings; the web app and config folder (production) or the token file (dev); the first tool check (production); the watcher; the bind; then the guards, the log line, and the automatic check. A failure at any step rejects, and a failed bind closes the watcher. Because the check starts after the bind, a server that can't start sends no `continue`.
 - **Production port** (`listen.ts`): `POD_BOARD_API_PORT` unset or empty tries `APP_PORT` (47800). On `EADDRINUSE` or `EACCES` (Windows reserved ranges answer `EACCES`), the OS picks a free port for this launch, and the server logs `pod-board: port 47800 is busy; using <port> for this launch`. Set: that port only; busy stops the start, naming the variable and the port. Any other listen error stops the start. The guards are built with the port that was really bound.
 - **Production answers** (`web-app.ts`, mounted last in `createApp`, so a real API route wins and every answer sits behind the request guard). First match wins, on the path without its query:
   1. `/api`, `/api/`, or `/api/…`, any method → 404.
@@ -88,6 +99,10 @@ flowchart TD
 - Tests never bind 47800: set `POD_BOARD_API_PORT` or pass `preferredPort`.
 - `/sw.js` differs by mode: production answers 404 JSON, and dev's web port still answers it with HTML from Vite. Only production's rules live in `web-app.ts`.
 - Until the owner file ships, production and dev on one config folder can both auto-continue. Use separate config folders in checks.
+- The finder stats `Path` entries with sync calls, as `resolveBin` always has: a dead mapped drive on `Path` blocks the server for that check.
+- After a Recheck finds `gh`, the Board's `gh` status can read `missing` until the next 30 s tick. A `missing` status with a found `gh` skips the 60 s auth cache, but nothing starts a tick early.
+- `reg.exe` prints in the console's code page. A literal non-ASCII folder in the registry `Path` can read wrong and not match. The inherited `Path`, the known folders, and a typed path still find the tool.
+- The bundle's own tests can find a real `gh` through the registry or a known folder, even with an empty `PATH`. To keep a test offline, seed `tool-paths.json` with fakes.
 - `main-production.ts` run from source looks for `packages/server/src/web/`, which doesn't exist, so it exits 1. The bundle puts `web/` beside the entry.
 
 ## History
@@ -125,3 +140,4 @@ flowchart TD
 - 2026-11-02 · fix-repo-id review round 2 · fixed: the owner comes from the session's own file, not the agent's transcript; only an exact fold of the project name hides an agent; Remove forgets toggles also for a repo a port claim still lists.
 - 2026-11-02 · fix-repo-id review round 3 · fixed: a failed read of a session file (a lock, say) is no longer kept as "no `cwd`"; the session stays unproven only until a later build can read it.
 - 2026-11-02 · one-port-server S1: the wiring moved from `main.ts` to `startServer` and `runMain`; a production mode serves the web app and the API on one port, with the token in memory and a port fallback. A busy port now stops dev with an error naming the variable, and the automatic check starts after the bind.
+- 2026-11-02 · outside-terminal T1: the tool finder, `GET /api/tools`, and `POST /api/actions/tool-path`, in production only. `gh` and resumed `claude` read the finder at each call and get a merged `Path`.

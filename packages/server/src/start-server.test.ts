@@ -12,6 +12,7 @@ const spies = vi.hoisted(() => ({
   watcherStarts: 0,
   watcherCloses: 0,
   autoStarts: 0,
+  watcherStartsAtFirstCheck: undefined as number | undefined,
 }))
 
 vi.mock('./watcher.ts', async (original) => {
@@ -46,6 +47,22 @@ vi.mock('./auto-continue.ts', async (original) => {
         start()
       }
       return a
+    },
+  }
+})
+
+vi.mock('./tool-finder.ts', async (original) => {
+  const real = await original<typeof import('./tool-finder.ts')>()
+  return {
+    ...real,
+    createToolFinder: (...args: Parameters<typeof real.createToolFinder>) => {
+      const finder = real.createToolFinder(...args)
+      const { check } = finder
+      finder.check = () => {
+        spies.watcherStartsAtFirstCheck ??= spies.watcherStarts
+        return check()
+      }
+      return finder
     },
   }
 })
@@ -177,6 +194,7 @@ beforeEach(async () => {
   spies.watcherStarts = 0
   spies.watcherCloses = 0
   spies.autoStarts = 0
+  spies.watcherStartsAtFirstCheck = undefined
 })
 
 afterEach(async () => {
@@ -236,6 +254,41 @@ describe('dev', () => {
 })
 
 describe('production', () => {
+  test('tool routes are production only', async () => {
+    const { started } = await startProduction()
+    const token = await pageToken(started.port)
+    const headers = { 'X-Pod-Board-Token': token }
+    const res = await send(started.port, '/api/tools', { headers })
+    expect(res.status).toBe(200)
+    expect((JSON.parse(res.text) as { tools: { tool: string }[] }).tools.map((t) => t.tool)).toEqual(['git', 'gh', 'claude'])
+    expect((await send(started.port, '/api/tools')).status).toBe(403)
+    // The first check ran before the watcher started.
+    expect(spies.watcherStartsAtFirstCheck).toBe(0)
+
+    const saved = await send(started.port, '/api/actions/tool-path', {
+      method: 'POST',
+      headers: { ...headers, Origin: `http://127.0.0.1:${started.port}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: 'gh', path: null }),
+    })
+    expect(saved.status).toBe(200)
+    expect(existsSync(join(cfg, 'tool-paths.json'))).toBe(true)
+
+    // Dev has neither route, even with the right token, and it writes no file.
+    const devCfg = join(tmp, 'dev-cfg')
+    const apiPort = await freePort()
+    const dev = await start(envFor({ POD_BOARD_CONFIG_DIR: devCfg, POD_BOARD_API_PORT: String(apiPort), POD_BOARD_WEB_PORT: String(await freePort()) }))
+    const devToken = (await readFile(join(devCfg, 'session-token'), 'utf8')).trim()
+    const devHeaders = { 'X-Pod-Board-Token': devToken }
+    expect((await send(dev.started.port, '/api/tools', { headers: devHeaders })).status).toBe(404)
+    const devSave = await send(dev.started.port, '/api/actions/tool-path', {
+      method: 'POST',
+      headers: { ...devHeaders, Origin: `http://127.0.0.1:${apiPort}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: 'gh', path: null }),
+    })
+    expect(devSave.status).toBe(404)
+    expect(existsSync(join(devCfg, 'tool-paths.json'))).toBe(false)
+  })
+
   test('production never touches the token file', async () => {
     // With no file, none appears.
     const first = await startProduction()

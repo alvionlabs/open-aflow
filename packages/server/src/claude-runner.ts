@@ -144,10 +144,14 @@ export function stderrTail(text: string): string {
 
 const failed = (message: string): StartResult => ({ outcome: 'failed', message })
 
+/**
+ * `bin` and `env` may be functions, read at each start. A function's `bin` is the tool finder's
+ * absolute path, with no lookup: `undefined` or a file since gone is `claude not found`.
+ */
 export function createClaudeRunner(o: {
-  bin: string
+  bin: string | (() => string | undefined)
   logDir: string
-  env?: NodeJS.ProcessEnv
+  env?: NodeJS.ProcessEnv | (() => NodeJS.ProcessEnv)
   windowMs?: number
 }): ClaudeRunner {
   const windowMs = o.windowMs ?? RESUME_WINDOW_MS
@@ -161,8 +165,14 @@ export function createClaudeRunner(o: {
   async function start(r: { session: string; word: ResumeWord; cwd: string }): Promise<StartResult> {
     if (!SESSION.test(r.session)) return failed('bad session id')
     if (!WORDS.includes(r.word)) return failed('bad reply word')
-    const env = childEnv(o.env ?? process.env)
-    const file = resolveBin(o.bin, env)
+    const env = childEnv((typeof o.env === 'function' ? o.env() : o.env) ?? process.env)
+    let file: string | undefined
+    if (typeof o.bin === 'function') {
+      const found = o.bin()
+      file = found !== undefined && isFile(found) ? found : undefined
+    } else {
+      file = resolveBin(o.bin, env)
+    }
     if (!file) return failed('claude not found')
     let isDir = false
     try {

@@ -96,12 +96,23 @@ export const createGhExec = (env: NodeJS.ProcessEnv = process.env): GhExec => {
   }
 }
 
+/**
+ * Runs the `gh` the tool finder found, with its merged env. Both are read at each call, so a
+ * Recheck takes effect with no restart. Nothing found answers `not-found`.
+ */
+export const createFoundGhExec =
+  (found: { path(tool: 'gh'): string | undefined; env(): NodeJS.ProcessEnv }): GhExec =>
+  (args, cwd, opts) => {
+    const file = found.path('gh')
+    return file ? createExec(file, found.env())(args, cwd, opts) : Promise.resolve({ status: 'not-found', stdout: '' })
+  }
+
 /** Runs `gh`. */
 export const defaultGhExec: GhExec = createGhExec()
 
 type Entry = { value?: PrStatus; fetchedAt?: number; inflight?: Promise<boolean> }
 
-export function createGhReader(opts: { exec?: GhExec; now?: () => number } = {}): GhCache {
+export function createGhReader(opts: { exec?: GhExec; now?: () => number; ghFound?: () => boolean } = {}): GhCache {
   const exec = opts.exec ?? defaultGhExec
   const now = opts.now ?? Date.now
   let status: GhStatus = 'unknown'
@@ -129,7 +140,9 @@ export function createGhReader(opts: { exec?: GhExec; now?: () => number } = {})
   /** Runs `gh auth status` when it's due; returns whether the status changed. */
   const checkAuth = (cwd: string): Promise<boolean> => {
     if (authInflight) return authInflight
-    if (authAt !== undefined && now() - authAt < AUTH_RECHECK_MS) return Promise.resolve(false)
+    // A Recheck that found gh ends a `missing` status at the next refresh, with no 60 s wait.
+    const foundSince = status === 'missing' && opts.ghFound?.() === true
+    if (!foundSince && authAt !== undefined && now() - authAt < AUTH_RECHECK_MS) return Promise.resolve(false)
     authInflight = (async () => {
       const r = await safeExec(['auth', 'status'], cwd)
       authAt = now()
