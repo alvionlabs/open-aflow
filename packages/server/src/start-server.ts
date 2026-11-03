@@ -19,7 +19,7 @@ import { listFolders, nodeFolderFs } from './folder-list.ts'
 import { portsDir } from './claims.ts'
 import { claudeBin, createClaudeRunner } from './claude-runner.ts'
 import { configPath, listenConfig, portFromEnv, type Env } from './config.ts'
-import { createGhReader, defaultGhExec } from './gh.ts'
+import { createFoundGhExec, createGhReader, defaultGhExec } from './gh.ts'
 import { openWithFallback, wantedPort } from './listen.ts'
 import { createRemoveRepoRoutes } from './remove-repo-routes.ts'
 import { addRepo, removeRepo } from './repos-config.ts'
@@ -27,6 +27,7 @@ import { createResumeRoutes } from './resume-routes.ts'
 import { createIdleCheck } from './session-activity.ts'
 import { createSessionToken, writeSessionToken } from './session-token.ts'
 import { createShutdown, createWorkTracker } from './shutdown.ts'
+import { createToolFinder } from './tool-finder.ts'
 import { claudeDir, transcriptDays } from './transcript-files.ts'
 import { createBoardWatcher } from './watcher.ts'
 import { createWebApp } from './web-app.ts'
@@ -78,8 +79,15 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
   const log = createActionLog({ file: join(configDir, 'actions.jsonl'), now: Date.now })
   // The auto-continue toggles and the resume runs' stderr logs sit there too.
   const store = createAutoContinueStore({ file: join(configDir, 'auto-continue.json') })
-  const runner = createClaudeRunner({ bin: settings.claudeBin, logDir: join(configDir, 'resume-logs') })
-  const gh = createGhReader({ exec: defaultGhExec })
+  const logDir = join(configDir, 'resume-logs')
+  // Production finds its tools with no terminal, and reads them at each call, so a Recheck needs no restart.
+  // Dev stays on its PATH lookups.
+  const tools = production ? createToolFinder({ env, platform, settingsFile: join(configDir, 'tool-paths.json') }) : undefined
+  const ghExec = tools ? createFoundGhExec(tools) : defaultGhExec
+  const runner = tools
+    ? createClaudeRunner({ bin: () => tools.path('claude'), env: () => tools.env(), logDir })
+    : createClaudeRunner({ bin: settings.claudeBin, logDir })
+  const gh = createGhReader({ exec: ghExec })
   const service = createBoardService({ ...settings, platform, gh, actions: log.recent, autoContinue: store.list })
   const watcher = createBoardWatcher({ service, ...settings, poll: env.POD_BOARD_POLL === '1' })
 
@@ -104,6 +112,7 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
       token,
       source: watcher,
       web,
+      tools,
       addRepo: (p) => addRepo(configFile, p, platform),
       folders: (dir) => listFolders(dir, { fs: nodeFolderFs, platform, home: homedir() }),
       timeline: createTimelineSource({ board: () => watcher.board(), ...settings, now: Date.now }).timeline,
@@ -114,7 +123,7 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
           createActionRoutes({
             board: () => watcher.board(),
             gh,
-            exec: defaultGhExec,
+            exec: ghExec,
             refreshGh: (board) => service.refreshGh(board),
             rebuild: () => watcher.rebuild(),
             log,
@@ -153,6 +162,9 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
     })
 
   let bound: Awaited<ReturnType<typeof open>>
+  // Before the watcher: its first Board already asks gh.
+  await tools?.check()
+
   try {
     await watcher.start()
     bound = await openWithFallback(want, open)

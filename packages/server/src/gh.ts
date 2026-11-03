@@ -96,6 +96,17 @@ export const createGhExec = (env: NodeJS.ProcessEnv = process.env): GhExec => {
   }
 }
 
+/**
+ * Runs the `gh` the tool finder found, with its merged env. Both are read at each call, so a
+ * Recheck takes effect with no restart. Nothing found answers `not-found`.
+ */
+export const createFoundGhExec =
+  (found: { path(tool: 'gh'): string | undefined; env(): NodeJS.ProcessEnv }): GhExec =>
+  (args, cwd, opts) => {
+    const file = found.path('gh')
+    return file ? createExec(file, found.env())(args, cwd, opts) : Promise.resolve({ status: 'not-found', stdout: '' })
+  }
+
 /** Runs `gh`. */
 export const defaultGhExec: GhExec = createGhExec()
 
@@ -295,7 +306,3 @@ export function rollupChecks(rollup: unknown): PrStatus['checks'] {
   }
   return pending ? 'pending' : 'pass'
 }
-
-/** Stub: the tests in gh-exec.test.ts come first. */
-export const createFoundGhExec = (_found: { path(tool: 'gh'): string | undefined; env(): NodeJS.ProcessEnv }): GhExec => () =>
-  Promise.resolve({ status: 'not-found', stdout: '' })

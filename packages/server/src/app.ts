@@ -6,7 +6,7 @@ import { AGENT_ID } from './agent-timeline.ts'
 import { actionGuard, readGuard, requestGuard } from './guard.ts'
 import type { FolderListError, FolderListing } from './folder-list.ts'
 import type { AddRepoError } from './repos-config.ts'
-import type { ToolRoutesDeps } from './tool-routes.ts'
+import { createToolRoutes, type ToolRoutesDeps } from './tool-routes.ts'
 
 export const PING_MS = 15_000
 /** The largest request body `/api/actions/*` and `POST /api/repos` take. Every real one is under 1 KB. */
@@ -35,7 +35,7 @@ export type AppDeps = {
   folders?: (dir: string | undefined) => Promise<FolderListing | { error: FolderListError }>
   /** The built web app (production), mounted after every API route and behind the request guard. With none, a page route gets 404. */
   web?: Hono | undefined
-  /** The tool finder (production). Stub: the tests come first. */
+  /** The tool finder (production), for `GET /api/tools` and `POST /api/actions/tool-path`. With none, neither route exists: 404. */
   tools?: ToolRoutesDeps | undefined
 }
 
@@ -63,6 +63,10 @@ export function createApp(deps: AppDeps): Hono {
   // Adding a repo makes the board read its files and run gh in it, so it's guarded like an action.
   app.use('/api/repos', limit, guard)
   if (deps.actions) app.route('/api/actions', deps.actions)
+  if (deps.tools) {
+    app.use('/api/tools', readGuard({ ports: deps.ports, token: deps.token }))
+    app.route('/', createToolRoutes(deps.tools))
+  }
   app.use('/api/fs/*', readGuard({ ports: deps.ports, token: deps.token }))
 
   const folders = deps.folders
