@@ -1,14 +1,14 @@
 # Sprint: one-port-server
 
-_From plan: pod-docs/plans/windows-app.md · Slug: one-port-server · Status: active · Generated: 2026-11-02_
-<!-- autopilot-run: started=2026-11-03T05:06:41Z sprints=0 waves=1 -->
+_From plan: pod-docs/plans/windows-app.md · Slug: one-port-server · Status: done · Generated: 2026-11-02_
+<!-- autopilot-run: started=2026-11-03T05:06:41Z sprints=0 waves=2 -->
 
 ## Status board
 
 | Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |
 |------|-------|-------|--------|----|--------|------------|------------|
-| 1 | S1 | Production server: web app and API on one port, token in memory | one-port-server-S1 | — | pending | — | — |
-| 2 | K1 | One-file bundle, `pnpm start`, `LICENSE` | one-port-server-K1 | — | pending | — | S1 |
+| 1 | S1 | Production server: web app and API on one port, token in memory | one-port-server-S1 | [#73](https://github.com/iamphduc/pod-board/pull/73) merged | done | medium | — |
+| 2 | K1 | One-file bundle, `pnpm start`, `LICENSE` | one-port-server-K1 | [#74](https://github.com/iamphduc/pod-board/pull/74) merged | done | medium | S1 |
 
 ## Shared contract
 
@@ -139,3 +139,20 @@ export function bundleApp(o: { webDist: string; outDir: string }): Promise<{ ext
 - **Depends on:** S1
 - **One-way door:** none. All of it reverts with git. The human already chose MIT; a copy taken while the licence is public keeps it.
 - **Model:** opus
+
+## Sprint summary
+
+- **Synced with merge-target:** up to date
+- **Slices shipped:** S1, K1
+- **Queue entries:** resolved 0, deferred 1 — third-party licence notices, for `installer-and-updates`
+- **Slice log:**
+  - S1: opus · medium · test-first partly — two dev-entry tests guard existing behavior, proved by mutation · runtime production entry, `pnpm dev`, browser on the mock · 5 NOTEs · time lost none
+  - K1: opus · medium · test-first yes · runtime `pnpm build`, `pnpm start`, bundle run outside the repo, `pnpm dev`, browser on the mock · 9 NOTEs, 2 PENDINGs (1 re-judged as a NOTE: an output folder that overlaps the web build is refused) · time lost none
+  - Wave fixes: none. Stalls: none.
+- **Agent context at hand-back:** 467,089 tokens (planner, S1, K1) — *each agent's final context size, not tokens billed*
+
+**For the next sprints:**
+- The bundle layout is `packages/server/dist/app/server.mjs` and `web/`; the real web build also holds `fonts/`, `icons/`, and `manifest.webmanifest`.
+- `main-production.ts` finds `web/` beside itself. Never leave `packages/server/src/web/` behind.
+- A real `EACCES` from Windows reserved ports and the busy-47800 fallback through the bundle aren't yet proved.
+- `agent-browser` ran through Bash with no hang in about 40 calls this sprint.
