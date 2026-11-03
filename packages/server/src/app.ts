@@ -32,6 +32,8 @@ export type AppDeps = {
   actions?: Hono
   /** Lists a folder's subfolders, or the roots with no path, for `GET /api/fs/folders`. With none, that route gets 404. */
   folders?: (dir: string | undefined) => Promise<FolderListing | { error: FolderListError }>
+  /** The built web app (production), mounted after every API route and behind the request guard. With none, a page route gets 404. */
+  web?: Hono | undefined
 }
 
 const FOLDER_STATUS = { 'not a local path': 400, 'not absolute': 400, 'bad request': 400, 'not a directory': 404 } as const
@@ -121,6 +123,8 @@ export function createApp(deps: AppDeps): Hono {
     await deps.source.rebuild()
     return c.json({ path: result.path }, 201)
   })
+
+  if (deps.web) app.route('/', deps.web)
 
   return app
 }

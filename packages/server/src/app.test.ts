@@ -8,6 +8,7 @@ import { createApp, type AppDeps, type BoardSource } from './app.ts'
 import { createBoardService } from './board-service.ts'
 import { listFolders, nodeFolderFs, type FolderFs } from './folder-list.ts'
 import { createSessionToken } from './session-token.ts'
+import { createWebApp } from './web-app.ts'
 import type { GhReader } from './gh.ts'
 import { normalizeRepoPath } from './guard.ts'
 import { addRepo } from './repos-config.ts'
@@ -55,12 +56,13 @@ const TIMELINE: AgentTimeline = {
 type TimelineFn = AppDeps['timeline']
 const noTimeline: TimelineFn = async () => undefined
 
-function fakeApp(opts: { pingMs?: number; source?: BoardSource; timeline?: TimelineFn; actions?: Hono; folders?: AppDeps['folders'] } = {}): Hono {
+function fakeApp(opts: { pingMs?: number; source?: BoardSource; timeline?: TimelineFn; actions?: Hono; folders?: AppDeps['folders']; web?: Hono } = {}): Hono {
   return createApp({
     ports: [API, WEB],
     token: TOKEN,
     ...(opts.folders === undefined ? {} : { folders: opts.folders }),
     ...(opts.actions === undefined ? {} : { actions: opts.actions }),
+    ...(opts.web === undefined ? {} : { web: opts.web }),
     source: opts.source ?? fakeSource().source,
     addRepo: async () => ({ error: 'not a directory' }),
     timeline: opts.timeline ?? noTimeline,
@@ -608,5 +610,69 @@ describe('folder listing route', () => {
     const refused = await bare.request(url(root), { headers: HOST })
     expect(refused.status).toBe(403)
     expect(await refused.json()).toEqual({ error: 'bad token' })
+  })
+})
+
+describe('web seam', () => {
+  /** A web app that answers everything, to show what reaches it. */
+  const catchAll = () => new Hono().all('*', (c) => c.text('from web'))
+
+  test('web app mounts after the API', async () => {
+    const seen = new Hono().post('/merge', (c) => c.json({ merged: true }))
+    const app = fakeApp({
+      web: catchAll(),
+      actions: seen,
+      timeline: async () => TIMELINE,
+      folders: async () => ({ path: null, parent: null, locked: false, truncated: false, folders: [] }),
+    })
+    const get = (path: string, headers: Record<string, string> = HOST) => app.request(path, { headers })
+
+    expect(await (await get('/api/health')).json()).toEqual({ ok: true })
+    expect(await (await get('/api/board')).json()).toEqual(BOARD)
+    expect(await (await get('/api/agents/r/a1/timeline')).json()).toEqual(TIMELINE)
+    expect((await get('/api/fs/folders', { ...HOST, 'x-pod-board-token': TOKEN })).status).toBe(200)
+    expect((await get('/api/fs/folders')).status).toBe(403)
+    const merged = await app.request('/api/actions/merge', { method: 'POST', headers: ACTION_HEADERS, body: '{}' })
+    expect(await merged.json()).toEqual({ merged: true })
+    // A guard refuses before the web app can answer.
+    const noToken = await app.request('/api/repos', { method: 'POST', headers: POST_HEADERS, body: '{}' })
+    expect(noToken.status).toBe(403)
+
+    for (const path of ['/', '/some/page', '/sw.js', '/api/nope']) {
+      expect(await (await get(path)).text(), path).toBe('from web')
+    }
+  })
+
+  test('with no web app, a page route stays 404', async () => {
+    const res = await fakeApp().request('/', { headers: HOST })
+    expect(res.status).toBe(404)
+  })
+
+  test('the web app sits behind the request guard', async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'pod-board-app-web-')))
+    try {
+      await writeFile(join(root, 'index.html'), '<html><head></head><body>page</body></html>')
+      const web = await createWebApp({ dir: root, token: TOKEN })
+      const app = fakeApp({ web })
+
+      const foreign = await app.request('/', { headers: { host: 'evil.example' } })
+      expect(foreign.status).toBe(403)
+      const body = await foreign.text()
+      expect(body).toContain('forbidden host')
+      expect(body).not.toContain(TOKEN)
+
+      const noOrigin = await app.request('/', { method: 'POST', headers: HOST })
+      expect(noOrigin.status).toBe(403)
+      expect(await noOrigin.json()).toEqual({ error: 'forbidden origin' })
+      const withOrigin = await app.request('/', { method: 'POST', headers: { ...HOST, origin: `http://127.0.0.1:${API}` } })
+      expect(withOrigin.status).toBe(404)
+      expect(await withOrigin.json()).toEqual({ error: 'not found' })
+
+      const page = await app.request('/', { headers: HOST })
+      expect(page.status).toBe(200)
+      expect(await page.text()).toContain(TOKEN)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
