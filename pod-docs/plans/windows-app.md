@@ -108,7 +108,7 @@ sequenceDiagram
 |--------|------|--------|------------|
 | one-port-server | `pnpm start` runs the bundled server and web app on one port, with the `LICENSE` added | done | — |
 | outside-terminal | The server works with no terminal: tool finder, setup check, clean stop | done | one-port-server |
-| desktop-shell | Electron window, tray, toasts, single instance, start at login | planned | outside-terminal |
+| desktop-shell | Electron window, tray, toasts, single instance, start at login | active | outside-terminal |
 | installer-and-updates | NSIS installer, release workflow, auto-update, install note | planned | desktop-shell |
 
 Start `one-port-server` after PR #72 merges, because both change the server's start code.
