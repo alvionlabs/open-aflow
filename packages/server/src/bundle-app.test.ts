@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
 import { createServer } from 'node:net'
@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest'
-import { bundleApp } from './bundle-app.ts'
+import { build } from 'esbuild'
+import { BUNDLE_OPTIONS, bundleApp } from './bundle-app.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const FIXTURE = join(here, '..', '..', 'model', 'fixtures', 'chess-web')
@@ -72,8 +73,9 @@ describe('bundleApp', () => {
   test('the bundle has no outside imports', () => {
     expect(existsSync(join(builtDir, 'server.mjs'))).toBe(true)
     const text = readFileSync(join(builtDir, 'server.mjs'), 'utf8')
-    // The reported list is real: the server can't run on nothing.
+    // The reported list is real: the server can't run on nothing. Its Node imports are listed, and so is the banner's.
     expect(externalImports).toContain('node:http')
+    expect(externalImports).toContain('node:module')
     expect(externalImports.filter((name) => !isBuiltin(name))).toEqual([])
     // The file's own text agrees, including a require left in place for a CommonJS dependency.
     const named = [
@@ -84,6 +86,22 @@ describe('bundleApp', () => {
     expect(named.filter((name) => !isBuiltin(name))).toEqual([])
     for (const name of named) expect(externalImports).toContain(name)
   })
+
+  // No dependency needs this today, so the app's own bundle can't prove it: a fake one does.
+  test("a CommonJS dependency's require of a builtin works", async () => {
+    const dir = tempDir('bundle-cjs')
+    try {
+      writeFileSync(join(dir, 'dep.cjs'), "module.exports = require('node:os').EOL.length > 0 ? 'cjs ok' : 'no'")
+      writeFileSync(join(dir, 'entry.mjs'), "import dep from './dep.cjs'\nconsole.log(dep)\n")
+      const outfile = join(dir, 'out.mjs')
+      await build({ ...BUNDLE_OPTIONS, entryPoints: [join(dir, 'entry.mjs')], outfile })
+      const run = spawnSync(process.execPath, [outfile], { encoding: 'utf8' })
+      expect(run.stderr).toBe('')
+      expect(run.stdout.trim()).toBe('cjs ok')
+    } finally {
+      await removeWithRetry(dir)
+    }
+  }, RUN_MS)
 
   test('the output layout holds no token', () => {
     expect(existsSync(builtDir)).toBe(true)

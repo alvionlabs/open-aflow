@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
+    "bundle": "tsx scripts/bundle.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
