@@ -26,7 +26,7 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - **States are dots plus words, never text color** ([decision](../decisions.md#2026-10-28--states-are-dots-plus-words-the-ink-tokens-go)): `--faint` and the light status colors fail 4.5:1 as text. This made the 2026-10-19 darker-ink-tokens decision obsolete.
 - **An inline boot script plus `color-scheme`**, not `main.tsx`: in dev Vite loads the CSS from the module script, so a stored Dark choice painted white first.
 - **Self-hosted fonts:** the plan rules out requests to other hosts.
-- **A local web app with a PWA window**, not Tauri or Electron; a wrapper can come later.
+- **A local web app with a PWA window, and now an Electron shell around it** ([desktop.md](desktop.md)). The plan [windows-app](../plans/windows-app.md) chose Electron over Tauri; the page itself doesn't change, and the PWA stays.
 
 ## Watch out
 
@@ -36,7 +36,7 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - The boot script and the app share `THEME_KEY` and the dark default; change both or neither. `pwa.test.ts` checks the manifest against the dark `--bg`.
 - Saving an empty path field clears the saved path (`path: null`). That's the only way back to the search from a saved path that no longer works. The field also strips the quotes that Windows' Copy as path adds.
 - A check slower than 5 s on load shows the board even with a tool missing (accepted: a hung check must not lock anyone out). Recheck and Save wait 15 s, because a check can take two 5 s registry reads; a failed Recheck never opens the board, though the same answer on load does.
-- The install links open with `target="_blank"`. A desktop shell has to send them to the system browser.
+- The install links open with `target="_blank"`. The desktop shell sends them to the system browser (`setWindowOpenHandler`, see [desktop.md](desktop.md)).
 - A render error shows `render failed` in place of the board and recovers on the next changed Board; keep the stream in `App`, above the `ErrorBoundary`.
 - `showModal()` runs in a layout effect so the dialog is open before the picker's own effect focuses the path box, and the dialog closes before focus goes back to `Add repo`: a focus call while the dialog is still modal lands on an inert button and is lost.
 - Native modal focus leaves the dialog for the browser's own UI after the last control (in headless Chrome, `body`); it never reaches the page.
@@ -64,3 +64,4 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - 2026-11-01 · fix-remove-repo review round 10 · fixed: the remove confirm gives focus back only when nothing else took it, so `Open run` keeps focus on the run title.
 - 2026-11-02 · one-port-server S1: the production server can serve the web build on the API's port; `/sw.js` answers 404 there. Dev serving doesn't change.
 - 2026-11-02 · outside-terminal U1: the setup check. In production, a tool that isn't found replaces the board with one row per tool, an install link, a path field, and Recheck. The board's stream waits for the gate.
+- 2026-11-03 · desktop-shell T1: an Electron window shows the page. The page doesn't change.
