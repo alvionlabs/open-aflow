@@ -87,7 +87,7 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
   const runner = tools
     ? createClaudeRunner({ bin: () => tools.path('claude'), env: () => tools.env(), logDir })
     : createClaudeRunner({ bin: settings.claudeBin, logDir })
-  const gh = createGhReader({ exec: ghExec })
+  const gh = createGhReader({ exec: ghExec, ...(tools ? { ghFound: () => tools.path('gh') !== undefined } : {}) })
   const service = createBoardService({ ...settings, platform, gh, actions: log.recent, autoContinue: store.list })
   const watcher = createBoardWatcher({ service, ...settings, poll: env.POD_BOARD_POLL === '1' })
 

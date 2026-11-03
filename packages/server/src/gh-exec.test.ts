@@ -178,6 +178,7 @@ describe.runIf(WIN)('gh from the finder', () => {
     plantGh(pathDir, 'from-path')
     await finder.check()
     expect(await reader.refresh(emptyDir, [])).toBe(true)
-    expect(reader.status()).toBe('ok')
+    // It ran: the stand-in answers `auth status` with an error, which reads as logged out.
+    expect(reader.status()).toBe('logged-out')
   })
 })

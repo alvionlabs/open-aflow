@@ -140,7 +140,9 @@ export function createGhReader(opts: { exec?: GhExec; now?: () => number; ghFoun
   /** Runs `gh auth status` when it's due; returns whether the status changed. */
   const checkAuth = (cwd: string): Promise<boolean> => {
     if (authInflight) return authInflight
-    if (authAt !== undefined && now() - authAt < AUTH_RECHECK_MS) return Promise.resolve(false)
+    // A Recheck that found gh ends a `missing` status at the next refresh, with no 60 s wait.
+    const foundSince = status === 'missing' && opts.ghFound?.() === true
+    if (!foundSince && authAt !== undefined && now() - authAt < AUTH_RECHECK_MS) return Promise.resolve(false)
     authInflight = (async () => {
       const r = await safeExec(['auth', 'status'], cwd)
       authAt = now()

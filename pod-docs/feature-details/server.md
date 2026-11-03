@@ -100,7 +100,7 @@ flowchart TD
 - `/sw.js` differs by mode: production answers 404 JSON, and dev's web port still answers it with HTML from Vite. Only production's rules live in `web-app.ts`.
 - Until the owner file ships, production and dev on one config folder can both auto-continue. Use separate config folders in checks.
 - The finder stats `Path` entries with sync calls, as `resolveBin` always has: a dead mapped drive on `Path` blocks the server for that check.
-- After a Recheck finds `gh`, the Board's `gh` status can read `missing` for up to 60 s, until the auth recheck is due.
+- After a Recheck finds `gh`, the Board's `gh` status can read `missing` until the next 30 s tick. A `missing` status with a found `gh` skips the 60 s auth cache, but nothing starts a tick early.
 - `reg.exe` prints in the console's code page. A literal non-ASCII folder in the registry `Path` can read wrong and not match. The inherited `Path`, the known folders, and a typed path still find the tool.
 - The bundle's own tests can find a real `gh` through the registry or a known folder, even with an empty `PATH`. To keep a test offline, seed `tool-paths.json` with fakes.
 - `main-production.ts` run from source looks for `packages/server/src/web/`, which doesn't exist, so it exits 1. The bundle puts `web/` beside the entry.
