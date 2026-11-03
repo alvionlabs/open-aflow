@@ -112,7 +112,7 @@ export const defaultGhExec: GhExec = createGhExec()
 
 type Entry = { value?: PrStatus; fetchedAt?: number; inflight?: Promise<boolean> }
 
-export function createGhReader(opts: { exec?: GhExec; now?: () => number } = {}): GhCache {
+export function createGhReader(opts: { exec?: GhExec; now?: () => number; ghFound?: () => boolean } = {}): GhCache {
   const exec = opts.exec ?? defaultGhExec
   const now = opts.now ?? Date.now
   let status: GhStatus = 'unknown'

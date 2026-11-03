@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import path, { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { createFoundGhExec, createGhExec, ghBin } from './gh.ts'
+import { createFoundGhExec, createGhExec, createGhReader, ghBin } from './gh.ts'
 import { createToolFinder } from './tool-finder.ts'
 
 const WIN = process.platform === 'win32'
@@ -159,5 +159,25 @@ describe.runIf(WIN)('gh from the finder', () => {
     // Gone with no check in between: not-found, and no throw.
     rmSync(join(pathDir, 'gh.exe'))
     expect((await exec([], emptyDir)).status).toBe('not-found')
+  })
+
+  test('a recheck that finds gh ends a missing status with no 60 s wait', async () => {
+    mkdirSync(pathDir)
+    const finder = finderWith(pathDir)
+    await finder.check()
+    const now = 1000 // the clock stands still, so the 60 s cache never ends by itself
+    const reader = createGhReader({ exec: createFoundGhExec(finder), ghFound: () => finder.path('gh') !== undefined, now: () => now })
+    await reader.refresh(emptyDir, [])
+    expect(reader.status()).toBe('missing')
+
+    // Still not found: the cache holds, and nothing is asked again.
+    const askedAt = reader.checkedAt()
+    expect(await reader.refresh(emptyDir, [])).toBe(false)
+    expect(reader.checkedAt()).toBe(askedAt)
+
+    plantGh(pathDir, 'from-path')
+    await finder.check()
+    expect(await reader.refresh(emptyDir, [])).toBe(true)
+    expect(reader.status()).toBe('ok')
   })
 })
