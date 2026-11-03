@@ -1,16 +1,16 @@
 # Sprint: desktop-shell
 
-_From plan: pod-docs/plans/windows-app.md · Slug: desktop-shell · Status: active · Generated: 2026-11-03_
-<!-- autopilot-run: started=2026-11-03T05:06:41Z sprints=2 waves=5 -->
+_From plan: pod-docs/plans/windows-app.md · Slug: desktop-shell · Status: done · Generated: 2026-11-03_
+<!-- autopilot-run: started=2026-11-03T05:06:41Z sprints=2 waves=6 -->
 
 ## Status board
 
 | Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |
 |------|-------|-------|--------|----|--------|------------|------------|
-| 1 | D1 | Desktop package, server host, and the real exit proof | desktop-shell-D1 | — | pending | — | — |
-| 1 | R1 | A resumed run never starts Electron by mistake | desktop-shell-R1 | — | pending | — | — |
-| 2 | T1 | Window, tray, close to tray, and start at login | desktop-shell-T1 | — | pending | — | D1 |
-| 2 | N1 | Notifier: toasts and the tray dot's source | desktop-shell-N1 | — | pending | — | D1 |
+| 1 | D1 | Desktop package, server host, and the real exit proof | desktop-shell-D1 | [#77](https://github.com/iamphduc/pod-board/pull/77) merged | done | medium | — |
+| 1 | R1 | A resumed run never starts Electron by mistake | desktop-shell-R1 | [#77](https://github.com/iamphduc/pod-board/pull/77) merged | done | medium | — |
+| 2 | T1 | Window, tray, close to tray, and start at login | desktop-shell-T1 | [#78](https://github.com/iamphduc/pod-board/pull/78) merged | done | medium | D1 |
+| 2 | N1 | Notifier: toasts and the tray dot's source | desktop-shell-N1 | [#78](https://github.com/iamphduc/pod-board/pull/78) merged | done | medium | D1 |
 
 ## Shared contract
 
@@ -260,3 +260,24 @@ This sprint proves the sends through fakes, plus the real toggle of the login it
 - **Depends on:** D1
 - **One-way door:** none
 - **Model:** opus
+
+## Sprint summary
+
+- **Synced with merge-target:** up to date
+- **Slices shipped:** D1, R1, T1, N1
+- **Queue entries:** resolved 0, deferred 2 — the toast after an answer, and late `gh` items (both decisions)
+- **Slice log:**
+  - D1: opus · medium · test-first yes, with exceptions named in its report · runtime real Electron exits, `pnpm desktop`, `pnpm dev`, `pnpm start` · 11 NOTEs · time lost a 5-minute mutation run
+  - R1: opus · medium · test-first partly — four guard tests proved by mutation · runtime real bundle with `fake-claude.mjs`, Electron simulated · 9 NOTEs · time lost none
+  - T1: opus · medium · test-first yes · runtime real window, tray objects, login item toggled and turned off · 9 NOTEs · time lost none
+  - N1: opus · medium · test-first yes · runtime real shell, notifier, page answers, server kill · 5 NOTEs, 3 PENDINGs (1 re-judged as a NOTE) · time lost none
+  - Wave fixes: none. Stalls: none.
+- **Agent context at hand-back:** 1,058,530 tokens (planner, D1, R1, T1, N1) — *each agent's final context size, not tokens billed*
+
+**For `installer-and-updates`:**
+- Open plan checks: the toast with the app's name and icon, a click from the notification center, a real login launch, and the taskbar and exe icons.
+- `APP_ID` is `com.iamphduc.podboard`, and it must match the installer's.
+- Third-party licence notices must ship (queued).
+- A bad `POD_BOARD_CLAUDE_BIN` gives a setup row with no install link.
+- Removing `SystemRoot` from the server's env makes `listen` fail in a `utilityProcess`.
+- Electron is pinned at 45.2.1.
