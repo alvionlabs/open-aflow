@@ -559,7 +559,7 @@ describe('folder listing route', () => {
     expect(body.folders.length).toBeGreaterThan(0)
     for (const f of body.folders) expect(isAbsolute(f.path), f.path).toBe(true)
     expect(seen).toEqual([undefined])
-  }, 10_000)
+  })
 
   test('every error code and body', async () => {
     const cases: [string, Record<string, string>, string, number, string][] = [

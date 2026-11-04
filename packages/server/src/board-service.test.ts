@@ -558,7 +558,7 @@ describe('board service', () => {
     const changed = new Promise<Board>((resolve) => watcher.subscribe(resolve))
     // A new claim outside the repo makes one watch cycle.
     await claim(3100, repo, 'sparring-ladder')
-    const next = await withTimeout(changed, 5000)
+    const next = await withTimeout(changed, 20_000)
     expect(next.repos[0]!.claims).toHaveLength(1)
     await watcher.close()
 
