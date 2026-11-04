@@ -740,7 +740,7 @@ describe('PRs found by head branch (fix runs)', () => {
       await tickUntil(HOURS_2 + MIN_5)
       const at = gh.lists_()
       await reader.refresh('E:\\Projects\\other', [], [])
-      await tickUntil(elapsed() + 10 * PR_CACHE_MS)
+      await tickUntil(elapsed() + 8 * PR_CACHE_MS) // the next slow ask is 4 m 30 s away
       expect(gh.lists_()).toBe(at)
     })
 
