@@ -32,6 +32,17 @@
 - **Tray.** It comes first, before the window. A left click is Open. The menu is Open, Start at login, Quit. `bus.onAttention` swaps the icon. The icons are in `packages/desktop/assets`, and `scripts/make-tray-icons.ts` makes them from the app icon and the dark `--needs-you`. `nativeImage` finds the `@2x` file beside each one.
 - **Start at login** (`login-item.ts`). The app writes only on the toggle, so it stays off by default. Unpackaged args are `[appPath, '--hidden']`, packaged `['--hidden']`, and a read uses the same args, because on Windows a read compares them. The checkbox shows what a read returns after the write.
 
+## The installer
+
+- **Build.** `pnpm package [--version=<x.y.z>] [--output=<dir>]` runs `pnpm build`, writes the licence notices, and calls electron-builder with `publish: never`, for a per-user one-click NSIS installer. It signs nothing. `build-config.ts` holds the config. The default output is `packages/desktop/release`, which git ignores. `--version` changes only the packaged `package.json`.
+- **Layout.** `resources/app.asar` holds `dist/main.cjs`, `assets/`, and `package.json`, and no `node_modules`. `resources/server` comes from `extraResources`. The desktop package has no production dependencies, so the packager has nothing to collect.
+- **Names.** The packaged `name` is `pod-board-desktop`. So the default install folder is `%LOCALAPPDATA%\Programs\pod-board-desktop`, and the updater's cache is `%LOCALAPPDATA%\pod-board-desktop-updater`. The exe is `Pod Board.exe`, and the Start-menu entry is `Pod Board`. NSIS's `--delete-app-data` removes `%APPDATA%\<name>`, so the name must never be `pod-board`, the server's config folder.
+- **Icon.** `scripts/make-app-icon.ts` makes `assets/icon.ico` from the app icon: BMP entries at 16, 32, and 48 px, and a stored PNG at 256 px. `app-icon.test.ts` compares the bytes.
+- **Notices.** `resources/THIRD-PARTY-NOTICES.txt` comes from `pnpm package`, not `pnpm build`. Each bundle's packages come from its esbuild metafile (`packages/server/dist/app.meta.json`, `dist/main.cjs.meta.json`), and the web build's from the web package's production closure. A package with no licence file and no entry in `LICENCE_OVERRIDES` in `scripts/package.ts` fails the step and names the package.
+- **How NSIS ends a running app.** In electron-builder 26.18.1, `allowOnlyOneInstallerInstance.nsh` finds each process whose exe path starts with the install folder, and runs `Stop-Process -Id` on each. When PowerShell is blocked, it runs `taskkill /IM` with the image name. Neither takes a tree, so a detached `claude` lives. `build-config.test.ts` fails if an update adds `taskkill /T`.
+- **Uninstall** keeps the config folder and Electron's data folder. `build/installer.nsh` removes the Run value `com.iamphduc.podboard`, unless `--updated` is on the command line: an update or an install over an install keeps it.
+- **The proof.** `pnpm test:install` runs `src/proof-*.test.ts` on this machine, through `install-check.ts`. It holds a machine-wide lock file in the temp folder, and refuses to run when Pod Board is already installed. It ends with an empty `stateDiff`.
+
 ## What this machine shows
 
 Measured with `pnpm test:electron` on Windows 11 and Electron 45.2.1:
@@ -42,6 +53,15 @@ Measured with `pnpm test:electron` on Windows 11 and Electron 45.2.1:
 - **Inside the `utilityProcess`:** `process.execPath` is Electron's exe, `process.parentPort` exists, and `ELECTRON_RUN_AS_NODE` is unset.
 - **Electron 45.2.1 has no install script.** It downloads its binary on the first `require('electron')` under Node, or on the first `pnpm desktop`. So `allowBuilds` needs no entry, and `install.js` doesn't read `ELECTRON_SKIP_BINARY_DOWNLOAD`. CI sets that variable as the contract asks, and nothing in `pnpm verify` loads the package.
 
+Measured with `pnpm test:install` on Windows 11 and electron-builder 26.18.1:
+
+- **A silent per-user install** asks for no admin rights and starts no app. It writes one `HKCU` uninstall key and no `HKLM` key.
+- **An uninstall with the app running** ends the main process and the server with `Stop-Process`, so the drain doesn't run and `auto-continue-owner.json` stays for the next start's stale check. A detached `fake-claude` run started through the resume route lives.
+- **The proof catches a tree kill.** With a temporary `installer.nsh` that ran `taskkill /F /T /PID` on the app's processes, the fake run died, and `uninstall keeps config and runs` failed.
+- **A packaged exe writes to a pipe,** so a proof reads the `toast sent` line from stdout, and needs no log file.
+- **electron-builder 26.18.1 downloads no winCodeSign archive,** the one whose symbolic links fail to extract without a Windows setting. It downloads Electron, 7-Zip, NSIS, and NSIS's resources once, to its cache, and still sets the exe's icon and name. This machine has Developer Mode on, so that setting's absence isn't proved here.
+- **The installer is about 122 MB.** A package run takes about a minute after the first download.
+
 ## Why it's this way
 
 - **Quit never kills a resumed run.** A resumed `claude` is detached on purpose. So there is no tree kill, no `taskkill`, and no Job Object. The only kill is `kill()` on the server's own process, after the timeout. See the plan's key decision in [windows-app.md](../plans/windows-app.md).
@@ -51,6 +71,10 @@ Measured with `pnpm test:electron` on Windows 11 and Electron 45.2.1:
 
 ## Watch out
 
+- The templates match a process by the prefix of its exe path, with `StartsWith($INSTDIR)`. A process that runs an exe from a folder whose name starts with the install folder's name also ends.
+- An uninstall leaves `%LOCALAPPDATA%\pod-board-desktop-updater`, because NSIS copies the installer there. A proof removes it through `finishProof`.
+- A proof's `proofPlace` env has `Path` set to System32, and `POD_BOARD_CLAUDE_BIN` set to a path with no file, so it can't start a real `claude`.
+- `withInstallLock` holds through a whole proof. Never call it inside itself: a process waits for its own lock until the limit.
 - Never import `electron` from a plain module, a test, or a build script. Under Node, loading the npm package downloads the binary, and CI has none. The guarded test resolves the path inside its `beforeAll` only.
 - A `real-*.test.ts` file sits in `src/`, so `pnpm verify` collects it. Keep its body inside `describe.runIf`.
 - `dialog.showErrorBox` blocks until a click. The probe passes `onFailed` in its place.
@@ -69,3 +93,4 @@ Measured with `pnpm test:electron` on Windows 11 and Electron 45.2.1:
 
 - 2026-11-03 · desktop-shell D1: the package, the server host, the quit, and the real exit proof.
 - 2026-11-03 · desktop-shell T1: the window, the tray, close to tray, the link rule, the window state, and Start at login.
+- 2026-11-03 · installer-and-updates P1: the per-user installer, the app icon, the licence notices, and the install proof.

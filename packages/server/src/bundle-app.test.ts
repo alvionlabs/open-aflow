@@ -112,6 +112,12 @@ describe('bundleApp', () => {
     expect(page).not.toContain('pod-board-token')
   })
 
+  test('the build writes its metafile beside the app folder, never in it', () => {
+    const meta = JSON.parse(readFileSync(join(root, 'out.meta.json'), 'utf8')) as { workingDir: string; metafile: { inputs: Record<string, unknown> } }
+    expect(existsSync(meta.workingDir)).toBe(true)
+    expect(Object.keys(meta.metafile.inputs).some((input) => input.includes('node_modules/hono/'))).toBe(true)
+  })
+
   test('a build clears old output', async () => {
     const dir = tempDir('bundle-clear')
     try {
