@@ -454,7 +454,7 @@ describe('board service', () => {
     expect(ship).toEqual([{ key: 'final-pr', label: 'Final PR', state: 'wait', detail: 'PR #91 · after review' }])
   })
 
-  test('every sprint done in a repo with a staging decision: 6 hours cost 248 asks per branch, with a real gh reader', async () => {
+  test('every sprint done in a repo with a staging decision: 6 hours cost 288 asks per branch, with a real gh reader', async () => {
     const repo = join(root, 'repos', 'done-plan')
     await mkdir(join(repo, 'pod-docs', 'plans'), { recursive: true })
     await mkdir(join(repo, 'pod-docs', 'sprints'), { recursive: true })
@@ -480,7 +480,7 @@ describe('board service', () => {
       await service.refreshGh(board)
       t += PR_CACHE_MS
     }
-    expect(Object.fromEntries(asks)).toEqual({ alpha: 248, 'pod-staging': 248 })
+    expect(Object.fromEntries(asks)).toEqual({ alpha: 288, 'pod-staging': 288 })
   })
 
   test("a final PR into a staging branch: refreshGh asks gh for that branch too, and the Board has its PR", async () => {

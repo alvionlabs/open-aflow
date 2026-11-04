@@ -560,7 +560,7 @@ describe('PRs found by head branch (fix runs)', () => {
   describe('a branch with no open PR', () => {
     const BRANCH = 'some-plan'
     const HOURS_2 = 2 * 60 * 60_000
-    const MIN_30 = 30 * 60_000
+    const MIN_5 = 5 * 60_000
     const open = (n = 90) => ok(JSON.stringify([item(n, 'OPEN', BRANCH)]))
     const closed = (n = 90) => ok(JSON.stringify([item(n, 'CLOSED', BRANCH)]))
 
@@ -581,10 +581,10 @@ describe('PRs found by head branch (fix runs)', () => {
       return { gh, c, reader, elapsed, tickUntil }
     }
 
-    test('the limit is the asks of 2 hours at the normal rate, then 30 minutes', () => {
+    test('the limit is the asks of 2 hours at the normal rate, then 5 minutes', () => {
       expect(NO_PR_ASK_LIMIT).toBe(240)
       expect(NO_PR_ASK_LIMIT * PR_CACHE_MS).toBe(HOURS_2)
-      expect(NO_PR_SLOW_MS).toBe(MIN_30)
+      expect(NO_PR_SLOW_MS).toBe(MIN_5)
     })
 
     test('a laptop sleep does not count: a PR opened just after wake shows on the next tick', async () => {
@@ -608,17 +608,17 @@ describe('PRs found by head branch (fix runs)', () => {
       // 220 more asks at the normal rate.
       await tickUntil(elapsed() + 220 * PR_CACHE_MS)
       expect(gh.lists_()).toBe(240)
-      await tickUntil(elapsed() + MIN_30 - PR_CACHE_MS)
+      await tickUntil(elapsed() + MIN_5 - PR_CACHE_MS)
       expect(gh.lists_()).toBe(240)
       await reader.refresh(REPO, [], [BRANCH])
       expect(gh.lists_()).toBe(241)
     })
 
-    test('the slow rate stays wall-clock: past the limit a long gap gives one ask on wake, then 30 minutes', async () => {
+    test('the slow rate stays wall-clock: past the limit a long gap gives one ask on wake, then 5 minutes', async () => {
       const { gh, c, elapsed, tickUntil } = setup()
       await tickUntil(HOURS_2)
       c.advance(3 * 60 * 60_000)
-      await tickUntil(elapsed() + MIN_30)
+      await tickUntil(elapsed() + MIN_5)
       expect(gh.lists_()).toBe(241)
     })
 
@@ -650,52 +650,52 @@ describe('PRs found by head branch (fix runs)', () => {
       expect(lists).toBe(30)
     })
 
-    test('gh is asked every 30 s until 2 hours, then at most once per 30 minutes', async () => {
+    test('gh is asked every 30 s until 2 hours, then at most once per 5 minutes', async () => {
       const { gh, tickUntil } = setup()
       await tickUntil(HOURS_2)
       expect(gh.lists_()).toBe(240)
-      // The last ask was at 2 h - 30 s, so the first slow ask is 30 minutes after that.
-      await tickUntil(HOURS_2 + MIN_30 - PR_CACHE_MS)
+      // The last ask was at 2 h - 30 s, so the first slow ask is 5 minutes after that.
+      await tickUntil(HOURS_2 + MIN_5 - PR_CACHE_MS)
       expect(gh.lists_()).toBe(240)
-      await tickUntil(HOURS_2 + MIN_30)
+      await tickUntil(HOURS_2 + MIN_5)
       expect(gh.lists_()).toBe(241)
-      await tickUntil(HOURS_2 + 5 * MIN_30)
+      await tickUntil(HOURS_2 + 5 * MIN_5)
       expect(gh.lists_()).toBe(245)
     })
 
     test('only a closed PR counts as no PR', async () => {
       const { gh, tickUntil } = setup(closed())
-      await tickUntil(HOURS_2 + MIN_30)
+      await tickUntil(HOURS_2 + MIN_5)
       expect(gh.lists_()).toBe(241)
     })
 
     test('a merged PR is still final: asked once', async () => {
       const { gh, tickUntil } = setup(ok(JSON.stringify([item(90, 'MERGED', BRANCH)])))
-      await tickUntil(HOURS_2 + MIN_30)
+      await tickUntil(HOURS_2 + MIN_5)
       expect(gh.lists_()).toBe(1)
     })
 
     test('an open PR keeps the normal rate past 2 hours', async () => {
       const { gh, tickUntil } = setup(open())
-      await tickUntil(HOURS_2 + MIN_30)
-      expect(gh.lists_()).toBe(300)
+      await tickUntil(HOURS_2 + MIN_5)
+      expect(gh.lists_()).toBe(250)
     })
 
     test('a failed ask counts as no PR, and a known open PR stays at the normal rate through failures', async () => {
       const none = setup({ status: 'failed', stdout: '' })
-      await none.tickUntil(HOURS_2 + MIN_30)
+      await none.tickUntil(HOURS_2 + MIN_5)
       expect(none.gh.lists_()).toBe(241)
 
       const known = setup(open())
       await known.tickUntil(PR_CACHE_MS)
       known.gh.lists.set(BRANCH, { status: 'failed', stdout: '' })
-      await known.tickUntil(HOURS_2 + MIN_30)
-      expect(known.gh.lists_()).toBe(300)
+      await known.tickUntil(HOURS_2 + MIN_5)
+      expect(known.gh.lists_()).toBe(250)
     })
 
-    test('a PR that appears after 2 hours is seen within 30 minutes, and its branch returns to the normal rate', async () => {
+    test('a PR that appears after 2 hours is seen within 5 minutes, and its branch returns to the normal rate', async () => {
       const { gh, c, reader, tickUntil } = setup()
-      await tickUntil(HOURS_2 + MIN_30) // the slow ask at 2 h 29 m 30 s has just run
+      await tickUntil(HOURS_2 + MIN_5) // the slow ask at 2 h 4 m 30 s has just run
       const opened = c.t
       gh.lists.set(BRANCH, open())
       let changed = false
@@ -703,7 +703,7 @@ describe('PRs found by head branch (fix runs)', () => {
         changed = await reader.refresh(REPO, [], [BRANCH])
         if (!changed) c.advance(PR_CACHE_MS)
       }
-      expect(c.t - opened).toBeLessThanOrEqual(MIN_30)
+      expect(c.t - opened).toBeLessThanOrEqual(MIN_5)
       expect(reader.getBranch(REPO, BRANCH)?.number).toBe(90)
       // Back at the normal rate: one ask per tick.
       const before = gh.lists_()
@@ -716,9 +716,9 @@ describe('PRs found by head branch (fix runs)', () => {
 
     test('a PR that closes again starts a new 2 hours at the normal rate', async () => {
       const { gh, elapsed, tickUntil } = setup()
-      await tickUntil(HOURS_2 + MIN_30)
+      await tickUntil(HOURS_2 + MIN_5)
       gh.lists.set(BRANCH, open())
-      await tickUntil(HOURS_2 + 2 * MIN_30)
+      await tickUntil(HOURS_2 + 2 * MIN_5)
       gh.lists.set(BRANCH, closed())
       const at = gh.lists_()
       await tickUntil(elapsed() + 60 * 60_000)
@@ -727,7 +727,7 @@ describe('PRs found by head branch (fix runs)', () => {
 
     test('a branch that left the asked list starts a new 2 hours when it returns', async () => {
       const { gh, c, reader, elapsed, tickUntil } = setup()
-      await tickUntil(HOURS_2 + MIN_30)
+      await tickUntil(HOURS_2 + MIN_5)
       const at = gh.lists_()
       await reader.refresh(REPO, [], []) // a new sprint: the plan's branch is not asked about now
       c.advance(24 * 60 * 60_000)
@@ -737,7 +737,7 @@ describe('PRs found by head branch (fix runs)', () => {
 
     test("another repo's refresh leaves this branch's count alone", async () => {
       const { gh, reader, elapsed, tickUntil } = setup()
-      await tickUntil(HOURS_2 + MIN_30)
+      await tickUntil(HOURS_2 + MIN_5)
       const at = gh.lists_()
       await reader.refresh('E:\\Projects\\other', [], [])
       await tickUntil(elapsed() + 10 * PR_CACHE_MS)
@@ -746,7 +746,7 @@ describe('PRs found by head branch (fix runs)', () => {
 
     test('branches count apart: a new branch starts at the normal rate', async () => {
       const { gh, elapsed, tickUntil } = setup()
-      await tickUntil(HOURS_2 + MIN_30)
+      await tickUntil(HOURS_2 + MIN_5)
       gh.lists.set('fix-new', ok('[]'))
       await tickUntil(elapsed() + 4 * PR_CACHE_MS, [BRANCH, 'fix-new'])
       expect(gh.calls.filter((a) => a[0] === 'pr' && a[3] === 'fix-new')).toHaveLength(4)
@@ -757,27 +757,27 @@ describe('PRs found by head branch (fix runs)', () => {
       const c = clock()
       gh.lists.set('pod-staging', ok(JSON.stringify([item(5, 'MERGED', 'pod-staging')])))
       const reader = createGhReader({ exec: gh.exec, now: c.now })
-      for (let t = 0; t < HOURS_2 + MIN_30; t += PR_CACHE_MS) {
+      for (let t = 0; t < HOURS_2 + MIN_5; t += PR_CACHE_MS) {
         await reader.refresh(REPO, [], [], ['pod-staging'])
         c.advance(PR_CACHE_MS)
       }
       expect(gh.lists_()).toBe(241)
     })
 
-    test('a new open PR on a slowed staging branch shows within 30 minutes and returns it to the normal rate, until it merges', async () => {
+    test('a new open PR on a slowed staging branch shows within 5 minutes and returns it to the normal rate, until it merges', async () => {
       const gh = listGh()
       const c = clock()
       gh.lists.set('pod-staging', ok(JSON.stringify([item(5, 'MERGED', 'pod-staging')])))
       const reader = createGhReader({ exec: gh.exec, now: c.now })
       const tick = () => reader.refresh(REPO, [], [], ['pod-staging'])
-      for (let t = 0; t < HOURS_2 + MIN_30; t += PR_CACHE_MS) {
+      for (let t = 0; t < HOURS_2 + MIN_5; t += PR_CACHE_MS) {
         await tick()
         c.advance(PR_CACHE_MS)
       }
       const opened = c.t
       gh.lists.set('pod-staging', ok(JSON.stringify([item(5, 'MERGED', 'pod-staging'), item(6, 'OPEN', 'pod-staging')])))
       while (!(await tick())) c.advance(PR_CACHE_MS)
-      expect(c.t - opened).toBeLessThanOrEqual(MIN_30)
+      expect(c.t - opened).toBeLessThanOrEqual(MIN_5)
       expect(reader.getBranch(REPO, 'pod-staging')?.number).toBe(6)
       const before = gh.lists_()
       for (let i = 1; i <= 5; i++) {
@@ -803,7 +803,7 @@ describe('PRs found by head branch (fix runs)', () => {
       const c = clock()
       gh.lists.set('pod-staging', ok('[]'))
       const reader = createGhReader({ exec: gh.exec, now: c.now })
-      for (let t = 0; t < HOURS_2 + MIN_30; t += PR_CACHE_MS) {
+      for (let t = 0; t < HOURS_2 + MIN_5; t += PR_CACHE_MS) {
         await reader.refresh(REPO, [], [], ['pod-staging'])
         c.advance(PR_CACHE_MS)
       }
@@ -812,7 +812,7 @@ describe('PRs found by head branch (fix runs)', () => {
 
     test('forget resets the count', async () => {
       const { gh, reader, elapsed, tickUntil } = setup(closed())
-      await tickUntil(HOURS_2 + MIN_30)
+      await tickUntil(HOURS_2 + MIN_5)
       reader.forget(REPO, 90)
       const at = gh.lists_()
       await tickUntil(elapsed() + 10 * PR_CACHE_MS)
