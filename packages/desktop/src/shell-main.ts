@@ -1,6 +1,7 @@
 // Glue: the app's start, for main.ts and the guarded probe. The logic is in the plain modules. The
 // rules are in pod-docs/feature-details/desktop.md.
 
+import { dirname, join } from 'node:path'
 import { app, BrowserWindow, dialog, Menu } from 'electron'
 import { forkServer } from './host-main.ts'
 import { startNotifier } from './notifier-main.ts'
@@ -9,7 +10,12 @@ import { createServerHost, type ServerHost } from './server-host.ts'
 import { serverEntry, serverEnv } from './server-launch.ts'
 import { createShellBus, type ShellBus } from './shell-bus.ts'
 import { APP_ID, APP_NAME, dataDirOverride } from './shell-config.ts'
+import { applyTestEnv, TEST_ENV_FILE } from './update-feed.ts'
+import { startUpdater } from './updater-main.ts'
 import { startWindow } from './window-main.ts'
+
+/** `pnpm package --test-feed` sets this. In every other build the test feed's code is removed. */
+declare const __POD_BOARD_TEST_FEED__: boolean
 
 export type ShellContext = { host: ServerHost; bus: ShellBus; env: NodeJS.ProcessEnv }
 
@@ -26,6 +32,11 @@ const showFailure = (error: string) => dialog.showErrorBox(APP_NAME, `The server
 
 /** Returns `undefined` on a second launch, which starts no server and exits. */
 export function startShell(o: ShellOptions): ShellContext | undefined {
+  if (__POD_BOARD_TEST_FEED__ && app.isPackaged && !applyTestEnv(o.env, join(dirname(process.execPath), '..', TEST_ENV_FILE))) {
+    console.error('pod-board desktop: a test build needs temp folders, so it will not start')
+    app.exit(1)
+    return undefined
+  }
   app.setName(APP_NAME)
   app.setAppUserModelId(APP_ID)
   const dataDir = dataDirOverride(o.env)
@@ -65,6 +76,7 @@ export function startShell(o: ShellOptions): ShellContext | undefined {
   void app.whenReady().then(() => {
     startWindow(ctx)
     startNotifier(ctx)
+    startUpdater(ctx)
     host.start()
   })
   return ctx

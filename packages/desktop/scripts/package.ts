@@ -1,5 +1,5 @@
-// `pnpm package [--version=<x.y.z>] [--output=<dir>]`: builds, writes the licence notices, then makes the installer,
-// its blockmap, and latest.yml. It always passes `publish: never`, and it signs nothing.
+// `pnpm package [--version=<x.y.z>] [--output=<dir>] [--test-feed]`: builds, writes the licence notices, then makes the
+// installer, its blockmap, and latest.yml. It always passes `publish: never`, and it signs nothing.
 
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Arch, build, Platform } from 'electron-builder'
 import { builderOptions, parsePackageArgs } from '../src/build-config.ts'
+import { bundleDesktop } from '../src/bundle-desktop.ts'
 import { packageRootsFromMetafile, productionClosure, renderNotices, type BundleMeta } from '../src/licence-notices.ts'
 
 const pkg = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -39,7 +40,7 @@ function writeNotices(): string {
 }
 
 // A bad flag stops here, before anything builds.
-const args = parsePackageArgs(process.argv.slice(2))
+const { testFeed = false, ...args } = parsePackageArgs(process.argv.slice(2))
 
 const built = spawnSync('pnpm -w run build', { cwd: root, shell: true, stdio: 'inherit' })
 if (built.status !== 0) process.exit(built.status ?? 1)
@@ -48,8 +49,15 @@ if (built.status !== 0) process.exit(built.status ?? 1)
 process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false'
 for (const name of ['CSC_LINK', 'CSC_KEY_PASSWORD', 'WIN_CSC_LINK', 'WIN_CSC_KEY_PASSWORD']) delete process.env[name]
 
-const files = await build({
-  ...builderOptions({ noticesFile: writeNotices(), ...args }),
-  targets: Platform.WINDOWS.createTarget('nsis', Arch.x64),
-})
-console.log(`pod-board: packaged, and published nothing:\n${files.join('\n')}`)
+const mainBundle = { entry: join(pkg, 'src', 'main.ts'), outfile: join(pkg, 'dist', 'main.cjs') }
+if (testFeed) await bundleDesktop({ ...mainBundle, testFeed: true })
+try {
+  const files = await build({
+    ...builderOptions({ noticesFile: writeNotices(), ...args }),
+    targets: Platform.WINDOWS.createTarget('nsis', Arch.x64),
+  })
+  console.log(`pod-board: packaged, and published nothing:\n${files.join('\n')}`)
+} finally {
+  // dist/main.cjs never stays a test build.
+  if (testFeed) await bundleDesktop(mainBundle)
+}

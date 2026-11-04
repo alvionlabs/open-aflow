@@ -8,7 +8,7 @@ import { describe, expect, test } from 'vitest'
 const THIS_FILE = fileURLToPath(import.meta.url)
 const pkg = join(dirname(THIS_FILE), '..')
 const FOLDERS = ['src', 'scripts', 'test']
-const ELECTRON_IMPORT = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)["']electron["']/
+const ELECTRON_IMPORT = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)["']electron(?:-updater)?["']/
 const mayImport = (file: string) => /^main\.ts$|-main\.ts$/.test(basename(file))
 
 const sources = (dir: string): string[] =>
