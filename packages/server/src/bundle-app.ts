@@ -1,8 +1,8 @@
 // Builds the production app folder: one ESM file with every dependency inside, and the web build
 // beside it. The folder runs when moved anywhere with `node server.mjs`.
 
-import { cp, mkdir, rm, stat } from 'node:fs/promises'
-import { dirname, join, relative, sep } from 'node:path'
+import { cp, mkdir, rm, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 
@@ -43,6 +43,9 @@ export async function bundleApp(o: { webDist: string; outDir: string }): Promise
   const outfile = join(o.outDir, 'server.mjs')
   const result = await build({ ...BUNDLE_OPTIONS, entryPoints: [ENTRY], outfile, metafile: true })
   await cp(o.webDist, join(o.outDir, 'web'), { recursive: true })
+  // Beside the folder, not in it: the folder is what ships. `pnpm package` reads the bundle's packages from this.
+  const meta = { workingDir: process.cwd(), metafile: result.metafile }
+  await writeFile(join(dirname(o.outDir), `${basename(o.outDir)}.meta.json`), JSON.stringify(meta))
 
   const imports = Object.values(result.metafile.outputs).flatMap((output) => output.imports)
   const external = imports.filter((i) => i.external).map((i) => i.path)

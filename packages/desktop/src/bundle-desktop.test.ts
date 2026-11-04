@@ -31,5 +31,10 @@ describe('bundleDesktop', () => {
     expect(text).not.toMatch(/^\s*import\s.+from\s/m)
     expect(text).toContain('com.iamphduc.podboard')
     expect(text).not.toContain('Electron failed to install correctly')
+
+    // pnpm package reads the bundle's packages from this file.
+    const meta = JSON.parse(readFileSync(`${outfile}.meta.json`, 'utf8')) as { workingDir: string; metafile: { inputs: Record<string, unknown> } }
+    expect(existsSync(meta.workingDir)).toBe(true)
+    expect(Object.keys(meta.metafile.inputs).some((input) => input.endsWith('src/main.ts'))).toBe(true)
   }, 60_000)
 })
