@@ -259,15 +259,31 @@ function pushedHeld(repo: Pick<BoardRepo, 'agents' | 'prs'>, plan: PlanModel, x:
   return isAutopilot(plan) || !repo.prs.some((p) => p.number === x.pr.number && p.state === 'merged')
 }
 
+const NAMED_PR = /\/pull\/(\d+)|#(\d+)\b/g
+
+/** A pending gate from the orchestrator to you that names one of these PRs: a real gate 3 or 6 is about its wave's PR. */
+const gateNamesPr = (plan: Pick<PlanModel, 'queue'>, prs: (number | undefined)[]) =>
+  plan.queue.some(
+    (e) =>
+      e.isPending &&
+      e.type === 'PENDING' &&
+      FROM_ORCHESTRATOR.test(e.route.trim()) &&
+      TO_HUMAN.test(e.route.trim()) &&
+      haltGate(e.body) !== undefined &&
+      [...e.body.matchAll(NAMED_PR)].some((m) => prs.includes(Number(m[1] ?? m[2]))),
+  )
+
 /**
- * Under autopilot, pod holds a pushed slice of the current sprint, unless it stopped at a gate or halt (`isAutopilotStopped`:
- * it ended its turn, and `continue` is how it resumes). It merges the PR or waits on its checks, so no
+ * Under autopilot, pod holds a pushed slice of the current sprint: it merges the PR or waits on its checks, so no
  * `continue` goes into that session, whatever the run reads. When pod has died (`pushedHeld` ends), `continue` returns.
+ * Unless pod really stopped, so `continue` is how it resumes: a BLOCKED halt, or a gate naming that slice's PR. A stale
+ * gate pod resumed past names no later wave's PR, and a real gate 5 is checked before a wave, with no pushed slice.
  */
 export function autopilotHoldsPushed(repo: Pick<BoardRepo, 'agents' | 'prs'>, plan: PlanModel, now: number): boolean {
-  if (!isAutopilot(plan) || isAutopilotStopped(plan)) return false
+  if (!isAutopilot(plan) || isHalted(plan)) return false
   const current = plan.sprints.find((s) => s.slug === plan.currentSprint)
-  return current?.waves.some((w) => w.slices.some((x) => !isSliceDone(x) && !isBlockedSlice(x) && pushedHeld(repo, plan, x, now))) ?? false
+  const held = current?.waves.flatMap((w) => w.slices).filter((x) => !isSliceDone(x) && !isBlockedSlice(x) && pushedHeld(repo, plan, x, now)) ?? []
+  return held.length > 0 && !gateNamesPr(plan, held.map((x) => x.pr.number))
 }
 
 /**
