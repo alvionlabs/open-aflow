@@ -94,8 +94,8 @@ describe('licence notices', () => {
     const web = join(dir, 'packages', 'web')
     mkdirSync(web, { recursive: true })
     writeFileSync(join(web, 'package.json'), JSON.stringify({ name: '@pod-board/web', dependencies: { react: '1', 'first-party': 'workspace:*' }, devDependencies: { vite: '1' } }))
-    const react = plant(web, 'react', '19.0.0', { licence: 'x', dependencies: { scheduler: '1' }, optionalDependencies: { 'not-installed': '1' } })
-    // One level up, as Node resolves it. It points back at react, so the walk meets a cycle.
+    const react = plant(dir, 'react', '19.0.0', { licence: 'x', dependencies: { scheduler: '1' }, optionalDependencies: { 'not-installed': '1' } })
+    // Both sit two levels up, as Node resolves them, and scheduler points back at react: a cycle.
     const scheduler = plant(dir, 'scheduler', '1.0.0', { licence: 'x', dependencies: { react: '19' } })
     plant(web, 'vite', '1.0.0', { licence: 'x' })
     // A pnpm workspace link: the real path holds no node_modules folder, so it lists nothing itself.

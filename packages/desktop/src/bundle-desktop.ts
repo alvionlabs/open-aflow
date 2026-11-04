@@ -1,7 +1,7 @@
 // Bundles an Electron main-process entry into one CommonJS file. `electron` stays external: Electron
 // answers that require itself, and under Node the npm package would download its binary.
 
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { build } from 'esbuild'
 
@@ -18,6 +18,8 @@ export async function bundleDesktop(o: { entry: string; outfile: string }): Prom
     outfile: o.outfile,
     metafile: true,
   })
+  // `pnpm package` reads the bundle's packages from this.
+  await writeFile(`${o.outfile}.meta.json`, JSON.stringify({ workingDir: process.cwd(), metafile: result.metafile }))
   const imports = Object.values(result.metafile.outputs).flatMap((output) => output.imports)
   return { externalImports: [...new Set(imports.filter((i) => i.external).map((i) => i.path))].sort() }
 }

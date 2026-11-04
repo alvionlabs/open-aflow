@@ -23,6 +23,9 @@ const MOCK = 'E:\\Projects\\pod-trial-mock'
 const FAKE = join(DESKTOP, '..', 'server', 'test', 'fake-claude.mjs')
 const SYS32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
 const POWERSHELL = join(SYS32, 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+const PROGRAMS = join(process.env.APPDATA ?? '', 'Microsoft', 'Windows', 'Start Menu', 'Programs')
+/** An unpackaged Electron's first toast leaves this shortcut, with the same AppID. Get-StartApps then lists its name. */
+const DEV_SHORTCUT = join(PROGRAMS, 'Electron.lnk')
 const RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'
 const PORT = Number(process.env.POD_BOARD_PROOF_PORT ?? 3100)
 const RUN_MS = 300_000
@@ -58,6 +61,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
   let freeLock: () => void = () => {}
   let lockDone: Promise<void> = Promise.resolve()
   let before: MachineState | undefined
+  let startMenuBefore: string[] = []
   let place: ProofPlace
   let repo: string
   let bin: string
@@ -72,6 +76,14 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
   const configDir = () => place.env.POD_BOARD_CONFIG_DIR!
   const fakePids = () => (existsSync(pidsFile) ? readFileSync(pidsFile, 'utf8').split('\n').filter(Boolean).map(Number) : [])
   const runValue = async () => (await machineState()).runValue
+
+  const stopFakes = async () => {
+    const pids = pidsFile ? fakePids() : []
+    for (const pid of pids) {
+      if (alive(pid)) process.kill(pid)
+    }
+    await until('the fakes to end', () => pids.every((pid) => !alive(pid)))
+  }
 
   const stopApp = async () => {
     if (appPid === 0) return
@@ -135,6 +147,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       lockDone.catch(() => held())
     })
     before = await machineState()
+    startMenuBefore = readdirSync(PROGRAMS)
     refuseRealInstall(before)
     place = proofPlace(PORT)
     writeFixture()
@@ -142,9 +155,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
 
   afterAll(async () => {
     try {
-      for (const pid of pidsFile ? fakePids() : []) {
-        if (alive(pid)) process.kill(pid)
-      }
+      await stopFakes()
       if (before && place && !finished) console.log(proofLastLine(await finishProof(place, before)))
     } finally {
       freeLock()
@@ -208,16 +219,19 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       expect(state.runValue).toBeNull()
       expect(existsSync(join(homedir(), 'Desktop', `${APP_NAME}.lnk`))).toBe(false)
 
-      let appId = ''
+      // The shortcut's own AppID, and then what the Start menu's index lists for that AppID.
+      expect(powershell(`(New-Object -ComObject Shell.Application).Namespace('${PROGRAMS}').ParseName('${APP_NAME}.lnk').ExtendedProperty('System.AppUserModel.ID')`)).toBe(APP_ID)
+      let listed = ''
       await until(
         'the Start-menu entry in Get-StartApps',
         () => {
-          appId = powershell(`(Get-StartApps | Where-Object Name -eq '${APP_NAME}').AppID`)
-          return appId !== ''
+          listed = powershell(`(Get-StartApps | Where-Object AppID -eq '${APP_ID}').Name`)
+          return listed !== ''
         },
         60_000,
       )
-      expect(appId).toBe(APP_ID)
+      if (existsSync(DEV_SHORTCUT)) console.log(`${DEV_SHORTCUT} has this AppID too, so Get-StartApps lists: ${listed}`)
+      else expect(listed).toBe(APP_NAME)
     },
     RUN_MS,
   )
@@ -344,6 +358,8 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       expect(alive(fake)).toBe(true)
       expect(existsSync(join(configDir(), 'config.json'))).toBe(true)
       expect(existsSync(join(configDir(), 'tool-paths.json'))).toBe(true)
+      // The uninstaller ends the server by force, so its drain never ran. The next start's stale check takes this over.
+      expect(existsSync(join(configDir(), 'auto-continue-owner.json'))).toBe(true)
       expect(readdirSync(place.env.POD_BOARD_DESKTOP_DATA_DIR!).length).toBeGreaterThan(0)
 
       process.kill(fake)
@@ -359,9 +375,11 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
   test(
     'leaves nothing behind',
     async () => {
+      await stopFakes()
       const diff = await finishProof(place, before!)
       finished = true
       expect(stateDiff(before!, await machineState())).toEqual([])
+      expect(readdirSync(PROGRAMS)).toEqual(startMenuBefore)
       expect(diff).toEqual([])
       console.log(proofLastLine(diff))
     },

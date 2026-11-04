@@ -49,17 +49,22 @@ Measured on Windows 11 and an unpackaged Electron 45.2.1, on a temp copy of the 
 - Answering an entry that joins no plan, on the page, sets the attention value off.
 - Answering a plan's `BLOCKED` doesn't set it off. See **Watch out**.
 
-## Checks that wait for `installer-and-updates`
+## Human list
 
-An unpackaged Electron has no Start-menu shortcut with `APP_ID`, so it can't prove these. The plan's Verification **Toast** row stays open until that sprint.
+`pnpm test:install` proves these on the installed app: the exe runs with a Start-menu entry that `Get-StartApps` gives the AppID `com.iamphduc.podboard`, a new `BLOCKED → human` line logs one `toast sent`, and `--hidden` answers health and opens no window. No agent can see the items below. Do them after the sprint's last proof, because a real install makes `refuseRealInstall` stop the proofs.
 
-- the toast shows at all, with the app's name and icon
-- a click on a toast from the notification center opens the run
-- a real login launches the installed exe, in the tray
-- the taskbar and exe icons
+First, if `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Electron.lnk` exists, delete it (see **Watch out**). Then run `pnpm package`, run `packages/desktop/release/pod-board-setup-<version>.exe`, and open Pod Board from the Start menu. Then check each item.
+
+1. **The toast shows at all, with the app's name and icon.** Register a temp copy of `E:\Projects\pod-trial-mock`. Append a `BLOCKED · orchestrator → human` line to the copy's `pod-docs/handoff-queue.md`. A toast shows, with the name `Pod Board` and its icon.
+2. **A click on a toast from the notification center opens the run.** Wait for the toast to leave the screen. Open the notification center and click the toast. The window opens on that run.
+3. **A real login launches the installed exe, in the tray.** Turn on Start at login in the tray's menu. Sign out and sign in. The tray icon shows, and no window opens.
+4. **The taskbar and exe icons.** With the window open, the taskbar shows the Pod Board icon. In File Explorer, `%LOCALAPPDATA%\Programs\pod-board-desktop\Pod Board.exe` shows it too.
+
+To uninstall, go to Settings > Apps > Installed apps > Pod Board > Uninstall. This removes the login item. It keeps `%APPDATA%\pod-board` and `%APPDATA%\Pod Board`. Delete `%LOCALAPPDATA%\pod-board-desktop-updater` by hand to get its space back.
 
 ## Watch out
 
+- **A dev toast can leave a Start-menu shortcut.** This machine has an `Electron.lnk` from 2026-11-03, with the AppID `com.iamphduc.podboard`, that targets the `electron.exe` of a `desktop-shell-w2` worktree. No code here writes it, so it likely came from Electron at a toast of an unpackaged run. `Get-StartApps` then lists `Electron` for that AppID, also beside `Pod Board.lnk`, and a toast may show that name. A friend's machine has no unpackaged run, so it doesn't apply there.
 - **Answering a plan's entry raises a reply.** pod reads an answer only when it resumes, so the model then offers `continue`. The `BLOCKED` item goes, and a new reply item comes in the same pass: the dot stays on, and a `Send continue` toast follows the answer at once. On a toggled run with a session, the board sends it, so there is no item.
 - **A repo added after the start isn't in the baseline.** Its open items are new, so they send, or give one summary toast.
 - **A repo id change sends again.** A repo's id changes when a name clash forms or ends. Its items then have new identities, so each one sends once more.
