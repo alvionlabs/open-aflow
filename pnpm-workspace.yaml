@@ -3,4 +3,5 @@ packages:
 
 # esbuild (used by Vite and tsx) runs a postinstall check for its native binary.
 allowBuilds:
+  electron-winstaller: false
   esbuild: true
