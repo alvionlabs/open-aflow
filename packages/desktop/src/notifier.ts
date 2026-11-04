@@ -7,6 +7,12 @@ import { attentionItems, type AttentionItem, type AttentionTier } from './attent
 
 /** Up to this many new items in one pass each get a toast. */
 export const BURST_MAX = 3
+/**
+ * How long PR items count as old news at an app start: from a first Board where gh hasn't answered,
+ * and again from gh's first `ok`, because the server can send a Board between `gh auth status` and
+ * its PR reads, and the Board doesn't say when those end.
+ */
+export const GH_HOLD_MS = 20_000
 
 export type Toast = { title: string; body: string; hash: string }
 export type NotifierOptions = {
@@ -36,19 +42,38 @@ function toastsFor(fresh: AttentionItem[]): Toast[] {
 export function createNotifier(o: NotifierOptions): Notifier {
   const seen = new Set<string>()
   let baseline = true
+  /** While set, only a queue's `blocked` lines can be new: the gh-named items may be old ones arriving late. */
+  let holdUntil: number | undefined
+  let ghAnswered = false
   let latest: Board | undefined
   let closed = false
 
+  /** What this pass may send. Reads the gh state, so it runs once per pass. */
+  const sendable = (board: Board, fresh: AttentionItem[], now: number): AttentionItem[] => {
+    if (baseline) {
+      baseline = false
+      if (board.gh === 'unknown') holdUntil = now + GH_HOLD_MS
+      return []
+    }
+    if (holdUntil === undefined) return fresh
+    if (board.gh === 'missing' || board.gh === 'logged-out') holdUntil = undefined
+    else if (board.gh === 'ok' && !ghAnswered) {
+      ghAnswered = true
+      holdUntil = now + GH_HOLD_MS
+    } else if (now >= holdUntil) holdUntil = undefined
+    return holdUntil === undefined ? fresh : fresh.filter((item) => item.tier === 'blocked')
+  }
+
   const pass = (board: Board) => {
     try {
-      const items = attentionItems(board, o.now())
+      const now = o.now()
+      const items = attentionItems(board, now)
       const fresh = items.filter((item) => !seen.has(item.id))
       for (const item of fresh) seen.add(item.id)
       o.setAttention(items.length > 0)
-      const quiet = baseline
-      baseline = false
-      if (quiet || fresh.length === 0 || !o.supported()) return
-      for (const toast of toastsFor(fresh)) {
+      const toSend = sendable(board, fresh, now)
+      if (toSend.length === 0 || !o.supported()) return
+      for (const toast of toastsFor(toSend)) {
         try {
           o.send(toast)
         } catch (err) {
