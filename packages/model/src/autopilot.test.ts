@@ -57,7 +57,8 @@ const repo = (o: Opts, prs: PrStatus[] = []): BoardRepo => ({
   path: '/r',
   source: 'registered',
   model: buildRepoModel(files(o)),
-  agents: [],
+  // pod is alive: an engineer of the plan handed back 10 minutes ago, so a pushed slice is pod's.
+  agents: [{ id: 'e', session: 's', type: 'pod:engineer', tokens: 0, ended: true, plan: 'alpha', lastAt: NOW - 10 * 60_000 }],
   prs,
   claims: [],
 })

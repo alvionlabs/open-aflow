@@ -380,9 +380,9 @@ describe('buildPipeline', () => {
     expect(at([])).toMatchObject({ run: 'idle', flow: ['Wave 1 done 1 slice', 'Wave 2 wait 1 slice', 'Wave 3 wait 1 slice planned'], log: ['merged PR #40', 'waiting', 'planned'] })
     // Its own engineer at work: blue running.
     expect(at([], [running({ sprint: 'one', slice: 'B1' })]).flow[1]).toMatch(/^Wave 2 live 1 engineer/)
-    // The run runs (a pushed slice) though no engineer of this wave does: running, in the flow and the log,
-    // as the runs list says.
-    expect(at([], [], 'pushed')).toMatchObject({ run: 'running', flow: ['Wave 1 done 1 slice', 'Wave 2 live 1 slice', 'Wave 3 wait 1 slice planned'], log: ['merged PR #40', 'running', 'planned'] })
+    // The run runs (a pushed slice, and an agent of the plan wrote lately) though no engineer of this wave does:
+    // running, in the flow and the log, as the runs list says.
+    expect(at([], [agent({ plan: 'alpha', ended: true, lastAt: NOW - 10 * MIN })], 'pushed')).toMatchObject({ run: 'running', flow: ['Wave 1 done 1 slice', 'Wave 2 live 1 slice', 'Wave 3 wait 1 slice planned'], log: ['merged PR #40', 'running', 'planned'] })
   })
 
   it('unknown plan and empty repo', () => {
@@ -432,11 +432,12 @@ describe('buildPipeline', () => {
     const live = wave(pushed(rows, { agents: [running({ sprint: 'one', slice: 'B1' })] }), 2)
     expect(live?.state).toBe('live')
     expect(live).not.toHaveProperty('merge')
-    // gh says merged or closed: the pushed slice keeps the run running, so the wave reads running; no merge.
+    // gh says merged: no longer running, on a manual run; it waits for your continue. No merge.
     const status = (state: PrStatus['state']): PrStatus => ({ number: 7, state, checks: 'pass', checkedAt: NOW })
-    for (const s of ['merged', 'closed'] as const) {
-      expect(wave(pushed(rows, { prs: [status(s)] }), 2)).toEqual({ key: 'one/wave-2', label: 'Wave 2', state: 'live', detail: '2 slices' })
-    }
+    const pod = agent({ plan: 'alpha', ended: true, lastAt: NOW - 10 * MIN })
+    expect(wave(pushed(rows, { prs: [status('merged')], agents: [pod] }), 2)).toEqual({ key: 'one/wave-2', label: 'Wave 2', state: 'wait', detail: '2 slices' })
+    // gh says closed: the pushed slice reads running while an agent of the plan wrote lately; no merge.
+    expect(wave(pushed(rows, { prs: [status('closed')], agents: [pod] }), 2)).toEqual({ key: 'one/wave-2', label: 'Wave 2', state: 'live', detail: '2 slices' })
     // Done still beats you: a done wave reads done, with no merge.
     expect(wave(pushed(rows), 1)).toEqual({ key: 'one/wave-1', label: 'Wave 1', state: 'done', detail: '1 slice' })
     // Blocked still beats you.

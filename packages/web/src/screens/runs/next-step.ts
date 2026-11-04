@@ -6,7 +6,7 @@
 // listed but never takes a run's card (a repo row keeps a real stop as its card).
 // Pure; the card and the tab only render these.
 
-import { haltGate, isAnswerable, stopsRun, waitingPrs, type BoardRepo, type QueueItem, type RunSummary, type WaitingPr } from '@pod-board/model'
+import { haltGate, holdsRun, isAnswerable, stopsRun, waitingPrs, type BoardRepo, type QueueItem, type RunSummary, type WaitingPr } from '@pod-board/model'
 import { KIND_ORDER } from './entry-kind.ts'
 import { waitingEntries, waitingRows, type WaitingRow } from './queue-view.ts'
 import { kindChip } from './waiting-tab.ts'
@@ -44,6 +44,8 @@ export type NextSteps = { card: NextItem; rest: NextItem[] }
 export const NOTHING_TITLE = 'Nothing to do'
 export const BLOCKED_DETAIL = 'The run is stopped until you answer.'
 export const PENDING_DETAIL = 'pod goes on with the value in use until you answer.'
+/** A gate or hand-back that holds nothing right now: an engineer works past it (`holdsRun`). */
+export const AT_WORK_DETAIL = 'An engineer is at work on this run. Answer when you can.'
 
 const TITLE_MAX = 80
 
@@ -76,16 +78,17 @@ function entryKeys(rows: WaitingRow[]): string[] {
   })
 }
 
-function entryItem(e: QueueItem, row: WaitingRow, key: string, repoId: string, stops: boolean, joined: boolean, run: RunSummary): NextItem {
+function entryItem(e: QueueItem, row: WaitingRow, key: string, repoId: string, stops: boolean, lifted: boolean, joined: boolean, run: RunSummary): NextItem {
   const answer: NextAction = { kind: 'answer', repoId, line: row.line }
   const blocked = e.type === 'BLOCKED'
   // The title is the body without its kind prefix; the kind shows as a dot and word, as on the rows.
-  const title = entryTitle(row.text)
+  // Only an entry that holds the run reads as a halt: the title of a gate that doesn't is its own words.
+  const title = blocked || stops ? entryTitle(row.text) : { title: short(row.text) }
   if (isAnswerable(e)) {
     const kind = row.kind === 'other' ? {} : { kind: kindChip(row) }
     // A plan's own BLOCKED says what the run says (`planState`): blocked when halted, else needs you.
     if (blocked) return { key, tier: 'blocked', status: joined && run.state !== 'blocked' ? 'needs-you' : 'blocked', ...title, ...kind, detail: BLOCKED_DETAIL, entry: row, action: answer }
-    if (!stops) return { key, tier: 'pending', status: runStatus(run), goesOn: true, ...title, ...kind, detail: PENDING_DETAIL, entry: row, action: answer }
+    if (!stops) return { key, tier: 'pending', status: runStatus(run), goesOn: true, ...title, ...kind, detail: lifted ? AT_WORK_DETAIL : PENDING_DETAIL, entry: row, action: answer }
     return { key, tier: 'pending', status: 'needs-you', ...(joined ? {} : { goesOn: true as const }), ...title, ...kind, detail: BLOCKED_DETAIL, entry: row, action: answer }
   }
   return { key, tier: 'info', status: blocked ? 'blocked' : 'idle', ...title, detail: row.yourAnswer ?? row.route, entry: row, action: { kind: 'none' } }
@@ -140,8 +143,12 @@ export function nextSteps(run: RunSummary | undefined, repo: BoardRepo | undefin
   const keys = entryKeys(rows)
   const plan = run.fix === undefined ? repo.model.plans.find((p) => p.slug === run.plan) : undefined
   const joined = new Set(plan?.queue.map((e) => e.line))
-  const stops = entries.map((e) => stopsRun(e, joined.has(e.line) ? plan : undefined))
-  const items: NextItem[] = entries.map((e, i) => entryItem(e, rows[i]!, keys[i]!, repo.id, stops[i]!, joined.has(e.line), run))
+  const own = (e: QueueItem) => (plan !== undefined && joined.has(e.line) ? plan : undefined)
+  const stops = entries.map((e) => {
+    const p = own(e)
+    return p ? holdsRun(repo, p, e, now) : stopsRun(e)
+  })
+  const items: NextItem[] = entries.map((e, i) => entryItem(e, rows[i]!, keys[i]!, repo.id, stops[i]!, !stops[i] && own(e) !== undefined && stopsRun(e, own(e)), joined.has(e.line), run))
   // An entry that joins no plan never heads a run; a repo row, with nowhere else to show it, keeps a real stop.
   const repoRow = run.plan === undefined
   const unjoined = new Set(entries.flatMap((e, i) => (joined.has(e.line) || (repoRow && stops[i]) ? [] : [items[i]!.key])))

@@ -5,6 +5,7 @@
 
 import {
   buildPipeline,
+  holdsRun,
   isBlockedSlice,
   isPlanHeld,
   isSliceDone,
@@ -12,7 +13,6 @@ import {
   isWaveRunning,
   planState,
   roleOf,
-  stopsRun,
   waitingPrs,
   waitingWords,
   type AgentRun,
@@ -72,6 +72,7 @@ export function buildWaveBoard(repo: BoardRepo, planSlug: string, now: number): 
   const caption = `Sprint ${i + 1} of ${plan.sprints.length} · ${sprint.slug}`
   const log = (buildPipeline(repo, planSlug, now)?.log ?? []).filter((g) => g.sprint === sprint.slug)
   const run = planState(repo, plan, now)
+  const stops = plan.queue.filter((e) => holdsRun(repo, plan, e, now))
   const waiting = waitingPrs(repo, now).filter((w) => w.kind === 'wave' && w.run === plan.slug && w.sprint === sprint.slug)
 
   const columns: Column[] = sprint.waves
@@ -88,11 +89,11 @@ export function buildWaveBoard(repo: BoardRepo, planSlug: string, now: number): 
           // with nothing of its own running reads the run's state.
           const current = sprint.slug === plan.currentSprint && sprint.currentWave === w.wave
           const waveRuns = isWaveRunning(repo, plan, sprint, w, now)
-          const held = (current || waveRuns) && isPlanHeld(plan)
+          const held = (current || waveRuns) && isPlanHeld(repo, plan, now)
           const running = !held && isSliceRunning(repo, plan, sprint, w, slice, now)
           const inProgress = held || (current && !waveRuns) ? run : undefined
-          const state = cardState(plan, sprint.slug, slice, running, mergePr !== undefined, inProgress)
-          return { code: slice.code, title: slice.title, state, meta: cardMeta(plan, sprint.slug, slice, row, state, mergePr), critical: false, slice, row }
+          const state = cardState(stops, sprint.slug, slice, running, mergePr !== undefined, inProgress)
+          return { code: slice.code, title: slice.title, state, meta: cardMeta(plan, stops, sprint.slug, slice, row, state, mergePr), critical: false, slice, row }
         }),
       }
     })
@@ -115,13 +116,13 @@ export function boardSlices(repo: BoardRepo | undefined, planSlug: string, now: 
 const naming = (e: QueueItem, sprint: string, code: string) => e.slice === code && (e.sprint === undefined || e.sprint === sprint)
 
 /**
- * First match wins: blocked → merged → needs-you (a stop naming it, or its wave's PR waiting on you)
+ * First match wins: blocked → merged → needs-you (an entry that holds the run (`holdsRun`) naming it, or its wave's PR waiting on you)
  * → running → the run's state, on the wave in progress → waiting. A done card reads merged even with a pending ask.
  */
-function cardState(plan: PlanModel, sprint: string, slice: SliceModel, running: boolean, waveWaits: boolean, inProgress: PlanState | undefined): CardState {
+function cardState(stops: QueueItem[], sprint: string, slice: SliceModel, running: boolean, waveWaits: boolean, inProgress: PlanState | undefined): CardState {
   if (isBlockedSlice(slice)) return 'blocked'
   if (isSliceDone(slice)) return 'merged'
-  if (waveWaits || plan.queue.some((e) => stopsRun(e, plan) && naming(e, sprint, slice.code))) return 'needs-you'
+  if (waveWaits || stops.some((e) => naming(e, sprint, slice.code))) return 'needs-you'
   if (running) return 'running'
   return inProgress === undefined || inProgress === 'idle' ? 'waiting' : inProgress
 }
@@ -130,7 +131,7 @@ const join = (parts: (string | undefined)[]) => parts.filter((p): p is string =>
 const mins = (row: LogRow) => (row.minutes === undefined ? undefined : `${row.minutes} min`)
 const entryLine = (e: QueueItem) => cut(`${e.type}: ${e.body}`)
 
-function cardMeta(plan: PlanModel, sprint: string, slice: SliceModel, row: LogRow, state: CardState, mergePr: number | undefined): string {
+function cardMeta(plan: PlanModel, stops: QueueItem[], sprint: string, slice: SliceModel, row: LogRow, state: CardState, mergePr: number | undefined): string {
   switch (state) {
     case 'merged':
       return join([slice.model, row.confidence, mins(row)])
@@ -138,7 +139,6 @@ function cardMeta(plan: PlanModel, sprint: string, slice: SliceModel, row: LogRo
       return join([slice.model, mins(row)])
     case 'needs-you': {
       // A stop naming this slice, else its wave's PR, else the stop that holds the run.
-      const stops = plan.queue.filter((x) => stopsRun(x, plan))
       const e = stops.findLast((x) => naming(x, sprint, slice.code))
       if (e) return entryLine(e)
       if (mergePr !== undefined) return `PR #${mergePr} · ${waitingWords(plan)}`

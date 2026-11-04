@@ -102,9 +102,10 @@ describe('listRuns', () => {
     expect(stateOf(repo('r', planFiles(), { agents: [agent({ sprint: 'one', lastAt: NOW - 30 * MIN })] }))).toEqual(['idle'])
     expect(stateOf(repo('r', planFiles(), { agents: [running({ sprint: 'one', ended: true })] }))).toEqual(['idle'])
     expect(stateOf(repo('r', planFiles(), { agents: [running({ sprint: 'other-sprint' })] }))).toEqual(['idle'])
-    // A pushed slice in the current wave → running.
+    // A pushed slice in the current wave, with an agent of the plan writing lately → running; with none read → idle.
     const pushed = planFiles({ board: [[1, 'A1', '—', 'done'], [2, 'B1', '[#7](https://github.com/o/r/pull/7)', 'pushed'], [2, 'B2', '—', 'pending']] })
-    expect(stateOf(repo('r', pushed))).toEqual(['running'])
+    expect(stateOf(repo('r', pushed, { agents: [running({ plan: 'alpha', ended: true })] }))).toEqual(['running'])
+    expect(stateOf(repo('r', pushed))).toEqual(['idle'])
 
     // needs-you wins over running.
     expect(stateOf(repo('r', planFiles({ queue: [ask] }), { agents: [running({ sprint: 'one' })] }))).toEqual(['needs-you'])
@@ -136,9 +137,9 @@ describe('listRuns', () => {
     expect(activeRuns(runsOf(repo('r', handedBack)))).toBe(1)
     // A running engineer of the wave: running, as today.
     expect(stateOf(repo('r', handedBack, { agents: [running({ sprint: 'one', slice: 'B1' })] }))).toEqual(['running'])
-    // gh says the PR merged: no waiting PR, so running from the pushed slices, as today.
+    // gh says the PR merged: no waiting PR, and on a manual run a merged PR is no longer pod's: it waits for continue.
     const merged = { number: 7, state: 'merged' as const, checks: 'pass' as const, checkedAt: NOW }
-    expect(stateOf(repo('r', handedBack, { prs: [merged] }))).toEqual(['running'])
+    expect(stateOf(repo('r', handedBack, { prs: [merged], agents: [running({ plan: 'alpha', ended: true })] }))).toEqual(['idle'])
     // blocked still wins: a halt, or a blocked slice in the current sprint.
     const halt = queueLine('BLOCKED', 'orchestrator → human', 'plan: alpha', 'Gate 2 stopped the run')
     const halted = planFiles({ queue: [halt], board: [[1, 'A1', '—', 'done'], [2, 'B1', link, 'pushed'], [2, 'B2', link, 'pushed']] })

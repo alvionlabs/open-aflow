@@ -274,7 +274,7 @@ describe('next step', () => {
 
   it('autopilot', () => {
     // Not halted: the wave PR is pod's to merge, so a run with nothing else has nothing to do, running.
-    const working = chess([onlyQueue(), t1Pushed], { prs: [gh(78, 'open')] })
+    const working = chess([onlyQueue(), t1Pushed], { prs: [gh(78, 'open')], agents: [engineer()] })
     expect(runOf(working).state).toBe('running')
     expect(steps(working)).toEqual<NextSteps>({
       card: { key: 'nothing', tier: 'nothing', status: 'running', title: 'Nothing to do', detail: 'ladder · wave 3/3', action: { kind: 'none' } },

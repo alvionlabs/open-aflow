@@ -100,6 +100,9 @@ const card = (b: WaveBoard, code: string): Card => {
 }
 const stateOf = (r: BoardRepo, code: string): CardState => card(wb(r), code).state
 
+/** pod is alive: an agent of the plan handed back lately, so a pushed slice is pod's. */
+const POD: AgentRun = { id: 'pod', session: 's', type: 'pod:engineer', tokens: 0, ended: true, plan: 'alpha', lastAt: NOW - 10 * MIN }
+
 describe('card state', () => {
   const askC1 = q('PENDING', 'engineer → human', 'sprint: s1 · slice: C1', 'keep undo after reload?')
 
@@ -124,8 +127,9 @@ describe('card state', () => {
     expect(stateOf(one([{ wave: 1, code: 'C1', status: 'done', pr: pr(4) }], {}, [running({ sprint: 's1', slice: 'C1' })]), 'C1')).toBe('merged')
   })
 
-  it('running beats waiting: pushed, or a running agent of the slice', () => {
-    expect(stateOf(one([{ wave: 1, code: 'C1', status: 'pushed' }]), 'C1')).toBe('running')
+  it('running beats waiting: pushed with an agent of the plan writing lately, or a running agent of the slice', () => {
+    expect(stateOf(one([{ wave: 1, code: 'C1', status: 'pushed' }], {}, [POD]), 'C1')).toBe('running')
+    expect(stateOf(one([{ wave: 1, code: 'C1', status: 'pushed' }]), 'C1')).toBe('waiting')
     expect(stateOf(one([{ wave: 1, code: 'C1' }], {}, [running({ sprint: 's1', slice: 'C1' })]), 'C1')).toBe('running')
     expect(stateOf(one([{ wave: 1, code: 'C1' }], {}, [ended({ sprint: 's1', slice: 'C1' })]), 'C1')).toBe('waiting')
     expect(stateOf(one([{ wave: 1, code: 'C1' }, { wave: 1, code: 'C2' }], {}, [running({ sprint: 's1', slice: 'C2' })]), 'C1')).toBe('waiting')
@@ -145,14 +149,14 @@ describe('card state', () => {
     // A running engineer of the wave: running, as today.
     expect(stateOf(one(handedBack, {}, [running({ sprint: 's1', slice: 'B2' })]), 'B1')).toBe('running')
     // blocked keeps precedence: a blocked slice blocks the wave, and its card reads blocked.
-    const withBlock = one([{ wave: 1, code: 'B1', status: 'pushed', pr: pr(7) }, { wave: 1, code: 'B2', status: 'blocked' }])
+    const withBlock = one([{ wave: 1, code: 'B1', status: 'pushed', pr: pr(7) }, { wave: 1, code: 'B2', status: 'blocked' }], {}, [POD])
     expect(['B1', 'B2'].map((c) => stateOf(withBlock, c))).toEqual(['running', 'blocked'])
     // merged keeps precedence: a done slice in a waiting wave reads merged.
     const mixed = wb(one([{ wave: 1, code: 'B1', status: 'done', pr: pr(7) }, { wave: 1, code: 'B2', status: 'pushed', pr: pr(7) }]))
     expect([card(mixed, 'B1').state, card(mixed, 'B2').state]).toEqual(['merged', 'needs-you'])
-    // A shown sprint that isn't current (the plan's last sprint with a doc) has no waiting wave.
+    // A shown sprint that isn't current (the plan's last sprint with a doc) has no waiting wave, and with no agent read its pushed slice isn't running.
     const old = repo({ sprints: [['s1', 'done']], docs: { s1: [{ wave: 1, code: 'B1', status: 'pushed', pr: pr(7) }] } })
-    expect(stateOf(old, 'B1')).toBe('running')
+    expect(stateOf(old, 'B1')).toBe('waiting')
   })
 
   it('cards of an autopilot wave: autopilot merges, or it stopped', () => {
@@ -160,7 +164,7 @@ describe('card state', () => {
     const autopilot = (queue: string[]): BoardRepo => {
       const f = files({ sprints: [['s1', 'active']], docs: { s1: rows }, queue })
       f['pod-docs/sprints/s1.md'] = f['pod-docs/sprints/s1.md']!.replace('## Status board', '<!-- autopilot-run: started=2026-10-18T10:00:00Z sprints=0 waves=1 -->\n\n## Status board')
-      return { id: 'id-r', name: 'r', path: '/r', source: 'registered', model: buildRepoModel(f), agents: [], prs: [], claims: [] }
+      return { id: 'id-r', name: 'r', path: '/r', source: 'registered', model: buildRepoModel(f), agents: [POD], prs: [], claims: [] }
     }
     // Not halted: pod merges it, so the card is running, not yours.
     expect(stateOf(autopilot([]), 'B1')).toBe('running')
@@ -420,6 +424,7 @@ describe('filters', () => {
         { wave: 3, code: 'C2' },
       ],
       { queue: [q('PENDING', 'engineer → human', 'sprint: s1 · slice: C2', 'x')] },
+      [POD],
     ),
   )
   const dimmed = (f: ReturnType<typeof filterState.toggle>) =>
