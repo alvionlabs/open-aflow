@@ -19,7 +19,6 @@ const PORT = process.env.POD_BOARD_PROOF_PORT ?? '3130'
 const RUN_MS = 600_000
 const LOCK_MS = 40 * 60_000
 const SYS32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
-const POWERSHELL = join(SYS32, 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 
 const ACTIONLINT_VERSION = '1.7.12'
 const ACTIONLINT_SHA256 = '6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9'
@@ -164,7 +163,8 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       writeFileSync(zip, Buffer.from(await res.arrayBuffer()))
       expect(createHash('sha256').update(readFileSync(zip)).digest('hex')).toBe(ACTIONLINT_SHA256)
       const unpacked = join(dir, 'unpacked')
-      const expanded = spawnSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', 'Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1]', zip, unpacked], { encoding: 'utf8', windowsHide: true })
+      mkdirSync(unpacked)
+      const expanded = spawnSync(join(SYS32, 'tar.exe'), ['-xf', zip, '-C', unpacked], { encoding: 'utf8', windowsHide: true })
       expect(expanded.status, expanded.stderr).toBe(0)
       const lint = spawnSync(join(unpacked, 'actionlint.exe'), [WORKFLOW], { cwd: ROOT, encoding: 'utf8', windowsHide: true })
       expect(`${lint.stdout}${lint.stderr}`).toBe('')
