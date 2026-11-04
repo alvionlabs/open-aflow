@@ -4,6 +4,8 @@ A local, read-only web app that shows every pod run across your repos: each
 run's stage, the current wave's slices, what needs you, and each engineer's
 live activity. See [docs/master-plan.md](docs/master-plan.md).
 
+To install the Windows app, follow [the install note](docs/install.md).
+
 ## Requirements
 
 - Node.js 22 or later.
@@ -66,7 +68,8 @@ If it can't find one, a setup check replaces the board. It shows how to install
 the tool, and has a field for the path to the tool. `pnpm dev` has no setup check.
 
 Set `CLAUDE*` variables in the `env` block of Claude's `settings.json`. Resumed
-runs drop those set only in a shell.
+runs keep only `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_GIT_BASH_PATH` (absolute only),
+and `CLAUDE_CODE_MAX_OUTPUT_TOKENS` from a shell, and drop the rest.
 
 Don't run `pnpm start` and `pnpm dev` on one config folder if you use
 auto-continue: both can send `continue`. Set `POD_BOARD_CONFIG_DIR` to a different
