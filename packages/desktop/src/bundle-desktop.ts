@@ -5,7 +5,8 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { build } from 'esbuild'
 
-export async function bundleDesktop(o: { entry: string; outfile: string }): Promise<{ externalImports: string[] }> {
+/** `testFeed` keeps the update test feed's code, for `pnpm package --test-feed` only. */
+export async function bundleDesktop(o: { entry: string; outfile: string; testFeed?: boolean }): Promise<{ externalImports: string[] }> {
   await mkdir(dirname(o.outfile), { recursive: true })
   const result = await build({
     bundle: true,
@@ -13,6 +14,7 @@ export async function bundleDesktop(o: { entry: string; outfile: string }): Prom
     format: 'cjs',
     target: 'node22',
     external: ['electron'],
+    define: { __POD_BOARD_TEST_FEED__: String(o.testFeed === true) },
     logLevel: 'warning',
     entryPoints: [o.entry],
     outfile: o.outfile,
