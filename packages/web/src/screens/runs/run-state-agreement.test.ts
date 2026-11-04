@@ -301,11 +301,98 @@ describe('a stop reads first on the wave in progress', () => {
   })
 
   it.each([
-    ['a quiet engineer', { agents: [quiet(STALE_MS + 15 * MIN)] }, undefined],
-    ['a live engineer', { agents: [engineer()] }, undefined],
-    ['a pushed slice', {}, PUSHED],
-  ])('a plan-level gate with %s reads needs you in all six views', (_n, extra: Partial<BoardRepo>, rows: Row[] | undefined) => {
-    expect(views(repoOf([GATE5], extra, rows))).toMatchObject(STOPPED)
+    ['no engineer', {}, undefined],
+    ['an engineer quiet past ENGINEER_QUIET_MS', { agents: [quiet(ENGINEER_QUIET_MS)] }, undefined],
+    ['an ended engineer', { agents: [engineer({ ended: true })] }, undefined],
+    ['a pushed slice, its engineer ended', { agents: [engineer({ ended: true })] }, PUSHED],
+  ])('a PENDING gate with %s reads needs you in all six views', (_n, extra: Partial<BoardRepo>, rows: Row[] | undefined) => {
+    for (const gate of [GATE5, GATE6]) expect(views(repoOf([gate], extra, rows))).toMatchObject(STOPPED)
+  })
+})
+
+describe('an engineer at work under a PENDING gate', () => {
+  it.each([
+    ['fresh', engineer()],
+    ['quiet under ENGINEER_QUIET_MS', quiet(ENGINEER_QUIET_MS - MIN)],
+  ])('%s: all six read running, and nothing says the run is stopped', (_n, agent) => {
+    for (const gate of [GATE5, GATE6]) {
+      const v = views(repoOf([gate], { agents: [agent] }))
+      expect(v).toMatchObject(RUNNING)
+      expect(v.title).not.toMatch(/autopilot|stopped/i)
+      expect(v.steps.card.detail).not.toMatch(/stopped/i)
+      // The gate stays listed and answerable.
+      expect(v.steps.card.entry?.line).toBe(gate.trim())
+      expect(v.steps.card.action.kind).toBe('answer')
+    }
+  })
+
+  it('offers no reply and raises no banner', () => {
+    const repo = repoOf([`${GATE5} **Answer (human):** go on`], { agents: [engineer()] })
+    expect(runReplies(repo, PLAN, NOW)).toEqual([])
+    const selected: BoardRepo = { ...repoOf([]), id: 'o', name: 'o', path: '/o' }
+    const board = { generatedAt: NOW, gh: 'ok' as const, repos: [selected, repoOf([GATE5], { agents: [engineer()] })] }
+    const runs = listRuns(board, NOW)
+    expect(elsewhere(runs, board, runs.find((r) => r.repoId === 'o'), NOW)).toBeUndefined()
+  })
+
+  it('a halt still reads first, and so does an ask naming the slice', () => {
+    expect(views(repoOf([GATE5, HALT], { agents: [engineer()] }))).toMatchObject(HALTED)
+    expect(views(repoOf([GATE5, SLICE_ASK], { agents: [engineer()] }))).toMatchObject({ flow: 'you', sidebar: 'needs-you', log: 'needs you', next: 'Needs you', board: { you: 1 } })
+  })
+})
+
+describe('a gate from anyone but the orchestrator', () => {
+  it('stops nothing, and its title stays its own words', () => {
+    const note = entry('PENDING', 'reviewer → human', `plan: ${PLAN}`, 'Gate 4 was slow in CI.')
+    const v = views(repoOf([note]))
+    expect(v).toMatchObject(IDLE)
+    expect(v.title).toBe('Gate 4 was slow in CI.')
+  })
+})
+
+describe('a pushed slice', () => {
+  const OPEN_PR: Row[] = [
+    [1, 'P1', '#9', 'pushed'],
+    [2, 'Q1', '—', 'pending'],
+  ]
+  const ended = (ago: number) => engineer({ ended: true, lastAt: NOW - ago, active: [[NOW - ago - 30 * MIN, NOW - ago]] })
+  const toggles = [{ path: '/r', run: PLAN }]
+  const sends = (repo: BoardRepo) => autoSends({ generatedAt: NOW, gh: 'ok', repos: [repo] }, toggles, NOW, () => true)
+  const autopilot = (agents: AgentRun[], state: PrStatus['state'] = 'open', queue = [ANSWERED_DECISION]) => repoOf(queue, { agents, prs: [gh(9, state)] }, OPEN_PR, undefined, true)
+
+  it('under autopilot, while pod holds it: all six read running, with no continue and nothing sent', () => {
+    const repo = autopilot([ended(10 * MIN)])
+    expect(views(repo)).toMatchObject(RUNNING)
+    expect(runReplies(repo, PLAN, NOW)).toEqual([])
+    expect(sends(repo)).toEqual([])
+  })
+
+  it('under autopilot with its PR merged: still running while pod is alive, it records the merge itself', () => {
+    const repo = autopilot([ended(10 * MIN)], 'merged')
+    expect(views(repo)).toMatchObject(RUNNING)
+    expect(runReplies(repo, PLAN, NOW)).toEqual([])
+  })
+
+  it.each(['open', 'merged'] as const)('under autopilot, pod dead (PR %s): idle once no agent of the plan wrote for ENGINEER_QUIET_MS, and continue is the way out', (state) => {
+    const repo = autopilot([ended(ENGINEER_QUIET_MS)], state)
+    expect(views(repo)).toMatchObject({ flow: 'wait', sidebar: 'idle', log: 'waiting', board: { you: 0, running: 0, waiting: 2, blocked: 0 } })
+    expect(runReplies(repo, PLAN, NOW).map((r) => r.reply)).toEqual(['continue'])
+  })
+
+  it('under autopilot with no agent read at all: idle, not running for ever', () => {
+    expect(views(autopilot([], 'open', [DECISION]))).toMatchObject(IDLE)
+  })
+
+  it('on a manual run with its PR merged: not running, and continue is on the card', () => {
+    const repo = repoOf([DECISION], { agents: [ended(10 * MIN)], prs: [gh(9, 'merged')] }, OPEN_PR)
+    const v = views(repo)
+    expect(v).toMatchObject({ flow: 'wait', sidebar: 'idle', log: 'waiting', board: { you: 0, running: 0, waiting: 2, blocked: 0 } })
+    expect(v.title).toBe('Send continue')
+  })
+
+  it('on a manual run with no PR to wait on: running while an agent wrote lately, then idle', () => {
+    expect(views(repoOf([DECISION], { agents: [ended(10 * MIN)] }, PUSHED))).toMatchObject(RUNNING)
+    expect(views(repoOf([DECISION], { agents: [ended(ENGINEER_QUIET_MS)] }, PUSHED))).toMatchObject(IDLE)
   })
 })
 
@@ -341,7 +428,7 @@ describe('the Log on a wave pod is merging', () => {
   ]
 
   it('reads running while no PR waits on you, and PR #N open once one does', () => {
-    const merging = views(repoOf([DECISION], { prs: [gh(9, 'open')] }, rows, undefined, true))
+    const merging = views(repoOf([DECISION], { agents: [engineer({ ended: true })], prs: [gh(9, 'open')] }, rows, undefined, true))
     expect(merging).toMatchObject({ flow: 'live', sidebar: 'running', log: 'running', logChip: 's-run', next: 'Running', board: { you: 0, running: 1, waiting: 1, blocked: 0 } })
     expect(merging.detail).toBe('PR #9 · autopilot merges')
     const stopped = views(repoOf([GATE6], { prs: [gh(9, 'open')] }, rows, undefined, true))
