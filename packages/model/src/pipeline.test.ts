@@ -550,11 +550,15 @@ describe('what stops a run', () => {
     ["pod's hand-back words", human('PENDING', 'orchestrator', 'plan: alpha', 'Plan alpha complete — final merge awaiting: https://github.com/o/r/pull/80')],
     ["a hand-back with the plan's own slug", human('PENDING', 'orchestrator', 'plan: alpha', 'plan alpha complete, all merged.')],
     ['a hand-back that mentions a default', human('PENDING', 'orchestrator', 'plan: alpha', 'Final PR https://github.com/o/r/pull/80 awaits you; 2 entries kept an agent default.')],
-    // No kind word and no default, from the orchestrator: a plain ask stops the run, though none is a hand-back.
-    ['plan words that are no hand-back', human('PENDING', 'orchestrator', 'plan: alpha', "Plan review isn't complete yet.")],
-    ['a note that says awaiting', human('PENDING', 'orchestrator', 'plan: alpha', 'Still awaiting CI on https://github.com/o/r/pull/9.')],
-    ['the orchestrator saying the plan review is complete', human('PENDING', 'orchestrator', 'plan: alpha', 'Plan review complete: no findings.')],
-    ["another plan's name", human('PENDING', 'orchestrator', 'plan: alpha', 'plan other complete, all merged.')],
+    // The orchestrator asks, with no kind word and no default: a plain ask stops the run.
+    ['an ask: needs your', human('PENDING', 'orchestrator', 'plan: alpha', 'Needs your call on the title.')],
+    ['an ask: your go', human('PENDING', 'orchestrator', 'plan: alpha', 'paid sample run: the new prompts have met only fake models. It needs your go.')],
+    ['an ask: your call', human('PENDING', 'orchestrator', 'plan: alpha', 'The title is your call.')],
+    ['an ask: your answer', human('PENDING', 'orchestrator', 'plan: alpha', 'The title waits for your answer.')],
+    ['an ask: any case', human('PENDING', 'orchestrator', 'plan: alpha', 'NEEDS YOUR GO.')],
+    ['an ask: a question', human('PENDING', 'orchestrator', 'plan: alpha', 'Which title should we use?')],
+    ['an ask: a question in markup', human('PENDING', 'orchestrator', 'plan: alpha', '**Which title should we use?**')],
+    ['an ask: a question in brackets', human('PENDING', 'orchestrator', 'plan: alpha', '(Which title should we use?).')],
     ['an ask naming an open slice', human('PENDING', 'engineer', 'plan: alpha · sprint: s1 · slice: A1', 'Which store?')],
     ['a `now` naming an open slice', human('PENDING', 'engineer', 'plan: alpha · sprint: s1 · slice: A1', 'now: pick the store.')],
     ['an empty value in use', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Which store? Value in use: .')],
@@ -581,6 +585,15 @@ describe('what stops a run', () => {
     ['a wave note that says complete', human('PENDING', 'orchestrator', 'plan: alpha', 'Wave 1 check complete on https://github.com/o/r/pull/9. Value in use: short title.')],
     ['a gate-worded note from a reviewer', human('PENDING', 'reviewer', 'plan: alpha', 'Gate 4 was slow in CI.')],
     ['a gate-worded note from an engineer', human('PENDING', 'engineer', 'plan: alpha', 'gate 5 (safety-bound): close to the limit.')],
+    ['plan words that are no hand-back', human('PENDING', 'orchestrator', 'plan: alpha', "Plan review isn't complete yet.")],
+    ['a note that says awaiting', human('PENDING', 'orchestrator', 'plan: alpha', 'Still awaiting CI on https://github.com/o/r/pull/9.')],
+    ['the orchestrator saying the plan review is complete', human('PENDING', 'orchestrator', 'plan: alpha', 'Plan review complete: no findings.')],
+    ["another plan's name", human('PENDING', 'orchestrator', 'plan: alpha', 'plan other complete, all merged.')],
+    ['a one-way door', human('PENDING', 'orchestrator', 'plan: alpha', 'one-way door in PR #12 — drops the old table, undo: restore from the dump')],
+    ['a kept concern', human('PENDING', 'orchestrator', 'plan: alpha', 'Runtime safety bound (gate 6) note: run clock reads ~12h at W2 dispatch. NOT halted; continuing.')],
+    ['a regate note', human('PENDING', 'orchestrator', 'plan: alpha', 'regate 5 after the fix.')],
+    ['a question mid-sentence', human('PENDING', 'orchestrator', 'plan: alpha', 'Why so slow? The cache was cold.')],
+    ['the words your and go apart', human('PENDING', 'orchestrator', 'plan: alpha', 'Your build can go on.')],
     ['a reviewer saying the plan review is complete', human('PENDING', 'reviewer', 'plan: alpha', 'Plan review complete: no findings.')],
     ['an engineer saying the plan is complete', human('PENDING', 'engineer', 'plan: alpha', 'plan alpha complete, all merged.')],
     ['an ask naming a done slice', human('PENDING', 'engineer', 'plan: alpha · slice: A0', 'Which store?')],
@@ -599,11 +612,6 @@ describe('what stops a run', () => {
   it('a hand-back with a comma before its URL keeps its Merge', () => {
     const line = human('PENDING', 'orchestrator', 'plan: alpha', 'Before you go, final PR https://github.com/o/r/pull/80 is awaiting you.')
     expect(model.waitingPrs(repo(files({ ...OPEN, queue: [line] })), NOW).map((w) => w.number)).toEqual([80])
-  })
-
-  it('a plain ask with a PR link stops the run, but offers no final-PR Merge', () => {
-    const line = human('PENDING', 'orchestrator', 'plan: alpha', 'Still awaiting CI on https://github.com/o/r/pull/9.')
-    expect(model.waitingPrs(repo(files({ ...OPEN, queue: [line] })), NOW)).toEqual([])
   })
 
   it('a wave note with a PR link offers no final-PR Merge', () => {

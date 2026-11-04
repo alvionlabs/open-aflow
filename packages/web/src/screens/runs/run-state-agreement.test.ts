@@ -387,6 +387,50 @@ describe("an orchestrator's plain ask", () => {
   })
 })
 
+describe('an orchestrator note that asks nothing', () => {
+  const DOOR = tagged('PENDING', 'orchestrator → human', 'one-way door in PR #12 — drops the old table, undo: restore from the dump')
+
+  it('a one-way door stops nothing with no engineer, and stays listed and answerable', () => {
+    const v = views(repoOf([DOOR]))
+    expect(v).toMatchObject(IDLE)
+    expect(v.steps.card.entry?.line).toBe(DOOR.trim())
+    expect(v.steps.card.action.kind).toBe('answer')
+  })
+
+  it('its real stop is the wave PR, while that waits', () => {
+    const rows: Row[] = [
+      [1, 'P1', '#12', 'pushed'],
+      [2, 'Q1', '—', 'pending'],
+    ]
+    const v = views(repoOf([DOOR], { prs: [gh(12, 'open')] }, rows))
+    expect(v).toMatchObject({ flow: 'you', sidebar: 'needs-you', log: 'PR #12 open', logChip: 's-you', next: 'Needs you', board: { you: 1, running: 0, waiting: 1, blocked: 0 } })
+    expect(v.title).toBe('Merge PR #12')
+  })
+})
+
+describe('under autopilot, while pod holds a pushed slice', () => {
+  const ROWS: Row[] = [
+    [1, 'P1', '#9', 'pushed'],
+    [2, 'Q1', '—', 'pending'],
+  ]
+  const ASK = tagged('PENDING', 'orchestrator → human', 'Which title should we use?')
+  const ANSWERED = [`${ASK} **Answer (human):** the short one`, ANSWERED_DECISION]
+  const ended = (ago: number) => engineer({ ended: true, lastAt: NOW - ago, active: [[NOW - ago - 30 * MIN, NOW - ago]] })
+  const repo = (ago: number) => repoOf(ANSWERED, { agents: [ended(ago)], prs: [gh(9, 'open')] }, ROWS, undefined, true)
+  const sends = (r: BoardRepo) => autoSends({ generatedAt: NOW, gh: 'ok', repos: [r] }, [{ path: '/r', run: PLAN }], NOW, () => true)
+
+  it('an answered plain ask and an answered decision offer no continue, and nothing is sent', () => {
+    const r = repo(10 * MIN)
+    expect(runReplies(r, PLAN, NOW)).toEqual([])
+    expect(sends(r)).toEqual([])
+    expect(views(r).title).not.toBe('Send continue')
+  })
+
+  it('pod dead: past the window, continue returns', () => {
+    expect(runReplies(repo(ENGINEER_QUIET_MS), PLAN, NOW).map((r) => r.reply)).toEqual(['continue'])
+  })
+})
+
 describe('a gate from anyone but the orchestrator', () => {
   it('stops nothing, and its title stays its own words', () => {
     const note = entry('PENDING', 'reviewer → human', `plan: ${PLAN}`, 'Gate 4 was slow in CI.')
