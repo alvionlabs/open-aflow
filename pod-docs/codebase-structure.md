@@ -48,7 +48,7 @@ No macOS or Linux run and no secret scan; see `pod-docs/decisions.md` (2026-10-2
 - **build** (`contents: read`): checks the tag against `version` in `packages/desktop/package.json` (`pnpm release:check --tag=<tag>`), then runs `pnpm verify`, `pnpm package`, and `pnpm release:check packages/desktop/release`. Then it uploads the installer, its blockmap, and `latest.yml`.
 - **publish** (`contents: write`, needs **build**): has no checkout and runs no code from the repo. It downloads the three files and runs `gh release create` as a normal release. The token is on that step only. If a release for the tag exists, the command fails and overwrites nothing.
 
-**Unproved until the human's first tag:** the workflow itself on GitHub, `pnpm release:check`'s install and launch on `windows-latest`, and the updater's GitHub provider. `pnpm test:install` proves the check on this machine only, and actionlint reads the file with no run. The steps for the first tags are in `pod-docs/feature-details/desktop.md`, under **First release: the human's hand-off**.
+**Unproved until the human's first tag:** the workflow itself on GitHub, `pnpm release:check`'s install and launch on `windows-latest`, and the updater's GitHub provider. `pnpm test:install` proves the check on this machine only, and actionlint reads the file with no run. The steps for the first tags are in `pod-docs/feature-details/installer-and-updates.md`, under **First release: the human's hand-off**.
 
 Each action is pinned to a full commit SHA. To update one, change the SHA and the version comment together. The installer's size limits are in `packages/desktop/src/release-rules.ts`: when the app gains or loses something large, measure again and change them.
 
@@ -58,7 +58,7 @@ Each action is pinned to a full commit SHA. To update one, change the SHA and th
 - `pod-docs/plans/board-read.md` — phase 1 goal, scope, look, and key decisions.
 - `docs/master-plan.md` — the phases beyond this plan.
 - `docs/design/preview.html` — the approved design.
-- `pod-docs/feature-details/desktop.md` — the Electron shell: start order, server host, quit, window, tray, start at login, and what the real exit proof shows on this machine.
+- `pod-docs/feature-details/installer-and-updates.md` — the Electron shell: start order, server host, quit, window, tray, start at login, and what the real exit proof shows on this machine.
 - `pod-docs/feature-details/server.md` — how the server finds repos, builds and watches the Board, and serves the API, and why.
 - `pod-docs/feature-details/actions.md` — the merge routes, the gh merge and re-read, and the action log, and why.
 - `pod-docs/feature-details/resume.md` — the resume and auto-continue routes, the toggle store, the idle rule, and the automatic check, and why.

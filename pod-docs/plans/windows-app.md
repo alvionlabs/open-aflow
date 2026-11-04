@@ -1,8 +1,10 @@
 # Plan: Windows app
 
-_Generated: 2026-11-02 · Status: active · Grilled-with: pod (fast)_
+_Generated: 2026-11-02 · Status: archived · Grilled-with: pod (fast)_
 
 Port base: 3100
+
+<!-- autopilot-run: started=2026-11-03T05:06:41Z sprints=4 waves=8 -->
 
 ## Goal
 Pod Board installs on Windows as a normal desktop app: a friend runs one installer, opens the app from the Start menu, and sees their pod runs. The app has its own window and tray icon, sends a toast when a run needs them, and updates itself from GitHub Releases.

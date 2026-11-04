@@ -230,3 +230,12 @@ The narrow layout follows the banner's own width through a container query on `.
 Context: the board had one user on one machine and ran only with `pnpm dev`, and the repo is now public. [Research](research/windows-desktop-app.md) compared wrappers for a backend that must stay Node.
 Decision: the human's words: "I will let my friends do this first and then go public later. Seems like electron is a better candidate." The order is Windows, then Linux, then Mac. The licence is MIT. Plan [`windows-app`](plans/windows-app.md) holds the rest.
 Consequences: this reverses "the board has one user on one machine" (2026-10-21) and `app-shell.md`'s "not Tauri or Electron". There is still no npm package: friends get an installer from GitHub Releases. Friends' builds are unsigned; signing comes before a public launch.
+
+## 2026-11-03 — Recheck and the Board's gh field (agent default — override anytime)
+After a Recheck finds `gh`, the Board's `gh` field can stay `missing` for up to 30 s, until the next tick. Value in use: accept the delay.
+
+## 2026-11-03 — toast after you answer a plan's BLOCKED (agent default — override anytime)
+Answering a plan's `BLOCKED` raises its `Send continue` reply at once, so the tray dot stays on and a toast follows, as the page's card does. Value in use: keep the toast.
+
+## 2026-11-03 — pod in the setup check (agent default — override anytime)
+The setup check looks for `git`, `gh`, and `claude`. The install note and the no-runs states name pod and its install step. Value in use: no setup row for pod.
