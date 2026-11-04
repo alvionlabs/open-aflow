@@ -71,6 +71,13 @@ export type GhStatus = 'ok' | 'missing' | 'logged-out' | 'unknown'
 
 export type Claim = { portBase: number; repoPath: string; plan: string }
 
+/**
+ * One PR the server asks gh about, by number or by head branch, and whether gh has answered that ask once.
+ * A failed read isn't one. A branch with no PR is. `staging`: the ask comes from another PR's base, so
+ * a PR read can bring it. How the toasts use it is in pod-docs/feature-details/toasts.md.
+ */
+export type GhRead = { pr: number; read: boolean } | { branch: string; staging?: true; read: boolean }
+
 export type BoardRepo = {
   id: string
   name: string
@@ -83,6 +90,8 @@ export type BoardRepo = {
   agents: AgentRun[]
   prs: PrStatus[]
   claims: Claim[]
+  /** Each PR the server asks gh about. Missing when it asks about none. */
+  ghReads?: GhRead[]
 }
 
 export type Board = {

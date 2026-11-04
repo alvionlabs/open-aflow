@@ -25,15 +25,17 @@ const runForText: StartTimeRun = (exe, args, options) => {
 
 /**
  * When a process started, in ms since the epoch, or `undefined` when that can't be read: another
- * system, no `SystemRoot`, a process gone or not ours, or a time-out. Windows PowerShell by its
- * absolute path, because production can run with an empty `Path`. Never throws, and opens no window.
+ * system, no `SystemRoot`, a process gone, or a time-out. `Win32_Process`, because `Get-Process` gives no
+ * `StartTime` for another account's process unless elevated. Windows PowerShell by its absolute path,
+ * because production can run with an empty `Path`. Never throws, and opens no window.
  */
 export function processStartTime(pid: number, o: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv; run?: StartTimeRun } = {}): number | undefined {
   if ((o.platform ?? process.platform) !== 'win32') return undefined
   const root = envKey(o.env ?? process.env, 'SYSTEMROOT')
   if (root === undefined || !DRIVE_PATH.test(root)) return undefined
   const exe = win32.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-  const script = `[DateTimeOffset]::new((Get-Process -Id ${pid} -ErrorAction Stop).StartTime).ToUnixTimeMilliseconds()`
+  // A process that is gone gives no row and no error, so that exit is explicit.
+  const script = `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}' -ErrorAction Stop; if (-not $p) { exit 1 }; [DateTimeOffset]::new($p.CreationDate).ToUnixTimeMilliseconds()`
   try {
     const { status, stdout } = (o.run ?? runForText)(exe, ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, shell: false, timeout: START_TIME_LIMIT_MS })
     const text = stdout.trim()

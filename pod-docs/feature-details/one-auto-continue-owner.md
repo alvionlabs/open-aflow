@@ -42,9 +42,9 @@ flowchart TD
 
 ## Watch out
 
-- **Open finding (PR #83, round 2):** a stale file whose process ID now belongs to a service process keeps auto-continue off, and a restart doesn't clear it. `Get-Process` gives no `StartTime` for another account's process unless the caller is elevated, so `isServer` reads can't tell. `EPERM` reads as alive. A stale file is most likely after a reboot. The reviewer saw this with `svchost` (1672) and `services.exe` (1480). The suggested fix reads `CreationDate` through `Get-CimInstance Win32_Process`, with a test on a process of another account.
+- **The start time comes from `Get-CimInstance Win32_Process`.** `Get-Process` gives no `StartTime` for another account's process unless the caller is elevated, so a stale file whose ID went to a service kept auto-continue off. A stale file is most likely after a reboot, when low process IDs repeat.
 - **The page shows nothing** when this server doesn't own the check. The switch still reads on, and only the log says why. The packaged app shows that log to nobody.
-- **Open queue item (now):** a PowerShell start over 5 s at login reads as can't tell. Not reproduced: about 0.5 s measured here.
+- **Open queue item (now):** a PowerShell start over 5 s at login reads as can't tell. Not reproduced: about 0.8 s measured here.
 - The lookup blocks the start for up to 5 s, and runs only when a live process holds the file. It starts PowerShell by its absolute path, with no window.
 - Outside Windows there is no lookup, so a reused ID reads as can't tell until that process ends or you delete the file.
 - A forced end, an uninstall with the app running, and `taskkill /F` on the main process each leave the file. The next start's check is the only cleanup.
@@ -54,3 +54,4 @@ flowchart TD
 - 2026-11-02 · outside-terminal C1 · the owner file, in dev and production · [PR #76](https://github.com/iamphduc/pod-board/pull/76)
 - 2026-11-03 · windows-app plan fix · a live process that started after the file's `startedAt` reads as a reused ID · [PR #84](https://github.com/iamphduc/pod-board/pull/84)
 - 2026-11-03 · windows-app · final PR #83, verdict fix at round 2, with the service-process case open · [report](../reports/windows-app.html)
+- 2026-11-03 · windows-app plan fix 2 · fixed: a stale file whose process ID went to a service process no longer turns auto-continue off. The start time of another account's process now reads without elevation.
