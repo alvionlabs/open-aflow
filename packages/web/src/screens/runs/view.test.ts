@@ -187,12 +187,13 @@ describe('empty messages', () => {
     expect(emptyMessage(unsupported, repoWith('# pod docs\n\npod docs: 3\n'))).toBe(
       "This repo's pod docs are version 3; Pod Board reads version 2. Update pod in this repo.",
     )
-    expect(emptyMessage(unsupported, repoWith('# pod docs\n'))).toBe(
-      'This repo has no pod docs version (an older pod). Update pod in this repo.',
-    )
-    expect(emptyMessage(unsupported, repoWith(undefined))).toBe(
-      'This repo has no pod docs version (an older pod). Update pod in this repo.',
-    )
+    // The model can't tell an older pod's docs from no pod at all, so the message serves both.
+    for (const readme of ['# pod docs\n', undefined]) {
+      const message = emptyMessage(unsupported, repoWith(readme))
+      expect(message).toMatch(/update pod in this repo/i)
+      expect(message).toContain('/plugin marketplace add iamphduc/claude-pod')
+      expect(message).toContain('/plugin install pod@pod')
+    }
   })
 
   it('without the repo, an unsupported run still says to update pod', () => {

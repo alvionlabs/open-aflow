@@ -3,4 +3,6 @@ packages:
 
 # esbuild (used by Vite and tsx) runs a postinstall check for its native binary.
 allowBuilds:
+  # Squirrel only. The NSIS target never runs it.
+  electron-winstaller: false
   esbuild: true

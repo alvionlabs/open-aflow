@@ -17,6 +17,7 @@ import {
   type Board,
   type BoardRepo,
   type Claim,
+  type GhRead,
   type PrStatus,
   type RepoModel,
   repoPathKey,
@@ -126,6 +127,17 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
     return runs
   }
 
+  /** What gh has answered, for the asks `refresh` makes. A head asked both ways counts as a plain head there too. */
+  function readsOf(repoPath: string, numbers: number[], heads: string[], stagingHeads: string[]): GhRead[] {
+    const { prRead, branchRead } = deps.gh
+    if (!prRead || !branchRead) return []
+    return [
+      ...numbers.map((pr) => ({ pr, read: prRead(repoPath, pr) })),
+      ...heads.map((branch) => ({ branch, read: branchRead(repoPath, branch) })),
+      ...stagingHeads.filter((b) => !heads.includes(b)).map((branch) => ({ branch, staging: true as const, read: branchRead(repoPath, branch) })),
+    ]
+  }
+
   async function buildRepo(entry: RepoEntry, id: string, listed: AgentFile[], sessionFiles: string[]): Promise<BoardRepo> {
     const base = {
       id,
@@ -141,22 +153,27 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
     } catch (err) {
       return { ...base, error: folderError(err), model: buildRepoModel({}), agents: [], prs: [] }
     }
-    const numbered = livePrNumbers(model, entry.claims)
+    const numbers = livePrNumbers(model, entry.claims)
+    const numbered = numbers
       .map((n) => deps.gh.get(entry.path, n))
       .filter((pr): pr is PrStatus => pr !== undefined)
     // A fix run's PR or a plan's final PR, found by its head branch; it replaces the same PR found by number.
-    const byBranch = prBranches({ model, claims: entry.claims })
+    const heads = prBranches({ model, claims: entry.claims })
+    const byBranch = heads
       .map((b) => deps.gh.getBranch(entry.path, b))
       .filter((pr): pr is PrStatus => pr !== undefined)
     const found = [...numbered.filter((p) => !byBranch.some((b) => b.number === p.number)), ...byBranch]
     // A staging branch's PR to main, once a plan reached its final PR (its base may name the branch). It
     // replaces the same PR found by number (a pending gate 7 names it), which has no `branch`, so the staging
     // rules still find it; a PR a fix or plan branch found stays as it is.
-    const staging = stagingBranches({ model, claims: entry.claims, prs: found })
+    const stagingHeads = stagingBranches({ model, claims: entry.claims, prs: found })
+    const staging = stagingHeads
       .map((b) => deps.gh.getBranch(entry.path, b))
       .filter((pr): pr is PrStatus => pr !== undefined && !byBranch.some((p) => p.number === pr.number))
     const prs = [...found.filter((p) => !staging.some((s) => s.number === p.number)), ...staging]
-    return { ...base, model, agents: await agentsOf(entry, listed, sessionFiles), prs }
+    // Before the first await after the reads above, so a read mark and its PR are from one moment.
+    const ghReads = readsOf(entry.path, numbers, heads, stagingHeads)
+    return { ...base, model, agents: await agentsOf(entry, listed, sessionFiles), prs, ...(ghReads.length > 0 ? { ghReads } : {}) }
   }
 
   return {

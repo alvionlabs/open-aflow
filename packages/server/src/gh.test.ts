@@ -64,6 +64,81 @@ function clock(start = 1_000_000) {
 const ok = (stdout: string): ExecResult => ({ status: 'ok', stdout })
 
 describe('createGhReader', () => {
+  describe('first reads', () => {
+    test('nothing is read before an answer', () => {
+      const reader = createGhReader({ exec: fakeGh().exec, now: clock().now })
+      expect(reader.prRead?.(REPO, 7)).toBe(false)
+      expect(reader.branchRead?.(REPO, 'fix-x')).toBe(false)
+    })
+
+    test('a PR read counts once gh answers, and the PR shows with it', async () => {
+      const gh = fakeGh()
+      gh.prs.set(7, ok(prJson(7, 'OPEN')))
+      const reader = createGhReader({ exec: gh.exec, now: clock().now })
+      await reader.refresh(REPO, [7])
+      expect(reader.prRead?.(REPO, 7)).toBe(true)
+      expect(reader.get(REPO, 7)?.number).toBe(7)
+    })
+
+    test.each([
+      ['a failed read', { status: 'failed', stdout: '' }],
+      ['a gh that is gone', { status: 'not-found', stdout: '' }],
+      ['output that is no PR', { status: 'ok', stdout: 'not json' }],
+    ] as const)('%s is not a read, until a later read works', async (_name, result) => {
+      const gh = fakeGh()
+      const c = clock()
+      gh.prs.set(7, result)
+      const reader = createGhReader({ exec: gh.exec, now: c.now })
+      await reader.refresh(REPO, [7])
+      expect(reader.prRead?.(REPO, 7)).toBe(false)
+      gh.prs.set(7, ok(prJson(7, 'OPEN')))
+      c.advance(61_000)
+      await reader.refresh(REPO, [7])
+      expect(reader.prRead?.(REPO, 7)).toBe(true)
+    })
+
+    test('a logged-out gh asks for no PR, so nothing is read', async () => {
+      const gh = fakeGh()
+      gh.auth = 'failed'
+      const reader = createGhReader({ exec: gh.exec, now: clock().now })
+      await reader.refresh(REPO, [7], ['fix-x'])
+      expect(reader.prRead?.(REPO, 7)).toBe(false)
+      expect(reader.branchRead?.(REPO, 'fix-x')).toBe(false)
+    })
+
+    const lists = (stdout: string | undefined): GhExec => async (args) =>
+      args[0] === 'auth' ? { status: 'ok', stdout: '' } : stdout === undefined ? { status: 'failed', stdout: '' } : { status: 'ok', stdout }
+
+    test('a branch with no PR yet counts as read', async () => {
+      const reader = createGhReader({ exec: lists('[]'), now: clock().now })
+      await reader.refresh(REPO, [], ['fix-x'])
+      expect(reader.branchRead?.(REPO, 'fix-x')).toBe(true)
+      expect(reader.getBranch(REPO, 'fix-x')).toBeUndefined()
+    })
+
+    test.each([
+      ['a failed list', undefined],
+      ['a list that is no list', '{"message":"nope"}'],
+      ['text', 'not json'],
+    ])('%s is not a read', async (_name, stdout) => {
+      const reader = createGhReader({ exec: lists(stdout), now: clock().now })
+      await reader.refresh(REPO, [], ['fix-x'])
+      expect(reader.branchRead?.(REPO, 'fix-x')).toBe(false)
+    })
+
+    test('a later failed read leaves an earlier read done', async () => {
+      const gh = fakeGh()
+      const c = clock()
+      gh.prs.set(7, ok(prJson(7, 'OPEN')))
+      const reader = createGhReader({ exec: gh.exec, now: c.now })
+      await reader.refresh(REPO, [7])
+      gh.prs.set(7, { status: 'failed', stdout: '' })
+      c.advance(PR_CACHE_MS)
+      await reader.refresh(REPO, [7])
+      expect(reader.prRead?.(REPO, 7)).toBe(true)
+    })
+  })
+
   test('runs only read-only commands', async () => {
     const gh = fakeGh()
     const c = clock()
