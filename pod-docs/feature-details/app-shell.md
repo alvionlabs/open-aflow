@@ -30,6 +30,7 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 
 ## Watch out
 
+- The dev and preview servers refuse framing with the same two headers as production (`server.headers` and `preview.headers` in `vite.config.ts`), because the dev page holds the token too. A framed page's own token and `Origin` pass the guards. Change both places or neither.
 - Build to `pod-docs/plans/calm-dashboard.md` `## Look` and its draft, not `docs/design/preview.html`.
 - `tokens.test.ts` fails on a CSS file under `packages/web/src` that sets `color` to `--faint` or a status token (rules targeting an `svg`, such as the flow's status marks, may), uses an old token name (`--panel`, `--line`, `--accent`, `--ok`, `--warn`, `--bad`, `--*-soft`, `--*-ink`, `--display`, `--body`), or drops text below 4.5:1.
 - `controls.test.ts` fails on any color literal in `base.css` (`transparent` and `currentColor` are allowed). Both tests find rules by selector text: write `textarea.input {` exactly and keep it after `.input`.
@@ -66,3 +67,4 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - 2026-11-02 · outside-terminal U1: the setup check. In production, a tool that isn't found replaces the board with one row per tool, an install link, a path field, and Recheck. The board's stream waits for the gate.
 - 2026-11-03 · desktop-shell T1: an Electron window shows the page. The page doesn't change.
 - 2026-11-03 · windows-app plan fix · the install note names pod and says the setup check doesn't look for it. A real check for pod is the human's call.
+- 2026-11-03 · windows-app plan fix 2 · fixed: another page can no longer frame the `pnpm dev` page and take clicks. Vite sends `Content-Security-Policy: frame-ancestors 'none'` and `X-Frame-Options: DENY`.
