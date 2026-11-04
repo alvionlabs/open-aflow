@@ -37,4 +37,28 @@ describe('bundleDesktop', () => {
     expect(existsSync(meta.workingDir)).toBe(true)
     expect(Object.keys(meta.metafile.inputs).some((input) => input.endsWith('src/main.ts'))).toBe(true)
   }, 60_000)
+
+  test('a default bundle has no test feed', async () => {
+    const outfile = join(dir, 'main.cjs')
+    const { externalImports } = await bundleDesktop({ entry: join(here, 'main.ts'), outfile })
+    const text = readFileSync(outfile, 'utf8')
+    expect(text).not.toContain('POD_BOARD_UPDATE_TEST')
+    // The file a test build reads. Nothing of the test feed stays.
+    expect(text).not.toContain('update-test-env')
+    // The updater is inside, set for no install on quit, and it adds no external import.
+    expect(text).toMatch(/autoInstallOnAppQuit = false/)
+    expect(text).toContain('.atom')
+    expect(externalImports.filter((name) => name !== 'electron' && !isBuiltin(name))).toEqual([])
+  }, 60_000)
+
+  test('a test bundle has the test feed', async () => {
+    const outfile = join(dir, 'main.cjs')
+    const { externalImports } = await bundleDesktop({ entry: join(here, 'main.ts'), outfile, testFeed: true })
+    const text = readFileSync(outfile, 'utf8')
+    expect(text).toContain('POD_BOARD_UPDATE_TEST_FEED')
+    expect(text).toContain('POD_BOARD_UPDATE_TEST_ANSWER')
+    expect(text).toContain('POD_BOARD_UPDATE_TEST_DELAY_MS')
+    expect(text).toContain('update-test-env')
+    expect(externalImports.filter((name) => name !== 'electron' && !isBuiltin(name))).toEqual([])
+  }, 60_000)
 })

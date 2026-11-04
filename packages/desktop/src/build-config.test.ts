@@ -102,6 +102,9 @@ describe('electron-builder config', () => {
     expect(parsePackageArgs(['--version=1.2.3', '--output=C:\\o'])).toEqual({ version: '1.2.3', output: 'C:\\o' })
     // pnpm passes a separator through from `pnpm package -- --version=...`.
     expect(parsePackageArgs(['--', '--version=1.2.3'])).toEqual({ version: '1.2.3' })
+    expect(parsePackageArgs(['--test-feed'])).toEqual({ testFeed: true })
+    expect(parsePackageArgs(['--version=1.2.3', '--test-feed', '--output=C:\o'])).toEqual({ version: '1.2.3', output: 'C:\o', testFeed: true })
+    expect(() => parsePackageArgs(['--test-feed=1'])).toThrow(/--test-feed=1/)
     expect(() => parsePackageArgs(['--version=1.2'])).toThrow(/version/)
     expect(() => parsePackageArgs(['--output='])).toThrow(/output/)
     expect(() => parsePackageArgs(['--nope'])).toThrow(/--nope/)

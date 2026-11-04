@@ -34,8 +34,8 @@ export function checkVersion(version: string): void {
   if (!VERSION.test(version)) throw new Error(`bad version ${JSON.stringify(version)}: use <major>.<minor>.<patch>, digits only, with no leading zero`)
 }
 
-export function parsePackageArgs(argv: string[]): { version?: string; output?: string } {
-  const out: { version?: string; output?: string } = {}
+export function parsePackageArgs(argv: string[]): { version?: string; output?: string; testFeed?: true } {
+  const out: { version?: string; output?: string; testFeed?: true } = {}
   for (const arg of argv) {
     if (arg === '--') continue
     if (arg.startsWith('--version=')) {
@@ -44,8 +44,10 @@ export function parsePackageArgs(argv: string[]): { version?: string; output?: s
     } else if (arg.startsWith('--output=')) {
       out.output = arg.slice('--output='.length)
       if (out.output === '') throw new Error('--output needs a folder')
+    } else if (arg === '--test-feed') {
+      out.testFeed = true
     } else {
-      throw new Error(`unknown flag ${arg}: pnpm package takes --version=<x.y.z> and --output=<dir>`)
+      throw new Error(`unknown flag ${arg}: pnpm package takes --version=<x.y.z>, --output=<dir>, and --test-feed`)
     }
   }
   return out
