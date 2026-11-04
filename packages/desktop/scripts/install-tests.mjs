@@ -21,5 +21,6 @@ const run = spawnSync(process.execPath, [vitest, 'run', '--reporter=verbose', '-
   cwd: root,
   env: { ...process.env, POD_BOARD_REAL_INSTALL: '1' },
   stdio: 'inherit',
+  windowsHide: true,
 })
 process.exit(run.status ?? 1)

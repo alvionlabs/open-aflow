@@ -38,7 +38,7 @@ afterEach(() => {
 const read = () => JSON.parse(readFileSync(file, 'utf8')) as { pid: number; id: string; startedAt: unknown }
 const holder = (pid: number, id = 'other') => writeFileSync(file, JSON.stringify({ pid, id, startedAt: 1 }))
 /** The process ID of a child that has already exited. */
-const exitedPid = () => spawnSync(process.execPath, ['-e', '0']).pid
+const exitedPid = () => spawnSync(process.execPath, ['-e', '0'], { windowsHide: true }).pid
 
 describe('owner file', () => {
   test('takes a free file', () => {

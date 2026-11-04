@@ -31,11 +31,11 @@ function plantGh(dir: string, says: 'planted' | 'from-path'): void {
 }
 
 /** What the PATH stand-in prints when it runs. */
-const fromPathOutput = () => (WIN ? execFileSync(join(SYS32, 'whoami.exe'), { encoding: 'utf8' }).trim() : 'from-path')
+const fromPathOutput = () => (WIN ? execFileSync(join(SYS32, 'whoami.exe'), { encoding: 'utf8', windowsHide: true }).trim() : 'from-path')
 
 /** The 8.3 short form of `file`, or `file` itself when the volume keeps no short name for it. */
 const shortName = (file: string): string =>
-  spawnSync(join(SYS32, 'cmd.exe'), ['/d', '/s', '/c', `for %I in ("${file}") do @echo %~sI`], { encoding: 'utf8', windowsVerbatimArguments: true }).stdout.trim()
+  spawnSync(join(SYS32, 'cmd.exe'), ['/d', '/s', '/c', `for %I in ("${file}") do @echo %~sI`], { encoding: 'utf8', windowsVerbatimArguments: true, windowsHide: true }).stdout.trim()
 
 /** The test process's env with PATH replaced (SystemRoot kept, which Windows tools need). */
 const envWithPath = (...dirs: string[]): NodeJS.ProcessEnv => {

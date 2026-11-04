@@ -18,7 +18,7 @@ const clean = (): MachineState => ({ uninstallKeys: [], runValue: null, startMen
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /** A process ID that has already ended. */
-const deadPid = () => Number(spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' }).stdout.trim())
+const deadPid = () => Number(spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8', windowsHide: true }).stdout.trim())
 
 describe('stateDiff', () => {
   test('stateDiff names each leftover', () => {

@@ -259,7 +259,7 @@ const launched = new Set<number>()
 let lastOutput: () => string = () => ''
 
 export async function launch(place: ProofPlace, args: string[] = []): Promise<{ pid: number; output(): string }> {
-  const child = spawn(join(place.installDir, EXE_NAME), args, { cwd: place.root, env: place.env, stdio: ['ignore', 'pipe', 'pipe'] })
+  const child = spawn(join(place.installDir, EXE_NAME), args, { cwd: place.root, env: place.env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
   let text = ''
   child.stdout.on('data', (d) => (text += String(d)))
   child.stderr.on('data', (d) => (text += String(d)))
