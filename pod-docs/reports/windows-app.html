@@ -79,8 +79,8 @@ svg .ln-d{stroke:var(--you);stroke-width:1.5;stroke-dasharray:5 4;fill:none;mark
 <p class="lead">Pod Board now builds as a per-user Windows installer: its own window, a tray icon, toasts, and auto-update from GitHub Releases. The code is on the plan branch. The review didn't pass.</p>
 
 <div class="verdict">
-<p><strong>PR #83, verdict fix (round 2)</strong></p>
-<p>The review still fails after the one fix pass. Three findings stay open: the click-jack on <code>pnpm dev</code>, the toast hold's timing in <code>notifier.ts</code>, and a stale owner file naming a service process in <code>owner-file.ts</code>. The reviewer wrote: “Three of the four fixes leave the same bug open on a nearby path.” <a href="https://github.com/iamphduc/pod-board/pull/83#issuecomment-6622201018">Read the round 2 comment</a>.</p>
+<p><strong>PR #83, verdict pass (round 3)</strong></p>
+<p>The review passes after a second fix pass, which the human asked for. <a href="https://github.com/iamphduc/pod-board/pull/85">PR #85</a> fixed the click-jack on <code>pnpm dev</code>, the toast hold's timing in <code>notifier.ts</code>, and a stale owner file naming a service process in <code>owner-file.ts</code>. <a href="https://github.com/iamphduc/pod-board/pull/83#issuecomment-6623620996">Round 3</a> re-checked all three on the real app. The workflow on GitHub and the updater's GitHub path stay unproved until the human's first tag.</p>
 </div>
 
 <nav class="toc" aria-label="Contents"><b>Contents</b>
@@ -104,11 +104,11 @@ svg .ln-d{stroke:var(--you);stroke-width:1.5;stroke-dasharray:5 4;fill:none;mark
 <div class="tile"><b>≈ 22 h 56 min</b><span>wall time, of which the laptop slept ≈ 11 to 14 h (estimate)</span></div>
 <div class="tile"><b>3,245,772</b><span>agent tokens, final context sizes</span></div>
 <div class="tile"><b>+18,085 / −237</b><span>PR #83, 149 files</span></div>
-<div class="tile"><b>Fix, round 2</b><span>3 open findings after 1 fix pass</span></div>
+<div class="tile"><b>Pass, round 3</b><span>After 2 fix passes</span></div>
 </div>
 <div class="scroll"><table>
 <tr><th>Measure</th><th>Value</th><th>Note</th></tr>
-<tr><td>Final PR</td><td><a href="https://github.com/iamphduc/pod-board/pull/83">PR #83</a>, verdict <b>fix</b></td><td>Round 1: 4 FIX, 4 PENDING. Round 2: 3 FIX, 2 new PENDING. CI <code>verify (windows-latest)</code> passes on head <code>b5f92ef</code>, and the findings don't show in CI.</td></tr>
+<tr><td>Final PR</td><td><a href="https://github.com/iamphduc/pod-board/pull/83">PR #83</a>, verdict <b>pass</b></td><td>Round 1: 4 FIX, 4 PENDING. Round 2: 3 FIX, 2 new PENDING. Round 3: pass, after PR #85. CI <code>verify (windows-latest)</code> passes on head <code>b5f92ef</code>, and the findings don't show in CI.</td></tr>
 <tr><td>Wall time</td><td>≈ 22 h 56 min</td><td>Estimate. From <code>started=2026-11-03T05:06:41Z</code> to the round 2 comment at 04:02:28 UTC on 11-04. The Windows event log shows a sleep entry at 10:01 UTC (Kernel-Power 42), then a hibernate from 13:01 and a wake at 00:17 UTC (Power-Troubleshooter). So the laptop slept ≈ 11 h 16 min to ≈ 14 h 16 min, and active time is ≈ 8 h 40 min to ≈ 11 h 40 min (estimates). The plan interview on 11-02 isn’t counted.</td></tr>
 <tr><td>Agent tokens</td><td>467,089 + 882,390 + 1,058,530 + 837,763</td><td>The Sprint summaries’ words: “each agent’s final context size, not tokens billed”. The sum covers sprint planners and slice engineers, plus the wave fix in sprint 2. No source gives the orchestrator, the reviewer’s rounds, or the plan fix engineer.</td></tr>
 <tr><td>Tests</td><td><code>pnpm test:electron</code> 5 of 5; <code>pnpm test:install</code> 22 passed, 1 skipped</td><td>From the wave checks of PR #77 and PR #82. The reviewer’s round 2 says that these and <code>pnpm verify</code> pass. I found no total test count.</td></tr>
@@ -262,6 +262,7 @@ svg .ln-d{stroke:var(--you);stroke-width:1.5;stroke-dasharray:5 4;fill:none;mark
 <tr><td class="when">03:33</td><td>Fix pass</td><td><a href="https://github.com/iamphduc/pod-board/pull/84">PR #84</a> addressed all four.</td></tr>
 <tr><td class="when">04:02</td><td>Review, round 2</td><td><a href="https://github.com/iamphduc/pod-board/pull/83#issuecomment-6622201018">Verdict fix</a>: 3 FIX. Each round 1 repro no longer goes wrong, and pod’s step is fixed. Three fixes left the same bug on a nearby path.</td></tr>
 </table></div>
+<p>After round 2, the human replied <code>fix all</code>. PR #85 fixed the three findings, and <a href="https://github.com/iamphduc/pod-board/pull/83#issuecomment-6623620996">round 3</a> returned pass. The wall time above stops at round 2.</p>
 <p>Why three findings came back: each first fix closed the repro it was given. Framing went into the production server but not Vite. The toast hold used a timer, because the Board doesn’t say when <code>gh</code> finished. The owner check used a lookup that fails on another account’s process. This reading is mine, from the two comments.</p>
 
 <h2 id="left">What’s left</h2>
