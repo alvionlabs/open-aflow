@@ -557,7 +557,7 @@ describe('PRs found by head branch (fix runs)', () => {
     expect(reader.getBranch(REPO, 'fix-scroll')?.number).toBe(37)
   })
 
-  describe('a branch with no open or merged PR', () => {
+  describe('a branch with no open PR', () => {
     const BRANCH = 'some-plan'
     const HOURS_2 = 2 * 60 * 60_000
     const MIN_30 = 30 * 60_000
