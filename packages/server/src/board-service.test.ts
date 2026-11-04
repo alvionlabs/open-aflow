@@ -548,10 +548,18 @@ describe('board service', () => {
       // No PR changed, so only this field can tell the notifier that the read is done.
       const repo = copyFixture()
       await claim(3200, repo, 'fix-clock')
-      const service = createBoardService(deps(createGhReader({ exec: noPrs, now: () => NOW })))
-      const first = await service.build()
-      await service.refreshGh(first)
-      expect(boardSignature(await service.build())).not.toBe(boardSignature(first))
+      let t = NOW
+      let answers = false
+      const exec: GhExec = async (args) => (args[0] === 'auth' || answers ? noPrs(args, '') : { status: 'failed', stdout: '' })
+      const service = createBoardService(deps(createGhReader({ exec, now: () => t })))
+      const board = await service.build()
+      await service.refreshGh(board)
+      // gh is ok by now and its first read failed, so nothing else can change from here.
+      const before = boardSignature(await service.build())
+      answers = true
+      t += PR_CACHE_MS
+      await service.refreshGh(board)
+      expect(boardSignature(await service.build())).not.toBe(before)
     })
 
     test('a failed read stays unread, and a PR number is asked by number', async () => {
