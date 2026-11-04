@@ -210,11 +210,12 @@ describe('autopilot run, stopped at a PENDING gate', () => {
 
   it.each(NOTES)('is no stop: %s', (_, body) => {
     const r = repo({ sprintMarker: MARKER, queue: [gate(body)] })
-    // Pod still merges the PR, so its wave reads running. A note leaves the run running too; a plan-complete
-    // hand-back is no wave stop, but it stops the run (`stopsRun`), and that reads first on the wave.
-    const handBack = /complete/i.test(body) && /^\W*plan\b/i.test(body)
-    expect(listRuns({ generatedAt: NOW, gh: 'ok', repos: [r] }, NOW)[0]?.state).toBe(handBack ? 'needs-you' : 'running')
-    expect(stopOf(body)).toEqual({ key: 'one/wave-1', label: 'Wave 1', state: handBack ? 'you' : 'live', detail: 'PR #9 · autopilot merges' })
+    // None is an autopilot stop, so pod still merges the PR and no wave PR waits on you. A kind word or a recorded
+    // default leaves the run running. A plan-complete hand-back or a plain ask stops the run (`stopsRun`), and that
+    // reads first on the wave.
+    const quiet = /^\W*(now|someday)\b/i.test(body) || /agent default/.test(body)
+    expect(listRuns({ generatedAt: NOW, gh: 'ok', repos: [r] }, NOW)[0]?.state).toBe(quiet ? 'running' : 'needs-you')
+    expect(stopOf(body)).toEqual({ key: 'one/wave-1', label: 'Wave 1', state: quiet ? 'live' : 'you', detail: 'PR #9 · autopilot merges' })
     // No wave PR waits on you (the hand-back case still lists its final PR, the Ship step's own rule).
     expect(waitingPrs(r, NOW).filter((w) => w.kind === 'wave')).toEqual([])
   })

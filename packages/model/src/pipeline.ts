@@ -111,9 +111,21 @@ const namesOpenSlice = (e: Pick<QueueItem, 'slice' | 'sprint'>, plan: Pick<PlanM
 const isGateOrHandBack = (e: Pick<QueueItem, 'isPending' | 'route' | 'body'>, plan: Pick<PlanModel, 'slug'> | undefined) =>
   (FROM_ORCHESTRATOR.test(e.route.trim()) && haltGate(e.body) !== undefined) || saysPlanComplete(e, plan) || isHandBack(e)
 
+/** pod's `fix next:` note: `entryKind` has no group for it, but it says when it matters, like a kind word. */
+const FIX_NEXT = /^fix next\b[^:]*:/i
+
+/**
+ * The orchestrator asks you in plain words: no kind word and no recorded default. It joins a plan: one that joins
+ * none stays listed and stops nothing. An entry that names an open slice is the slice rule's.
+ */
+const isPlainAsk = (e: Pick<QueueItem, 'route' | 'body' | 'slice' | 'sprint'>, plan: Pick<PlanModel, 'slug' | 'sprints'> | undefined) => {
+  const text = unmarked(e.body)
+  return plan !== undefined && FROM_ORCHESTRATOR.test(e.route.trim()) && kindOf(e.body) === 'other' && !FIX_NEXT.test(text) && !RECORDED_DEFAULT.test(text) && !namesOpenSlice(e, plan)
+}
+
 /**
  * The one rule for what stops a run: a BLOCKED to you, the orchestrator's halt gate (`haltGate`, 7 included), a plan-complete
- * hand-back, or a PENDING to you that names an open slice of `plan` and records no default. Anything else (a
+ * hand-back, an orchestrator's plain ask (`isPlainAsk`), or a PENDING to you that names an open slice of `plan` and records no default. Anything else (a
  * recorded default, `someday`, a bare `now`, any other note) stays listed and answerable, and pod goes on with it.
  * An answer doesn't clear a stop: pod reads it when it resumes. With no `plan` (an entry that joins none), the
  * slice rule has nothing to read. Run state, the flow, the Log, the wave board, Next step and the banner all read this.
@@ -125,17 +137,18 @@ export function stopsRun(e: QueueItem, plan?: Pick<PlanModel, 'slug' | 'sprints'
   if (type !== 'PENDING') return false
   const text = unmarked(e.body)
   if (isGateOrHandBack(e, plan)) return true
+  if (isPlainAsk(e, plan)) return true
   if (RECORDED_DEFAULT.test(text) || kindOf(e.body) === 'someday') return false
   return plan !== undefined && namesOpenSlice(e, plan)
 }
 
 /**
- * Whether the entry holds the run right now. Any stop (`stopsRun`) does, except a PENDING gate or hand-back with an
+ * Whether the entry holds the run right now. Any stop (`stopsRun`) does, except a PENDING gate, hand-back or plain ask with an
  * engineer at work (`engineerAtWork`): `PENDING` only needs acknowledging, so a resumed autopilot goes on past it.
  * It stays listed and answerable. A BLOCKED always holds: pod must resolve it before it resumes.
  */
 export const holdsRun = (repo: Pick<BoardRepo, 'agents'>, plan: PlanModel, e: QueueItem, now: number) =>
-  stopsRun(e, plan) && !(e.type.trim().toUpperCase() === 'PENDING' && isGateOrHandBack(e, plan) && engineerAtWork(repo, plan, now))
+  stopsRun(e, plan) && !(e.type.trim().toUpperCase() === 'PENDING' && (isGateOrHandBack(e, plan) || isPlainAsk(e, plan)) && engineerAtWork(repo, plan, now))
 
 /**
  * A stop on the plan as a whole: halted (`isHalted`), or an entry that holds the run and names no open slice.
