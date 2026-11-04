@@ -39,7 +39,7 @@ function fakeRunner(result: () => Promise<StartResult> | StartResult = () => ({ 
 }
 
 /** The check over a Board you set, with fakes for everything outside the server. */
-function setup(o: { board: Board; store?: AutoContinueStore; runner?: ReturnType<typeof fakeRunner>; idle?: (repo: BoardRepo, session: string) => boolean; inFlight?: Set<string>; onError?: (err: unknown) => void }) {
+function setup(o: { board: Board; store?: AutoContinueStore; runner?: ReturnType<typeof fakeRunner>; idle?: (repo: BoardRepo, session: string) => boolean; inFlight?: Set<string>; onError?: (err: unknown) => void; owner?: () => boolean }) {
   let board = o.board
   const subscribers = new Set<(b: Board) => void>()
   const logged: NewActionEntry[] = []
@@ -70,6 +70,7 @@ function setup(o: { board: Board; store?: AutoContinueStore; runner?: ReturnType
     inFlight,
     now: () => NOW,
     onError: o.onError,
+    ...(o.owner ? { owner: o.owner } : {}),
   })
   /** A new Board from the watcher. */
   const emit = (b: Board = board) => {
@@ -99,6 +100,56 @@ describe('automatic check', () => {
     const s = setup({ board: boardOf(planRepo(SPRINT_DONE)), store: throwingStore(), onError: () => {} })
     expect(() => s.auto.start()).not.toThrow()
     s.auto.stop()
+  })
+
+  test('only the owner sends', async () => {
+    const store = createAutoContinueStore({ file })
+    await store.set('/r', 'alpha', true)
+    let owns = false
+    const asked: boolean[] = []
+    const s = setup({
+      board: boardOf(planRepo(SPRINT_DONE)),
+      store,
+      owner: () => {
+        asked.push(owns)
+        return owns
+      },
+    })
+    await s.auto.check()
+    expect(asked).toEqual([false])
+    expect(s.runner.starts).toEqual([])
+    expect(s.logged).toEqual([])
+    expect(s.inFlight.size).toBe(0)
+    // The key isn't saved either, so the stop stays due for the owner.
+    expect(s.store.list()).toEqual([{ path: '/r', run: 'alpha' }])
+
+    owns = true
+    await s.auto.check()
+    expect(s.runner.starts).toHaveLength(1)
+
+    // With no owner check, it sends as it always did.
+    const free = createAutoContinueStore({ file: join(root, 'cfg', 'other.json') })
+    await free.set('/r', 'alpha', true)
+    const none = setup({ board: boardOf(planRepo(SPRINT_DONE)), store: free })
+    await none.auto.check()
+    expect(none.runner.starts).toHaveLength(1)
+  })
+
+  test('an owner check that throws sends nothing and is logged', async () => {
+    const store = createAutoContinueStore({ file })
+    await store.set('/r', 'alpha', true)
+    const errors: unknown[] = []
+    const s = setup({
+      board: boardOf(planRepo(SPRINT_DONE)),
+      store,
+      onError: (e) => errors.push(e),
+      owner: () => {
+        throw new Error('owner failed')
+      },
+    })
+    await s.auto.check()
+    expect(s.runner.starts).toEqual([])
+    expect(errors).toHaveLength(1)
   })
 
   test('sends only with the toggle on', async () => {

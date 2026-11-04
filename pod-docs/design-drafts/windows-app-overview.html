@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windows app: overview</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #000; color: #ededed; font: 16px/1.55 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.02em; }
+  h2 { font-size: 20px; margin: 40px 0 12px; }
+  p { color: #cfcfcf; max-width: 80ch; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid #262626; vertical-align: top; }
+  th { color: #a1a1a1; font-weight: 500; }
+  code { font: 14px Consolas, ui-monospace, monospace; }
+  .mermaid { background: #0a0a0a; border: 1px solid #262626; border-radius: 8px; padding: 16px; overflow-x: auto; }
+  li { margin-bottom: 6px; }
+  .note { border: 1px solid #5a4a1f; background: #1a1505; border-radius: 8px; padding: 12px 16px; }
+  .note p { margin: 0; color: #ededed; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Windows app</h1>
+  <p>A friend runs one installer, opens Pod Board from the Start menu, and sees their pod runs. The app has its own window and tray icon, sends a toast when a run needs them, and updates itself from GitHub Releases.</p>
+
+  <div class="note"><p><strong>One change from what we discussed:</strong> no process-tree kill on quit. The board starts resumed <code>claude</code> runs as detached processes on purpose, and a tree kill or a Job Object would stop them. Quit asks the server to stop, and your runs keep going.</p></div>
+
+  <h2>Parts</h2>
+  <table>
+    <tr><th>Part</th><th>New or changed</th><th>Where</th><th>Does</th></tr>
+    <tr><td>Production server</td><td>changed</td><td><code>packages/server</code></td><td>Serves the web build and the API on one port; puts the token in the page itself; is bundled to one file</td></tr>
+    <tr><td>Tool finder</td><td>new</td><td><code>packages/server</code></td><td>Finds <code>git</code>, <code>gh</code>, and <code>claude</code> at start: the inherited <code>PATH</code>, the registry <code>Path</code>, known folders, then a path set in settings</td></tr>
+    <tr><td>Setup check</td><td>new</td><td><code>packages/server</code>, <code>packages/web/src/screens</code></td><td>Reports each tool's state; shows what's missing, with a recheck</td></tr>
+    <tr><td>Clean stop</td><td>changed</td><td><code>packages/server</code></td><td>Stops on a message or when its parent dies, waits for running actions, and leaves detached <code>claude</code> runs alone</td></tr>
+    <tr><td>Desktop shell</td><td>new</td><td><code>packages/desktop</code></td><td>Electron main process: starts the server, opens the window, owns the tray and quit</td></tr>
+    <tr><td>Notifier</td><td>new</td><td><code>packages/desktop</code></td><td>Reads the board's live updates and sends a toast for each new item that needs the human</td></tr>
+    <tr><td>Updater</td><td>new</td><td><code>packages/desktop</code></td><td>Checks GitHub Releases, downloads in the background, and asks before it restarts</td></tr>
+    <tr><td>Release build</td><td>new</td><td><code>.github/workflows</code>, <code>packages/desktop</code></td><td>On a version tag, builds the installer, launches it as a check, and publishes the release</td></tr>
+  </table>
+
+  <h2>How they connect</h2>
+  <pre class="mermaid">
+flowchart LR
+  shell[Desktop shell] -->|starts, stop message| server[Production server]
+  server -->|port| shell
+  shell -->|loads 127.0.0.1| web[Web app]
+  web -->|API, token| server
+  server -->|asks for paths| finder[Tool finder]
+  check[Setup check] -->|reads state| finder
+  web -->|shows| check
+  notifier[Notifier] -->|live board updates| server
+  shell --> notifier
+  shell --> updater[Updater]
+  updater -->|new version?| gh[GitHub Releases]
+  release[Release build] -->|installer, update file| gh
+  </pre>
+
+  <h2>Main flow: a friend installs the app, and a run needs them</h2>
+  <pre class="mermaid">
+sequenceDiagram
+  actor Friend
+  participant Shell as Desktop shell
+  participant Server as Production server
+  participant Web as Web app
+  Friend->>Shell: open from the Start menu
+  Shell->>Server: start
+  Server->>Server: find git, gh, claude
+  Server-->>Shell: ready on this port
+  Shell->>Web: open window on 127.0.0.1
+  Web->>Server: load the board
+  Server-->>Web: the page, with its token
+  Web-->>Friend: runs, or the setup check if a tool is missing
+  Friend->>Shell: close the window
+  Shell-->>Friend: stays in the tray, server keeps running
+  Server-->>Shell: a run is now blocked
+  Shell-->>Friend: toast
+  Friend->>Shell: click the toast
+  Shell->>Web: show the window on that run
+  </pre>
+
+  <h2>Sprints</h2>
+  <table>
+    <tr><th>Sprint</th><th>Goal</th></tr>
+    <tr><td><code>one-port-server</code></td><td><code>pnpm start</code> runs the bundled server and web app on one port, with the <code>LICENSE</code> added. Starts after PR #72 merges.</td></tr>
+    <tr><td><code>outside-terminal</code></td><td>The server works with no terminal: tool finder, setup check, clean stop</td></tr>
+    <tr><td><code>desktop-shell</code></td><td>Electron window, tray, toasts, single instance, start at login</td></tr>
+    <tr><td><code>installer-and-updates</code></td><td>NSIS installer, release workflow, auto-update, install note</td></tr>
+  </table>
+
+  <h2>Not in this plan</h2>
+  <ul>
+    <li>Code signing and a public launch. They are the next plan, before anyone outside the friends group installs it.</li>
+    <li>Linux and Mac builds. Each is its own plan after Windows ships.</li>
+  </ul>
+
+  <h2>Choices the agent made</h2>
+  <ul>
+    <li>Unsigned for friends, with auto-update's signature check off. Your GitHub account is the trust boundary, so keep 2FA on.</li>
+    <li>The server runs apart from the window, so a server crash doesn't take the window down.</li>
+    <li>Closing the window hides it to the tray. Quit is in the tray menu.</li>
+    <li>Toasts only for blocked, merge, and reply items.</li>
+    <li>Fixed port 47800, with a free port as the fallback.</li>
+    <li>If the app and <code>pnpm dev</code> share a config folder, only one of them auto-continues.</li>
+    <li>You start each release by pushing a version tag. Agents never publish one.</li>
+  </ul>
+</main>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+</script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import path, { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { childEnv, claudeBin, createClaudeRunner, MAX_RESUME_LOGS, pruneLogs, RESUME_WINDOW_MS } from './claude-runner.ts'
+import { createToolFinder } from './tool-finder.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const FAKE = join(here, '..', 'test', 'fake-claude.mjs')
@@ -398,6 +399,184 @@ describe('createClaudeRunner', () => {
     expect(fresh).toHaveLength(1)
     expect(logs.filter((n) => n.startsWith('old-')).sort()).toEqual(seeded.slice(seeded.length - (MAX_RESUME_LOGS - 1)).sort())
     expect(statSync(join(logDir, fresh[0]!)).mtimeMs).toBeGreaterThan(1_000_000)
+  })
+})
+
+describe.runIf(WIN)('the runner with the tool finder', () => {
+  test('a stripped Path still starts the found claude', async () => {
+    const env: NodeJS.ProcessEnv = { ...envWith(), Path: '', CLAUDE_CONFIG_DIR: join(tmp, 'claude-home'), CLAUDE_CODE_ENTRYPOINT: 'x', CLAUDECODE: '1', claude_pid: '7' }
+    delete env.PATH
+    const finder = createToolFinder({
+      env,
+      platform: 'win32',
+      settingsFile: join(tmp, 'tool-paths.json'),
+      readRegistryPath: async (hive) => (hive === 'HKCU' ? `\r\nHKEY\r\n    Path    REG_EXPAND_SZ    ${binDir}\r\n` : ''),
+    })
+    await finder.check()
+    expect(finder.path('claude')).toBe(join(binDir, 'claude.cmd'))
+
+    const runner = createClaudeRunner({ bin: () => finder.path('claude'), env: () => finder.env(), logDir, windowMs: 3000 })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
+
+    const record = await readRecord()
+    const pathKey = Object.keys(record.env).find((k) => k.toUpperCase() === 'PATH')
+    expect(record.env[pathKey!]!.split(';')).toContain(binDir)
+    expect(Object.keys(record.env).filter((k) => k.toUpperCase().startsWith('CLAUDE'))).toEqual(['CLAUDE_CONFIG_DIR'])
+  })
+
+  test('the runner reads the finder at each start', async () => {
+    let bin: string | undefined
+    const env = envWith({ PATH: '' })
+    const runner = createClaudeRunner({ bin: () => bin, env: () => env, logDir, windowMs: 3000 })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'failed', message: 'claude not found' })
+    bin = join(binDir, 'claude.cmd')
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
+  })
+
+  test('a found claude that has since gone is a failed start', async () => {
+    const runner = createClaudeRunner({ bin: () => join(tmp, 'gone', 'claude.cmd'), env: () => envWith(), logDir, windowMs: 3000 })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'failed', message: 'claude not found' })
+  })
+
+  test('no found claude fails the start', async () => {
+    const runner = createClaudeRunner({ bin: () => undefined, env: () => envWith(), logDir, windowMs: 3000 })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'failed', message: 'claude not found' })
+    expect(startedPids()).toEqual([])
+    expect(existsSync(recordFile)).toBe(false)
+    expect(existsSync(logDir)).toBe(false)
+    expect(runner.isRunning(SESSION)).toBe(false)
+  })
+})
+
+describe.runIf(WIN)('the node a shim runs under', () => {
+  /** A shim whose script records the exe that runs it, so a test can tell one node from another. */
+  const nodeShim = (dir: string): { bin: string; ranUnder: () => Promise<string> } => {
+    const out = join(tmp, 'ran-under.txt')
+    const pkg = join(dir, 'node_modules', 'who')
+    mkdirSync(pkg, { recursive: true })
+    writeFileSync(
+      join(pkg, 'cli.mjs'),
+      [
+        "import { appendFileSync, writeFileSync } from 'node:fs'",
+        `appendFileSync(${JSON.stringify(pidsFile)}, process.pid + '\\n')`,
+        `writeFileSync(${JSON.stringify(out)}, process.execPath)`,
+      ].join('\n'),
+    )
+    const bin = join(dir, 'claude.cmd')
+    writeFileSync(bin, npmShim('node_modules\\who\\cli.mjs'))
+    return {
+      bin,
+      ranUnder: async () => {
+        await waitFor(() => existsSync(out) && readFileSync(out, 'utf8') !== '')
+        return realpathSync.native(readFileSync(out, 'utf8'))
+      },
+    }
+  }
+  const copyNode = (dir: string): string => {
+    mkdirSync(dir, { recursive: true })
+    const node = join(dir, 'node.exe')
+    copyFileSync(process.execPath, node)
+    return realpathSync.native(node)
+  }
+  /** A system tool that exits 0 on these arguments, standing in for a native `claude.exe`. */
+  const copyNative = (dir: string): string => {
+    mkdirSync(dir, { recursive: true })
+    const exe = join(dir, 'claude.exe')
+    copyFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe'), exe)
+    return exe
+  }
+  const noNodeFailure = { outcome: 'failed', message: 'node not found' }
+
+  test("Electron's exe is never the fallback", async () => {
+    const runner = createClaudeRunner({ bin: 'claude', logDir, env: envWith(), windowMs: 3000, fallbackNode: undefined })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual(noNodeFailure)
+    expect(startedPids()).toEqual([])
+    expect(existsSync(recordFile)).toBe(false)
+    expect(existsSync(logDir)).toBe(false)
+    expect(runner.isRunning(SESSION)).toBe(false)
+  })
+
+  test('under Electron the default has no fallback', async () => {
+    // The app's own call passes no fallbackNode, so this default is what a shell gets.
+    Object.defineProperty(process.versions, 'electron', { value: '99.0.0', configurable: true })
+    try {
+      const runner = createClaudeRunner({ bin: 'claude', logDir, env: envWith(), windowMs: 3000 })
+      expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual(noNodeFailure)
+    } finally {
+      delete (process.versions as { electron?: string }).electron
+    }
+    expect(startedPids()).toEqual([])
+    expect(existsSync(recordFile)).toBe(false)
+  })
+
+  test('a found node still runs the shim under Electron', async () => {
+    const onPath = copyNode(join(tmp, 'tools'))
+    const { bin, ranUnder } = nodeShim(binDir)
+    const env = envWith({ Path: `${binDir};${dirname(onPath)}` })
+    delete env.PATH
+    const runner = createClaudeRunner({ bin, logDir, env: () => env, windowMs: 3000, fallbackNode: undefined })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
+    expect(await ranUnder()).toBe(onPath)
+  })
+
+  test('a node in the repo folder never counts under Electron', async () => {
+    copyNode(repo)
+    const home = process.cwd()
+    process.chdir(repo)
+    try {
+      const env = envWith({ PATH: `.;${binDir}` })
+      const runner = createClaudeRunner({ bin: 'claude', logDir, env, windowMs: 3000, fallbackNode: undefined })
+      expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual(noNodeFailure)
+    } finally {
+      process.chdir(home)
+    }
+    expect(startedPids()).toEqual([])
+  })
+
+  test("the shim's own node wins under Electron", async () => {
+    const own = copyNode(binDir)
+    const other = copyNode(join(tmp, 'tools'))
+    const { bin, ranUnder } = nodeShim(binDir)
+    const env = envWith({ PATH: `${dirname(other)};${binDir}` })
+    const runner = createClaudeRunner({ bin, logDir, env, windowMs: 3000, fallbackNode: undefined })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
+    expect(await ranUnder()).toBe(own)
+  })
+
+  test('a native claude ignores the fallback', async () => {
+    // Started as is, with no node on PATH.
+    const native = copyNative(join(tmp, 'native'))
+    const direct = createClaudeRunner({ bin: native, logDir, env: envWith(), windowMs: 3000, fallbackNode: undefined })
+    expect(await direct.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
+
+    // Named by a shim, the way npm's native installer writes one.
+    const shim = join(tmp, 'native', 'claude.cmd')
+    writeFileSync(shim, npmShim('claude.exe'))
+    const named = createClaudeRunner({ bin: shim, logDir, env: envWith(), windowMs: 3000, fallbackNode: undefined })
+    expect(await named.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
+  })
+
+  test('an unknown shim keeps its cmd.exe path under Electron', async () => {
+    const plain = join(tmp, 'plain')
+    installFake(plain, 'plain')
+    const runner = createClaudeRunner({ bin: join(plain, 'claude.cmd'), logDir, env: envWith(), windowMs: 3000, fallbackNode: undefined })
+    expect(await runner.start({ session: SESSION, word: 'go', cwd: repo })).toEqual({ outcome: 'started' })
+    expect((await readRecord()).argv).toEqual(['-p', '--resume', SESSION, 'go'])
+  })
+
+  test('plain Node keeps its fallback', async () => {
+    const { bin, ranUnder } = nodeShim(binDir)
+    const runner = createClaudeRunner({ bin, logDir, env: envWith(), windowMs: 3000 })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
+    expect(await ranUnder()).toBe(realpathSync.native(process.execPath))
+  })
+
+  test('a given fallback runs the shim when no node is found', async () => {
+    const given = copyNode(join(tmp, 'given'))
+    const { bin, ranUnder } = nodeShim(binDir)
+    const runner = createClaudeRunner({ bin, logDir, env: envWith(), windowMs: 3000, fallbackNode: given })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
+    expect(await ranUnder()).toBe(given)
   })
 })
 

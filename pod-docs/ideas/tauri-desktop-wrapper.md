@@ -1,6 +1,6 @@
 # Idea: Tauri desktop wrapper
 
-Status: parked
+Status: planned — pod-docs/plans/windows-app.md (as Electron, not Tauri)
 
 ## The idea
 Wrap the same local server and web UI in a Tauri app: a native window, a tray icon showing what needs you, and native notifications. No rewrite, since the server stays the same.

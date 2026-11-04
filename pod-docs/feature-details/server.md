@@ -9,12 +9,52 @@ The API server (`packages/server`) finds the repos to show, reads their pod docs
 - **Repos:** paths in the config file plus every repo a claim file names, merged by normalized path (case-blind where the file system is). `source` is `registered`, `claim`, or `both`.
 - **Each repo:** pod docs → the model (a doc whose real path leaves the repo's real path is skipped); recent pod-agent transcripts → parsed runs through a cache keyed by size and mtime, never text; PRs from a `gh` cache refreshed every 30 s (a head branch with no open PR after 240 asks, which is 2 hours at that rate: every 5 minutes). One bad repo sets its `error`; the others still build.
 - **`gh`:** run by the absolute path of the first `gh.exe` / `gh.com` (`gh` on POSIX) in an absolute `PATH` entry; asked only about live PRs (current-sprint PRs, hand-back PRs, a fix claim's or a plan's PR by head branch).
+- **Tool finder** (`tool-finder.ts`, production only; dev keeps its `PATH` lookups): finds `git`, `gh`, and `claude` when the app doesn't start from a terminal. A check only looks for a file, so it starts no tool and shows no window. First match wins, per tool:
+  1. `claude` only: `POD_BOARD_CLAUDE_BIN`, with no search. No file → `bad-path`, `source: 'env'`.
+  2. A path in `<config dir>/tool-paths.json`. It wins over every search. A path that fails the rules → `bad-path`, `source: 'settings'`, with no search.
+  3. The inherited `Path`, absolute entries only.
+  4. The registry `Path`, HKLM then HKCU, read by `reg.exe` from `SystemRoot` with no window and a 5 s limit per hive. `%VAR%` expands from the env. An entry with an unknown variable, a relative entry, or a UNC entry is dropped. A failed read counts as empty.
+  5. Known folders, each skipped when its variable is unset: `Git\cmd` and `GitHub CLI` under both Program Files and `%LOCALAPPDATA%\Programs`, `%LOCALAPPDATA%\Microsoft\WinGet\Links`, `%USERPROFILE%\scoop\shims`, `\.local\bin`, and `\.claude\local`, and `%APPDATA%\npm`.
+
+  Steps 4 and 5 run on Windows only. Extensions: `.com` and `.exe` for `git` and `gh`, also `.cmd` and `.bat` for `claude`. The first check runs before the watcher starts, and a finder failure never stops the start.
+- **Path rules** (the settings file and the route), in order: no NUL (`bad request`); not two leading separators, refused before any file system call (`not a local path`); an absolute drive path (`not absolute`); a file (`not a file`); and a base name of the tool's name plus an allowed extension (`wrong tool`). The file is read at each check. Missing, unreadable, or bad JSON reads as nothing set, and a value that isn't a string is ignored.
+- **Tool routes** (`tool-routes.ts`, only with the `tools` dep, so dev answers 404): `GET /api/tools`, behind the read guard, runs a new check and answers `{ tools }`, always in the order git, gh, claude. Calls during a running check share its result. `POST /api/actions/tool-path`, behind the action guard, takes `{ tool, path }` (`path: null` clears), saves through a temp file and a rename, and answers `{ tools }` from a new check. A refused path gets `400` with its word and saves nothing; a failed write gets `500 settings unwritable`. It isn't in the action log.
+- **Child `Path`:** `gh` and resumed `claude` get the inherited env with `Path` = inherited absolute entries, then registry entries, then the folders of found tools, with duplicates removed (case-blind on Windows). `safeChildEnv` and `childEnv` still apply on top. Both `gh` uses read the finder at each call, so a Recheck takes effect with no restart.
 - **Watching:** one watcher per folder; a rebuild after 300 ms of quiet, never later than 1.5 s after a burst starts. Clients get a Board over SSE only when its JSON changed.
 - **Guards,** in order, the first failure answers:
   - every route: a loopback `Host` on the API or web port (`403 forbidden host`), and an exact `Origin` on writes. No CORS headers; both ports bind `127.0.0.1`.
   - `/api/actions/*` (remove-repo included) and `POST /api/repos` (`actionGuard`): Origin, a body over 64 KB (`413`), POST, `application/json`, the token, a JSON object.
   - `/api/fs/*` (`readGuard`): the token only, no `Origin`.
-  - The token is a fresh random value per API start in `<config dir>/session-token`; Vite puts it in the page's `<meta name="pod-board-token">`, and the page sends it as `X-Pod-Board-Token`. Compared in constant time. Never in the Board, a URL, a cookie, or `pnpm build` output.
+  - The token is a fresh random value per API start. In dev it's in `<config dir>/session-token`, and Vite puts it in the page's `<meta name="pod-board-token">`. In production it stays in memory, and the server puts it in the page. The page sends it as `X-Pod-Board-Token`. Compared in constant time. Never in the Board, a URL, a cookie, a log, or `pnpm build` output.
+- **Two modes, one wiring** (`startServer` in `start-server.ts`; `runMain` prints a rejection as `pod-board: <message>`, exits 1, and connects the signals). `main.ts` runs dev. `main-production.ts` runs production and finds its `web` folder from `import.meta.url`, never from the working folder.
+
+  | | Dev | Production |
+  |---|---|---|
+  | Token | Written to `<config dir>/session-token` before anything listens | In memory only. An existing file stays as it is, so a dev page on the same config folder keeps working |
+  | Config folder | Created by the token write | Created at start; a failure stops the start, naming the folder |
+  | Port | `POD_BOARD_API_PORT`, default 3000, no fallback | See **Production port** |
+  | `Host` and `Origin` | API port and `POD_BOARD_WEB_PORT` | The bound port only. `POD_BOARD_WEB_PORT` isn't read |
+  | Page routes | 404 on the API port | See **Production answers** |
+
+- **Start order:** settings; the web app and config folder (production) or the token file (dev); the first tool check (production); the watcher; the bind; then the guards, the log line, the owner file ([resume.md](resume.md)), and the automatic check. A failure at any step rejects, and a failed bind closes the watcher. Because the check starts after the bind, a server that can't start sends no `continue`.
+- **Clean stop** (`parent-link.ts`, production only; `runMain` connects it before `startServer`; dev attaches no channel and doesn't read the variable):
+  - **Channel:** `process.parentPort` (Electron's `utilityProcess`; the message is in `e.data`), else Node IPC (`process.send`), else none. A closed channel never throws.
+  - **Messages:** only an exact `{ type: 'pod-board:stop' }` counts. `{ type: 'pod-board:ready', port }` goes out once, after the bind. A stop that arrives during the start runs once the start ends. A failed start exits 1 with no ready message.
+  - **Parent watch:** `POD_BOARD_PARENT_PID` holds the parent's process ID, polled at once and then every 2 s. Unset or empty: no watch, so a plain `pnpm start` outlives whatever started it. A bad value stops the start, naming the variable. Gone → the same stop as the message.
+  - **One stop path:** the message and the watch run `createShutdown` at most once, so a repeat never turns into its "second press" `exit(1)`. A second signal quits at once, also after a message started the stop. A signal followed by a message doesn't force a quit.
+  - **The drain cap stays `DRAIN_CAP_MS` (70 s).** A parent's kill timeout must be longer.
+  - **Closed output:** `EPIPE` on stdout or stderr is ignored, so a dead parent's pipe doesn't end the drain. Other stream errors act as before.
+  - **A stop ends only its own process.** A resumed `claude` is detached and keeps running ([resume.md](resume.md)).
+- **Production port** (`listen.ts`): `POD_BOARD_API_PORT` unset or empty tries `APP_PORT` (47800). On `EADDRINUSE` or `EACCES` (Windows reserved ranges answer `EACCES`), the OS picks a free port for this launch, and the server logs `pod-board: port 47800 is busy; using <port> for this launch`. Set: that port only; busy stops the start, naming the variable and the port. Any other listen error stops the start. The guards are built with the port that was really bound.
+- **Production answers** (`web-app.ts`, mounted last in `createApp`, so a real API route wins and every answer sits behind the request guard). First match wins, on the path without its query:
+  1. `/api`, `/api/`, or `/api/…`, any method → 404.
+  2. A method other than GET or HEAD → 404. The request guard checks `Origin` first.
+  3. `/` or `/index.html` → 200, the page with the token, `no-store`.
+  4. A file listed at start, by exact path → 200 with its type. `/assets/…` is `public, max-age=31536000, immutable`; any other file is `no-cache`. A listed file that has since gone → 404.
+  5. A last path part that holds a dot (`/sw.js`, `/INDEX.HTML`, `/index.html::$DATA`) → 404.
+  6. Anything else → the same answer as rule 3.
+
+  Every web answer, a 404 too, has `Content-Security-Policy: frame-ancestors 'none'` and `X-Frame-Options: DENY`: a framed page's own token and `Origin` pass the guards, so a click in a frame would count. The Vite dev server and `vite preview` send them too (`vite.config.ts`). Every 404 is `{"error":"not found"}`, never HTML. HEAD gets GET's status and headers with no body. The page text and the file list are read once at start; a file added later isn't served, and a missing folder, a missing `index.html`, or an `index.html` with no `</head>` stops the start, naming the folder.
 - **Repo ids** (`repoIds` in `guard.ts`, one call per build, over config and claim repos together): a repo's plain id is its normalized path with each non-alphanumeric character as `-`, lowercased when its file system ignores case. Two spellings of one repo on such a file system are one entry (`sameRepoPath`), so they never clash. A repo with no clash keeps its plain id. Every member of a clash (`chess-web`, `chess_web`) gets `-` and 6 hex characters of the SHA-256 of its normalized path (case-folded where case is ignored), so an id depends only on the path and the set, never on list order. Suffixed ids that still collide, with each other or with another repo's plain id, double their suffix; the plain repo keeps its id.
 - **Agents of a repo** (`agentOfRepo` in `transcript-files.ts`, per build, on the cached parse): by the first `cwd` in the session's own `<session>.jsonl`, never the agent's: an agent can work anywhere, and every agent of a session is placed the same way. Session in the repo (`isInsideRepo`, the `sameRepoPath` case rule) → listed, and it can be sent to. In a folder that, or a parent of which, folds exactly to this repo's Claude project name (a sibling or the sibling's worktree) → not listed. No session file, no `cwd` in the file's first 1 MB, or anywhere else (`chess-web-A1`) → listed, marked `sessionUnproven`, and no send. The `cwd` never reaches the Board. Each build stats each listed session file once per repo; a file whose size or mtime changed is read again, from its head only, 64 KB at a time.
 - **Add repo:** a local absolute path only; a Windows path starting with two separators → `400 not a local path` before any file system call.
@@ -45,6 +85,10 @@ flowchart TD
 - **Add repo needs the token:** a registered repo is a folder the board reads and runs `gh` in.
 - **`gh` by absolute path from absolute `PATH` entries:** a `gh.exe` planted in a cloned repo could otherwise run on the 30 s refresh.
 - **A new token per launch** keeps `dist` free of it. Trade-off: a page from before a restart must reload.
+- **Production's token stays in memory:** writing the file would break a `pnpm dev` page open on the same config folder ([plan](../plans/windows-app.md#key-decisions)). The page response is `no-store`, and nothing on disk holds the token.
+- **A missing web file answers 404, not the page:** a fallback to `index.html` would answer `/sw.js` with `200` and HTML ([plan](../plans/windows-app.md#key-decisions)).
+- **The app is built after the bind:** port 0 has no number until the OS picks one, and the guards need the real port. The server binds first, with a handler that the listening callback fills in before any connection can arrive.
+- **URL text is only a key into the file list:** it never becomes a disk path, so no spelling (`%2e%2e`, `%2f`, `%5c`, `%00`, `::$DATA`) can reach a file outside the folder.
 - **Quiet spell plus a cap** ([decision](../decisions.md#2026-10-19--fix-live-update-starvation-before-the-final-review)); **parsed runs, not text, in the cache** (the text cache held about 1 GB); **no transcript size cap** ([decision](../decisions.md#2026-10-23--no-size-cap-on-transcripts)).
 
 ## Watch out
@@ -61,6 +105,14 @@ flowchart TD
 - Point `POD_BOARD_CONFIG_DIR` and `POD_BOARD_PORTS_DIR` at temp folders in tests and smoke runs. From Git Bash, send a UNC test path URL-encoded.
 - The rebuild chain must never stay rejected; keep the cap timer apart from the quiet timer.
 - Ctrl+C waits up to 70 s for running actions; don't wait for `server.close()` (open SSE streams keep it from finishing).
+- Tests never bind 47800: set `POD_BOARD_API_PORT` or pass `preferredPort`.
+- `/sw.js` differs by mode: production answers 404 JSON, and dev's web port still answers it with HTML from Vite. Only production's rules live in `web-app.ts`.
+- On Windows, Node's `spawn` puts a child that isn't `detached` in a libuv job that ends it with its parent. A Node parent that dies then ends the server at once, with no drain and a stale owner file. The parent watch can't help there. To test the watch, start the server with `detached: true`.
+- The finder stats `Path` entries with sync calls, as `resolveBin` always has: a dead mapped drive on `Path` blocks the server for that check.
+- After a Recheck finds `gh`, the Board's `gh` status can read `missing` until the next 30 s tick. A `missing` status with a found `gh` skips the 60 s auth cache, but nothing starts a tick early.
+- `reg.exe` prints in the console's code page. A literal non-ASCII folder in the registry `Path` can read wrong and not match. The inherited `Path`, the known folders, and a typed path still find the tool.
+- The bundle's own tests can find a real `gh` through the registry or a known folder, even with an empty `PATH`. To keep a test offline, seed `tool-paths.json` with fakes.
+- `main-production.ts` run from source looks for `packages/server/src/web/`, which doesn't exist, so it exits 1. The bundle puts `web/` beside the entry.
 
 ## History
 
@@ -96,4 +148,8 @@ flowchart TD
 - 2026-11-02 · fix-repo-id review round 1 · fixed: a repo lists an agent by a `cwd`, so a sibling's session is never offered or sent, and no readable `cwd` sends nothing. Remove forgets the repo's auto-continue toggles.
 - 2026-11-02 · fix-repo-id review round 2 · fixed: the owner comes from the session's own file, not the agent's transcript; only an exact fold of the project name hides an agent; Remove forgets toggles also for a repo a port claim still lists.
 - 2026-11-02 · fix-repo-id review round 3 · fixed: a failed read of a session file (a lock, say) is no longer kept as "no `cwd`"; the session stays unproven only until a later build can read it.
+- 2026-11-02 · one-port-server S1: the wiring moved from `main.ts` to `startServer` and `runMain`; a production mode serves the web app and the API on one port, with the token in memory and a port fallback. A busy port now stops dev with an error naming the variable, and the automatic check starts after the bind.
+- 2026-11-02 · outside-terminal T1: the tool finder, `GET /api/tools`, and `POST /api/actions/tool-path`, in production only. `gh` and resumed `claude` read the finder at each call and get a merged `Path`.
+- 2026-11-02 · outside-terminal C1: production stops by a parent's message or when `POD_BOARD_PARENT_PID` is gone, and says `ready` after the bind. Dev and production share one auto-continue owner per config folder.
 - 2026-11-03 · fix-ship-blockers · fixed: a plan with every sprint done and no PR cost one `gh pr list` every 30 s with no end, on its own branch and its staging branch; a head branch with no open PR now slows to one per 5 minutes after 240 asks.
+- 2026-11-03 · windows-app plan fix · fixed: another origin can no longer frame the production page and take clicks. Every web answer refuses framing.
