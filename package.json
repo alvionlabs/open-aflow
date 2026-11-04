@@ -17,6 +17,7 @@
     "test:electron": "node packages/desktop/scripts/real-tests.mjs",
     "package": "pnpm --filter @pod-board/desktop package",
     "test:install": "node packages/desktop/scripts/install-tests.mjs",
+    "release:check": "pnpm --filter @pod-board/desktop exec tsx scripts/release-check.ts",
     "verify": "pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
