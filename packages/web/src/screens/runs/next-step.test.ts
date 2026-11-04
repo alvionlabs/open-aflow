@@ -124,10 +124,11 @@ describe('next step', () => {
       'merge pr:78',
       'merge pr:80',
       `reply reply:${PLAN}`,
+      // A stop first in its tier: the hand-back; the fixture's own entries name done slices or none.
+      `pending ${entryKey(HAND_BACK)}`,
       `pending ${entryKey(H1)}`,
       `pending ${entryKey(U1)}`,
       `pending ${entryKey(WAVE2)}`,
-      `pending ${entryKey(HAND_BACK)}`,
     ])
 
     // No BLOCKED: the first PR is the card; a reply beats a PENDING → human.
@@ -139,7 +140,8 @@ describe('next step', () => {
     expect(s.rest[1]).toEqual<NextItem>({
       key: entryKey(H1),
       tier: 'pending',
-      status: 'needs-you',
+      status: 'idle',
+      goesOn: true,
       title: expect.stringMatching(/^Needs your decision: recent arenas gave too few players .*…$/),
       detail: 'pod goes on with the value in use until you answer.',
       entry: expect.objectContaining({ line: H1, answerable: true }),
@@ -210,8 +212,8 @@ describe('next step', () => {
     expect(runOf(blocked).state).toBe('blocked')
     expect(steps(blocked).card).toMatchObject({ tier: 'nothing', status: 'blocked' })
 
-    // A needs-you run with only info entries: not running or blocked, so idle.
-    expect(runOf(chess([onlyQueue(TO_ORCHESTRATOR)])).state).toBe('needs-you')
+    // A run with only info entries: a BLOCKED between agents is pod's to resolve, so it stays idle.
+    expect(runOf(chess([onlyQueue(TO_ORCHESTRATOR)])).state).toBe('idle')
     expect(steps(chess([onlyQueue(TO_ORCHESTRATOR)])).card).toMatchObject({ tier: 'nothing', status: 'idle' })
 
     // An error, unsupported, or plan-less run: the empty message as the detail.
@@ -341,7 +343,8 @@ describe('next step', () => {
     // A repo row: only the entries that join no plan; no PR, no reply.
     const row: RunSummary = { repoId: 'chess', repo: 'chess-web', where: 'no active plan', state: 'idle' }
     const s = defined(nextSteps(row, repo, NOW))
-    expect(order(s)).toEqual([`pending ${entryKey(UNJOINED)}`])
+    // It stays listed, but an entry with no plan is no row's headline.
+    expect(order(s)).toEqual(['nothing nothing', `pending ${entryKey(UNJOINED)}`])
   })
 
   it('pending entries sort by kind: now, decision, before, other, someday', () => {
@@ -380,7 +383,7 @@ describe('next step', () => {
     const p = (type: string, body: string) => entry(type, 'reviewer → human', `plan: ${PLAN}`, body)
     const DECISION = p('PENDING', '**decision (wording):** pick the `port` label.')
     const s = steps(chess([onlyQueue(DECISION)]))
-    expect(s.card).toMatchObject({ tier: 'pending', status: 'needs-you', title: 'pick the port label.', kind: { cls: 's-run', label: 'decision (wording)' } })
+    expect(s.card).toMatchObject({ tier: 'pending', status: 'idle', title: 'pick the port label.', kind: { cls: 's-run', label: 'decision (wording)' } })
     // A BLOCKED entry keeps its blocked status; its kind shows beside it.
     const BLOCKED_NOW = p('BLOCKED', 'now: the rates file is missing.')
     expect(steps(chess([onlyQueue(BLOCKED_NOW)])).card).toMatchObject({ tier: 'blocked', status: 'blocked', title: 'the rates file is missing.', kind: { cls: 's-you', label: 'now' } })

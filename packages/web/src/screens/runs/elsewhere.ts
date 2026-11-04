@@ -24,14 +24,12 @@ export type Elsewhere = {
 }
 
 const RANK: Record<NextItem['tier'], number> = { blocked: 4, merge: 3, reply: 2, pending: 1, nothing: 0, info: 0 }
-/** The pending kinds that can raise a banner; `other` and `someday` wait. */
-const URGENT_KINDS = new Set(['now', 'decision', 'before'])
 
-/** Whether another run's card can raise a banner at all. */
-function canRaise(item: NextItem): boolean {
-  if (item.tier === 'pending') return URGENT_KINDS.has(item.entry?.kind ?? 'other')
-  return item.tier === 'blocked' || item.tier === 'merge' || item.tier === 'reply'
-}
+/** An item's urgency: its tier's, and none for an entry pod goes on without (`stopsRun`). */
+const rankOf = (item: NextItem) => (item.goesOn ? 0 : RANK[item.tier])
+
+/** Whether another run's card can raise a banner at all: a stop, a PR, or a reply. */
+const canRaise = (item: NextItem) => rankOf(item) > 0
 
 type Candidate = { run: RunSummary; item: NextItem; rank: number; index: number }
 
@@ -58,7 +56,7 @@ export function elsewhere(runs: RunSummary[], board: Board | undefined, selected
   const repoOf = (run: RunSummary) => board.repos.find((r) => r.id === run.repoId)
   const own = nextSteps(selected, repoOf(selected), now)
   if (!own) return undefined
-  const floor = RANK[own.card.tier]
+  const floor = rankOf(own.card)
   const selectedHash = hashFor(selected)
 
   const candidates: Candidate[] = []
@@ -66,8 +64,8 @@ export function elsewhere(runs: RunSummary[], board: Board | undefined, selected
     if (hashFor(run) === selectedHash) return
     const repo = repoOf(run)
     const item = nextSteps(run, repo, now)?.card
-    if (!item || !canRaise(item) || RANK[item.tier] <= floor) return
-    candidates.push({ run, item, rank: RANK[item.tier], index })
+    if (!item || !canRaise(item) || rankOf(item) <= floor) return
+    candidates.push({ run, item, rank: rankOf(item), index })
   })
   const win = candidates.reduce<Candidate | undefined>((best, c) => (best === undefined || before(c, best) ? c : best), undefined)
   if (!win) return undefined

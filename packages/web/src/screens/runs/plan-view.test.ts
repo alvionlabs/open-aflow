@@ -94,12 +94,12 @@ describe('plan view', () => {
     const code = flowColumns(buildPipeline(chess(manual), 'sparring-ladder', NOW)!.stages)
     expect(code.map((c) => [c.caption, c.steps.map((s) => `${s.label} ${s.word}`)])).toEqual([
       ['Plan', ['Plan done', 'Go unknown']],
-      // The fixture's queue asks for you and no engineer runs: the wave in progress needs you.
-      ['Sprint 1 of 1', ['Wave 1 done', 'Wave 2 done', 'Wave 3 needs you']],
+      // No entry in the fixture's queue stops the run and no engineer runs: the wave in progress waits.
+      ['Sprint 1 of 1', ['Wave 1 done', 'Wave 2 done', 'Wave 3 waiting']],
       ['Check', ['Final review waiting', 'Fix pass waiting']],
       ['Ship', ['Final PR waiting']],
     ])
-    expect(code[1]?.steps[2]).toMatchObject({ detail: '1 slice', highlight: true })
+    expect(code[1]?.steps[2]).toMatchObject({ detail: '1 slice', highlight: false, dim: true })
     // Autopilot records no Go, so its Plan column has one card.
     const auto = flowColumns(buildPipeline(chess(), 'sparring-ladder', NOW)!.stages)
     expect(auto[0]?.steps.map((s) => s.label)).toEqual(['Plan'])
@@ -118,7 +118,7 @@ describe('plan view', () => {
       // The fixture has no research report, and its Look section is empty (scrubbed).
       ['Research skipped', 'Plan interview done'],
       ['Look picked unknown', 'Replied go unknown'],
-      ['Wave 1 done', 'Wave 2 done', 'Wave 3 needs you'],
+      ['Wave 1 done', 'Wave 2 done', 'Wave 3 waiting'],
       ['Final review waiting', 'Fix pass waiting'],
       ['Final PR waiting'],
     ])
@@ -134,8 +134,8 @@ describe('plan view', () => {
     // Everything done: the last step.
     expect(foldLine(cols(['done', 'done']))).toMatchObject({ label: 'Step 1', mark: 'check', state: 'done' })
     expect(foldLine([])).toBeUndefined()
-    // The real run: wave 3, which needs you (the queue asks, no engineer runs).
-    expect(foldLine(flowColumns(buildFlow(chess(), 'sparring-ladder', NOW) ?? []))).toMatchObject({ label: 'Wave 3', detail: '1 slice', state: 'you', mark: 'alert' })
+    // The real run: wave 3, which waits (nothing in the queue stops it, no engineer runs).
+    expect(foldLine(flowColumns(buildFlow(chess(), 'sparring-ladder', NOW) ?? []))).toMatchObject({ label: 'Wave 3', detail: '1 slice', state: 'wait', mark: 'circle' })
   })
 
   it('run header', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildFlow, buildPipeline, buildRepoModel, listRuns, QUIET_MS, STALE_MS, type AgentRun, type BoardRepo, type PrStatus, type RunSummary } from '@pod-board/model'
+import { buildFlow, buildPipeline, buildRepoModel, listRuns, ENGINEER_QUIET_MS, STALE_MS, type AgentRun, type BoardRepo, type PrStatus, type RunSummary } from '@pod-board/model'
 import { buildWaveBoard } from '../board/board-view.ts'
 import { elsewhere } from './elsewhere.ts'
 import { nextSteps } from './next-step.ts'
@@ -125,8 +125,8 @@ describe('the views agree on what stops a run', () => {
     expect(v).toMatchObject(RUNNING)
   })
 
-  it('an engineer quiet past QUIET_MS reads idle everywhere, never you', () => {
-    const v = views(repoOf([DECISION, UNTAGGED_NOW], { agents: [quiet(QUIET_MS)] }))
+  it('an engineer quiet past ENGINEER_QUIET_MS reads idle everywhere, never you', () => {
+    const v = views(repoOf([DECISION, UNTAGGED_NOW], { agents: [quiet(ENGINEER_QUIET_MS)] }))
     expect(v).toMatchObject(IDLE)
   })
 

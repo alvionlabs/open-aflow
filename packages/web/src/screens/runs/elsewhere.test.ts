@@ -21,6 +21,8 @@ const entry = (type: string, route: string, fields: string, body: string, date =
 const own = `plan: ${PLAN}`
 const blocked = (date = '2026-10-19', body = 'Gate 1: T1 is blocked, the rates file is missing.') => entry('BLOCKED', 'orchestrator → human', own, body, date)
 const pending = (body: string, date = '2026-10-19') => entry('PENDING', 'engineer → human', own, body, date)
+/** A PENDING that stops the run: it names open slice T1 and records no default. */
+const ask = (body: string, date = '2026-10-19') => entry('PENDING', 'engineer → human', `${own} · sprint: ladder · slice: T1`, body, date)
 /** No date: a blank first part in the header. */
 const undated = (line: string) => line.replace(/`\[\d{4}-\d{2}-\d{2} · /, '`[ · ')
 
@@ -48,9 +50,9 @@ const RECIPE: Record<Card, (id: string) => BoardRepo> = {
   blocked: (id) => repoOf(id, [onlyQueue(blocked()), manual]),
   merge: (id) => repoOf(id, [onlyQueue(), manual, t1Pushed], { prs: [gh(78, 'open')] }),
   reply: (id) => repoOf(id, [onlyQueue(), manual, t1Pushed], { prs: [gh(78, 'merged')] }),
-  now: (id) => repoOf(id, [onlyQueue(pending('now: pick the title line.')), manual]),
-  decision: (id) => repoOf(id, [onlyQueue(pending('decision: pick the port.')), manual]),
-  before: (id) => repoOf(id, [onlyQueue(pending('before hosting: add TLS.')), manual]),
+  now: (id) => repoOf(id, [onlyQueue(ask('now: pick the title line.')), manual]),
+  decision: (id) => repoOf(id, [onlyQueue(ask('decision: pick the port.')), manual]),
+  before: (id) => repoOf(id, [onlyQueue(ask('before hosting: add TLS.')), manual]),
   other: (id) => repoOf(id, [onlyQueue(pending('Check the npm cache.')), manual]),
   someday: (id) => repoOf(id, [onlyQueue(pending('someday: trim the cache.')), manual]),
   nothing: (id) => repoOf(id, [onlyQueue(), manual]),
@@ -139,11 +141,17 @@ describe('elsewhere', () => {
     expect(pick(RECIPE.nothing('x'), RECIPE.merge('y'))?.item).toMatchObject({ tier: 'merge', title: 'Merge PR #78' })
   })
 
-  it('someday, other and answered never raise a banner', () => {
+  it('an entry pod goes on without never raises a banner, whatever its kind', () => {
     expect(winner(RECIPE.nothing('x'), RECIPE.someday('y'))).toBeUndefined()
     expect(winner(RECIPE.nothing('x'), RECIPE.other('y'))).toBeUndefined()
-    // The same run with a decision instead does show.
+    for (const body of ['now: pick the title line.', 'decision: pick the port.', 'before hosting: add TLS.', 'decision: pick the port. Value in use: 3000.']) {
+      expect(winner(RECIPE.nothing('x'), repoOf('y', [onlyQueue(pending(body)), manual])), body).toBeUndefined()
+    }
+    // The same run with a stop instead does show, also with no kind word.
     expect(winner(RECIPE.nothing('x'), RECIPE.decision('y'))).toBe('y')
+    expect(winner(RECIPE.nothing('x'), repoOf('y', [onlyQueue(ask('Which store?')), manual]))).toBe('y')
+    // A selected card pod goes on without ranks as nothing, so a stop elsewhere still outranks it.
+    expect(winner(repoOf('x', [onlyQueue(pending('decision: pick the port.')), manual]), RECIPE.now('y'))).toBe('y')
     // An answered decision is info, never the card: with only it (and its reply, as autopilot gives
     // none here), the run's card is Nothing to do and no banner shows.
     const answered = `${pending('decision: pick the port.')} **Answer (human):** 3000`
@@ -154,11 +162,12 @@ describe('elsewhere', () => {
     expect(pick(RECIPE.nothing('x'), y)?.item.key).not.toBe(`entry:${answered}`)
   })
 
-  it('selected someday card ranks by tier', () => {
-    expect(winner(RECIPE.someday('x'), RECIPE.decision('y'))).toBeUndefined()
-    expect(winner(RECIPE.someday('x'), RECIPE.now('y'))).toBeUndefined()
+  it('a selected card pod goes on without ranks as nothing', () => {
+    expect(winner(RECIPE.someday('x'), RECIPE.decision('y'))).toBe('y')
+    expect(winner(RECIPE.someday('x'), RECIPE.now('y'))).toBe('y')
     expect(winner(RECIPE.someday('x'), RECIPE.merge('y'))).toBe('y')
-    expect(winner(RECIPE.other('x'), RECIPE.decision('y'))).toBeUndefined()
+    expect(winner(RECIPE.other('x'), RECIPE.decision('y'))).toBe('y')
+    expect(winner(RECIPE.someday('x'), RECIPE.other('y'))).toBeUndefined()
   })
 
   it("only each run's card counts", () => {
@@ -196,10 +205,10 @@ describe('elsewhere', () => {
     const none2 = repoOf('none2', [onlyQueue(undated(blocked())), manual])
     expect(winner(x, none2, none)).toBe('none2')
     // The pending rank ties the same way, whatever the kinds.
-    const pLate = repoOf('plate', [onlyQueue(pending('now: a.', '2026-10-19')), manual])
-    const pEarly = repoOf('pearly', [onlyQueue(pending('decision: b.', '2026-10-02')), manual])
+    const pLate = repoOf('plate', [onlyQueue(ask('now: a.', '2026-10-19')), manual])
+    const pEarly = repoOf('pearly', [onlyQueue(ask('decision: b.', '2026-10-02')), manual])
     expect(winner(x, pLate, pEarly)).toBe('pearly')
-    const pNone = repoOf('pnone', [onlyQueue(undated(pending('before hosting: c.'))), manual])
+    const pNone = repoOf('pnone', [onlyQueue(undated(ask('before hosting: c.'))), manual])
     expect(winner(x, pNone, pLate)).toBe('plate')
     // Rank still comes first: a newer blocked beats an older pending.
     expect(winner(x, pEarly, late)).toBe('late')

@@ -108,9 +108,11 @@ describe('listRuns', () => {
 
     // needs-you wins over running.
     expect(stateOf(repo('r', planFiles({ queue: [ask] }), { agents: [running({ sprint: 'one' })] }))).toEqual(['needs-you'])
-    // A BLOCKED entry from an engineer needs you, but doesn't halt the plan.
+    // A BLOCKED between agents is pod's to resolve: it neither halts the plan nor stops the run.
     const engineerBlocked = queueLine('BLOCKED', 'engineer → orchestrator', 'plan: alpha', 'stuck')
-    expect(stateOf(repo('r', planFiles({ queue: [engineerBlocked] })))).toEqual(['needs-you'])
+    expect(stateOf(repo('r', planFiles({ queue: [engineerBlocked] })))).toEqual(['idle'])
+    // A BLOCKED from an engineer to you stops the run, but doesn't halt the plan.
+    expect(stateOf(repo('r', planFiles({ queue: [queueLine('BLOCKED', 'engineer → human', 'plan: alpha', 'stuck')] })))).toEqual(['needs-you'])
     // A resolved halt is nothing.
     expect(stateOf(repo('r', planFiles({ queue: [queueLine('BLOCKED', 'orchestrator → human', 'plan: alpha', 'old halt', false)] })))).toEqual(['idle'])
 
@@ -282,7 +284,7 @@ describe('listRuns', () => {
 
   it('order and count', () => {
     const halt = queueLine('BLOCKED', 'orchestrator → human', 'plan: alpha', 'Gate 2 halted')
-    const ask = queueLine('PENDING', 'engineer → human', 'plan: alpha', 'Pick a name')
+    const ask = queueLine('PENDING', 'orchestrator → human', 'plan: alpha', 'gate 5 (safety-bound): hit the limit')
     // Two plans in one repo, in different states.
     const twoPlans: RepoFiles = {
       ...planFiles({ slug: 'zed' }),

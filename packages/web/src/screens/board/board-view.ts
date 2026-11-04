@@ -6,15 +6,19 @@
 import {
   buildPipeline,
   isBlockedSlice,
-  isRunning,
   isSliceDone,
+  isSliceRunning,
+  isWaveRunning,
+  planState,
   roleOf,
+  stopsRun,
   waitingPrs,
   waitingWords,
   type AgentRun,
   type BoardRepo,
   type LogRow,
   type PlanModel,
+  type PlanState,
   type QueueItem,
   type SliceModel,
   type SprintModel,
@@ -66,7 +70,7 @@ export function buildWaveBoard(repo: BoardRepo, planSlug: string, now: number): 
   const i = plan.sprints.indexOf(sprint)
   const caption = `Sprint ${i + 1} of ${plan.sprints.length} · ${sprint.slug}`
   const log = (buildPipeline(repo, planSlug, now)?.log ?? []).filter((g) => g.sprint === sprint.slug)
-  const live = repo.agents.filter((a) => isRunning(a, now)).map((a) => roleOf(a, plan))
+  const run = planState(repo, plan, now)
   const waiting = waitingPrs(repo, now).filter((w) => w.kind === 'wave' && w.run === plan.slug && w.sprint === sprint.slug)
 
   const columns: Column[] = sprint.waves
@@ -79,8 +83,10 @@ export function buildWaveBoard(repo: BoardRepo, planSlug: string, now: number): 
         status: group?.status ?? '',
         cards: w.slices.map((slice): Card => {
           const row = group?.rows.find((r) => r.code === slice.code) ?? { code: slice.code, title: slice.title, live: false }
-          const running = live.some((r) => r.kind === 'slice' && r.sprint === sprint.slug && r.code === slice.code)
-          const state = cardState(plan, sprint.slug, slice, running, mergePr !== undefined)
+          // The wave in progress with nothing of its own running reads the run's state, as the flow's card does.
+          const running = isSliceRunning(repo, plan, sprint, w, slice, now)
+          const inProgress = sprint.slug === plan.currentSprint && sprint.currentWave === w.wave && !isWaveRunning(repo, plan, sprint, w, now) ? run : undefined
+          const state = cardState(plan, sprint.slug, slice, running, mergePr !== undefined, inProgress)
           return { code: slice.code, title: slice.title, state, meta: cardMeta(plan, sprint.slug, slice, row, state, mergePr), critical: false, slice, row }
         }),
       }
@@ -104,15 +110,15 @@ export function boardSlices(repo: BoardRepo | undefined, planSlug: string, now: 
 const naming = (e: QueueItem, sprint: string, code: string) => e.slice === code && (e.sprint === undefined || e.sprint === sprint)
 
 /**
- * First match wins: blocked → merged → needs-you (an ask naming it, or its wave's PR waiting on you)
- * → running → waiting. A done card reads merged even with a pending ask.
+ * First match wins: blocked → merged → needs-you (a stop naming it, or its wave's PR waiting on you)
+ * → running → the run's state, on the wave in progress → waiting. A done card reads merged even with a pending ask.
  */
-function cardState(plan: PlanModel, sprint: string, slice: SliceModel, running: boolean, waveWaits: boolean): CardState {
+function cardState(plan: PlanModel, sprint: string, slice: SliceModel, running: boolean, waveWaits: boolean, inProgress: PlanState | undefined): CardState {
   if (isBlockedSlice(slice)) return 'blocked'
   if (isSliceDone(slice)) return 'merged'
-  if (waveWaits || plan.queue.some((e) => e.needsYou && naming(e, sprint, slice.code))) return 'needs-you'
-  if (slice.status === 'pushed' || running) return 'running'
-  return 'waiting'
+  if (waveWaits || plan.queue.some((e) => stopsRun(e, plan) && naming(e, sprint, slice.code))) return 'needs-you'
+  if (running) return 'running'
+  return inProgress === undefined || inProgress === 'idle' ? 'waiting' : inProgress
 }
 
 const join = (parts: (string | undefined)[]) => parts.filter((p): p is string => p !== undefined && p !== '').join(' · ')
@@ -126,11 +132,17 @@ function cardMeta(plan: PlanModel, sprint: string, slice: SliceModel, row: LogRo
     case 'running':
       return join([slice.model, mins(row)])
     case 'needs-you': {
-      const e = plan.queue.findLast((x) => x.needsYou && naming(x, sprint, slice.code))
-      return e ? entryLine(e) : mergePr !== undefined ? `PR #${mergePr} · ${waitingWords(plan)}` : ''
+      // A stop naming this slice, else its wave's PR, else the stop that holds the run.
+      const stops = plan.queue.filter((x) => stopsRun(x, plan))
+      const e = stops.findLast((x) => naming(x, sprint, slice.code))
+      if (e) return entryLine(e)
+      if (mergePr !== undefined) return `PR #${mergePr} · ${waitingWords(plan)}`
+      const held = stops.at(-1)
+      return held ? entryLine(held) : ''
     }
     case 'blocked': {
-      const e = plan.queue.findLast((x) => x.isPending && x.type === 'BLOCKED' && naming(x, sprint, slice.code))
+      const blocked = plan.queue.filter((x) => x.isPending && x.type === 'BLOCKED')
+      const e = blocked.findLast((x) => naming(x, sprint, slice.code)) ?? (isBlockedSlice(slice) ? undefined : blocked.at(-1))
       if (e) return entryLine(e)
       return slice.status.trim() === '' ? '' : `status ${slice.status.trim()}`
     }

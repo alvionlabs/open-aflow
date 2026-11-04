@@ -374,8 +374,8 @@ describe('buildPipeline', () => {
     }
     // Halted: red blocked.
     expect(at([queueLine('BLOCKED', 'orchestrator → human', 'plan: alpha', 'gate 1: B1 is blocked')])).toMatchObject({ run: 'blocked', flow: ['Wave 1 done 1 slice', 'Wave 2 blocked 1 slice', 'Wave 3 wait 1 slice planned'] })
-    // A plan-level ask for you: amber needs you.
-    expect(at([queueLine('PENDING', 'orchestrator → human', 'plan: alpha', 'Pick a look')])).toMatchObject({ run: 'needs-you', flow: ['Wave 1 done 1 slice', 'Wave 2 you 1 slice', 'Wave 3 wait 1 slice planned'] })
+    // A plan-level stop for you: amber needs you.
+    expect(at([queueLine('PENDING', 'orchestrator → human', 'plan: alpha', 'gate 5 (safety-bound): hit the limit')])).toMatchObject({ run: 'needs-you', flow: ['Wave 1 done 1 slice', 'Wave 2 you 1 slice', 'Wave 3 wait 1 slice planned'] })
     // Idle: dim waiting, and not called planned, since it is the wave in progress.
     expect(at([])).toMatchObject({ run: 'idle', flow: ['Wave 1 done 1 slice', 'Wave 2 wait 1 slice', 'Wave 3 wait 1 slice planned'], log: ['merged PR #40', 'waiting', 'planned'] })
     // Its own engineer at work: blue running.
@@ -559,6 +559,8 @@ describe('what stops a run', () => {
     ['a value in use in bold', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'decision: store? **Value in use:** SQLite.')],
     ['a value in use in ticks', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'decision: store? `Value in use`: SQLite.')],
     ['a default', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Which store? Default: SQLite.')],
+    ['a recorded default', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Default recorded: SQLite.')],
+    ['an agent default', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Keep the old flag (agent default — override anytime).')],
     ['someday', human('PENDING', 'reviewer', 'plan: alpha', 'someday: cache it.')],
     ['someday naming an open slice', human('PENDING', 'reviewer', 'plan: alpha · slice: A1', 'someday: cache it.')],
     ['someday in bold, with a note', human('PENDING', 'reviewer', 'plan: alpha · slice: A1', '**Someday (Look):** cache it.')],
@@ -598,11 +600,11 @@ describe('a running wave', () => {
   const IDLE = { state: 'idle', wave: 'wait', log: 'waiting' }
   const quiet = (ago: number, over: Partial<AgentRun> = {}) => agent({ sprint: 's1', slice: 'A1', startedAt: NOW - ago - MIN, lastAt: NOW - ago, ...over })
 
-  it('runs from a fresh write to just under QUIET_MS, and stops at it', () => {
+  it('runs from a fresh write to just under ENGINEER_QUIET_MS, and stops at it', () => {
     expect(read([quiet(MIN)])).toEqual(RUNS)
     expect(read([quiet(model.STALE_MS)])).toEqual(RUNS)
-    expect(read([quiet(model.QUIET_MS - 1)])).toEqual(RUNS)
-    expect(read([quiet(model.QUIET_MS)])).toEqual(IDLE)
+    expect(read([quiet(model.ENGINEER_QUIET_MS - 1)])).toEqual(RUNS)
+    expect(read([quiet(model.ENGINEER_QUIET_MS)])).toEqual(IDLE)
   })
 
   it('an ended engineer or one that never wrote does not run it', () => {

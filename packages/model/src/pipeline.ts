@@ -6,7 +6,7 @@
 
 import type { AgentRun, BoardRepo, PrStatus } from './board.ts'
 import { formatTokens, isDone } from './pod-flow/model.ts'
-import type { PlanModel, SliceModel, SprintModel, WaveModel } from './run-model.ts'
+import type { PlanModel, QueueItem, SliceModel, SprintModel, WaveModel } from './run-model.ts'
 import { agentState, IDLE_GAP_MS, STALE_MS } from './transcript.ts'
 
 /** `skipped`: the plan didn't take this step (no research, no UI); the flow shows it dim. */
@@ -24,11 +24,23 @@ const HAND_BACK = /complete|final PR|hand-?back|awaiting/i
 const FROM_ORCHESTRATOR = /^orchestrator\b/i
 const WAVE_FIX = /^(.+)-w(\d+)-fix$/
 
-/** The plan's hand-back PR: from the last pending orchestrator entry that hands back and links `/pull/<N>`. */
+/** Markdown marks out: `**Someday:**` and a ticked `Value in use` read as their words. */
+const unmarked = (body: string) => body.replace(/[*`]/g, '').trim()
+
+/** The kind words a note starts with (web's `entryKind`): it says when it matters, so it is no hand-back. */
+const KIND_NOTE = /^(?:now|decision|someday|before\s[^:]+)\b[^:]*:/i
+const SOMEDAY = /^someday\b[^:]*:/i
+/** A default the entry records: `Value in use:`, `Default:`, `Default recorded:` with a value after it, or `agent default`. "off by default" records none. */
+const RECORDED_DEFAULT = /\b(?:value in use|default(?: recorded)?)\s*:\s*[^\s.!?]|\bagent default\b/i
+
+const isHandBack = (e: Pick<QueueItem, 'isPending' | 'route' | 'body'>) => {
+  const text = unmarked(e.body)
+  return e.isPending && FROM_ORCHESTRATOR.test(e.route.trim()) && HAND_BACK.test(e.body) && /\/pull\/\d+/.test(e.body) && !KIND_NOTE.test(text) && !RECORDED_DEFAULT.test(text)
+}
+
+/** The plan's hand-back PR: from the last pending orchestrator entry that hands back and links `/pull/<N>`, and is no kind note. */
 export function handBackPr(plan: Pick<PlanModel, 'queue'>): number | undefined {
-  const entry = plan.queue
-    .filter((e) => e.isPending && FROM_ORCHESTRATOR.test(e.route.trim()) && HAND_BACK.test(e.body) && /\/pull\/\d+/.test(e.body))
-    .at(-1)
+  const entry = plan.queue.filter(isHandBack).at(-1)
   const n = entry && /\/pull\/(\d+)/.exec(entry.body)?.[1]
   return n === undefined ? undefined : Number(n)
 }
@@ -60,7 +72,7 @@ const PENDING_GATE =
  * with a halt gate. The policy's gates 5–7 halt with PENDING (pod has filed gate 3 that way too), and gate 6
  * withholds a mergeable PR for you to merge; the orchestrator's other PENDING notes to you (`now: …`,
  * `someday: …`, an agent default, a note that names a gate mid-sentence) don't stop it. Run state
- * still follows `isHalted` (BLOCKED → blocked; a PENDING reads needs-you).
+ * follows `isHalted` (BLOCKED → blocked) and `stopsRun` (needs-you).
  */
 const GATE_NAMES = ['blocked-concern', 'plan-review-fail', 'auto-merge-fail', 'inter-wave-verify', 'safety-bound', 'escalation-valve', 'plan-complete']
 
@@ -79,6 +91,32 @@ export const isAutopilotStopped = (plan: Pick<PlanModel, 'queue'>) =>
   plan.queue.some(
     (e) => e.isPending && e.type === 'PENDING' && FROM_ORCHESTRATOR.test(e.route.trim()) && TO_HUMAN.test(e.route.trim()) && PENDING_GATE.test(e.body),
   )
+
+/** A hand-back in so many words: `plan <slug> complete`, or `Plan complete`. */
+const PLAN_COMPLETE = /^plan(?:\s+[\w.-]+)?\s+complete\b/i
+
+/** The entry names a slice of the plan that isn't done, under its sprint or none. */
+const namesOpenSlice = (e: Pick<QueueItem, 'slice' | 'sprint'>, plan: Pick<PlanModel, 'sprints'>) =>
+  e.slice !== undefined &&
+  plan.sprints.some((s) => (e.sprint === undefined || e.sprint === s.slug) && s.waves.some((w) => w.slices.some((x) => x.code === e.slice && !isSliceDone(x))))
+
+/**
+ * The one rule for what stops a run: a BLOCKED to you, a halt gate (`haltGate`, 7 included), a plan-complete
+ * hand-back, or a PENDING to you that names an open slice of `plan` and records no default. Anything else (a
+ * recorded default, `someday`, a bare `now`, any other note) stays listed and answerable, and pod goes on with it.
+ * An answer doesn't clear a stop: pod reads it when it resumes. With no `plan` (an entry that joins none), the
+ * slice rule has nothing to read. Run state, the flow, the Log, the wave board, Next step and the banner all read this.
+ */
+export function stopsRun(e: QueueItem, plan?: Pick<PlanModel, 'sprints'>): boolean {
+  if (!e.isPending || !TO_HUMAN.test(e.route.trim())) return false
+  const type = e.type.trim().toUpperCase()
+  if (type === 'BLOCKED') return true
+  if (type !== 'PENDING') return false
+  const text = unmarked(e.body)
+  if (haltGate(e.body) !== undefined || PLAN_COMPLETE.test(text) || isHandBack(e)) return true
+  if (RECORDED_DEFAULT.test(text) || SOMEDAY.test(text)) return false
+  return plan !== undefined && namesOpenSlice(e, plan)
+}
 
 /** What a step with a PR waiting on you says: under autopilot, only a stop hands the merge to you. */
 export const waitingWords = (plan: Pick<PlanModel, 'autopilot'>) => (isAutopilot(plan) ? 'autopilot stopped' : 'you merge')
@@ -131,6 +169,33 @@ export const isRunning = (a: AgentRun, now: number) => agentState(a, now) === 'r
 /** A running sprint planner that names the plan. */
 export const isDrafting = (agents: AgentRun[], plan: PlanModel, now: number) =>
   agents.some((a) => isType(a, 'sprint-planner') && a.plan === plan.slug && isRunning(a, now))
+
+/**
+ * How long an engineer that hasn't ended can stay quiet and still count as at work on its wave. Longer than
+ * STALE_MS: a long test, a wait on a signature, or a nested agent can leave its transcript quiet past 30 minutes,
+ * and it comes back. Bounded, since a closed laptop or a killed session never writes that it ended.
+ */
+export const ENGINEER_QUIET_MS = 2 * 60 * 60 * 1000
+
+const isAtWork = (a: AgentRun, now: number) => !a.ended && a.lastAt !== undefined && now - a.lastAt < ENGINEER_QUIET_MS
+
+/**
+ * The one rule for a running slice, and so a running wave: unfinished, and pushed (pod holds it: autopilot merges
+ * it, or it waits on checks), or its own engineer or its wave's fix engineer at work. The flow, the Log, the wave
+ * board and the run state all read this. A stop or a PR waiting on you reads first.
+ */
+export function isSliceRunning(repo: Pick<BoardRepo, 'agents'>, plan: PlanModel, s: SprintModel, w: WaveModel, x: SliceModel, now: number): boolean {
+  if (isSliceDone(x) || isBlockedSlice(x)) return false
+  if (x.status === 'pushed') return true
+  return repo.agents.some((a) => {
+    if (!isAtWork(a, now)) return false
+    const role = roleOf(a, plan)
+    return (role.kind === 'slice' && role.sprint === s.slug && role.code === x.code) || (role.kind === 'wave-fix' && role.sprint === s.slug && role.wave === w.wave)
+  })
+}
+
+export const isWaveRunning = (repo: Pick<BoardRepo, 'agents'>, plan: PlanModel, s: SprintModel, w: WaveModel, now: number) =>
+  w.slices.some((x) => isSliceRunning(repo, plan, s, w, x, now))
 
 // ---- Which plans are runs (the runs list's rule, shared with waitingPrs) ----
 
@@ -251,19 +316,18 @@ export const stagingWaitingPr = (repo: BoardRepo, plan: PlanModel, now: number):
 /** A plan run's state, as the runs list shows it. */
 export type PlanState = 'blocked' | 'needs-you' | 'running' | 'idle'
 
-/** First match wins: blocked → needs-you (an ask, a wave PR, or the staging PR waiting on you) → running → idle. */
+/** First match wins: blocked → needs-you (`stopsRun`, a wave PR, or the staging PR waiting on you) → running → idle. */
 export function planState(repo: BoardRepo, plan: PlanModel, now: number): PlanState {
   const current = plan.sprints.find((s) => s.slug === plan.currentSprint)
   const slices = current?.waves.flatMap((w) => w.slices) ?? []
   if (isHalted(plan) || slices.some(isBlockedSlice)) return 'blocked'
   if (
-    plan.queue.some((e) => e.needsYou) ||
+    plan.queue.some((e) => stopsRun(e, plan)) ||
     current?.waves.some((w) => waveWaitingPr(repo, plan, current, w, now) !== undefined) ||
     stagingPr(repo, plan) !== undefined
   )
     return 'needs-you'
-  const wave = current?.waves.find((w) => w.wave === current.currentWave)
-  if (planAgentRunning(repo, plan, now) || wave?.slices.some((s) => s.status === 'pushed')) return 'running'
+  if (planAgentRunning(repo, plan, now) || current?.waves.some((w) => isWaveRunning(repo, plan, current, w, now))) return 'running'
   return 'idle'
 }
 
@@ -335,28 +399,33 @@ function sliceAgents(ctx: Ctx, s: SprintModel, code: string) {
 
 /**
  * Wave step state, first match wins: blocked → done → you → live → wait.
- * A done wave reads done even with a pending ask for the human. Only an ask naming one
+ * A done wave reads done even with a pending ask for the human. Only a stop naming one
  * of its unfinished slices, or a PR waiting on you, makes a wave `you`, so it agrees with its cards.
  */
 function waveState(ctx: Ctx, s: SprintModel, w: WaveModel): StepState {
   if (w.slices.some(isBlockedSlice)) return 'blocked'
   if (w.slices.every(isSliceDone)) return 'done'
-  const open = new Set(w.slices.filter((x) => !isSliceDone(x)).map((x) => x.code))
-  const asks = ctx.plan.queue.some((e) => e.needsYou && e.slice !== undefined && open.has(e.slice) && (e.sprint === undefined || e.sprint === s.slug))
-  if (asks || waveWaitingPr(ctx.repo, ctx.plan, s, w, ctx.now) !== undefined) return 'you'
+  if (waveAsks(ctx, s, w) || waveWaitingPr(ctx.repo, ctx.plan, s, w, ctx.now) !== undefined) return 'you'
+  if (isWaveRunning(ctx.repo, ctx.plan, s, w, ctx.now)) return 'live'
   if (!isWaveLive(ctx, s, w)) return 'wait'
-  // The wave in progress: running while one of its own engineers runs; otherwise the run's state
-  // (running, as when autopilot merges its PR; blocked; needs you; or waiting when the run is idle).
-  return waveAgents(ctx, s, w).some((x) => x.live) ? 'live' : IN_PROGRESS_STEP[ctx.state]
+  // The wave in progress with nothing of its own running: the run's state (running, as when another of
+  // the plan's agents works; blocked; needs you; or waiting when the run is idle).
+  return IN_PROGRESS_STEP[ctx.state]
+}
+
+/** A stop that names an unfinished slice of this wave. */
+function waveAsks(ctx: Ctx, s: SprintModel, w: WaveModel): boolean {
+  const open = new Set(w.slices.filter((x) => !isSliceDone(x)).map((x) => x.code))
+  return ctx.plan.queue.some((e) => stopsRun(e, ctx.plan) && e.slice !== undefined && open.has(e.slice) && (e.sprint === undefined || e.sprint === s.slug))
 }
 
 /** The flow's wave in progress with no engineer of its own at work, by the run's state. */
 const IN_PROGRESS_STEP: Record<PlanState, StepState> = { blocked: 'blocked', 'needs-you': 'you', running: 'live', idle: 'wait' }
 
-/** The current wave of the current sprint, a pushed slice, or one of the wave's engineers running. */
+/** The current wave of the current sprint, or a wave that runs (`isWaveRunning`). */
 function isWaveLive(ctx: Ctx, s: SprintModel, w: WaveModel): boolean {
   const current = s.slug === ctx.plan.currentSprint && s.currentWave === w.wave
-  return current || w.slices.some((x) => x.status === 'pushed') || waveAgents(ctx, s, w).some((x) => x.live)
+  return current || isWaveRunning(ctx.repo, ctx.plan, s, w, ctx.now)
 }
 
 /**
@@ -459,17 +528,18 @@ function shipStep(ctx: Ctx): Step {
   return step
 }
 
-/** Status, first match wins: blocked → merged (PR #N) → PR #N open → running → planned. */
+/** Status, first match wins: blocked → merged (PR #N) → PR #N open → needs you (a stop naming it) → planned → running → the run's. */
 function logStatus(ctx: Ctx, s: SprintModel, w: WaveModel): string {
   if (w.slices.some(isBlockedSlice)) return 'blocked'
   const numbered = w.slices.find((x) => x.pr.number !== undefined)?.pr.number
   if (w.slices.every(isSliceDone)) return numbered === undefined ? 'merged' : `merged PR #${numbered}`
   const open = w.slices.find((x) => x.pr.state === 'open' && x.pr.number !== undefined)?.pr.number
   if (open !== undefined) return `PR #${open} open`
+  if (waveAsks(ctx, s, w)) return 'needs you'
   if (!isWaveLive(ctx, s, w)) return 'planned'
-  // An engineer at work on this wave is a fact about it: running. Otherwise the wave in progress says
-  // what the run does (running, blocked, needs you, or waiting when idle), as the flow's wave card does.
-  return waveAgents(ctx, s, w).some((x) => x.live) ? 'running' : IN_PROGRESS[ctx.state]
+  // A running wave is a fact about it. Otherwise the wave in progress says what the run does
+  // (running, blocked, needs you, or waiting when idle), as the flow's wave card does.
+  return isWaveRunning(ctx.repo, ctx.plan, s, w, ctx.now) ? 'running' : IN_PROGRESS[ctx.state]
 }
 
 const IN_PROGRESS: Record<PlanState, string> = { blocked: 'blocked', 'needs-you': 'needs you', running: 'running', idle: 'waiting' }
@@ -479,7 +549,7 @@ const NO_CONFIDENCE = new Set(['', '—', '-'])
 function logGroup(ctx: Ctx, s: SprintModel, i: number, w: WaveModel): LogGroup {
   const rows = w.slices.map((x): LogRow => {
     const agents = sliceAgents(ctx, s, x.code)
-    const live = agents.some((y) => y.live)
+    const live = agents.some((y) => isAtWork(y.a, ctx.now))
     const row: LogRow = { code: x.code, title: x.title, live }
     if (x.model) row.model = x.model
     if (!NO_CONFIDENCE.has(x.confidence.trim())) row.confidence = x.confidence.trim()

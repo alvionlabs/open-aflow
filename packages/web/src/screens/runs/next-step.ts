@@ -1,10 +1,12 @@
 // The Next step card and the Waiting tab: the selected run's most urgent item and its one action,
 // then everything else that waits on you. Picks from the model's rules only (the queue entries,
 // waitingPrs, the reply panel), in the plan's order: blocked → merge → reply → pending → info,
-// the pending tier sorted by kind (entry-kind.ts).
+// the pending tier sorted by stops first (the model's `stopsRun`), then by kind (entry-kind.ts).
+// An entry that doesn't stop the run wears the run's own status, never `Needs you`; an entry that joins
+// no plan and doesn't stop stays listed, but never takes the card.
 // Pure; the card and the tab only render these.
 
-import { haltGate, isAnswerable, waitingPrs, type BoardRepo, type QueueItem, type RunSummary, type WaitingPr } from '@pod-board/model'
+import { haltGate, isAnswerable, stopsRun, waitingPrs, type BoardRepo, type QueueItem, type RunSummary, type WaitingPr } from '@pod-board/model'
 import { KIND_ORDER } from './entry-kind.ts'
 import { waitingEntries, waitingRows, type WaitingRow } from './queue-view.ts'
 import { kindChip } from './waiting-tab.ts'
@@ -32,6 +34,8 @@ export type NextItem = {
   entry?: WaitingRow
   /** A pending or blocked entry's kind as a dot and word (kindChip); none for `other`. */
   kind?: Chip
+  /** A pending entry that doesn't stop the run (`stopsRun`): pod goes on, so it raises no banner and ranks as nothing. */
+  goesOn?: true
   action: NextAction
 }
 /** `card` is the first action item; `rest` is every other item (the Waiting tab's count is its length). */
@@ -54,10 +58,11 @@ function short(text: string): string {
 const ACTION_TIERS = new Set<NextItem['tier']>(['blocked', 'merge', 'reply', 'pending'])
 const TIER_ORDER: NextItem['tier'][] = ['blocked', 'merge', 'reply', 'pending', 'info']
 
-/** Tier first; inside the pending tier, by the entry's kind (now → decision → before → other → someday). */
+/** Tier first; inside the pending tier, a stop first, then by the entry's kind (now → decision → before → other → someday). */
 function byTier(a: NextItem, b: NextItem): number {
   const tier = TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier)
   if (tier !== 0 || a.tier !== 'pending') return tier
+  if (!a.goesOn !== !b.goesOn) return a.goesOn ? 1 : -1
   return KIND_ORDER.indexOf(a.entry?.kind ?? 'other') - KIND_ORDER.indexOf(b.entry?.kind ?? 'other')
 }
 
@@ -71,16 +76,17 @@ function entryKeys(rows: WaitingRow[]): string[] {
   })
 }
 
-function entryItem(e: QueueItem, row: WaitingRow, key: string, repoId: string): NextItem {
+function entryItem(e: QueueItem, row: WaitingRow, key: string, repoId: string, stops: boolean, run: RunSummary): NextItem {
   const answer: NextAction = { kind: 'answer', repoId, line: row.line }
   const blocked = e.type === 'BLOCKED'
   // The title is the body without its kind prefix; the kind shows as a dot and word, as on the rows.
   const title = entryTitle(row.text)
   if (isAnswerable(e)) {
     const kind = row.kind === 'other' ? {} : { kind: kindChip(row) }
-    return blocked
-      ? { key, tier: 'blocked', status: 'blocked', ...title, ...kind, detail: BLOCKED_DETAIL, entry: row, action: answer }
-      : { key, tier: 'pending', status: 'needs-you', ...title, ...kind, detail: PENDING_DETAIL, entry: row, action: answer }
+    if (blocked) return { key, tier: 'blocked', status: 'blocked', ...title, ...kind, detail: BLOCKED_DETAIL, entry: row, action: answer }
+    return stops
+      ? { key, tier: 'pending', status: 'needs-you', ...title, ...kind, detail: BLOCKED_DETAIL, entry: row, action: answer }
+      : { key, tier: 'pending', status: runStatus(run), goesOn: true, ...title, ...kind, detail: PENDING_DETAIL, entry: row, action: answer }
   }
   return { key, tier: 'info', status: blocked ? 'blocked' : 'idle', ...title, detail: row.yourAnswer ?? row.route, entry: row, action: { kind: 'none' } }
 }
@@ -115,8 +121,11 @@ function replyItem(panel: ReplyPanelView): NextItem | undefined {
   }
 }
 
+/** What the run does, for a card that isn't asking you to stop anything. */
+const runStatus = (run: RunSummary): NextStatus => (run.state === 'blocked' ? 'blocked' : run.state === 'running' ? 'running' : 'idle')
+
 function nothingCard(run: RunSummary, repo: BoardRepo): NextItem {
-  const status: NextStatus = run.state === 'blocked' ? 'blocked' : run.state === 'running' ? 'running' : 'idle'
+  const status = runStatus(run)
   const empty = run.state === 'error' || run.state === 'unsupported' || run.plan === undefined
   return { key: 'nothing', tier: 'nothing', status, title: NOTHING_TITLE, detail: empty ? emptyMessage(run, repo) : run.where, action: { kind: 'none' } }
 }
@@ -128,7 +137,11 @@ export function nextSteps(run: RunSummary | undefined, repo: BoardRepo | undefin
   const entries = waitingEntries(repo, run)
   const rows = waitingRows(repo, run)
   const keys = entryKeys(rows)
-  const items: NextItem[] = entries.map((e, i) => entryItem(e, rows[i]!, keys[i]!, repo.id))
+  const plan = run.fix === undefined ? repo.model.plans.find((p) => p.slug === run.plan) : undefined
+  const joined = new Set(plan?.queue.map((e) => e.line))
+  const items: NextItem[] = entries.map((e, i) => entryItem(e, rows[i]!, keys[i]!, repo.id, stopsRun(e, joined.has(e.line) ? plan : undefined), run))
+  // An entry that joins no plan and doesn't stop anything: listed, but never the run's headline.
+  const unjoined = new Set(entries.flatMap((e, i) => (joined.has(e.line) || items[i]!.goesOn !== true ? [] : [items[i]!.key])))
   // A repo row names no plan, so it has no PRs; a fix run's PRs carry its claim name.
   if (run.plan !== undefined) items.push(...waitingPrs(repo, now).filter((pr) => pr.run === run.plan).map((pr) => prItem(pr, repo.id)))
   const panel = replyPanel(run, repo, now)
@@ -136,8 +149,8 @@ export function nextSteps(run: RunSummary | undefined, repo: BoardRepo | undefin
   if (reply) items.push(reply)
   // A stable sort: list order holds within a tier, and within a kind in the pending tier.
   const sorted = items.sort(byTier)
-  const first = sorted[0]
-  if (first && ACTION_TIERS.has(first.tier)) return { card: first, rest: sorted.slice(1) }
+  const first = sorted.find((i) => !unjoined.has(i.key))
+  if (first && ACTION_TIERS.has(first.tier)) return { card: first, rest: sorted.filter((i) => i !== first) }
   return { card: nothingCard(run, repo), rest: sorted }
 }
 
