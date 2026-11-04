@@ -94,7 +94,11 @@ const waitFor = async (check: () => boolean, ms = 20_000) => {
 }
 
 const readRecord = async (): Promise<Record> => {
-  await waitFor(() => existsSync(recordFile))
+  await waitFor(() => existsSync(recordFile)).catch((err: Error) => {
+    // Says which step never came: the fake starting, or its record after that, and what the run logged.
+    const logs = existsSync(logDir) ? readdirSync(logDir).map((f) => readFileSync(join(logDir, f), 'utf8')).join(' | ') : 'no log folder'
+    throw new Error(`${err.message} for the record; fake started: ${existsSync(pidsFile)}; log: ${logs}`)
+  })
   return JSON.parse(readFileSync(recordFile, 'utf8')) as Record
 }
 
@@ -351,6 +355,7 @@ describe('createClaudeRunner', () => {
       env: { ...process.env, HOST_ENV: JSON.stringify(env) },
       encoding: 'utf8',
       timeout: 20_000,
+      windowsHide: true,
     })
     expect(out.stderr).toBe('')
     expect(JSON.parse(out.stdout.trim())).toEqual({ outcome: 'started' })
