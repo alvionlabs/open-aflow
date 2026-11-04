@@ -23,6 +23,7 @@ The Electron shell's notifier reads the live Board in the main process. It sends
 - **The dot** is on while at least one item exists. The many open `pending` entries never light it.
 - **Toast rules.**
   - The first Board of an app run marks its items seen and sends nothing. The dot still shows them.
+  - **The hold.** When that first Board has `gh: 'unknown'`, merge and reply items stay quiet too, for `GH_HOLD_MS` (20 s) from that Board, and again from gh's first `ok`. They are marked seen. `missing` or `logged-out` ends the hold at once. A first Board where gh has answered has no hold. A queue's `BLOCKED` line needs no `gh`, so a new one still sends during the hold.
   - The seen set lasts the app run and only grows. An item that goes and comes back, a reconnect, or a server restart never sends again.
   - Items are worked out on each Board and every `LIVE_TICK_MS`, because replies depend on `now`.
   - Up to 3 new items in one pass each get a toast. More than 3 get one toast: the title `<N> items need you`, the body the name of the run it opens, the first new item by tier, then list order.
@@ -34,6 +35,7 @@ The Electron shell's notifier reads the live Board in the main process. It sends
 
 - **Fetch, not `EventSource`.** The main process has no `EventSource`. `/api/events` needs only a loopback `Host`, so the shell never holds the session token.
 - **The clock waits while the stream is lost.** The last Board may be stale then. A reply worked out from it could raise a toast about a server that has gone, or move the dot, and the dot keeps its value while the stream is lost.
+- **The hold has a time limit after `ok`, not only until `ok`.** The server's `gh` tick and its rebuilds run side by side, so a Board can say `ok` between `gh auth status` and the PR reads. The Board doesn't say when those reads end. `gh` that never answers can't silence toasts: with no repo, `gh` stays `unknown`, and the limit ends the hold.
 - **Each item gets one try.** An item is marked seen before its send, so a send that throws can't repeat on every tick.
 - **A throw stops at the notifier.** A throw in a timer would end the main process with an error box. The notifier logs it, and the dot keeps its value.
 
@@ -69,5 +71,10 @@ To uninstall, go to Settings > Apps > Installed apps > Pod Board > Uninstall. Th
 - **A repo added after the start isn't in the baseline.** Its open items are new, so they send, or give one summary toast.
 - **A repo id change sends again.** A repo's id changes when a name clash forms or ends. Its items then have new identities, so each one sends once more.
 - **An edited queue line sends again.** An entry's identity is its whole line, so a line someone rewrites is a new item.
-- **A PR that only `gh` can name arrives after the baseline.** The first Board at a start can come before `gh` answers. A fix PR or a merged-PR reply first shows on a later Board, so it sends once after each start, also when it is old. A wave PR isn't affected: an unknown state counts as open.
+- **A slow `gh` can still outlast the hold.** With many repos, or PR reads near their 10 s limit, the reads can end more than 20 s after gh's first `ok`. An old fix PR or merged-PR reply then sends once at that start.
+- **A new merge or reply in the hold sends nothing.** It is marked seen, and the dot shows it. The same goes for a server restart in the hold: the new server's PR items can send once, if the first hold has ended.
 - Never import `@pod-board/web`'s `.tsx` files or its package root from the shell. Only the three subpaths are exported. `notifier.test.ts` bundles the main process and checks that it holds no React.
+
+## History
+
+- 2026-11-03 · windows-app plan fix · fixed: old items that only `gh` can name no longer send at every app start. The baseline holds merge and reply items until `gh` has answered or reads as unavailable.

@@ -118,6 +118,9 @@ export function rowFigures(row: LogRow): string {
   return parts.join(' · ')
 }
 
+/** pod's own install steps, from its README. Pod Board has no runs to show without it. */
+export const POD_INSTALL = 'To install pod, open Claude Code and run /plugin marketplace add iamphduc/claude-pod, then /plugin install pod@pod.'
+
 /** Why a run has no pipeline, and what to do about it. `repo` gives an unsupported repo's docs version. */
 export function emptyMessage(r: RunSummary, repo?: BoardRepo): string {
   if (r.state === 'error') return `Can't read this repo: ${r.where}. Check that the folder still exists.`
@@ -125,7 +128,7 @@ export function emptyMessage(r: RunSummary, repo?: BoardRepo): string {
     if (!repo) return "This repo's pod docs are from an older pod. Update pod in this repo to see its runs."
     const { version } = repo.model.docs
     return version === undefined
-      ? 'This repo has no pod docs version (an older pod). Update pod in this repo.'
+      ? `This repo has no pod docs, or they are from an older pod. Update pod in this repo. ${POD_INSTALL}`
       : `This repo's pod docs are version ${version}; Pod Board reads version 2. Update pod in this repo.`
   }
   if (r.plan === undefined) return 'No active plan in this repo. A plan shows here once pod starts one.'

@@ -36,7 +36,7 @@ import { UrgentBanner } from './UrgentBanner.tsx'
 import { readWidth, saveWidth } from './sidebar-width.ts'
 import { readTab, saveTab, shownTab, type Tab, type TabStorage } from './tab-memory.ts'
 import { WaitingTab } from './WaitingTab.tsx'
-import { banners, connectionStatus, tabPress } from './view.ts'
+import { banners, connectionStatus, POD_INSTALL, tabPress } from './view.ts'
 import './runs.css'
 
 type Props = {
@@ -230,6 +230,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
                 {menu}
               </div>
               <p className="muted">Press Add repo in the sidebar and pick a repo's folder to see its pod runs.</p>
+              <p className="muted">Runs come from pod, a Claude Code plugin. {POD_INSTALL}</p>
             </div>
           ) : view === 'board' && pipeline && selected.plan !== undefined ? (
             <>

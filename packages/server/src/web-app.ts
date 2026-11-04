@@ -9,6 +9,9 @@ import { injectTokenMeta } from './session-token.ts'
 
 const HTML = 'text/html; charset=utf-8'
 
+/** No other page may frame the board: a framed page's own token and Origin pass the guards, so a click there would count. */
+const NO_FRAMING = { 'Content-Security-Policy': "frame-ancestors 'none'", 'X-Frame-Options': 'DENY' }
+
 const TYPES: Record<string, string> = {
   '.html': HTML,
   '.js': 'text/javascript; charset=utf-8',
@@ -44,7 +47,12 @@ export async function createWebApp(o: { dir: string; token: string }): Promise<H
 
   const servePage = () => answer(withToken, HTML, 'no-store')
 
-  return new Hono().all('*', async (c) => {
+  const app = new Hono()
+  app.use('*', async (c, next) => {
+    await next()
+    for (const [name, value] of Object.entries(NO_FRAMING)) c.res.headers.set(name, value)
+  })
+  return app.all('*', async (c) => {
     const notFound = () => c.json({ error: 'not found' }, 404)
     // Without its query, and with escapes undone as the router undoes them. A malformed escape stays as text.
     const path = c.req.path

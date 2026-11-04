@@ -21,10 +21,11 @@ This build has no code signature, so Windows can warn you.
 - `git`: [Git for Windows](https://git-scm.com/downloads/win).
 - `gh`: [GitHub CLI](https://cli.github.com/). Run `gh auth login` once.
 - `claude`: [Claude Code](https://code.claude.com/docs/en/setup). Sign in once. If you installed it with npm, Node must be on your `Path`. A native `claude.exe` doesn't need Node.
+- `pod`: [pod](https://github.com/iamphduc/claude-pod), a plugin for Claude Code. Inside Claude Code, run `/plugin marketplace add iamphduc/claude-pod`, then `/plugin install pod@pod`. With no pod, the board stays empty, because pod makes the runs it shows.
 
 ## The setup check
 
-The app looks for these tools when it starts. If it can't find a tool, the **Setup check** screen opens.
+The app looks for `git`, `gh`, and `claude` when it starts. It doesn't look for pod. If it can't find a tool, the **Setup check** screen opens.
 
 1. Install the tool, then select **Recheck**.
 2. If the tool stays missing, type its full path in the field on that row, then select **Save**. For example: `C:\Program Files\Git\cmd\git.exe`.

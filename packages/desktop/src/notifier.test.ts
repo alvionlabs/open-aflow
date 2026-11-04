@@ -7,7 +7,7 @@ import { buildRepoModel, type AgentRun, type Board, type BoardRepo, type PrStatu
 import { LIVE_TICK_MS } from '@pod-board/web/selection'
 import { loadFixture } from '../../model/test/load-fixture.ts'
 import { bundleDesktop } from './bundle-desktop.ts'
-import { createNotifier, type Toast } from './notifier.ts'
+import { createNotifier, GH_HOLD_MS, type Toast } from './notifier.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const NOW = Date.UTC(2026, 9, 20, 12)
@@ -35,6 +35,8 @@ const boardOf = (...repos: BoardRepo[]): Board => ({ generatedAt: NOW, gh: 'ok',
 const withEntries = (...names: string[]) => boardOf(repoWith(names))
 /** Stops being a merged-PR reply's blocker once `live` goes stale. */
 const clockBoard = () => boardOf(repoWith([], { pr: prOf(78, 'merged'), agents: [live] }))
+/** A Board at this gh state, with entries and with one PR item that only gh can name. */
+const ghBoard = (gh: Board['gh'], names: string[], pr?: number): Board => ({ ...boardOf(repoWith(names, pr === undefined ? {} : { pr: prOf(pr, 'open') })), gh })
 
 function setup(o: { supported?: () => boolean; send?: (t: Toast) => void } = {}) {
   const toasts: Toast[] = []
@@ -243,6 +245,91 @@ describe('notifier', () => {
     s.notifier.board(withEntries('A'))
     expect(s.toasts).toEqual([])
     expect(s.dot).toEqual([false])
+  })
+
+  describe('the hold while gh has not answered', () => {
+    test('an old PR that only gh can name sends nothing', () => {
+      const s = setup()
+      s.notifier.board(ghBoard('unknown', ['A']))
+      s.notifier.board(ghBoard('ok', ['A'], 901))
+      expect(s.toasts).toEqual([])
+      expect(s.dot.at(-1)).toBe(true)
+      s.notifier.close()
+    })
+
+    test('holds while gh is ok but a refresh may still be running', () => {
+      // The server can rebuild between `gh auth status` and the PR reads.
+      const s = setup()
+      s.notifier.board(ghBoard('unknown', []))
+      s.notifier.board(ghBoard('ok', []))
+      vi.advanceTimersByTime(GH_HOLD_MS - 1000)
+      s.notifier.board(ghBoard('ok', [], 901))
+      expect(s.toasts).toEqual([])
+      s.notifier.close()
+    })
+
+    test('a PR after the hold sends once', () => {
+      const s = setup()
+      s.notifier.board(ghBoard('unknown', []))
+      s.notifier.board(ghBoard('ok', []))
+      vi.advanceTimersByTime(GH_HOLD_MS)
+      s.notifier.board(ghBoard('ok', [], 901))
+      expect(s.toasts).toHaveLength(1)
+      s.notifier.board(ghBoard('ok', [], 901))
+      expect(s.toasts).toHaveLength(1)
+      s.notifier.close()
+    })
+
+    test.each(['missing', 'logged-out'] as const)('gh %s ends the hold at once', (gh) => {
+      const s = setup()
+      s.notifier.board(ghBoard('unknown', []))
+      s.notifier.board(ghBoard(gh, []))
+      s.notifier.board(ghBoard(gh, [], 901))
+      expect(s.toasts).toHaveLength(1)
+      s.notifier.close()
+    })
+
+    test('a gh that never answers ends the hold at the time limit', () => {
+      const s = setup()
+      s.notifier.board(ghBoard('unknown', []))
+      s.notifier.board(ghBoard('unknown', [], 901))
+      expect(s.toasts).toEqual([])
+      // The clock's pass ends the hold with nothing new: 901 stays old news.
+      vi.advanceTimersByTime(Math.max(GH_HOLD_MS, LIVE_TICK_MS))
+      expect(s.toasts).toEqual([])
+      s.notifier.board(ghBoard('unknown', [], 902))
+      expect(s.toasts).toHaveLength(1)
+      s.notifier.close()
+    })
+
+    test('a new BLOCKED line sends during the hold', () => {
+      const s = setup()
+      s.notifier.board(ghBoard('unknown', ['A']))
+      s.notifier.board(ghBoard('unknown', ['A', 'B']))
+      expect(s.toasts).toHaveLength(1)
+      expect(s.toasts[0]!.body).toContain('B')
+      // With an old PR in the same pass: only the line sends.
+      s.notifier.board(ghBoard('ok', ['A', 'B', 'C'], 901))
+      expect(s.toasts).toHaveLength(2)
+      expect(s.toasts[1]!.body).toContain('C')
+      s.notifier.close()
+    })
+
+    test('a first Board where gh has answered has no hold', () => {
+      const s = setup()
+      s.notifier.board(ghBoard('ok', ['A']))
+      s.notifier.board(ghBoard('ok', ['A'], 901))
+      expect(s.toasts).toHaveLength(1)
+      s.notifier.close()
+    })
+
+    test('a first Board where gh is unavailable has no hold', () => {
+      const s = setup()
+      s.notifier.board(ghBoard('missing', ['A']))
+      s.notifier.board(ghBoard('missing', ['A'], 901))
+      expect(s.toasts).toHaveLength(1)
+      s.notifier.close()
+    })
   })
 })
 

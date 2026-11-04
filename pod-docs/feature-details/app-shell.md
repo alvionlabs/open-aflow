@@ -65,3 +65,4 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - 2026-11-02 · one-port-server S1: the production server can serve the web build on the API's port; `/sw.js` answers 404 there. Dev serving doesn't change.
 - 2026-11-02 · outside-terminal U1: the setup check. In production, a tool that isn't found replaces the board with one row per tool, an install link, a path field, and Recheck. The board's stream waits for the gate.
 - 2026-11-03 · desktop-shell T1: an Electron window shows the page. The page doesn't change.
+- 2026-11-03 · windows-app plan fix · the install note names pod and says the setup check doesn't look for it. A real check for pod is the human's call.

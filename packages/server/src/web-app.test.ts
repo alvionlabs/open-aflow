@@ -203,3 +203,21 @@ test('a bad web folder rejects', async () => {
   const aFile = join(root, 'secret.txt')
   await expect(createWebApp({ dir: aFile, token: TOKEN })).rejects.toThrow(aFile)
 })
+
+test('every web answer refuses to be framed', async () => {
+  const answers = await Promise.all([
+    app.request('/'),
+    app.request('/index.html'),
+    app.request('/some/route'),
+    app.request('/assets/app-abc.js'),
+    app.request('/manifest.webmanifest'),
+    app.request('/', { method: 'HEAD' }),
+    app.request('/missing.js'),
+    app.request('/api/nothing'),
+    app.request('/', { method: 'POST' }),
+  ])
+  for (const res of answers) {
+    expect(res.headers.get('content-security-policy'), res.url).toBe("frame-ancestors 'none'")
+    expect(res.headers.get('x-frame-options'), res.url).toBe('DENY')
+  }
+})
