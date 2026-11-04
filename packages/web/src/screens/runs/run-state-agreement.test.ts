@@ -387,6 +387,41 @@ describe("an orchestrator's plain ask", () => {
   })
 })
 
+describe('the ask marker', () => {
+  const ASK = (from: string, body = 'ask: which title?') => tagged('PENDING', `${from} → human`, body)
+
+  it.each(['orchestrator', 'engineer', 'reviewer'])('from %s: needs you in all six, with no engineer', (from) => {
+    const v = views(repoOf([ASK(from)]))
+    expect(v).toMatchObject(STOPPED)
+    expect(v.title).toBe('which title?')
+    expect(v.steps.card.detail).toBe('The run is stopped until you answer.')
+    expect(v.steps.card.kind?.label).toBe('ask')
+  })
+
+  it('stops also with a recorded default', () => {
+    expect(views(repoOf([ASK('engineer', 'ask: pick one. Value in use: short.')]))).toMatchObject(STOPPED)
+  })
+
+  it('lifts while an engineer is at work, listed and answerable', () => {
+    const v = views(repoOf([ASK('reviewer')], { agents: [engineer()] }))
+    expect(v).toMatchObject(RUNNING)
+    expect(v.steps.card.action.kind).toBe('answer')
+    expect(v.steps.card.detail).toBe('An engineer is at work on this run. Answer when you can.')
+  })
+
+  it('with no plan: no effect on a plan run, and still listed', () => {
+    const line = entry('PENDING', 'orchestrator → human', '', 'ask: which title?')
+    const v = views(repoOf([line]))
+    expect(v).toMatchObject(IDLE)
+    expect(v.steps.rest.map((i) => i.entry?.line)).toEqual([line.trim()])
+  })
+
+  it('has its own Waiting group, first among the pending groups', () => {
+    const v = views(repoOf([ASK('engineer'), tagged('PENDING', 'engineer → human', 'ask: another one?'), DECISION]))
+    expect(waitGroups(v.steps.rest).map((g) => g.label)).toEqual(['Asks', 'Decisions'])
+  })
+})
+
 describe('an orchestrator note that asks nothing', () => {
   const DOOR = tagged('PENDING', 'orchestrator → human', 'one-way door in PR #12 — drops the old table, undo: restore from the dump')
 
