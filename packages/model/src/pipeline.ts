@@ -115,12 +115,19 @@ const isGateOrHandBack = (e: Pick<QueueItem, 'isPending' | 'route' | 'body'>, pl
 const FIX_NEXT = /^fix next\b[^:]*:/i
 
 /**
- * The orchestrator asks you in plain words: no kind word and no recorded default. It joins a plan: one that joins
- * none stays listed and stops nothing. An entry that names an open slice is the slice rule's.
+ * The words of an ask: `needs your …`, `your go`, `your call`, `your answer`, or a body that ends in `?`, with any
+ * closing punctuation. Word matching, until `claude-pod` marks asks: a note in other words reads as no ask.
+ */
+const ASKS = /\bneeds your\s+\S|\byour (?:go|call|answer)\b|\?[\s)\]"'.!_]*$/i
+
+/**
+ * The orchestrator asks you in plain words: it asks (`ASKS`), with no kind word and no recorded default. It joins a
+ * plan: one that joins none stays listed and stops nothing. An entry that names an open slice is the slice rule's.
+ * A note that asks nothing (a one-way door, a concern kept while pod goes on) stops nothing: a door's real stop is its wave PR.
  */
 const isPlainAsk = (e: Pick<QueueItem, 'route' | 'body' | 'slice' | 'sprint'>, plan: Pick<PlanModel, 'slug' | 'sprints'> | undefined) => {
   const text = unmarked(e.body)
-  return plan !== undefined && FROM_ORCHESTRATOR.test(e.route.trim()) && kindOf(e.body) === 'other' && !FIX_NEXT.test(text) && !RECORDED_DEFAULT.test(text) && !namesOpenSlice(e, plan)
+  return plan !== undefined && FROM_ORCHESTRATOR.test(e.route.trim()) && ASKS.test(text) && kindOf(e.body) === 'other' && !FIX_NEXT.test(text) && !RECORDED_DEFAULT.test(text) && !namesOpenSlice(e, plan)
 }
 
 /**
@@ -245,6 +252,17 @@ function pushedHeld(repo: Pick<BoardRepo, 'agents' | 'prs'>, plan: PlanModel, x:
   if (x.status !== 'pushed') return false
   if (!repo.agents.some((a) => isPlanAgent(a, plan) && a.lastAt !== undefined && now - a.lastAt < ENGINEER_QUIET_MS)) return false
   return isAutopilot(plan) || !repo.prs.some((p) => p.number === x.pr.number && p.state === 'merged')
+}
+
+/**
+ * Under autopilot, pod holds a pushed slice of the current sprint, unless it stopped at a gate or halt (`isAutopilotStopped`:
+ * it ended its turn, and `continue` is how it resumes). It merges the PR or waits on its checks, so no
+ * `continue` goes into that session, whatever the run reads. When pod has died (`pushedHeld` ends), `continue` returns.
+ */
+export function autopilotHoldsPushed(repo: Pick<BoardRepo, 'agents' | 'prs'>, plan: PlanModel, now: number): boolean {
+  if (!isAutopilot(plan) || isAutopilotStopped(plan)) return false
+  const current = plan.sprints.find((s) => s.slug === plan.currentSprint)
+  return current?.waves.some((w) => w.slices.some((x) => !isSliceDone(x) && !isBlockedSlice(x) && pushedHeld(repo, plan, x, now))) ?? false
 }
 
 /**
