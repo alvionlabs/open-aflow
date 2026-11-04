@@ -25,7 +25,7 @@ const isExecutable = (file: string): boolean => {
 }
 
 /** On Windows, a drive path (`C:\x`); `\x` and `C:x` hang off the current drive or folder. */
-const isAbsoluteFor = (p: string, win: boolean): boolean => (win ? /^[A-Za-z]:[\\/]/.test(p) || /^[\\/]{2}[^\\/]/.test(p) : path.posix.isAbsolute(p))
+export const isAbsoluteFor = (p: string, win: boolean): boolean => (win ? /^[A-Za-z]:[\\/]/.test(p) || /^[\\/]{2}[^\\/]/.test(p) : path.posix.isAbsolute(p))
 
 /**
  * `env` made safe for a child started in a repo folder: PATH keeps only its absolute
