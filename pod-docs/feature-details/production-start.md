@@ -14,7 +14,7 @@ Two entries share one wiring. `startServer` holds it. `main.ts` runs dev, and `m
 | Port | `POD_BOARD_API_PORT`, default 3000, no fallback | See below |
 | `Host` and `Origin` | API port and web port | The bound port only |
 | Page routes | Vite | The answer order below |
-| Framing headers | None (open finding, see **Watch out**) | On every web answer |
+| Framing headers | `frame-ancestors 'none'` and `X-Frame-Options: DENY` from Vite | On every web answer |
 
 **Port.** With `POD_BOARD_API_PORT` unset or empty, the server tries 47800. On `EADDRINUSE` or `EACCES`, the OS picks a free port for this launch, and the log names it. With the variable set, a busy port stops the start.
 
@@ -54,7 +54,6 @@ Every web answer, a 404 too, sends `Content-Security-Policy: frame-ancestors 'no
 
 ## Watch out
 
-- **Open finding (PR #83, round 2):** `pnpm dev` still lets another page frame the board. Vite sends neither header, and it puts the token in the page. A click in a frame on a `file://` page wrote to `auto-continue.json`. The fix goes in `server.headers` and `preview.headers` in `packages/web/vite.config.ts`.
 - **Open queue item (before hosting):** any local process can read the token from `GET /`, and `tool-path` then chooses the file that runs as `claude`.
 - A framed page passes the guards, because it holds its own token and sends its own `Origin`. Only the headers stop it.
 - `/sw.js` differs by mode: production answers 404 JSON, and dev's web port answers HTML from Vite.
