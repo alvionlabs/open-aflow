@@ -27,7 +27,7 @@ This build has no code signature, so Windows can warn you.
 The app looks for these tools when it starts. If it can't find a tool, the **Setup check** screen opens.
 
 1. Install the tool, then select **Recheck**.
-2. If the tool stays missing, type its full path in the field on that row, then save. For example: `C:\Program Files\Git\cmd\git.exe`.
+2. If the tool stays missing, type its full path in the field on that row, then select **Save**. For example: `C:\Program Files\Git\cmd\git.exe`.
 
 A typed path also helps when your user folder name has letters outside English, such as `C:\Users\José`. The app can fail to read such a folder from your system `Path`, but a typed path still works.
 
