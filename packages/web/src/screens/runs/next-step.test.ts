@@ -97,7 +97,8 @@ describe('next step', () => {
     expect(s.card).toEqual<NextItem>({
       key: entryKey(T1_BLOCKED),
       tier: 'blocked',
-      status: 'blocked',
+      // An engineer's BLOCKED to you: the run reads needs you (only a halt reads blocked), so the card does too.
+      status: 'needs-you',
       title: "T1 can't reach the rates file.",
       detail: 'The run is stopped until you answer.',
       entry: expect.objectContaining({ line: T1_BLOCKED, route: 'engineer → human', body: "T1 can't reach the rates file.", answerable: true }),
@@ -140,7 +141,7 @@ describe('next step', () => {
     expect(s.rest[1]).toEqual<NextItem>({
       key: entryKey(H1),
       tier: 'pending',
-      status: 'idle',
+      status: 'needs-you',
       goesOn: true,
       title: expect.stringMatching(/^Needs your decision: recent arenas gave too few players .*…$/),
       detail: 'pod goes on with the value in use until you answer.',
@@ -384,9 +385,9 @@ describe('next step', () => {
     const DECISION = p('PENDING', '**decision (wording):** pick the `port` label.')
     const s = steps(chess([onlyQueue(DECISION)]))
     expect(s.card).toMatchObject({ tier: 'pending', status: 'idle', title: 'pick the port label.', kind: { cls: 's-run', label: 'decision (wording)' } })
-    // A BLOCKED entry keeps its blocked status; its kind shows beside it.
+    // A BLOCKED entry to you says what the run says; its kind shows beside it.
     const BLOCKED_NOW = p('BLOCKED', 'now: the rates file is missing.')
-    expect(steps(chess([onlyQueue(BLOCKED_NOW)])).card).toMatchObject({ tier: 'blocked', status: 'blocked', title: 'the rates file is missing.', kind: { cls: 's-you', label: 'now' } })
+    expect(steps(chess([onlyQueue(BLOCKED_NOW)])).card).toMatchObject({ tier: 'blocked', status: 'needs-you', title: 'the rates file is missing.', kind: { cls: 's-you', label: 'now' } })
     // No kind word: no kind on the card (a BLOCKED one already says blocked), and the whole body as title.
     const plain = steps(chess([onlyQueue(T1_BLOCKED)])).card
     expect(plain.title).toBe("T1 can't reach the rates file.")

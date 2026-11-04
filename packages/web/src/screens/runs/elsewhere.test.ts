@@ -239,7 +239,7 @@ describe('elsewhere', () => {
     expect(pick(RECIPE.reply('x'), RECIPE.decision('a'), RECIPE.merge('b'), RECIPE.blocked('c'))?.more).toBe(1)
   })
 
-  it('a shared entry counts once', () => {
+  it('an entry with no plan on two runs raises nothing', () => {
     // An entry with no plan tag goes to every run of its repo: the plan run and a fix run here.
     const name = 'fix-scroll'
     const claim: Claim = { portBase: 3100, repoPath: '/y', plan: name }
@@ -248,19 +248,17 @@ describe('elsewhere', () => {
     const yRuns = listRuns(boardOf(y), NOW)
     const plan = yRuns.find((r) => r.plan === PLAN)!
     const fix = yRuns.find((r) => r.plan === name)!
-    expect(cardOf(y, plan).key).toBe(cardOf(y, fix).key)
+    // It heads neither run's card, so it raises no banner and counts for nothing.
+    expect(cardOf(y, plan).tier).toBe('nothing')
+    expect(cardOf(y, fix).tier).toBe('nothing')
     const x = RECIPE.nothing('x')
     const xRun = runOf(x)
-    // The two runs' cards are one item: the winner, with nothing more.
-    const got = elsewhere([xRun, plan, fix], boardOf(x, y), xRun, NOW)
-    expect(got?.run).toEqual(plan)
-    expect(got?.more).toBe(0)
-    // Behind an older winner, the shared item still counts once.
+    expect(elsewhere([xRun, plan, fix], boardOf(x, y), xRun, NOW)).toBeUndefined()
     const z = repoOf('z', [onlyQueue(blocked('2026-10-01')), manual])
     const zRun = runOf(z)
     const behind = elsewhere([xRun, plan, fix, zRun], boardOf(x, y, z), xRun, NOW)
     expect(behind?.run.repoId).toBe('z')
-    expect(behind?.more).toBe(1)
+    expect(behind?.more).toBe(0)
   })
 
   it('selected run, missing board and missing repo', () => {

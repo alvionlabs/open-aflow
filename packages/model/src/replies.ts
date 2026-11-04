@@ -3,7 +3,7 @@
 
 import type { AgentRun, BoardRepo } from './board.ts'
 import { fixPr, fixRunAgents, fixRunNames, fixWaitingPr, listedFixRuns } from './fix-runs.ts'
-import { handBackPr, isAutopilot, isBlockedSlice, isHalted, isPlanAgent, isRun, isRunning, isSliceDone, pendingHandBack, planAgentRunning, waveWaitingPr } from './pipeline.ts'
+import { handBackPr, isAutopilot, isBlockedSlice, isHalted, isPlanAgent, isRun, isRunning, isSliceDone, pendingHandBack, planAgentRunning, waitsOnEngineer, waveWaitingPr } from './pipeline.ts'
 import { asksYou } from './queue-answer.ts'
 import type { PlanModel } from './run-model.ts'
 
@@ -50,7 +50,7 @@ export function runReplies(repo: BoardRepo, run: string, now: number): RunReply[
 }
 
 function planReplies(repo: BoardRepo, plan: PlanModel, now: number): RunReply[] {
-  if (!isRun(repo, plan, now) || planAgentRunning(repo, plan, now)) return []
+  if (!isRun(repo, plan, now) || planAgentRunning(repo, plan, now) || waitsOnEngineer(repo, plan, now)) return []
   // A halt hides the stop replies: only answering it moves pod on. Any stop reply wins over answered.
   const stop = isHalted(plan) ? [] : stopReplies(repo, plan, now)
   if (stop.length > 0) return stop

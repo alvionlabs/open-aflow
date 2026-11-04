@@ -6,6 +6,7 @@
 import {
   buildPipeline,
   isBlockedSlice,
+  isPlanHeld,
   isSliceDone,
   isSliceRunning,
   isWaveRunning,
@@ -83,9 +84,13 @@ export function buildWaveBoard(repo: BoardRepo, planSlug: string, now: number): 
         status: group?.status ?? '',
         cards: w.slices.map((slice): Card => {
           const row = group?.rows.find((r) => r.code === slice.code) ?? { code: slice.code, title: slice.title, live: false }
-          // The wave in progress with nothing of its own running reads the run's state, as the flow's card does.
-          const running = isSliceRunning(repo, plan, sprint, w, slice, now)
-          const inProgress = sprint.slug === plan.currentSprint && sprint.currentWave === w.wave && !isWaveRunning(repo, plan, sprint, w, now) ? run : undefined
+          // As the flow's card: a stop on the whole plan reads first on a live wave; the wave in progress
+          // with nothing of its own running reads the run's state.
+          const current = sprint.slug === plan.currentSprint && sprint.currentWave === w.wave
+          const waveRuns = isWaveRunning(repo, plan, sprint, w, now)
+          const held = (current || waveRuns) && isPlanHeld(plan)
+          const running = !held && isSliceRunning(repo, plan, sprint, w, slice, now)
+          const inProgress = held || (current && !waveRuns) ? run : undefined
           const state = cardState(plan, sprint.slug, slice, running, mergePr !== undefined, inProgress)
           return { code: slice.code, title: slice.title, state, meta: cardMeta(plan, sprint.slug, slice, row, state, mergePr), critical: false, slice, row }
         }),
