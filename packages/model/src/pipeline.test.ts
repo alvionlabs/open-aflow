@@ -544,12 +544,14 @@ describe('what stops a run', () => {
     ['a hand-back', human('PENDING', 'orchestrator', 'plan: alpha', 'plan alpha complete — final PR https://github.com/o/r/pull/80.')],
     ['a hand-back with no slug or PR', human('PENDING', 'orchestrator', 'plan: alpha', 'Plan complete: all merged.')],
     ['a hand-back in other words', human('PENDING', 'orchestrator', 'plan: alpha', 'Final PR https://github.com/o/r/pull/80 is awaiting you.')],
+    ['a hand-back with a comma before its URL', human('PENDING', 'orchestrator', 'plan: alpha', 'Before you go, final PR https://github.com/o/r/pull/80 is awaiting you.')],
+    ["a hand-back with the plan's own slug", human('PENDING', 'orchestrator', 'plan: alpha', 'plan alpha complete, all merged.')],
     ['a hand-back that mentions a default', human('PENDING', 'orchestrator', 'plan: alpha', 'Final PR https://github.com/o/r/pull/80 awaits you; 2 entries kept an agent default.')],
     ['an ask naming an open slice', human('PENDING', 'engineer', 'plan: alpha · sprint: s1 · slice: A1', 'Which store?')],
     ['a `now` naming an open slice', human('PENDING', 'engineer', 'plan: alpha · sprint: s1 · slice: A1', 'now: pick the store.')],
     ['an empty value in use', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Which store? Value in use: .')],
     ['a default in prose only', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Which store? It is off by default.')],
-    ['an answered ask, until pod resolves it', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Which store?').replace(' **Resolution:**', ' **Answer (human):** SQLite **Resolution:**')],
+    ['an answered ask, until pod resolves it', `${human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Which store?')} **Answer (human):** SQLite`],
     ['a BLOCKED to you, also with a value in use', human('BLOCKED', 'engineer', 'plan: alpha · slice: A1', 'decision: store? Value in use: SQLite.')],
   ])('stops: %s', (_name, line) => {
     expect(stateOf(line)).toBe('needs-you')
@@ -569,6 +571,10 @@ describe('what stops a run', () => {
     ['a plain note', human('PENDING', 'reviewer', 'plan: alpha', 'The cache is cold.')],
     ['a gate named mid-sentence', human('PENDING', 'orchestrator', 'plan: alpha', 'now: past gate 5, it went on.')],
     ['plan words that are no hand-back', human('PENDING', 'orchestrator', 'plan: alpha', "Plan review isn't complete yet.")],
+    ['a reviewer saying the plan review is complete', human('PENDING', 'reviewer', 'plan: alpha', 'Plan review complete: no findings.')],
+    ['the orchestrator saying the plan review is complete', human('PENDING', 'orchestrator', 'plan: alpha', 'Plan review complete: no findings.')],
+    ["another plan's name", human('PENDING', 'orchestrator', 'plan: alpha', 'plan other complete, all merged.')],
+    ['an engineer saying the plan is complete', human('PENDING', 'engineer', 'plan: alpha', 'plan alpha complete, all merged.')],
     ['an ask naming a done slice', human('PENDING', 'engineer', 'plan: alpha · slice: A0', 'Which store?')],
     ['an ask naming no slice of the plan', human('PENDING', 'engineer', 'plan: alpha · slice: wave 1', 'Which store?')],
     ['an ask naming a slice under another sprint', human('PENDING', 'engineer', 'plan: alpha · sprint: s9 · slice: A1', 'Which store?')],
@@ -580,6 +586,11 @@ describe('what stops a run', () => {
   ])('goes on: %s', (_name, line) => {
     expect(stateOf(line)).toBe('idle')
     expect(stateOf(line, [running({ sprint: 's1', slice: 'A1' })])).toBe('running')
+  })
+
+  it('a hand-back with a comma before its URL keeps its Merge', () => {
+    const line = human('PENDING', 'orchestrator', 'plan: alpha', 'Before you go, final PR https://github.com/o/r/pull/80 is awaiting you.')
+    expect(model.waitingPrs(repo(files({ ...OPEN, queue: [line] })), NOW).map((w) => w.number)).toEqual([80])
   })
 
   it('a note that only reads like a hand-back offers no Merge', () => {
