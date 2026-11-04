@@ -158,6 +158,19 @@ describe('createClaudeRunner', () => {
     expect(argv).not.toContain('--bare')
   })
 
+  test('a resumed run gets the two machine settings and none of the dropped names', async () => {
+    const kept = { CLAUDE_CODE_GIT_BASH_PATH: 'C:\\fake\\bash.exe', CLAUDE_CODE_MAX_OUTPUT_TOKENS: '1234' }
+    const dropped = ['CLAUDECODE', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_PID', 'CLAUDE_EFFORT', 'CLAUDE_CODE_ENTRYPOINT', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_FOO']
+    const env = envWith({ ...kept, ...Object.fromEntries(dropped.map((n) => [n, 'fake'])) })
+    const runner = createClaudeRunner({ bin: 'claude', logDir, env, windowMs: 3000 })
+    expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
+    const seen = (await readRecord()).env
+    expect(seen.CLAUDE_CODE_MAX_OUTPUT_TOKENS).toBe(kept.CLAUDE_CODE_MAX_OUTPUT_TOKENS)
+    const names = Object.keys(seen).map((k) => k.toUpperCase())
+    for (const n of dropped) expect(names).not.toContain(n)
+    if (WIN) expect(seen.CLAUDE_CODE_GIT_BASH_PATH).toBe(kept.CLAUDE_CODE_GIT_BASH_PATH)
+  })
+
   test('strips api keys from the env', async () => {
     const env = envWith({
       ANTHROPIC_API_KEY: 'sk-1',
@@ -649,6 +662,39 @@ describe('childEnv', () => {
     )
     expect(out.CLAUDE_CONFIG_DIR).toBe(board.CLAUDE_CONFIG_DIR)
     expect(board.CLAUDECODE).toBe('1') // the board's own env is left alone
+  })
+
+  describe('the machine settings kept by exact name', () => {
+    test('CLAUDE_CODE_GIT_BASH_PATH and CLAUDE_CODE_MAX_OUTPUT_TOKENS pass on, in any case', () => {
+      const out = childEnv({ CLAUDE_CODE_GIT_BASH_PATH: 'C:\\fake\\bash.exe', claude_code_max_output_tokens: '1234' }, 'win32')
+      expect(out.CLAUDE_CODE_GIT_BASH_PATH).toBe('C:\\fake\\bash.exe')
+      expect(out.claude_code_max_output_tokens).toBe('1234')
+    })
+
+    test('credentials, session state, and any other CLAUDE_CODE_ name stay out', () => {
+      const board = {
+        CLAUDECODE: '1',
+        CLAUDE_CODE_OAUTH_TOKEN: 'fake',
+        CLAUDE_PID: '42',
+        CLAUDE_EFFORT: 'high',
+        CLAUDE_CODE_ENTRYPOINT: 'cli',
+        ANTHROPIC_API_KEY: 'fake',
+        CLAUDE_CODE_FOO: 'x',
+        CLAUDE_CODE_MAX_OUTPUT_TOKENS_X: 'x',
+        CLAUDE_CODE_GIT_BASH_PATH_X: 'x',
+        KEPT_NOTE: 'kept: no dropped prefix',
+      }
+      expect(Object.keys(childEnv(board, 'linux'))).toEqual(['KEPT_NOTE'])
+    })
+
+    test('a relative bash path stays out: it would resolve in the repo folder the run starts in', () => {
+      for (const rel of ['bash.exe', '.\\bash.exe', 'tools\\bash.exe', 'D:bash.exe', '\\bash.exe', '']) {
+        expect(childEnv({ CLAUDE_CODE_GIT_BASH_PATH: rel }, 'win32').CLAUDE_CODE_GIT_BASH_PATH).toBeUndefined()
+      }
+      expect(childEnv({ claude_code_git_bash_path: 'bash' }, 'linux').claude_code_git_bash_path).toBeUndefined()
+      expect(childEnv({ CLAUDE_CODE_GIT_BASH_PATH: 'D:/Git/bin/bash.exe' }, 'win32').CLAUDE_CODE_GIT_BASH_PATH).toBe('D:/Git/bin/bash.exe')
+      expect(childEnv({ CLAUDE_CODE_GIT_BASH_PATH: '/usr/bin/bash' }, 'linux').CLAUDE_CODE_GIT_BASH_PATH).toBe('/usr/bin/bash')
+    })
   })
 
   test('drops empty and relative PATH entries, keeping order and the key as spelled', () => {

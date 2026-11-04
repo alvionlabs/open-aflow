@@ -19,8 +19,9 @@ export type GhReader = {
   /** The PR found by its head branch (a fix run's `fix-<slug>`, or a plan's final PR on `<plan-slug>`), with `branch` set. */
   getBranch(repoPath: string, branch: string): PrStatus | undefined
   /**
-   * Fetches the PRs that are due, by number and by head branch. `staging` heads are asked about every
-   * PR_CACHE_MS even after a merge (every plan reuses the branch). `true` when the gh status or
+   * Fetches the PRs that are due, by number and by head branch. `staging` heads are asked about even
+   * after a merge (every plan reuses the branch). A head with no open PR slows to NO_PR_SLOW_MS after
+   * NO_PR_ASK_LIMIT asks. `true` when the gh status or
    * any PR's number, state, checks, or url changed.
    */
   refresh(repoPath: string, numbers: number[], branches?: string[], staging?: string[]): Promise<boolean>
@@ -34,6 +35,13 @@ export type GhCache = GhReader & {
 
 export const AUTH_RECHECK_MS = 60_000
 export const PR_CACHE_MS = 30_000
+/**
+ * How many asks a branch with no open PR gets at PR_CACHE_MS: 2 hours' worth. It counts asks, not
+ * time, so a laptop sleep or a gh logout, when nothing is asked, doesn't use it up.
+ */
+export const NO_PR_ASK_LIMIT = (2 * 60 * 60_000) / PR_CACHE_MS
+/** How often a branch is asked about after NO_PR_ASK_LIMIT, in clock time, so a PR opened later still shows. */
+export const NO_PR_SLOW_MS = 5 * 60_000
 export const GH_TIMEOUT_MS = 10_000
 const PR_FIELDS = 'number,state,url,statusCheckRollup,baseRefName,mergedAt'
 /** `title` names a fix run in its header; only PRs found by branch need it. */
@@ -110,7 +118,8 @@ export const createFoundGhExec =
 /** Runs `gh`. */
 export const defaultGhExec: GhExec = createGhExec()
 
-type Entry = { value?: PrStatus; fetchedAt?: number; inflight?: Promise<boolean> }
+/** `noPrAsks`: a head-branch entry only, the asks in a row that left it with no open PR. */
+type Entry = { value?: PrStatus; fetchedAt?: number; inflight?: Promise<boolean>; noPrAsks?: number }
 
 export function createGhReader(opts: { exec?: GhExec; now?: () => number; ghFound?: () => boolean } = {}): GhCache {
   const exec = opts.exec ?? defaultGhExec
@@ -173,16 +182,16 @@ export function createGhReader(opts: { exec?: GhExec; now?: () => number; ghFoun
   }
 
   /**
-   * Fetches an entry when it's due: not final, and not fetched in the last PR_CACHE_MS. By number,
+   * Fetches an entry when it's due: not final, and not fetched in the last `waitMs`. By number,
    * merged and closed are final. By branch, only merged is: a closed PR can be reopened, or a new PR
    * opened on the same branch, while the run lasts.
    */
-  const refreshEntry = (key: string, fetch: (entry: Entry) => Promise<boolean>, isFinal: (pr: PrStatus) => boolean): Promise<boolean> => {
+  const refreshEntry = (key: string, fetch: (entry: Entry) => Promise<boolean>, isFinal: (pr: PrStatus) => boolean, waitMs: (entry: Entry) => number = () => PR_CACHE_MS): Promise<boolean> => {
     let entry = cache.get(key)
     if (!entry) cache.set(key, (entry = {}))
     if (entry.inflight) return entry.inflight
     if (entry.value && isFinal(entry.value)) return Promise.resolve(false)
-    if (entry.fetchedAt !== undefined && now() - entry.fetchedAt < PR_CACHE_MS) return Promise.resolve(false)
+    if (entry.fetchedAt !== undefined && now() - entry.fetchedAt < waitMs(entry)) return Promise.resolve(false)
     const e = entry
     e.inflight = fetch(e).finally(() => {
       e.inflight = undefined
@@ -197,15 +206,38 @@ export function createGhReader(opts: { exec?: GhExec; now?: () => number; ghFoun
       (pr) => pr.state !== 'open',
     )
 
+  /**
+   * Counts an ask that left the entry with no open PR, or clears the count on an open one. A failed
+   * ask counts too, or a branch gh can never read (a folder with no remote) would cost 30 s asks with
+   * no end. Merged on a plan or fix head is final, so only a reused head is asked on and slows.
+   */
+  const countNoPr = (e: Entry) => {
+    e.noPrAsks = e.value?.state === 'open' ? 0 : (e.noPrAsks ?? 0) + 1
+  }
+
+  const branchWaitMs = (e: Entry) => ((e.noPrAsks ?? 0) >= NO_PR_ASK_LIMIT ? NO_PR_SLOW_MS : PR_CACHE_MS)
+
+  /** A branch no longer asked about loses its count: when it returns, it starts again at the normal rate. */
+  const clearUnasked = (repoPath: string, asked: string[]) => {
+    const keys = new Set(asked.map((b) => branchKey(repoPath, b)))
+    for (const [key, entry] of cache) {
+      if (key.startsWith('branch\u0000') && key.endsWith(`\u0000${repoPath}`) && !keys.has(key)) entry.noPrAsks = 0
+    }
+  }
+
   /** `reused`: a branch every plan merges through (staging), so even a merged PR on it is asked about again. */
   const refreshBranch = (repoPath: string, branch: string, reused = false) =>
     refreshEntry(
       branchKey(repoPath, branch),
-      (e) =>
-        fetchInto(['pr', 'list', '--head', branch, '--state', 'all', '--json', LIST_FIELDS, '--limit', '10'], repoPath, e, (out, at) =>
+      async (e) => {
+        const changed = await fetchInto(['pr', 'list', '--head', branch, '--state', 'all', '--json', LIST_FIELDS, '--limit', '10'], repoPath, e, (out, at) =>
           parsePrList(out, branch, at),
-        ),
+        )
+        countNoPr(e)
+        return changed
+      },
       (pr) => !reused && pr.state === 'merged',
+      branchWaitMs,
     )
 
   return {
@@ -226,6 +258,7 @@ export function createGhReader(opts: { exec?: GhExec; now?: () => number; ghFoun
       const wanted = [...new Set(numbers)].filter((n) => Number.isSafeInteger(n) && n > 0)
       const heads = [...new Set(branches)].filter((b) => BRANCH.test(b))
       const reused = [...new Set(staging)].filter((b) => BRANCH.test(b) && !heads.includes(b))
+      clearUnasked(repoPath, [...heads, ...reused])
       const results = await Promise.all([
         ...wanted.map((n) => refreshPr(repoPath, n)),
         ...heads.map((b) => refreshBranch(repoPath, b)),

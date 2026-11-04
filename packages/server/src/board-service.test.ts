@@ -7,7 +7,7 @@ import type { Board } from '@pod-board/model'
 import * as model from '@pod-board/model'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createBoardService, finalPrBranches, livePrNumbers, type BoardServiceDeps } from './board-service.ts'
-import type { GhReader, GhStatus, PrStatus } from './gh.ts'
+import { createGhReader, PR_CACHE_MS, type GhExec, type GhReader, type GhStatus, type PrStatus } from './gh.ts'
 import { normalizeRepoPath, repoId } from './guard.ts'
 import { projectDirName } from './transcript-files.ts'
 import { createBoardWatcher } from './watcher.ts'
@@ -452,6 +452,35 @@ describe('board service', () => {
     expect(board.repos[0]!.prs).toEqual([pr])
     const ship = model.buildPipeline(board.repos[0]!, 'ui-polish', NOW)?.stages.find((s) => s.key === 'ship')?.steps
     expect(ship).toEqual([{ key: 'final-pr', label: 'Final PR', state: 'wait', detail: 'PR #91 · after review' }])
+  })
+
+  test('every sprint done in a repo with a staging decision: 6 hours cost 288 asks per branch, with a real gh reader', async () => {
+    const repo = join(root, 'repos', 'done-plan')
+    await mkdir(join(repo, 'pod-docs', 'plans'), { recursive: true })
+    await mkdir(join(repo, 'pod-docs', 'sprints'), { recursive: true })
+    await writeFile(join(repo, 'pod-docs', 'README.md'), '# pod docs\n\npod docs: 2\n')
+    await writeFile(join(repo, 'pod-docs', 'decisions.md'), '# Decisions\n\n## 2026-10-18 — merge target: staging\n\nLand on `pod-staging`.\n')
+    await writeFile(
+      join(repo, 'pod-docs', 'plans', 'alpha.md'),
+      '# Plan: alpha\n\n_Generated: 2026-10-21 · Status: active · Grilled-with: grilling_\n\n## Sprint sequence\n\n| Sprint | Goal | Status | Depends on |\n|--------|------|--------|------------|\n| one | goal | done | — |\n',
+    )
+    await register(repo)
+    let t = NOW
+    const asks = new Map<string, number>()
+    const exec: GhExec = async (args) => {
+      if (args[0] === 'auth') return { status: 'ok', stdout: '' }
+      const head = args[3] ?? ''
+      asks.set(head, (asks.get(head) ?? 0) + 1)
+      const stdout = head === 'pod-staging' ? JSON.stringify([{ number: 5, state: 'MERGED', url: 'https://github.com/o/r/pull/5', statusCheckRollup: [], headRefName: head }]) : '[]'
+      return { status: 'ok', stdout }
+    }
+    const service = createBoardService(deps(createGhReader({ exec, now: () => t })))
+    const board = await service.build()
+    for (let tick = 0; tick < 720; tick++) {
+      await service.refreshGh(board)
+      t += PR_CACHE_MS
+    }
+    expect(Object.fromEntries(asks)).toEqual({ alpha: 288, 'pod-staging': 288 })
   })
 
   test("a final PR into a staging branch: refreshGh asks gh for that branch too, and the Board has its PR", async () => {

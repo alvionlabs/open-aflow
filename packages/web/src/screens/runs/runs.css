@@ -1106,7 +1106,8 @@
   min-width: 0;
 }
 
-.reply-session {
+.reply-session,
+.reply-folder {
   margin: 0;
   overflow-wrap: anywhere;
 }
