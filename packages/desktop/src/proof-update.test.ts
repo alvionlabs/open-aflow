@@ -130,7 +130,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
   const fakePids = () => (pidsFile && existsSync(pidsFile) ? readFileSync(pidsFile, 'utf8').split('\n').filter(Boolean).map(Number) : [])
   const tokenOf = async () => META.exec(await (await fetch(`${base()}/`)).text())![1]!
   // Windows keeps four parts: 0.1.0.0.
-  const exeVersion = () => powershell(`(Get-Item -LiteralPath '${exe()}' -ErrorAction SilentlyContinue).VersionInfo.ProductVersion`).replace(/.0$/, '')
+  const exeVersion = () => powershell(`(Get-Item -LiteralPath '${exe()}' -ErrorAction SilentlyContinue).VersionInfo.ProductVersion`).replace(/\.0$/, '')
   const packagedVersion = () => (JSON.parse(extractFile(join(place.installDir, 'resources', 'app.asar'), 'package.json').toString('utf8')) as { version: string }).version
   const installerFor = (version: string) => join(builds, version, `pod-board-setup-${version}.exe`)
 
