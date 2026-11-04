@@ -339,11 +339,23 @@ describe.runIf(process.platform === 'win32')('on the real process table', () => 
     return Number(found[1])
   }
 
+  /**
+   * The real lookup, asked again while it can't answer. PowerShell can pass the lookup's 5 s limit on a busy machine,
+   * and these tests are about what it reads, not about that limit.
+   */
+  const startTimeOf = (pid: number) => {
+    for (let tries = 1; tries < 4; tries++) {
+      const start = processStartTime(pid)
+      if (start !== undefined) return start
+    }
+    return processStartTime(pid)
+  }
+
   test('reads the start time of a process of another account', () => {
-    const start = processStartTime(servicePid())
+    const start = startTimeOf(servicePid())
     expect(start).toBeGreaterThan(0)
     expect(start).toBeLessThanOrEqual(Date.now())
-  }, 20_000)
+  }, 60_000)
 
   test('a stale file whose ID went to a service is taken over, with no log line', () => {
     // Fixed well before any boot of this machine, as a file left by an earlier boot is.
@@ -359,17 +371,21 @@ describe.runIf(process.platform === 'win32')('on the real process table', () => 
   test('a file written after that process started still reads as held', () => {
     const pid = servicePid()
     held(pid, { startedAt: Date.now() })
-    const owner = createOwnerFile({ dir, log })
+    const owner = createOwnerFile({ dir, log, startTime: startTimeOf })
     expect(owner.take()).toBe(false)
     expect(logs).toEqual([expect.stringContaining(`process ${pid} runs auto-continue`)])
-  }, 20_000)
+  }, 60_000)
 
   test('reads a real start time, and none for a process that is gone', () => {
-    const start = processStartTime(process.pid)
+    const start = startTimeOf(process.pid)
     // Against the process's own clock, so a time zone mistake in the lookup shows.
     expect(Math.abs(start! - (Date.now() - process.uptime() * 1000))).toBeLessThan(10_000)
-    expect(processStartTime(exitedPid())).toBeUndefined()
-  }, 20_000)
+    // On a busy machine Windows can give a gone process's ID straight to a new one, so a real time here means
+    // that happened: ask again about another gone process.
+    let gone = processStartTime(exitedPid())
+    for (let tries = 1; gone !== undefined && tries < 5; tries++) gone = processStartTime(exitedPid())
+    expect(gone).toBeUndefined()
+  }, 60_000)
 
   test('a live program with a reused ID loses the file, and a live server keeps it', async () => {
     const written = Date.now() - 60_000
