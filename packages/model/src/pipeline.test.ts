@@ -544,6 +544,7 @@ describe('what stops a run', () => {
     ['a hand-back', human('PENDING', 'orchestrator', 'plan: alpha', 'plan alpha complete — final PR https://github.com/o/r/pull/80.')],
     ['a hand-back with no slug or PR', human('PENDING', 'orchestrator', 'plan: alpha', 'Plan complete: all merged.')],
     ['a hand-back in other words', human('PENDING', 'orchestrator', 'plan: alpha', 'Final PR https://github.com/o/r/pull/80 is awaiting you.')],
+    ['a hand-back that mentions a default', human('PENDING', 'orchestrator', 'plan: alpha', 'Final PR https://github.com/o/r/pull/80 awaits you; 2 entries kept an agent default.')],
     ['an ask naming an open slice', human('PENDING', 'engineer', 'plan: alpha · sprint: s1 · slice: A1', 'Which store?')],
     ['a `now` naming an open slice', human('PENDING', 'engineer', 'plan: alpha · sprint: s1 · slice: A1', 'now: pick the store.')],
     ['an empty value in use', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Which store? Value in use: .')],

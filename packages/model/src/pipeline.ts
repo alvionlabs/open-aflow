@@ -33,10 +33,8 @@ const SOMEDAY = /^someday\b[^:]*:/i
 /** A default the entry records: `Value in use:`, `Default:`, `Default recorded:` with a value after it, or `agent default`. "off by default" records none. */
 const RECORDED_DEFAULT = /\b(?:value in use|default(?: recorded)?)\s*:\s*[^\s.!?]|\bagent default\b/i
 
-const isHandBack = (e: Pick<QueueItem, 'isPending' | 'route' | 'body'>) => {
-  const text = unmarked(e.body)
-  return e.isPending && FROM_ORCHESTRATOR.test(e.route.trim()) && HAND_BACK.test(e.body) && /\/pull\/\d+/.test(e.body) && !KIND_NOTE.test(text) && !RECORDED_DEFAULT.test(text)
-}
+const isHandBack = (e: Pick<QueueItem, 'isPending' | 'route' | 'body'>) =>
+  e.isPending && FROM_ORCHESTRATOR.test(e.route.trim()) && HAND_BACK.test(e.body) && /\/pull\/\d+/.test(e.body) && !KIND_NOTE.test(unmarked(e.body))
 
 /** The plan's hand-back PR: from the last pending orchestrator entry that hands back and links `/pull/<N>`, and is no kind note. */
 export function handBackPr(plan: Pick<PlanModel, 'queue'>): number | undefined {
