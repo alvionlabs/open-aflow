@@ -41,7 +41,7 @@ export const PR_CACHE_MS = 30_000
  */
 export const NO_PR_ASK_LIMIT = (2 * 60 * 60_000) / PR_CACHE_MS
 /** How often a branch is asked about after NO_PR_ASK_LIMIT, in clock time, so a PR opened later still shows. */
-export const NO_PR_SLOW_MS = 30 * 60_000
+export const NO_PR_SLOW_MS = 5 * 60_000
 export const GH_TIMEOUT_MS = 10_000
 const PR_FIELDS = 'number,state,url,statusCheckRollup,baseRefName,mergedAt'
 /** `title` names a fix run in its header; only PRs found by branch need it. */
