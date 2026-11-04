@@ -10,7 +10,7 @@ import { createBoardService, finalPrBranches, livePrNumbers, type BoardServiceDe
 import { createGhReader, PR_CACHE_MS, type GhExec, type GhReader, type GhStatus, type PrStatus } from './gh.ts'
 import { normalizeRepoPath, repoId } from './guard.ts'
 import { projectDirName } from './transcript-files.ts'
-import { createBoardWatcher } from './watcher.ts'
+import { boardSignature, createBoardWatcher } from './watcher.ts'
 
 // The model as is, with handBackPr and parseAgentTranscript watched, so the test can see the
 // server uses the model's rule and parses only the transcripts that changed.
@@ -529,6 +529,71 @@ describe('board service', () => {
     expect(model.stagingPr(r, plan)).toBe(95)
     const ship = model.buildFlow(r, 'ui-polish', NOW)?.find((s) => s.key === 'ship')?.steps
     expect(ship?.map((s) => [s.label, s.state, s.detail])).toContainEqual(['Staging → main', 'you', 'PR #95 · you merge'])
+  })
+
+  describe('gh reads on the Board', () => {
+    const noPrs: GhExec = async (args) => (args[0] === 'auth' ? { status: 'ok', stdout: '' } : { status: 'ok', stdout: '[]' })
+
+    test('each ask says whether its first read is done', async () => {
+      const repo = copyFixture()
+      await claim(3200, repo, 'fix-clock')
+      const service = createBoardService(deps(createGhReader({ exec: noPrs, now: () => NOW })))
+      const first = await service.build()
+      expect(first.repos[0]!.ghReads).toContainEqual({ branch: 'fix-clock', read: false })
+      await service.refreshGh(first)
+      expect((await service.build()).repos[0]!.ghReads).toContainEqual({ branch: 'fix-clock', read: true })
+    })
+
+    test('a read that finds nothing still reaches the subscribers', async () => {
+      // No PR changed, so only this field can tell the notifier that the read is done.
+      const repo = copyFixture()
+      await claim(3200, repo, 'fix-clock')
+      const service = createBoardService(deps(createGhReader({ exec: noPrs, now: () => NOW })))
+      const first = await service.build()
+      await service.refreshGh(first)
+      expect(boardSignature(await service.build())).not.toBe(boardSignature(first))
+    })
+
+    test('a failed read stays unread, and a PR number is asked by number', async () => {
+      const repo = copyFixture()
+      const queue = join(repo, 'pod-docs', 'handoff-queue.md')
+      const handBack = '- `[2026-10-20 · PENDING · orchestrator → human · plan: sparring-ladder]` plan sparring-ladder complete — final PR https://github.com/o/r/pull/77 **Resolution:** pending'
+      await writeFile(queue, `${await readFile(queue, 'utf8')}\n${handBack}\n`)
+      await register(repo)
+      const failing: GhExec = async (args) => (args[0] === 'auth' ? { status: 'ok', stdout: '' } : { status: 'failed', stdout: '' })
+      const service = createBoardService(deps(createGhReader({ exec: failing, now: () => NOW })))
+      await service.refreshGh(await service.build())
+      expect((await service.build()).repos[0]!.ghReads).toContainEqual({ pr: 77, read: false })
+    })
+
+    test('a staging ask is marked, because a PR read can bring it', async () => {
+      const repo = copyFixture('chess-web', 'chess-web-ui-polish')
+      await writeFile(join(repo, 'pod-docs', 'handoff-queue.md'), '# Handoff Queue\n')
+      await claim(3200, repo, 'ui-polish')
+      const final: PrStatus = { number: 91, state: 'merged', checks: 'pass', checkedAt: NOW, branch: 'ui-polish', base: 'ui-polish-staging' }
+      const gh: GhReader = { ...fakeGh({}, 'ok', { 'ui-polish': final }), prRead: () => false, branchRead: (_p, b) => b === 'ui-polish' }
+      const board = await createBoardService(deps(gh)).build()
+      expect(board.repos[0]!.ghReads).toEqual(expect.arrayContaining([{ branch: 'ui-polish', read: true }, { branch: 'ui-polish-staging', staging: true, read: false }]))
+    })
+
+    test('a reader with no read state adds no field', async () => {
+      const repo = copyFixture()
+      await claim(3200, repo, 'fix-clock')
+      expect((await createBoardService(deps()).build()).repos[0]).not.toHaveProperty('ghReads')
+    })
+
+    test('a repo that asks for nothing adds no field, and neither does a bad repo', async () => {
+      const bare = join(root, 'bare')
+      await mkdir(join(bare, 'pod-docs'), { recursive: true })
+      await register(bare)
+      const service = createBoardService(deps(createGhReader({ exec: noPrs, now: () => NOW })))
+      expect((await service.build()).repos[0]).not.toHaveProperty('ghReads')
+
+      await rm(bare, { recursive: true, force: true })
+      const gone = (await service.build()).repos[0]!
+      expect(gone.error).toBeDefined()
+      expect(gone).not.toHaveProperty('ghReads')
+    })
   })
 
   test('a PR found by branch that is also a numbered live PR is on the Board once', async () => {

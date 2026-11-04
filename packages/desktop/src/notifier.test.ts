@@ -3,11 +3,11 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { buildRepoModel, type AgentRun, type Board, type BoardRepo, type PrStatus } from '@pod-board/model'
+import { buildRepoModel, type AgentRun, type Board, type BoardRepo, type GhRead, type PrStatus } from '@pod-board/model'
 import { LIVE_TICK_MS } from '@pod-board/web/selection'
 import { loadFixture } from '../../model/test/load-fixture.ts'
 import { bundleDesktop } from './bundle-desktop.ts'
-import { createNotifier, GH_HOLD_MS, type Toast } from './notifier.ts'
+import { createNotifier, type Toast } from './notifier.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const NOW = Date.UTC(2026, 9, 20, 12)
@@ -35,8 +35,6 @@ const boardOf = (...repos: BoardRepo[]): Board => ({ generatedAt: NOW, gh: 'ok',
 const withEntries = (...names: string[]) => boardOf(repoWith(names))
 /** Stops being a merged-PR reply's blocker once `live` goes stale. */
 const clockBoard = () => boardOf(repoWith([], { pr: prOf(78, 'merged'), agents: [live] }))
-/** A Board at this gh state, with entries and with one PR item that only gh can name. */
-const ghBoard = (gh: Board['gh'], names: string[], pr?: number): Board => ({ ...boardOf(repoWith(names, pr === undefined ? {} : { pr: prOf(pr, 'open') })), gh })
 
 function setup(o: { supported?: () => boolean; send?: (t: Toast) => void } = {}) {
   const toasts: Toast[] = []
@@ -247,88 +245,205 @@ describe('notifier', () => {
     expect(s.dot).toEqual([false])
   })
 
-  describe('the hold while gh has not answered', () => {
-    test('an old PR that only gh can name sends nothing', () => {
+  describe("the PRs gh hadn't read at the first Board", () => {
+    const FIX = 'fix-scroll'
+    /** A reviewed fix run: its merge item exists only once gh names PR #36 on its branch. */
+    const fixRun = (o: { names?: string[]; reads?: GhRead[]; pr?: boolean; reviewed?: boolean; gh?: Board['gh']; slicePr?: number } = {}): Board => {
+      const at = Date.now()
+      const engineer: AgentRun = { id: 'f1', session: 'sess-1', type: 'pod:engineer', tokens: 0, ended: true, branch: FIX, startedAt: at - 90 * 60_000, lastAt: at - 60 * 60_000 }
+      const reviewer: AgentRun = { ...engineer, id: 'f2', type: 'pod:reviewer', kind: 'fix', startedAt: at - 50 * 60_000, lastAt: at - 5 * 60_000 }
+      const base = repoWith(o.names ?? [], o.slicePr === undefined ? {} : { pr: prOf(o.slicePr, 'open') })
+      const repo: BoardRepo = {
+        ...base,
+        claims: [{ portBase: 3100, repoPath: base.path, plan: FIX }],
+        agents: o.reviewed === false ? [{ ...engineer, ended: false, lastAt: at }] : [engineer, reviewer],
+        prs: [...base.prs, ...(o.pr ? [{ ...prOf(36, 'open'), branch: FIX }] : [])],
+        ...(o.reads ? { ghReads: o.reads } : {}),
+      }
+      return { ...boardOf(repo), gh: o.gh ?? 'ok' }
+    }
+    const unread: GhRead[] = [{ branch: FIX, read: false }]
+    const read: GhRead[] = [{ branch: FIX, read: true }]
+    const AFTER_THE_OLD_HOLD = 91_000
+
+    test('the fixture: PR #36 is an item only when gh names it', () => {
       const s = setup()
-      s.notifier.board(ghBoard('unknown', ['A']))
-      s.notifier.board(ghBoard('ok', ['A'], 901))
+      s.notifier.board(fixRun({ reads: read }))
+      expect(s.dot.at(-1)).toBe(false)
+      s.notifier.board(fixRun({ reads: read, pr: true }))
+      expect(s.dot.at(-1)).toBe(true)
+      s.notifier.close()
+    })
+
+    test('gh offline at the start: an old PR stays quiet when gh comes back', () => {
+      const s = setup()
+      s.notifier.board(fixRun({ gh: 'unknown', reads: unread }))
+      // `gh auth status` fails through a dead network, which reads as logged-out for 60 s.
+      s.notifier.board(fixRun({ gh: 'logged-out', reads: unread }))
+      vi.advanceTimersByTime(AFTER_THE_OLD_HOLD)
+      s.notifier.board(fixRun({ gh: 'ok', reads: read, pr: true }))
+      vi.advanceTimersByTime(LIVE_TICK_MS)
       expect(s.toasts).toEqual([])
       expect(s.dot.at(-1)).toBe(true)
       s.notifier.close()
     })
 
-    test('holds while gh is ok but a refresh may still be running', () => {
-      // The server can rebuild between `gh auth status` and the PR reads.
+    test('a failed first PR read counts as not read: asked again later, the PR stays quiet', () => {
       const s = setup()
-      s.notifier.board(ghBoard('unknown', []))
-      s.notifier.board(ghBoard('ok', []))
-      vi.advanceTimersByTime(GH_HOLD_MS - 1000)
-      s.notifier.board(ghBoard('ok', [], 901))
+      s.notifier.board(fixRun({ gh: 'unknown', reads: unread }))
+      s.notifier.board(fixRun({ gh: 'ok', reads: unread }))
+      vi.advanceTimersByTime(AFTER_THE_OLD_HOLD)
+      s.notifier.board(fixRun({ gh: 'ok', reads: unread }))
+      s.notifier.board(fixRun({ gh: 'ok', reads: read, pr: true }))
       expect(s.toasts).toEqual([])
       s.notifier.close()
     })
 
-    test('a PR after the hold sends once', () => {
+    test('a merge item the docs alone name sends at once, while gh is out', () => {
       const s = setup()
-      s.notifier.board(ghBoard('unknown', []))
-      s.notifier.board(ghBoard('ok', []))
-      vi.advanceTimersByTime(GH_HOLD_MS)
-      s.notifier.board(ghBoard('ok', [], 901))
-      expect(s.toasts).toHaveLength(1)
-      s.notifier.board(ghBoard('ok', [], 901))
+      s.notifier.board(fixRun({ gh: 'logged-out', reads: unread }))
+      vi.advanceTimersByTime(8000)
+      const next = fixRun({ gh: 'logged-out', reads: unread, slicePr: 78 })
+      // The docs name it, so a Board with no gh answer has it: no PR on the repo backs it.
+      next.repos[0]!.prs = []
+      s.notifier.board(next)
+      expect(s.toasts).toMatchObject([{ body: 'Merge PR #78' }])
+      s.notifier.close()
+    })
+
+    test('hours of gh offline silence neither a doc-named item nor a BLOCKED', () => {
+      const s = setup()
+      s.notifier.board(fixRun({ gh: 'logged-out', reads: unread }))
+      vi.advanceTimersByTime(3 * 3_600_000)
+      s.notifier.board(fixRun({ gh: 'logged-out', reads: unread, names: ['A'] }))
+      expect(s.toasts.map((t) => t.body)).toEqual(['A is stuck.'])
+      vi.advanceTimersByTime(3 * 3_600_000)
+      s.notifier.board(fixRun({ gh: 'ok', reads: read, names: ['A'], pr: true }))
       expect(s.toasts).toHaveLength(1)
       s.notifier.close()
     })
 
-    test.each(['missing', 'logged-out'] as const)('gh %s ends the hold at once', (gh) => {
+    test('in one pass, the new line sends and the old PR does not', () => {
       const s = setup()
-      s.notifier.board(ghBoard('unknown', []))
-      s.notifier.board(ghBoard(gh, []))
-      s.notifier.board(ghBoard(gh, [], 901))
-      expect(s.toasts).toHaveLength(1)
+      s.notifier.board(fixRun({ gh: 'unknown', reads: unread }))
+      s.notifier.board(fixRun({ gh: 'ok', reads: read, pr: true, names: ['B'] }))
+      expect(s.toasts.map((t) => t.body)).toEqual(['B is stuck.'])
       s.notifier.close()
     })
 
-    test('a gh that never answers ends the hold at the time limit', () => {
+    test('a first read that finds no PR ends the wait: a PR opened later sends', () => {
       const s = setup()
-      s.notifier.board(ghBoard('unknown', []))
-      s.notifier.board(ghBoard('unknown', [], 901))
+      s.notifier.board(fixRun({ gh: 'unknown', reads: unread }))
+      s.notifier.board(fixRun({ gh: 'ok', reads: read }))
       expect(s.toasts).toEqual([])
-      // The clock's pass ends the hold with nothing new: 901 stays old news.
-      vi.advanceTimersByTime(Math.max(GH_HOLD_MS, LIVE_TICK_MS))
+      s.notifier.board(fixRun({ gh: 'ok', reads: read, pr: true }))
+      expect(s.toasts).toMatchObject([{ body: 'Merge PR #36' }])
+      s.notifier.close()
+    })
+
+    test('a read asked for only after the first Board finds a new PR: it sends', () => {
+      const s = setup()
+      s.notifier.board(fixRun({ gh: 'ok', reads: [{ pr: 99, read: true }] }))
+      // A run that started later: not in the baseline, whenever its first read lands.
+      s.notifier.board(fixRun({ gh: 'ok', reads: [{ pr: 99, read: true }, ...unread] }))
+      s.notifier.board(fixRun({ gh: 'ok', reads: [{ pr: 99, read: true }, ...read], pr: true }))
+      expect(s.toasts).toMatchObject([{ body: 'Merge PR #36' }])
+      s.notifier.close()
+    })
+
+    test('a late PR that later changes sends: only its first read is old news', () => {
+      const s = setup()
+      s.notifier.board(fixRun({ gh: 'unknown', reads: unread, reviewed: false }))
+      s.notifier.board(fixRun({ gh: 'ok', reads: read, pr: true, reviewed: false }))
+      expect(s.dot.at(-1)).toBe(false)
+      s.notifier.board(fixRun({ gh: 'ok', reads: read, pr: true }))
+      expect(s.toasts).toMatchObject([{ body: 'Merge PR #36' }])
+      s.notifier.close()
+    })
+
+    test('a reply only a late read can name stays quiet', () => {
+      const s = setup()
+      const repo = (prs: PrStatus[], reads: GhRead[]): BoardRepo => ({ ...repoWith([], { pr: prOf(78, 'merged') }), prs, ghReads: reads, agents: [{ ...live, ended: true, lastAt: NOW - 3_600_000 }] })
+      // The docs name #78, so its merge item is in the baseline. gh then says it merged, which asks for a reply.
+      s.notifier.board(boardOf(repo([], [{ pr: 78, read: false }])))
+      s.notifier.board(boardOf(repo([prOf(78, 'merged')], [{ pr: 78, read: true }])))
+      vi.advanceTimersByTime(LIVE_TICK_MS)
       expect(s.toasts).toEqual([])
-      s.notifier.board(ghBoard('unknown', [], 902))
-      expect(s.toasts).toHaveLength(1)
+      expect(s.dot.at(-1)).toBe(true)
+      s.notifier.close()
+
+      // Control: with that PR not awaited, the same reply sends.
+      const t = setup()
+      t.notifier.board(boardOf(repo([], [{ pr: 78, read: true }])))
+      t.notifier.board(boardOf(repo([prOf(78, 'merged')], [{ pr: 78, read: true }])))
+      expect(t.toasts).toMatchObject([{ body: 'Send continue' }])
+      t.notifier.close()
+    })
+
+    test('an ask that leaves the Board and comes back is still unread', () => {
+      const s = setup()
+      s.notifier.board(fixRun({ reads: unread }))
+      // A half-saved doc, say: the Board asks for nothing this time.
+      s.notifier.board(fixRun({}))
+      s.notifier.board(fixRun({ reads: read, pr: true }))
+      expect(s.toasts).toEqual([])
       s.notifier.close()
     })
 
-    test('a new BLOCKED line sends during the hold', () => {
+    test('a staging ask that a late read found waits too', () => {
+      const parent: GhRead = { pr: 99, read: false }
+      const staging: GhRead = { branch: FIX, staging: true, read: false }
+      const first = setup()
+      first.notifier.board(fixRun({ reads: [parent] }))
+      const found = fixRun({ reads: [{ ...parent, read: true }, staging] })
+      found.repos[0]!.prs = [prOf(99, 'merged')]
+      first.notifier.board(found)
+      const done = fixRun({ reads: [{ ...parent, read: true }, { ...staging, read: true }], pr: true })
+      done.repos[0]!.prs.push(prOf(99, 'merged'))
+      first.notifier.board(done)
+      expect(first.toasts).toEqual([])
+      first.notifier.close()
+
+      // Control: no late read found anything, so a staging ask that shows up later is really new.
+      const second = setup()
+      second.notifier.board(fixRun({ reads: [{ ...parent, read: true }] }))
+      second.notifier.board(fixRun({ reads: [{ ...parent, read: true }, staging] }))
+      second.notifier.board(fixRun({ reads: [{ ...parent, read: true }, { ...staging, read: true }], pr: true }))
+      expect(second.toasts).toMatchObject([{ body: 'Merge PR #36' }])
+      second.notifier.close()
+    })
+
+    test('a server restart resets its reads, and the notifier does not wait again', () => {
       const s = setup()
-      s.notifier.board(ghBoard('unknown', ['A']))
-      s.notifier.board(ghBoard('unknown', ['A', 'B']))
-      expect(s.toasts).toHaveLength(1)
-      expect(s.toasts[0]!.body).toContain('B')
-      // With an old PR in the same pass: only the line sends.
-      s.notifier.board(ghBoard('ok', ['A', 'B', 'C'], 901))
-      expect(s.toasts).toHaveLength(2)
-      expect(s.toasts[1]!.body).toContain('C')
+      s.notifier.board(fixRun({ reads: read }))
+      s.notifier.lost()
+      s.notifier.board(fixRun({ gh: 'unknown', reads: unread }))
+      s.notifier.board(fixRun({ reads: read, pr: true }))
+      expect(s.toasts).toMatchObject([{ body: 'Merge PR #36' }])
       s.notifier.close()
     })
 
-    test('a first Board where gh has answered has no hold', () => {
+    test('the wait is per repo', () => {
       const s = setup()
-      s.notifier.board(ghBoard('ok', ['A']))
-      s.notifier.board(ghBoard('ok', ['A'], 901))
-      expect(s.toasts).toHaveLength(1)
+      const of = (id: string, o: Parameters<typeof fixRun>[0]) => ({ ...fixRun(o).repos[0]!, id })
+      s.notifier.board(boardOf(of('aaa', { reads: unread }), of('bbb', { reads: read })))
+      s.notifier.board(boardOf(of('aaa', { reads: read, pr: true }), of('bbb', { reads: read, pr: true })))
+      expect(s.toasts).toMatchObject([{ body: 'Merge PR #36', hash: `#/bbb/${FIX}` }])
       s.notifier.close()
     })
 
-    test('a first Board where gh is unavailable has no hold', () => {
+    test('a first Board where every read is done has no wait, and one with no field has none', () => {
       const s = setup()
-      s.notifier.board(ghBoard('missing', ['A']))
-      s.notifier.board(ghBoard('missing', ['A'], 901))
+      s.notifier.board(fixRun({ reads: read, names: ['A'] }))
+      s.notifier.board(fixRun({ reads: read, names: ['A'], pr: true }))
       expect(s.toasts).toHaveLength(1)
       s.notifier.close()
+
+      const t = setup()
+      t.notifier.board(fixRun({}))
+      t.notifier.board(fixRun({ pr: true }))
+      expect(t.toasts).toHaveLength(1)
+      t.notifier.close()
     })
   })
 })
