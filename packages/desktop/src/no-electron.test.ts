@@ -18,10 +18,21 @@ const sources = (dir: string): string[] =>
 
 describe('electron imports', () => {
   test('the check sees every import form', () => {
-    for (const line of [`import { app } from 'electron'`, `import type { App } from "electron"`, `import 'electron'`, `await import('electron')`, `const e = require("electron")`]) {
+    for (const line of [
+      `import { app } from 'electron'`,
+      `import type { App } from "electron"`,
+      `import 'electron'`,
+      `await import('electron')`,
+      `const e = require("electron")`,
+      `import { autoUpdater } from 'electron-updater'`,
+      `import type { UpdateInfo } from "electron-updater"`,
+      `import 'electron-updater'`,
+      `await import('electron-updater')`,
+      `const u = require("electron-updater")`,
+    ]) {
       expect(ELECTRON_IMPORT.test(line), line).toBe(true)
     }
-    for (const line of [`external: ['electron']`, `import x from 'electron-log'`, `// electron`]) {
+    for (const line of [`external: ['electron']`, `import x from 'electron-log'`, `import x from 'electron-builder'`, `// electron`, `// electron-updater`]) {
       expect(ELECTRON_IMPORT.test(line), line).toBe(false)
     }
     expect(mayImport('src/main.ts')).toBe(true)
