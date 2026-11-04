@@ -1,10 +1,10 @@
-// The kind word a queue entry body starts with (`now:`, `decision:`, `before hosting:`, `someday (pod side):`),
+// The kind word a queue entry body starts with (`ask:`, `now:`, `decision:`, `before hosting:`, `someday (pod side):`),
 // which says when the entry matters. Pure; web's queue-view.ts reads it, its next-step.ts sorts by it, and `stopsRun` and `handBackPr` read it.
 
-export type EntryKind = 'now' | 'decision' | 'before' | 'other' | 'someday'
+export type EntryKind = 'ask' | 'now' | 'decision' | 'before' | 'other' | 'someday'
 
 /** Most urgent first: the pending tier of the Waiting tab sorts and groups in this order. */
-export const KIND_ORDER: readonly EntryKind[] = ['now', 'decision', 'before', 'other', 'someday']
+export const KIND_ORDER: readonly EntryKind[] = ['ask', 'now', 'decision', 'before', 'other', 'someday']
 
 /** `label` is what the row shows (`before hosting`, `someday (pod side)`); `text` is the body without the prefix. */
 export type EntryKindOf = { kind: EntryKind; label: string; text: string }
@@ -14,7 +14,7 @@ export type EntryKindOf = { kind: EntryKind; label: string; text: string }
  * (`before hosting`, `before you turn on Continue`), so a sentence such as `Before merging PR #3, check: …`
  * is no kind. Case is ignored; the word is labelled in lowercase, the target and note as written.
  */
-const KIND = /^(now|decision|someday|before)(?:\s+([^\s:(),.;][^:(),.;]{0,39}?))?\s*(?:\(([^()]{1,40})\))?\s*:\s*/i
+const KIND = /^(ask|now|decision|someday|before)(?:\s+([^\s:(),.;][^:(),.;]{0,39}?))?\s*(?:\(([^()]{1,40})\))?\s*:\s*/i
 
 /** The kind a body starts with; `other` with the whole body when it starts with none, or nothing follows it. */
 export function entryKind(body: string): EntryKindOf {

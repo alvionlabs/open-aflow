@@ -115,10 +115,15 @@ const isGateOrHandBack = (e: Pick<QueueItem, 'isPending' | 'route' | 'body'>, pl
 const FIX_NEXT = /^fix next\b[^:]*:/i
 
 /**
- * The words of an ask: `needs your …`, `your go`, `your call`, `your answer`, or a body that ends in `?`, with any
- * closing punctuation. Word matching, until `claude-pod` marks asks: a note in other words reads as no ask.
+ * The words of an ask: `needs your …`, `needs you`, `waits on you`, `waiting on you`, `your go` (`call`, `answer`,
+ * `decision`, `input`, `approval`, `review`, `ok`), a sentence that starts with `please`, `can you`, `could you`, `pick`,
+ * `choose`, `decide`, `confirm` or `approve`, or a body that ends in `?`, with any closing punctuation. Word matching,
+ * until `claude-pod` writes `ask:` (`isMarkedAsk`): a note in other words reads as no ask.
  */
-const ASKS = /\bneeds your\s+\S|\byour (?:go|call|answer)\b|\?[\s)\]"'.!_]*$/i
+const ASKS = /\bneeds your\s+\S|\bneeds you\b|\bwait(?:s|ing) on you\b|\byour (?:go|call|answer|decision|input|approval|review|ok)\b|(?:^|[.!?]\s+)(?:please|can you|could you|pick|choose|decide|confirm|approve)\b|\?[\s)\]"'.!_]*$/i
+
+/** The explicit marker: `ask: …` on a plan's entry to you, from anyone, whatever else its text says. */
+const isMarkedAsk = (e: Pick<QueueItem, 'body'>, plan: unknown) => plan !== undefined && kindOf(e.body) === 'ask'
 
 /**
  * The orchestrator asks you in plain words: it asks (`ASKS`), with no kind word and no recorded default. It joins a
@@ -132,7 +137,7 @@ const isPlainAsk = (e: Pick<QueueItem, 'route' | 'body' | 'slice' | 'sprint'>, p
 
 /**
  * The one rule for what stops a run: a BLOCKED to you, the orchestrator's halt gate (`haltGate`, 7 included), a plan-complete
- * hand-back, an orchestrator's plain ask (`isPlainAsk`), or a PENDING to you that names an open slice of `plan` and records no default. Anything else (a
+ * hand-back, an `ask:` entry on a plan (`isMarkedAsk`), an orchestrator's plain ask (`isPlainAsk`), or a PENDING to you that names an open slice of `plan` and records no default. Anything else (a
  * recorded default, `someday`, a bare `now`, any other note) stays listed and answerable, and pod goes on with it.
  * An answer doesn't clear a stop: pod reads it when it resumes. With no `plan` (an entry that joins none), the
  * slice rule has nothing to read. Run state, the flow, the Log, the wave board, Next step and the banner all read this.
@@ -144,18 +149,18 @@ export function stopsRun(e: QueueItem, plan?: Pick<PlanModel, 'slug' | 'sprints'
   if (type !== 'PENDING') return false
   const text = unmarked(e.body)
   if (isGateOrHandBack(e, plan)) return true
-  if (isPlainAsk(e, plan)) return true
+  if (isMarkedAsk(e, plan) || isPlainAsk(e, plan)) return true
   if (RECORDED_DEFAULT.test(text) || kindOf(e.body) === 'someday') return false
   return plan !== undefined && namesOpenSlice(e, plan)
 }
 
 /**
- * Whether the entry holds the run right now. Any stop (`stopsRun`) does, except a PENDING gate, hand-back or plain ask with an
+ * Whether the entry holds the run right now. Any stop (`stopsRun`) does, except a PENDING gate, hand-back, `ask:` or plain ask with an
  * engineer at work (`engineerAtWork`): `PENDING` only needs acknowledging, so a resumed autopilot goes on past it.
  * It stays listed and answerable. A BLOCKED always holds: pod must resolve it before it resumes.
  */
 export const holdsRun = (repo: Pick<BoardRepo, 'agents'>, plan: PlanModel, e: QueueItem, now: number) =>
-  stopsRun(e, plan) && !(e.type.trim().toUpperCase() === 'PENDING' && (isGateOrHandBack(e, plan) || isPlainAsk(e, plan)) && engineerAtWork(repo, plan, now))
+  stopsRun(e, plan) && !(e.type.trim().toUpperCase() === 'PENDING' && (isGateOrHandBack(e, plan) || isMarkedAsk(e, plan) || isPlainAsk(e, plan)) && engineerAtWork(repo, plan, now))
 
 /**
  * A stop on the plan as a whole: halted (`isHalted`), or an entry that holds the run and names no open slice.

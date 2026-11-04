@@ -60,7 +60,7 @@ export function replySeen(items: NextItem[]): ReplySeen | undefined {
 export const replyGhost = (items: NextItem[], last: ReplySeen | undefined): ReplySeen | undefined =>
   last && !items.some((i) => i.key === last.key) ? last : undefined
 
-const KIND_CLS: Record<EntryKind, ChipClass> = { now: 's-you', before: 's-you', decision: 's-run', other: 's-idle', someday: 's-idle' }
+const KIND_CLS: Record<EntryKind, ChipClass> = { ask: 's-you', now: 's-you', before: 's-you', decision: 's-run', other: 's-idle', someday: 's-idle' }
 
 /** The row's kind as a status dot and word; a BLOCKED entry with no kind word reads `blocked`. */
 export function kindChip(row: WaitingRow): Chip {
@@ -74,7 +74,7 @@ export function kindChip(row: WaitingRow): Chip {
  */
 export type WaitGroup = { key: string; label?: string; items: NextItem[]; startsOpen: boolean }
 
-const KIND_LABEL: Record<EntryKind, string> = { now: 'Now', decision: 'Decisions', before: 'Before a step', other: 'Other', someday: 'Someday' }
+const KIND_LABEL: Record<EntryKind, string> = { ask: 'Asks', now: 'Now', decision: 'Decisions', before: 'Before a step', other: 'Other', someday: 'Someday' }
 export const INFO_LABEL = 'No answer needed'
 
 /** The items in groups, list order kept inside each; empty groups left out. */
