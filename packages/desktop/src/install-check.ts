@@ -344,6 +344,8 @@ export async function finishProof(place: ProofPlace, before: MachineState): Prom
   }
   launched.clear()
   if (existsSync(join(place.installDir, UNINSTALLER))) await silentUninstall(place)
+  // A failed uninstall can't take a Run value with it. This one names the temp folder, so it's the proof's own.
+  if ((await runValue())?.includes(place.root)) await stdoutOf(join(SYS32, 'reg.exe'), ['delete', RUN_KEY, '/v', APP_ID, '/f'])
   if (!before.updaterCache) await removeWithRetry(updaterCacheDir())
   await removeWithRetry(place.root)
   return stateDiff(before, await machineState())

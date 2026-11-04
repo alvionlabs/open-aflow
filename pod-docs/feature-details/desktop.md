@@ -57,6 +57,7 @@ Measured with `pnpm test:install` on Windows 11 and electron-builder 26.18.1:
 
 - **A silent per-user install** asks for no admin rights and starts no app. It writes one `HKCU` uninstall key and no `HKLM` key.
 - **An uninstall with the app running** ends the main process and the server with `Stop-Process`, so the drain doesn't run and `auto-continue-owner.json` stays for the next start's stale check. A detached `fake-claude` run started through the resume route lives.
+- **The proof catches a tree kill.** With a temporary `installer.nsh` that ran `taskkill /F /T /PID` on the app's processes, the fake run died, and `uninstall keeps config and runs` failed.
 - **A packaged exe writes to a pipe,** so a proof reads the `toast sent` line from stdout, and needs no log file.
 - **electron-builder 26.18.1 downloads no winCodeSign archive,** the one whose symbolic links fail to extract without a Windows setting. It downloads Electron, 7-Zip, NSIS, and NSIS's resources once, to its cache, and still sets the exe's icon and name. This machine has Developer Mode on, so that setting's absence isn't proved here.
 - **The installer is about 122 MB.** A package run takes about a minute after the first download.
