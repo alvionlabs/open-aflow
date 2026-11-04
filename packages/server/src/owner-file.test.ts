@@ -1,9 +1,9 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { createOwnerFile, OWNER_FILE } from './owner-file.ts'
+import { createOwnerFile, OWNER_FILE, processStartTime, type StartTimeRun } from './owner-file.ts'
 
 // Runs right after the owner file's removal of a stale file, so a test can lose the race.
 const afterRemove = vi.hoisted(() => ({ run: undefined as (() => void) | undefined }))
@@ -65,7 +65,7 @@ describe('owner file', () => {
   test('a live holder keeps it', () => {
     holder(4242)
     const before = readFileSync(file, 'utf8')
-    const owner = createOwnerFile({ dir, log, alive: () => true })
+    const owner = createOwnerFile({ dir, log, alive: () => true, startTime: () => 1 })
     expect(owner.take()).toBe(false)
     expect(readFileSync(file, 'utf8')).toBe(before)
     expect(logs).toHaveLength(1)
@@ -87,7 +87,7 @@ describe('owner file', () => {
 
     for (const bad of ['', 'not json', '{"pid":', 'null', '[]', '7', '{}', '{"pid":"x","id":"y"}', '{"pid":0,"id":"y"}', '{"pid":-1,"id":"y"}', '{"pid":1.5,"id":"y"}', '{"pid":99999999999,"id":"y"}', '{"pid":5}', '{"pid":5,"id":7}']) {
       writeFileSync(file, bad)
-      const owner = createOwnerFile({ dir, log, alive: () => true })
+      const owner = createOwnerFile({ dir, log, alive: () => true, startTime: () => 1 })
       expect(owner.take(), bad).toBe(true)
       expect(read().pid, bad).toBe(process.pid)
       owner.release()
@@ -190,9 +190,171 @@ describe('owner file', () => {
     expect(readFileSync(file, 'utf8')).toBe(text)
 
     // A server that never held it leaves the holder's file.
-    const never = createOwnerFile({ dir, log, alive: () => true })
+    const never = createOwnerFile({ dir, log, alive: () => true, startTime: () => 1 })
     never.take()
     never.release()
     expect(readFileSync(file, 'utf8')).toBe(text)
   })
+})
+
+const STARTED = 1_000_000
+const held = (pid: number, extra: object) => writeFileSync(file, JSON.stringify({ pid, id: 'other', ...extra }))
+
+describe('a process ID in use by another program', () => {
+  test('a process that started after the file was written is no server: take over', () => {
+    held(4242, { startedAt: STARTED })
+    const owner = createOwnerFile({ dir, log, alive: () => true, startTime: () => STARTED + 60_000 })
+    expect(owner.take()).toBe(true)
+    expect(read().pid).toBe(process.pid)
+    expect(owner.check()).toBe(true)
+    expect(logs).toEqual([])
+  })
+
+  test('a file that names this process, from an earlier one with its ID, is taken over', () => {
+    held(process.pid, { startedAt: STARTED })
+    const owner = createOwnerFile({ dir, log, alive: () => true, startTime: () => STARTED + 60_000 })
+    expect(owner.take()).toBe(true)
+  })
+
+  test('a process that started before the file was written is the server: it keeps it', () => {
+    held(4242, { startedAt: STARTED })
+    const text = readFileSync(file, 'utf8')
+    const owner = createOwnerFile({ dir, log, alive: () => true, startTime: () => STARTED - 500 })
+    expect(owner.take()).toBe(false)
+    expect(readFileSync(file, 'utf8')).toBe(text)
+    expect(logs).toHaveLength(1)
+    expect(logs[0]).toContain('4242')
+    expect(logs[0]).toContain("won't auto-continue until it restarts")
+    expect(logs[0]).not.toContain("can't read")
+  })
+
+  test('a small clock step never reads as a reused ID', () => {
+    held(4242, { startedAt: STARTED })
+    const owner = createOwnerFile({ dir, log, alive: () => true, startTime: () => STARTED + 1000 })
+    expect(owner.take()).toBe(false)
+  })
+
+  test("a start time it can't read keeps today's behavior and says so once", () => {
+    held(4242, { startedAt: STARTED })
+    const owner = createOwnerFile({ dir, log, alive: () => true, startTime: () => undefined })
+    expect(owner.take()).toBe(false)
+    expect(logs).toHaveLength(1)
+    expect(logs[0]).toContain('4242')
+    expect(logs[0]).toContain(dir)
+    expect(logs[0]).toContain("can't read")
+    expect(logs[0]).toContain("won't auto-continue until it restarts")
+  })
+
+  test('a reader that throws fails closed', () => {
+    held(4242, { startedAt: STARTED })
+    const owner = createOwnerFile({
+      dir,
+      log,
+      alive: () => true,
+      startTime: () => {
+        throw new Error('boom')
+      },
+    })
+    expect(owner.take()).toBe(false)
+    expect(logs).toHaveLength(1)
+  })
+
+  test.each([[{}], [{ startedAt: 'x' }], [{ startedAt: null }], [{ startedAt: -1 }]])('a file with no usable startedAt stays with its holder: %j', (extra) => {
+    held(4242, extra)
+    const startTime = vi.fn(() => STARTED)
+    const owner = createOwnerFile({ dir, log, alive: () => true, startTime })
+    expect(owner.take()).toBe(false)
+    expect(startTime).not.toHaveBeenCalled()
+    expect(read().pid).toBe(4242)
+    expect(logs).toHaveLength(1)
+    expect(logs[0]).toContain("can't read")
+  })
+
+  test('starts no lookup with no file or a dead holder', () => {
+    const startTime = vi.fn(() => undefined)
+    const free = createOwnerFile({ dir, log, startTime })
+    expect(free.take()).toBe(true)
+    free.release()
+    held(4242, { startedAt: STARTED })
+    const stale = createOwnerFile({ dir, log, alive: () => false, startTime })
+    expect(stale.take()).toBe(true)
+    expect(startTime).not.toHaveBeenCalled()
+  })
+})
+
+describe('processStartTime', () => {
+  const env = { SystemRoot: 'C:\\Windows' }
+
+  test('asks Windows PowerShell by absolute path, with no window and no shell', () => {
+    const run = vi.fn<StartTimeRun>(() => ({ status: 0, stdout: '1793762042037\r\n' }))
+    expect(processStartTime(4242, { platform: 'win32', env, run })).toBe(1793762042037)
+    const [exe, args, options] = run.mock.calls[0]!
+    expect(exe).toBe('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe')
+    expect(args.join(' ')).toContain('4242')
+    expect(args).toContain('-NoProfile')
+    expect(args).toContain('-NonInteractive')
+    expect(options).toMatchObject({ windowsHide: true, shell: false })
+    expect(options.timeout).toBeGreaterThan(0)
+  })
+
+  test('reads SystemRoot in any case', () => {
+    expect(processStartTime(1, { platform: 'win32', env: { SYSTEMROOT: 'D:\\Win' }, run: () => ({ status: 0, stdout: '5' }) })).toBe(5)
+  })
+
+  test.each([
+    ['a failed run', { status: 1, stdout: '' }],
+    ['a time-out', { status: null, stdout: '' }],
+    ['text', { status: 0, stdout: 'Get-Process: nope' }],
+    ['nothing', { status: 0, stdout: '' }],
+  ])('%s reads as unknown', (_name, result) => {
+    expect(processStartTime(1, { platform: 'win32', env, run: () => result })).toBeUndefined()
+  })
+
+  test('a run that throws reads as unknown', () => {
+    const run: StartTimeRun = () => {
+      throw new Error('spawn failed')
+    }
+    expect(processStartTime(1, { platform: 'win32', env, run })).toBeUndefined()
+  })
+
+  test.each([
+    ['no SystemRoot', 'win32', {}],
+    ['a SystemRoot that is no drive path', 'win32', { SystemRoot: 'Windows' }],
+    ['another system', 'linux', env],
+  ])('%s starts nothing', (_name, platform, e) => {
+    const run = vi.fn<StartTimeRun>(() => ({ status: 0, stdout: '5' }))
+    expect(processStartTime(1, { platform: platform as NodeJS.Platform, env: e as NodeJS.ProcessEnv, run })).toBeUndefined()
+    expect(run).not.toHaveBeenCalled()
+  })
+})
+
+describe.runIf(process.platform === 'win32')('on the real process table', () => {
+  test('reads a real start time, and none for a process that is gone', () => {
+    const start = processStartTime(process.pid)
+    expect(start).toBeLessThanOrEqual(Date.now())
+    expect(start).toBeGreaterThan(Date.now() - 24 * 3_600_000)
+    expect(processStartTime(exitedPid())).toBeUndefined()
+  }, 20_000)
+
+  test('a live program with a reused ID loses the file, and a live server keeps it', async () => {
+    const written = Date.now() - 60_000
+    const program = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true })
+    try {
+      await new Promise((resolve) => program.once('spawn', resolve))
+      held(program.pid!, { startedAt: written })
+      const owner = createOwnerFile({ dir, log })
+      expect(owner.take()).toBe(true)
+      expect(read().pid).toBe(process.pid)
+      expect(logs).toEqual([])
+      owner.release()
+
+      // This test's own process stands in for a server that wrote the file after it started.
+      held(process.pid, { startedAt: Date.now() })
+      const second = createOwnerFile({ dir, log })
+      expect(second.take()).toBe(false)
+      expect(logs).toHaveLength(1)
+    } finally {
+      program.kill()
+    }
+  }, 30_000)
 })
