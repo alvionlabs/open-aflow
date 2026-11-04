@@ -83,6 +83,12 @@ describe('entry kind', () => {
   })
 
   it('orders kinds most urgent first, someday last', () => {
-    expect(KIND_ORDER).toEqual(['now', 'decision', 'before', 'other', 'someday'])
+    expect(KIND_ORDER).toEqual(['ask', 'now', 'decision', 'before', 'other', 'someday'])
+  })
+
+  it('reads the ask marker as a kind', () => {
+    expect(entryKind('ask: which title?')).toEqual({ kind: 'ask', label: 'ask', text: 'which title?' })
+    expect(entryKind('Ask (pod side): pick one.')).toEqual({ kind: 'ask', label: 'ask (pod side)', text: 'pick one.' })
+    expect(entryKind('ask the team: which title?').kind).toBe('other')
   })
 })

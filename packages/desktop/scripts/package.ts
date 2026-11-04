@@ -53,7 +53,7 @@ function writeNotices(): string {
 // A bad flag stops here, before anything builds.
 const { testFeed = false, ...args } = parsePackageArgs(process.argv.slice(2))
 
-const built = spawnSync('pnpm -w run build', { cwd: root, shell: true, stdio: 'inherit' })
+const built = spawnSync('pnpm -w run build', { cwd: root, shell: true, stdio: 'inherit', windowsHide: true })
 if (built.status !== 0) process.exit(built.status ?? 1)
 
 // No signing, also on a machine that has a certificate.

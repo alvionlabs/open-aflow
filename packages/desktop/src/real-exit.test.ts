@@ -208,6 +208,7 @@ describe.runIf(process.env.POD_BOARD_REAL_ELECTRON === '1' && process.platform =
         ...over,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
     })
     children.push(c)
     if (c.pid) recorded.push(c.pid)
@@ -356,6 +357,7 @@ describe.runIf(process.env.POD_BOARD_REAL_ELECTRON === '1' && process.platform =
         cwd: tmp,
         env: { ...baseEnv(), POD_BOARD_API_PORT: String(nextPort) },
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+        windowsHide: true,
       })
       children.push(next)
       if (next.pid) recorded.push(next.pid)

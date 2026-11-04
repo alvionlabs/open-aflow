@@ -95,7 +95,7 @@ describe('bundleApp', () => {
       writeFileSync(join(dir, 'entry.mjs'), "import dep from './dep.cjs'\nconsole.log(dep)\n")
       const outfile = join(dir, 'out.mjs')
       await build({ ...BUNDLE_OPTIONS, entryPoints: [join(dir, 'entry.mjs')], outfile })
-      const run = spawnSync(process.execPath, [outfile], { encoding: 'utf8' })
+      const run = spawnSync(process.execPath, [outfile], { encoding: 'utf8', windowsHide: true })
       expect(run.stderr).toBe('')
       expect(run.stdout.trim()).toBe('cjs ok')
     } finally {
@@ -214,7 +214,7 @@ describe('the bundle, run alone', () => {
       POD_BOARD_CLAUDE_DIR: join(tmp, 'claude'),
       POD_BOARD_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
     })
-    const c = spawn(process.execPath, [join(appDir, 'server.mjs')], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] })
+    const c = spawn(process.execPath, [join(appDir, 'server.mjs')], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
     child = c
     let text = ''
     c.stdout!.on('data', (d) => (text += String(d)))

@@ -78,7 +78,7 @@ describe.runIf(WIN)('the bundle with no terminal', () => {
         POD_BOARD_PORTS_DIR: join(root, 'ports'),
         POD_BOARD_CLAUDE_DIR: join(root, 'claude'),
       })
-      const c = spawn(process.execPath, [join(root, 'out', 'server.mjs')], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
+      const c = spawn(process.execPath, [join(root, 'out', 'server.mjs')], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
       child = c
       let out = ''
       c.stdout!.on('data', (d) => (out += String(d)))

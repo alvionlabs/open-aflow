@@ -70,6 +70,7 @@ const boot = async (o: { env?: Record<string, string>; ipc?: boolean } = {}): Pr
   const c = spawn(process.execPath, ['--import', TSX, MAIN], {
     env,
     stdio: o.ipc ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
   })
   child = c // so teardown kills it even if boot fails
   let text = ''
@@ -170,7 +171,7 @@ const runToExit = async (entry: string, over: Record<string, string>): Promise<{
     POD_BOARD_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
     ...over,
   })
-  const c = spawn(process.execPath, ['--import', TSX, entry], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+  const c = spawn(process.execPath, ['--import', TSX, entry], { env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
   child = c
   let text = ''
   c.stdout!.on('data', (d) => (text += String(d)))
@@ -202,7 +203,7 @@ describe('the dev entry', () => {
   }, 60_000)
 
   test('dev ignores a parent that is gone', async () => {
-    const gone = spawnSync(process.execPath, ['-e', '0']).pid
+    const gone = spawnSync(process.execPath, ['-e', '0'], { windowsHide: true }).pid
     const b = await boot({ env: { POD_BOARD_PARENT_PID: String(gone) } })
     child = b.child
     await new Promise((r) => setTimeout(r, 3000))

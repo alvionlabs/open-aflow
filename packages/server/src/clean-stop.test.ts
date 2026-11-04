@@ -195,7 +195,7 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
   const startBundle = async (o: { port?: number; env?: Record<string, string>; ipc?: boolean } = {}): Promise<Run> => {
     const port = o.port ?? (await freePort())
     const stdio = o.ipc === false ? (['ignore', 'pipe', 'pipe'] as const) : (['ignore', 'pipe', 'pipe', 'ipc'] as const)
-    const c = spawn(process.execPath, [built], { cwd: tmp, env: bundleEnv(port, o.env), stdio: [...stdio] })
+    const c = spawn(process.execPath, [built], { cwd: tmp, env: bundleEnv(port, o.env), stdio: [...stdio], windowsHide: true })
     children.push(c)
     let text = ''
     c.stdout!.on('data', (d) => (text += String(d)))
@@ -250,14 +250,14 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
         "import { writeFileSync } from 'node:fs'",
         'const [server, mode, pidFile] = process.argv.slice(2)',
         "const env = { ...process.env, ...(mode === 'watch' ? { POD_BOARD_PARENT_PID: String(process.pid) } : {}) }",
-        "const c = mode === 'watch' ? spawn(process.execPath, [server], { env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }) : spawn(process.execPath, [server], { env, detached: true, stdio: 'ignore', windowsHide: true })",
+        "const c = mode === 'watch' ? spawn(process.execPath, [server], { env, detached: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }) : spawn(process.execPath, [server], { env, detached: true, stdio: 'ignore', windowsHide: true })",
         'writeFileSync(pidFile, String(c.pid))',
         "if (mode === 'watch') setInterval(() => {}, 1000)",
         'else { c.unref(); process.exit(0) }',
         '',
       ].join('\n'),
     )
-    const c = spawn(process.execPath, [helper, built, mode, serverPidFile], { cwd: tmp, env: bundleEnv(port), stdio: 'ignore' })
+    const c = spawn(process.execPath, [helper, built, mode, serverPidFile], { cwd: tmp, env: bundleEnv(port), stdio: 'ignore', windowsHide: true })
     children.push(c)
     return { c, serverPid: async () => {
       await until('the server process ID', () => existsSync(serverPidFile) && readFileSync(serverPidFile, 'utf8') !== '')
@@ -410,7 +410,7 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
   test(
     'a parent gone at start',
     async () => {
-      const gone = spawnSync(process.execPath, ['-e', '0']).pid
+      const gone = spawnSync(process.execPath, ['-e', '0'], { windowsHide: true }).pid
       const r = await startBundle({ ipc: false, env: { POD_BOARD_PARENT_PID: String(gone) } })
       expect(await exitOf(r.c)).toBe(0)
       expect(r.out()).toContain('pod-board API listening')

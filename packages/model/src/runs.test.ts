@@ -102,15 +102,18 @@ describe('listRuns', () => {
     expect(stateOf(repo('r', planFiles(), { agents: [agent({ sprint: 'one', lastAt: NOW - 30 * MIN })] }))).toEqual(['idle'])
     expect(stateOf(repo('r', planFiles(), { agents: [running({ sprint: 'one', ended: true })] }))).toEqual(['idle'])
     expect(stateOf(repo('r', planFiles(), { agents: [running({ sprint: 'other-sprint' })] }))).toEqual(['idle'])
-    // A pushed slice in the current wave → running.
+    // A pushed slice in the current wave, with an agent of the plan writing lately → running; with none read → idle.
     const pushed = planFiles({ board: [[1, 'A1', '—', 'done'], [2, 'B1', '[#7](https://github.com/o/r/pull/7)', 'pushed'], [2, 'B2', '—', 'pending']] })
-    expect(stateOf(repo('r', pushed))).toEqual(['running'])
+    expect(stateOf(repo('r', pushed, { agents: [running({ plan: 'alpha', ended: true })] }))).toEqual(['running'])
+    expect(stateOf(repo('r', pushed))).toEqual(['idle'])
 
     // needs-you wins over running.
     expect(stateOf(repo('r', planFiles({ queue: [ask] }), { agents: [running({ sprint: 'one' })] }))).toEqual(['needs-you'])
-    // A BLOCKED entry from an engineer needs you, but doesn't halt the plan.
+    // A BLOCKED between agents is pod's to resolve: it neither halts the plan nor stops the run.
     const engineerBlocked = queueLine('BLOCKED', 'engineer → orchestrator', 'plan: alpha', 'stuck')
-    expect(stateOf(repo('r', planFiles({ queue: [engineerBlocked] })))).toEqual(['needs-you'])
+    expect(stateOf(repo('r', planFiles({ queue: [engineerBlocked] })))).toEqual(['idle'])
+    // A BLOCKED from an engineer to you stops the run, but doesn't halt the plan.
+    expect(stateOf(repo('r', planFiles({ queue: [queueLine('BLOCKED', 'engineer → human', 'plan: alpha', 'stuck')] })))).toEqual(['needs-you'])
     // A resolved halt is nothing.
     expect(stateOf(repo('r', planFiles({ queue: [queueLine('BLOCKED', 'orchestrator → human', 'plan: alpha', 'old halt', false)] })))).toEqual(['idle'])
 
@@ -134,9 +137,9 @@ describe('listRuns', () => {
     expect(activeRuns(runsOf(repo('r', handedBack)))).toBe(1)
     // A running engineer of the wave: running, as today.
     expect(stateOf(repo('r', handedBack, { agents: [running({ sprint: 'one', slice: 'B1' })] }))).toEqual(['running'])
-    // gh says the PR merged: no waiting PR, so running from the pushed slices, as today.
+    // gh says the PR merged: no waiting PR, and on a manual run a merged PR is no longer pod's: it waits for continue.
     const merged = { number: 7, state: 'merged' as const, checks: 'pass' as const, checkedAt: NOW }
-    expect(stateOf(repo('r', handedBack, { prs: [merged] }))).toEqual(['running'])
+    expect(stateOf(repo('r', handedBack, { prs: [merged], agents: [running({ plan: 'alpha', ended: true })] }))).toEqual(['idle'])
     // blocked still wins: a halt, or a blocked slice in the current sprint.
     const halt = queueLine('BLOCKED', 'orchestrator → human', 'plan: alpha', 'Gate 2 stopped the run')
     const halted = planFiles({ queue: [halt], board: [[1, 'A1', '—', 'done'], [2, 'B1', link, 'pushed'], [2, 'B2', link, 'pushed']] })
@@ -282,7 +285,7 @@ describe('listRuns', () => {
 
   it('order and count', () => {
     const halt = queueLine('BLOCKED', 'orchestrator → human', 'plan: alpha', 'Gate 2 halted')
-    const ask = queueLine('PENDING', 'engineer → human', 'plan: alpha', 'Pick a name')
+    const ask = queueLine('PENDING', 'orchestrator → human', 'plan: alpha', 'gate 5 (safety-bound): hit the limit')
     // Two plans in one repo, in different states.
     const twoPlans: RepoFiles = {
       ...planFiles({ slug: 'zed' }),

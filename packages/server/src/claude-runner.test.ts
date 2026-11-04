@@ -84,7 +84,8 @@ function envWith(extra: { [k: string]: string } = {}): NodeJS.ProcessEnv {
   return { ...env, PATH: binDir, FAKE_CLAUDE_RECORD: recordFile, FAKE_CLAUDE_PIDS: pidsFile, ...extra }
 }
 
-const waitFor = async (check: () => boolean, ms = 5000) => {
+// A fake starts through cmd.exe and a cold node, which a busy disk can hold for many seconds. It ends at the condition.
+const waitFor = async (check: () => boolean, ms = 20_000) => {
   const end = Date.now() + ms
   while (!check()) {
     if (Date.now() > end) throw new Error('timed out waiting')
@@ -93,7 +94,11 @@ const waitFor = async (check: () => boolean, ms = 5000) => {
 }
 
 const readRecord = async (): Promise<Record> => {
-  await waitFor(() => existsSync(recordFile))
+  await waitFor(() => existsSync(recordFile)).catch((err: Error) => {
+    // Says which step never came: the fake starting, or its record after that, and what the run logged.
+    const logs = existsSync(logDir) ? readdirSync(logDir).map((f) => readFileSync(join(logDir, f), 'utf8')).join(' | ') : 'no log folder'
+    throw new Error(`${err.message} for the record; fake started: ${existsSync(pidsFile)}; log: ${logs}`)
+  })
   return JSON.parse(readFileSync(recordFile, 'utf8')) as Record
 }
 
@@ -241,7 +246,7 @@ describe('createClaudeRunner', () => {
     expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
     expect(existsSync(planted)).toBe(false)
     expect((await readRecord()).argv).toEqual(['-p', '--resume', SESSION, 'continue'])
-  }, 15_000)
+  })
 
   test('refuses an unsafe session id', async () => {
     const runner = createClaudeRunner({ bin: 'claude', logDir, env: envWith(), windowMs: 3000 })
@@ -350,6 +355,7 @@ describe('createClaudeRunner', () => {
       env: { ...process.env, HOST_ENV: JSON.stringify(env) },
       encoding: 'utf8',
       timeout: 20_000,
+      windowsHide: true,
     })
     expect(out.stderr).toBe('')
     expect(JSON.parse(out.stdout.trim())).toEqual({ outcome: 'started' })

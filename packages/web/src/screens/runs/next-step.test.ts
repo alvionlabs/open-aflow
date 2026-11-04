@@ -97,7 +97,8 @@ describe('next step', () => {
     expect(s.card).toEqual<NextItem>({
       key: entryKey(T1_BLOCKED),
       tier: 'blocked',
-      status: 'blocked',
+      // An engineer's BLOCKED to you: the run reads needs you (only a halt reads blocked), so the card does too.
+      status: 'needs-you',
       title: "T1 can't reach the rates file.",
       detail: 'The run is stopped until you answer.',
       entry: expect.objectContaining({ line: T1_BLOCKED, route: 'engineer → human', body: "T1 can't reach the rates file.", answerable: true }),
@@ -124,10 +125,11 @@ describe('next step', () => {
       'merge pr:78',
       'merge pr:80',
       `reply reply:${PLAN}`,
+      // A stop first in its tier: the hand-back; the fixture's own entries name done slices or none.
+      `pending ${entryKey(HAND_BACK)}`,
       `pending ${entryKey(H1)}`,
       `pending ${entryKey(U1)}`,
       `pending ${entryKey(WAVE2)}`,
-      `pending ${entryKey(HAND_BACK)}`,
     ])
 
     // No BLOCKED: the first PR is the card; a reply beats a PENDING → human.
@@ -140,6 +142,7 @@ describe('next step', () => {
       key: entryKey(H1),
       tier: 'pending',
       status: 'needs-you',
+      goesOn: true,
       title: expect.stringMatching(/^Needs your decision: recent arenas gave too few players .*…$/),
       detail: 'pod goes on with the value in use until you answer.',
       entry: expect.objectContaining({ line: H1, answerable: true }),
@@ -210,8 +213,8 @@ describe('next step', () => {
     expect(runOf(blocked).state).toBe('blocked')
     expect(steps(blocked).card).toMatchObject({ tier: 'nothing', status: 'blocked' })
 
-    // A needs-you run with only info entries: not running or blocked, so idle.
-    expect(runOf(chess([onlyQueue(TO_ORCHESTRATOR)])).state).toBe('needs-you')
+    // A run with only info entries: a BLOCKED between agents is pod's to resolve, so it stays idle.
+    expect(runOf(chess([onlyQueue(TO_ORCHESTRATOR)])).state).toBe('idle')
     expect(steps(chess([onlyQueue(TO_ORCHESTRATOR)])).card).toMatchObject({ tier: 'nothing', status: 'idle' })
 
     // An error, unsupported, or plan-less run: the empty message as the detail.
@@ -271,7 +274,7 @@ describe('next step', () => {
 
   it('autopilot', () => {
     // Not halted: the wave PR is pod's to merge, so a run with nothing else has nothing to do, running.
-    const working = chess([onlyQueue(), t1Pushed], { prs: [gh(78, 'open')] })
+    const working = chess([onlyQueue(), t1Pushed], { prs: [gh(78, 'open')], agents: [engineer()] })
     expect(runOf(working).state).toBe('running')
     expect(steps(working)).toEqual<NextSteps>({
       card: { key: 'nothing', tier: 'nothing', status: 'running', title: 'Nothing to do', detail: 'ladder · wave 3/3', action: { kind: 'none' } },
@@ -341,7 +344,8 @@ describe('next step', () => {
     // A repo row: only the entries that join no plan; no PR, no reply.
     const row: RunSummary = { repoId: 'chess', repo: 'chess-web', where: 'no active plan', state: 'idle' }
     const s = defined(nextSteps(row, repo, NOW))
-    expect(order(s)).toEqual([`pending ${entryKey(UNJOINED)}`])
+    // It stays listed, but an entry with no plan is no row's headline.
+    expect(order(s)).toEqual(['nothing nothing', `pending ${entryKey(UNJOINED)}`])
   })
 
   it('pending entries sort by kind: now, decision, before, other, someday', () => {
@@ -380,10 +384,10 @@ describe('next step', () => {
     const p = (type: string, body: string) => entry(type, 'reviewer → human', `plan: ${PLAN}`, body)
     const DECISION = p('PENDING', '**decision (wording):** pick the `port` label.')
     const s = steps(chess([onlyQueue(DECISION)]))
-    expect(s.card).toMatchObject({ tier: 'pending', status: 'needs-you', title: 'pick the port label.', kind: { cls: 's-run', label: 'decision (wording)' } })
-    // A BLOCKED entry keeps its blocked status; its kind shows beside it.
+    expect(s.card).toMatchObject({ tier: 'pending', status: 'idle', title: 'pick the port label.', kind: { cls: 's-run', label: 'decision (wording)' } })
+    // A BLOCKED entry to you says what the run says; its kind shows beside it.
     const BLOCKED_NOW = p('BLOCKED', 'now: the rates file is missing.')
-    expect(steps(chess([onlyQueue(BLOCKED_NOW)])).card).toMatchObject({ tier: 'blocked', status: 'blocked', title: 'the rates file is missing.', kind: { cls: 's-you', label: 'now' } })
+    expect(steps(chess([onlyQueue(BLOCKED_NOW)])).card).toMatchObject({ tier: 'blocked', status: 'needs-you', title: 'the rates file is missing.', kind: { cls: 's-you', label: 'now' } })
     // No kind word: no kind on the card (a BLOCKED one already says blocked), and the whole body as title.
     const plain = steps(chess([onlyQueue(T1_BLOCKED)])).card
     expect(plain.title).toBe("T1 can't reach the rates file.")
