@@ -290,7 +290,9 @@ describe('processStartTime', () => {
     expect(processStartTime(4242, { platform: 'win32', env, run })).toBe(1793762042037)
     const [exe, args, options] = run.mock.calls[0]!
     expect(exe).toBe('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe')
-    expect(args.join(' ')).toContain('4242')
+    expect(args.join(' ')).toContain('ProcessId=4242')
+    // Win32_Process gives every account's start time with no elevation. Get-Process doesn't.
+    expect(args.join(' ')).toContain('CreationDate')
     expect(args).toContain('-NoProfile')
     expect(args).toContain('-NonInteractive')
     expect(options).toMatchObject({ windowsHide: true, shell: false })
@@ -329,10 +331,43 @@ describe('processStartTime', () => {
 })
 
 describe.runIf(process.platform === 'win32')('on the real process table', () => {
+  /** A process of another account: `services.exe` runs as SYSTEM, and this only reads its ID and start time. */
+  const servicePid = () => {
+    const { stdout } = spawnSync('tasklist', ['/FI', 'IMAGENAME eq services.exe', '/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true })
+    const found = /"services.exe","(d+)"/i.exec(stdout)
+    if (!found) throw new Error(`no services.exe in: ${stdout}`)
+    return Number(found[1])
+  }
+
+  test('reads the start time of a process of another account', () => {
+    const start = processStartTime(servicePid())
+    expect(start).toBeGreaterThan(0)
+    expect(start).toBeLessThanOrEqual(Date.now())
+  }, 20_000)
+
+  test('a stale file whose ID went to a service is taken over, with no log line', () => {
+    // Fixed well before any boot of this machine, as a file left by an earlier boot is.
+    const pid = servicePid()
+    held(pid, { startedAt: Date.UTC(2020, 0, 1) })
+    const owner = createOwnerFile({ dir, log })
+    expect(owner.take()).toBe(true)
+    expect(read().pid).toBe(process.pid)
+    expect(logs).toEqual([])
+    owner.release()
+  }, 20_000)
+
+  test('a file written after that process started still reads as held', () => {
+    const pid = servicePid()
+    held(pid, { startedAt: Date.now() })
+    const owner = createOwnerFile({ dir, log })
+    expect(owner.take()).toBe(false)
+    expect(logs).toEqual([expect.stringContaining(`process ${pid} runs auto-continue`)])
+  }, 20_000)
+
   test('reads a real start time, and none for a process that is gone', () => {
     const start = processStartTime(process.pid)
-    expect(start).toBeLessThanOrEqual(Date.now())
-    expect(start).toBeGreaterThan(Date.now() - 24 * 3_600_000)
+    // Against the process's own clock, so a time zone mistake in the lookup shows.
+    expect(Math.abs(start! - (Date.now() - process.uptime() * 1000))).toBeLessThan(10_000)
     expect(processStartTime(exitedPid())).toBeUndefined()
   }, 20_000)
 
