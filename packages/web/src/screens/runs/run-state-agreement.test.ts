@@ -3,6 +3,7 @@ import { autoSends, buildFlow, buildPipeline, buildRepoModel, listRuns, runRepli
 import { buildWaveBoard } from '../board/board-view.ts'
 import { elsewhere } from './elsewhere.ts'
 import { nextSteps } from './next-step.ts'
+import { entryKind } from './entry-kind.ts'
 import { waitGroups } from './waiting-tab.ts'
 import { groupChip, nextStatus } from './view.ts'
 
@@ -338,6 +339,51 @@ describe('an engineer at work under a PENDING gate', () => {
   it('a halt still reads first, and so does an ask naming the slice', () => {
     expect(views(repoOf([GATE5, HALT], { agents: [engineer()] }))).toMatchObject(HALTED)
     expect(views(repoOf([GATE5, SLICE_ASK], { agents: [engineer()] }))).toMatchObject({ flow: 'you', sidebar: 'needs-you', log: 'needs you', next: 'Needs you', board: { you: 1 } })
+  })
+})
+
+describe("an orchestrator's plain ask", () => {
+  const SENTENCE = 'paid sample run: the new prompts have met only fake models. It needs your go.'
+  const ASK = tagged('PENDING', 'orchestrator → human', SENTENCE)
+
+  it('its colon is no kind', () => {
+    expect(entryKind(SENTENCE)).toEqual({ kind: 'other', label: 'other', text: SENTENCE })
+  })
+
+  it('with no engineer: needs you in all six, its text as the title, and a true line', () => {
+    const v = views(repoOf([ASK]))
+    expect(v).toMatchObject({ flow: 'you', sidebar: 'needs-you', log: 'needs you', logChip: 's-you', next: 'Needs you', board: { you: 1, running: 0, waiting: 1, blocked: 0 } })
+    expect(v.title).toBe('paid sample run: the new prompts have met only fake models. It needs your go.')
+    expect(v.steps.card.detail).toBe('The run is stopped until you answer.')
+    expect(v.steps.card.action.kind).toBe('answer')
+  })
+
+  it('with an engineer at work: running in all six, listed and answerable', () => {
+    const v = views(repoOf([ASK], { agents: [engineer()] }))
+    expect(v).toMatchObject(RUNNING)
+    expect(v.steps.card.entry?.line).toBe(ASK.trim())
+    expect(v.steps.card.action.kind).toBe('answer')
+    expect(v.steps.card.detail).toBe('An engineer is at work on this run. Answer when you can.')
+  })
+
+  it('from a reviewer or an engineer: stops nothing', () => {
+    for (const from of ['reviewer', 'engineer']) expect(views(repoOf([tagged('PENDING', `${from} → human`, SENTENCE)]))).toMatchObject(IDLE)
+  })
+
+  it.each(['someday: ', 'now: ', 'decision: ', 'before hosting: ', 'fix next: '])('from the orchestrator with %s: stops nothing', (prefix) => {
+    expect(views(repoOf([tagged('PENDING', 'orchestrator → human', `${prefix}${SENTENCE}`)]))).toMatchObject(IDLE)
+  })
+
+  it('from the orchestrator with a recorded default: stops nothing', () => {
+    expect(views(repoOf([tagged('PENDING', 'orchestrator → human', `${SENTENCE} Value in use: skip it.`)]))).toMatchObject(IDLE)
+  })
+
+  it('with no plan: no effect on a plan run, and still listed', () => {
+    const line = entry('PENDING', 'orchestrator → human', '', SENTENCE)
+    const v = views(repoOf([line]))
+    expect(v).toMatchObject(IDLE)
+    expect(v.title).toBe('Nothing to do')
+    expect(v.steps.rest.map((i) => i.entry?.line)).toEqual([line.trim()])
   })
 })
 
