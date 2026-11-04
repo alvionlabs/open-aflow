@@ -1,15 +1,15 @@
 # Sprint: installer-and-updates
 
-_From plan: pod-docs/plans/windows-app.md · Slug: installer-and-updates · Status: active · Generated: 2026-11-03_
-<!-- autopilot-run: started=2026-11-03T05:06:41Z sprints=3 waves=7 -->
+_From plan: pod-docs/plans/windows-app.md · Slug: installer-and-updates · Status: done · Generated: 2026-11-03_
+<!-- autopilot-run: started=2026-11-03T05:06:41Z sprints=3 waves=8 -->
 
 ## Status board
 
 | Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |
 |------|-------|-------|--------|----|--------|------------|------------|
-| 1 | P1 | Per-user installer, icons, licence notices, and the install proof | installer-and-updates-P1 | — | pending | — | — |
-| 2 | U1 | Auto-update, with the local two-version proof | installer-and-updates-U1 | — | pending | — | P1 |
-| 2 | R1 | Release workflow, its local check, and the install note | installer-and-updates-R1 | — | pending | — | P1 |
+| 1 | P1 | Per-user installer, icons, licence notices, and the install proof | installer-and-updates-P1 | [#80](https://github.com/iamphduc/pod-board/pull/80) merged | done | medium | — |
+| 2 | U1 | Auto-update, with the local two-version proof | installer-and-updates-U1 | [#82](https://github.com/iamphduc/pod-board/pull/82) merged | done | medium | P1 |
+| 2 | R1 | Release workflow, its local check, and the install note | installer-and-updates-R1 | [#82](https://github.com/iamphduc/pod-board/pull/82) merged | done | medium | P1 |
 
 ## Shared contract
 
@@ -178,3 +178,15 @@ Rules for every proof:
 - **Depends on:** P1
 - **One-way door:** none in this sprint: no agent runs this workflow. The door is the human's tag. A tag publishes to friends, and the updater carries that build to every installed app until a higher version ships. The `build` job gates `publish`.
 - **Model:** opus
+
+## Sprint summary
+
+- **Synced with merge-target:** synced 1 PR (#79) before wave 2, with two doc conflicts, both additive
+- **Slices shipped:** P1, U1, R1
+- **Queue entries:** resolved 1 (licence notices), deferred 0 new
+- **Slice log:**
+  - P1: opus · medium · test-first partly — five guarded tests never seen red, with a negative control on the tree kill · runtime real package, install, uninstall, toast, fake run · 11 NOTEs, 2 PENDINGs (re-judged as NOTEs; the orchestrator deleted the stale `Electron.lnk` from its own wave check) · time lost about 15 minutes on first proof failures
+  - U1: opus · medium · test-first partly — proofs after the feature, some not separately red · runtime real 0.1.0 to 0.1.1 update from a local feed, Later, bad feed, fake run · 9 NOTEs · time lost none
+  - R1: opus · medium · test-first yes, with one guard by mutation · runtime real `release:check`, actionlint · 8 NOTEs · time lost waits on the install lock
+  - Wave fixes: none. Stalls: one sprint-planner, re-dispatched once.
+- **Agent context at hand-back:** 837,763 tokens (planner, P1, U1, R1) — *each agent's final context size, not tokens billed*
