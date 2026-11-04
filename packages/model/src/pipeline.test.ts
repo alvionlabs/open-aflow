@@ -528,3 +528,106 @@ describe('haltGate', () => {
     expect(haltGate('Pick the step size.')).toBeUndefined()
   })
 })
+
+describe('what stops a run', () => {
+  const OPEN = { sprints: [['s1', 'active']] as SprintRow[], docs: { s1: [[1, 'A0', `${pr(4)} merged`, 'done'], [1, 'A1', '—', 'pending']] as BoardRow[] } }
+  const human = (type: string, from: string, fields: string, body: string) => queueLine(type, `${from} → human`, fields, body)
+  const stateOf = (line: string, agents: AgentRun[] = []) => {
+    const r = repo(files({ ...OPEN, queue: [line] }), { agents })
+    return planState(r, r.model.plans[0]!, NOW)
+  }
+
+  it.each<[string, string]>([
+    ['a gate by number', human('PENDING', 'orchestrator', 'plan: alpha', 'gate 5 (safety-bound): hit the limit.')],
+    ['a gate by name, in bold', human('PENDING', 'orchestrator', 'plan: alpha', '**Autopilot escalation-valve**: held.')],
+    ['a gate that also states a value', human('PENDING', 'orchestrator', 'plan: alpha', 'gate 4 (inter-wave-verify): smoke. Value in use: skip A1.')],
+    ['a hand-back', human('PENDING', 'orchestrator', 'plan: alpha', 'plan alpha complete — final PR https://github.com/o/r/pull/80.')],
+    ['a hand-back with no slug or PR', human('PENDING', 'orchestrator', 'plan: alpha', 'Plan complete: all merged.')],
+    ['a hand-back in other words', human('PENDING', 'orchestrator', 'plan: alpha', 'Final PR https://github.com/o/r/pull/80 is awaiting you.')],
+    ['an ask naming an open slice', human('PENDING', 'engineer', 'plan: alpha · sprint: s1 · slice: A1', 'Which store?')],
+    ['a `now` naming an open slice', human('PENDING', 'engineer', 'plan: alpha · sprint: s1 · slice: A1', 'now: pick the store.')],
+    ['an empty value in use', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Which store? Value in use: .')],
+    ['a default in prose only', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Which store? It is off by default.')],
+    ['an answered ask, until pod resolves it', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Which store?').replace(' **Resolution:**', ' **Answer (human):** SQLite **Resolution:**')],
+    ['a BLOCKED to you, also with a value in use', human('BLOCKED', 'engineer', 'plan: alpha · slice: A1', 'decision: store? Value in use: SQLite.')],
+  ])('stops: %s', (_name, line) => {
+    expect(stateOf(line)).toBe('needs-you')
+  })
+
+  it.each<[string, string]>([
+    ['value in use', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'decision: store? Value in use: SQLite.')],
+    ['a value in use in bold', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'decision: store? **Value in use:** SQLite.')],
+    ['a value in use in ticks', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'decision: store? `Value in use`: SQLite.')],
+    ['a default', human('PENDING', 'engineer', 'plan: alpha · slice: A1', 'Which store? Default: SQLite.')],
+    ['someday', human('PENDING', 'reviewer', 'plan: alpha', 'someday: cache it.')],
+    ['someday naming an open slice', human('PENDING', 'reviewer', 'plan: alpha · slice: A1', 'someday: cache it.')],
+    ['someday in bold, with a note', human('PENDING', 'reviewer', 'plan: alpha · slice: A1', '**Someday (Look):** cache it.')],
+    ['a bare now', human('PENDING', 'reviewer', 'plan: alpha', 'now: check the cache.')],
+    ['a plain note', human('PENDING', 'reviewer', 'plan: alpha', 'The cache is cold.')],
+    ['a gate named mid-sentence', human('PENDING', 'orchestrator', 'plan: alpha', 'now: past gate 5, it went on.')],
+    ['plan words that are no hand-back', human('PENDING', 'orchestrator', 'plan: alpha', "Plan review isn't complete yet.")],
+    ['an ask naming a done slice', human('PENDING', 'engineer', 'plan: alpha · slice: A0', 'Which store?')],
+    ['an ask naming no slice of the plan', human('PENDING', 'engineer', 'plan: alpha · slice: wave 1', 'Which store?')],
+    ['an ask naming a slice under another sprint', human('PENDING', 'engineer', 'plan: alpha · sprint: s9 · slice: A1', 'Which store?')],
+    ['a BLOCKED between agents', queueLine('BLOCKED', 'engineer → orchestrator', 'plan: alpha · slice: A1', 'tool missing.')],
+    ['a PENDING between agents', queueLine('PENDING', 'engineer → orchestrator', 'plan: alpha · slice: A1', 'Which store?')],
+    ['a resolved entry', queueLine('PENDING', 'engineer → human', 'plan: alpha · slice: A1', 'Which store?', false)],
+    ['a final PR note with a value', human('PENDING', 'orchestrator', 'plan: alpha', 'decision: final PR https://github.com/o/r/pull/80 title. Value in use: short.')],
+    ['a final PR note kept as now', human('PENDING', 'orchestrator', 'plan: alpha', 'now: final PR https://github.com/o/r/pull/80 needs a look.')],
+  ])('goes on: %s', (_name, line) => {
+    expect(stateOf(line)).toBe('idle')
+    expect(stateOf(line, [running({ sprint: 's1', slice: 'A1' })])).toBe('running')
+  })
+
+  it('a note that only reads like a hand-back offers no Merge', () => {
+    const line = human('PENDING', 'orchestrator', 'plan: alpha', 'decision: final PR https://github.com/o/r/pull/80 title. Value in use: short.')
+    const r = repo(files({ ...OPEN, queue: [line] }))
+    expect(model.waitingPrs(r, NOW)).toEqual([])
+    expect(stage(build(r), 'ship').steps[0]?.state).toBe('wait')
+  })
+})
+
+describe('a running wave', () => {
+  const OPEN = { sprints: [['s1', 'active']] as SprintRow[], docs: { s1: [[1, 'A1', '—', 'pending'], [2, 'A2', '—', 'pending']] as BoardRow[] } }
+  const read = (agents: AgentRun[], docs = OPEN) => {
+    const r = repo(files(docs), { agents })
+    const p = build(r)
+    return { state: planState(r, r.model.plans[0]!, NOW), wave: stage(p, 'sprint:s1').steps[0]?.state, log: p.log[0]?.status }
+  }
+  const RUNS = { state: 'running', wave: 'live', log: 'running' }
+  const IDLE = { state: 'idle', wave: 'wait', log: 'waiting' }
+  const quiet = (ago: number, over: Partial<AgentRun> = {}) => agent({ sprint: 's1', slice: 'A1', startedAt: NOW - ago - MIN, lastAt: NOW - ago, ...over })
+
+  it('runs from a fresh write to just under QUIET_MS, and stops at it', () => {
+    expect(read([quiet(MIN)])).toEqual(RUNS)
+    expect(read([quiet(model.STALE_MS)])).toEqual(RUNS)
+    expect(read([quiet(model.QUIET_MS - 1)])).toEqual(RUNS)
+    expect(read([quiet(model.QUIET_MS)])).toEqual(IDLE)
+  })
+
+  it('an ended engineer or one that never wrote does not run it', () => {
+    expect(read([quiet(MIN, { ended: true })])).toEqual(IDLE)
+    expect(read([agent({ sprint: 's1', slice: 'A1' })])).toEqual(IDLE)
+  })
+
+  it("a quiet wave fix runs it, and a quiet engineer's log row reads live", () => {
+    const { slice: _slice, ...fix } = quiet(model.STALE_MS, { branch: 's1-w1-fix' })
+    expect(read([fix])).toEqual(RUNS)
+    expect(build(repo(files(OPEN), { agents: [quiet(model.STALE_MS)] })).log[0]?.rows[0]?.live).toBe(true)
+  })
+
+  it('a quiet engineer on a done slice does not run the plan', () => {
+    const docs = { ...OPEN, docs: { s1: [[1, 'A1', `${pr(4)} merged`, 'done'], [2, 'A2', '—', 'pending']] as BoardRow[] } }
+    expect(read([quiet(model.STALE_MS)], docs).state).toBe('idle')
+  })
+
+  it('a pushed open slice runs it, its engineer gone', () => {
+    const docs = { ...OPEN, docs: { s1: [[1, 'A1', '—', 'pushed'], [2, 'A2', '—', 'pending']] as BoardRow[] } }
+    expect(read([quiet(MIN, { ended: true })], docs)).toEqual(RUNS)
+  })
+
+  it('a waiting wave PR outranks a quiet engineer past the live window', () => {
+    const docs = { ...OPEN, docs: { s1: [[1, 'A1', pr(7), 'pushed'], [2, 'A2', '—', 'pending']] as BoardRow[] } }
+    expect(read([quiet(model.STALE_MS)], docs)).toMatchObject({ state: 'needs-you', wave: 'you' })
+  })
+})
