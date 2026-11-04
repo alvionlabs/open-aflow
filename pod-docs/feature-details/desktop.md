@@ -76,7 +76,7 @@ No agent publishes. These two tags are the only proof of the GitHub path: the lo
 1. On the merge target, set `version` in `packages/desktop/package.json` to the first version, and merge it.
 2. Run `git tag v<version>`.
 3. Run `git push origin v<version>`.
-4. Watch the `release` workflow in the Actions tab until it passes. A tag that differs from `version` fails before it builds.
+4. Watch the `release` workflow in the Actions tab until it passes. The tag must equal `version` in `packages/desktop/package.json`, or the first check step fails before any build. `publish` needs `build`. An existing release for the tag makes `gh release create` fail, so nothing is overwritten. The build's artifact keeps for 1 day.
 5. On a machine with no Pod Board, download `pod-board-setup-<version>.exe` from the Releases page, click through SmartScreen (`More info`, then `Run anyway`), and open the app from the Start menu.
 6. Set a higher `version`, merge it, and repeat steps 2 to 4.
 7. Leave the installed app open. Within 30 s of its next start, or within 6 h while it runs, it finds the new version, downloads it, and opens the box. Choose `Later`, then open the app again: it asks again. Choose `Restart now`: the app closes, installs, and opens on the new version. The log lines start with `pod-board desktop: update`.
