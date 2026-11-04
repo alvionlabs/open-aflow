@@ -334,7 +334,7 @@ describe.runIf(process.platform === 'win32')('on the real process table', () => 
   /** A process of another account: `services.exe` runs as SYSTEM, and this only reads its ID and start time. */
   const servicePid = () => {
     const { stdout } = spawnSync('tasklist', ['/FI', 'IMAGENAME eq services.exe', '/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true })
-    const found = /"services.exe","(d+)"/i.exec(stdout)
+    const found = /"services\.exe","(\d+)"/i.exec(stdout)
     if (!found) throw new Error(`no services.exe in: ${stdout}`)
     return Number(found[1])
   }
