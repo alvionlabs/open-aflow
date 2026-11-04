@@ -1,5 +1,5 @@
 // The urgent banner's pick: another run whose Next step card is more urgent than the selected run's.
-// Reads only each run's card (nextSteps), ranks it by tier, and keeps the first of the highest rank:
+// Reads only each run's card (nextSteps), ranks it by tier (an entry pod goes on without ranks nothing), and keeps the first of the highest rank:
 // the oldest entry in the blocked and pending ranks, else the earlier run in the sidebar.
 // Pure; the banner only renders it.
 

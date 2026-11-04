@@ -8,7 +8,7 @@ Screen 2, at `#/<repoId>/<plan>/board`, opened from `Open the wave board` in the
 
 - **Shown sprint:** the plan's current sprint, else the last sprint with a doc. None, or no slices → `Sprint <s> isn't drafted yet.` (or `No sprint with a doc yet.`).
 - **Columns** take their status from the pipeline's slice log for that wave; each card's row is that log's row.
-- **Card state,** first match: `blocked` → `merged` → `needs-you` (a queue item for the human naming the slice, or its wave's PR in `waitingPrs`) → `running` (`pushed`, or a running engineer for the slice) → `waiting`. Meta: model, confidence, minutes; or the latest entry's text cut to 60 characters; else `PR #N · you merge` (`PR #N · autopilot stopped` on a halted autopilot run); or `needs <codes>`.
+- **Card state,** first match: `blocked` → `merged` → `needs-you` (a stop naming the slice (`stopsRun`), or its wave's PR in `waitingPrs`) → `running` (`isSliceRunning`: `pushed`, or its own or its wave's fix engineer at work) → on the wave in progress with nothing of its own running, the run's state (`blocked`, `needs-you`, `running`) → `waiting`. Meta: model, confidence, minutes; or the latest entry's text cut to 60 characters; else `PR #N · you merge` (`PR #N · autopilot stopped` on a halted autopilot run); or `needs <codes>`.
 - **Look:** cards are plain, compact `.card`s; state is the dot and word only, never an edge. A card on the critical path gets a `--muted` frame, the open card a `--fg` frame on `--hover`, and focus a `--focus` outline.
 - **Edges:** one per dependency on a slice of this board in an earlier wave, in `--border-strong`. **Critical path:** the longest chain by slice count, in `--fg`; a tie goes to the chain whose slices come first.
 - **Lines** are SVG curves from one card's right edge to the next card's left edge, redrawn on board change, resize, and once fonts load.
@@ -28,7 +28,7 @@ Screen 2, at `#/<repoId>/<plan>/board`, opened from `Open the wave board` in the
 ## Watch out
 
 - An entry with a `slice:` but no `sprint:` or `plan:` joins no plan's queue, so it never makes a card `needs-you`.
-- A done slice with a pending `→ human` note reads `merged`; the run still reads `needs you`.
+- A done slice with a pending `→ human` note reads `merged`, and that note doesn't stop the run (`stopsRun` needs an open slice).
 - A card reads `running` from an engineer only when its dispatch fields were read ([engineer-view.md](engineer-view.md)).
 - `#/<repoId>/board` is plan `board`'s run, not a board. Fix runs have no wave board.
 - Depends-on values are kept as written, so `needs …` can list codes that draw no line.
@@ -45,3 +45,4 @@ Screen 2, at `#/<repoId>/<plan>/board`, opened from `Open the wave board` in the
 - 2026-10-28 · calm-dashboard · look only: plain cards with a status dot and word (no colored edge), critical path in `--fg`, other lines `--border-strong`; opened from the Plan tab with `Back to the run`; final PR #54 passed review at round 1 · [report](../reports/calm-dashboard.html)
 - 2026-10-30 · fix-run-flow round 5 · `geometry.ts` adds `downPath` and `headPath` beside `edgePath`; screen 1's run flow draws its connectors with all three.
 - 2026-10-30 · fix-run-flow round 7 · `geometry.ts` adds `stepPath` and reshapes `backPath` as smooth-step routes for screen 1's flow; the wave board's own `edgePath` curves are unchanged.
+- 2026-11-03 · fix-run-state · changed: cards read the shared rules (`stopsRun`, `isSliceRunning`), and the wave in progress with nothing of its own running takes the run's state, as the flow's card does, so the counts agree with the flow, sidebar and Log.
