@@ -464,6 +464,41 @@ describe('under autopilot, while pod holds a pushed slice', () => {
   it('pod dead: past the window, continue returns', () => {
     expect(runReplies(repo(ENGINEER_QUIET_MS), PLAN, NOW).map((r) => r.reply)).toEqual(['continue'])
   })
+
+  describe('the exemption: pod really stopped', () => {
+    const fresh = (queue: string[], rows: Row[], number: number) => repoOf(queue, { agents: [ended(10 * MIN)], prs: [gh(number, 'open')] }, rows, undefined, true)
+    const replies = (r: BoardRepo) => runReplies(r, PLAN, NOW).map((x) => x.reply)
+    const LATER: Row[] = [
+      [1, 'P1', '#9', 'merged'],
+      [2, 'Q1', '#12', 'pushed'],
+    ]
+
+    it('a resume past an unanswered gate 5: the stale gate names no pushed PR, so no continue and nothing sent', () => {
+      const r = fresh([GATE5, ANSWERED_DECISION], LATER, 12)
+      expect(replies(r)).toEqual([])
+      expect(sends(r)).toEqual([])
+    })
+
+    it('an answered stale gate 5 changes nothing', () => {
+      const r = fresh([`${GATE5} **Answer (human):** go on`], LATER, 12)
+      expect(replies(r)).toEqual([])
+      expect(sends(r)).toEqual([])
+    })
+
+    it.each(['#9', 'https://github.com/o/r/pull/9'])('a gate 6 naming %s, its PR pushed, answered: continue is offered', (pr) => {
+      const gate = tagged('PENDING', 'orchestrator → human', `gate 6 (escalation-valve): wave PR ${pr} is withheld.`)
+      expect(replies(fresh([`${gate} **Answer (human):** go on`], ROWS, 9))).toEqual(['continue'])
+    })
+
+    it('a gate 6 naming another PR: the guard applies', () => {
+      const gate = tagged('PENDING', 'orchestrator → human', 'gate 6 (escalation-valve): wave PR #99 is withheld, and #90.')
+      expect(replies(fresh([`${gate} **Answer (human):** go on`], ROWS, 9))).toEqual([])
+    })
+
+    it('a BLOCKED halt with a pushed slice, answered: continue is offered', () => {
+      expect(replies(fresh([`${HALT} **Answer (human):** go on`], ROWS, 9))).toEqual(['continue'])
+    })
+  })
 })
 
 describe('a gate from anyone but the orchestrator', () => {
