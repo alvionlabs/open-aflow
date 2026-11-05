@@ -29,18 +29,34 @@ const wordOf = (arg: unknown): string => {
   return `[${typeof arg}]`
 }
 
-/** A letter, digit, or other sign that would make the text a longer folder name: `Name2`, `Name-old`, `Name.old`. */
-const NAME_GOES_ON = '(?![\\p{L}\\p{N}_~$-]|\\.[\\p{L}\\p{N}_~$-])'
+/**
+ * The text after the home folder makes it another folder: signs a folder name can hold, up to a letter or digit
+ * (`Name2`, `Name+old`, `Name(2)`, `Name%20Smith`). A space, `,`, or `;` ends the path, and so does punctuation with no
+ * letter or digit after it (`Name.`, `Name)`). A folder with a space can't be told from prose, so it swaps: a wrong swap
+ * only mislabels a path, and a missed one leaks a name.
+ */
+const NAME_GOES_ON = '(?![^\\s\\\\/:*?"<>|,;]*[\\p{L}\\p{N}\\p{M}_])'
+const SEPARATOR = '(?:[\\\\/]|%5C|%2F)+'
+
+const percentEncoded = (char: string) => [...new TextEncoder().encode(char)].map((byte) => `%${byte.toString(16).padStart(2, '0')}`).join('')
+
+/** One character, plain or URL-encoded, as Node prints a stack frame's `file:///` URL. */
+function charPattern(char: string): string {
+  const plain = char.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')
+  if (/^[A-Za-z0-9_.~-]$/.test(char)) return plain
+  const encoded = [...new Set([char, char.toLowerCase(), char.toUpperCase()])].map(percentEncoded)
+  return `(?:${[plain, ...encoded].join('|')})`
+}
 
 /**
- * Finds the home folder in any spelling: any case, either slash, doubled backslashes as in JSON text. Undefined with
- * no home, or a drive root, which would match too much.
+ * Finds the home folder in any spelling: any case, either slash, doubled backslashes as in JSON text, or URL-encoded.
+ * Undefined with no home, or a drive root, which would match too much.
  */
 function homePattern(home: string | undefined): RegExp | undefined {
   const parts = (home ?? '').split(/[\\/]+/).filter((part) => part !== '')
   if (parts.length < 2) return undefined
-  const lead = /^[\\/]/.test(home!) ? '[\\\\/]+' : ''
-  const body = parts.map((part) => part.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')).join('[\\\\/]+')
+  const lead = /^[\\/]/.test(home!) ? SEPARATOR : ''
+  const body = parts.map((part) => [...part].map(charPattern).join('')).join(SEPARATOR)
   return new RegExp(`${lead}${body}${NAME_GOES_ON}`, 'giu')
 }
 
