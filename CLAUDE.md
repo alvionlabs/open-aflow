@@ -13,6 +13,11 @@ Read `DESIGN.md` before any UI change. It holds all design rules.
 
 - The mock has no agents and no GitHub PRs, so live engineers, minutes, and PR states don't show there. For those, use fixture copies with fake transcripts in a temp folder.
 
+## Real-run tests
+
+- `E:\Projects\pod-board-run-test` (private GitHub repo `iamphduc/pod-board-run-test`) is for tests that need a real `claude` run and real PRs, such as Merge, Continue, and Quit in the installed app. Use it instead of creating a new repo.
+- A real run costs tokens and needs the human's go-ahead. Keep each run to a one-line README change.
+
 ## Desktop app and browser version
 
 - Users run the desktop app (`packages/desktop`). You can't see its window.
