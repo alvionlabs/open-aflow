@@ -48,7 +48,7 @@ The app checks for updates and downloads them for you. When an update is ready, 
 
 ## Report a bug
 
-The app keeps a small log at `%APPDATA%\Pod Board\desktop.log`. It holds no queue text and no tokens. Attach it to your report.
+The app keeps a small log at `%APPDATA%\Pod Board\desktop.log`. It holds the app's status lines and error messages, and no tokens. It writes your user folder as `~`. An error message can quote a file the app read, so read the log before you attach it to your report.
 
 ## Uninstall
 

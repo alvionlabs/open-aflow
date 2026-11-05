@@ -9,7 +9,7 @@ The Electron shell's notifier reads the live Board in the main process, so it wo
 **Items.** For each run of `listRuns(board, now)`, take `card` plus `rest` of the web's `nextSteps`, and keep the tiers `blocked`, `merge`, and `reply`. `pending` and `info` never count. These cases give no item of their own:
 
 - a reply on a PR that is already a merge item of that run
-- a `continue` on a run with auto-continue on and a session, because the board sends it itself
+- a `continue` on a run with auto-continue on and a session, because the board sends it itself. An old `fix-merged` is an item, because the board won't send it (`autoMaySend`)
 - anything from a repo in `error` or `unsupported`
 
 **Identity.** `<repoId>\n<key>`, where the key is `entry:<line>`, `pr:<number>`, or the model's key for one stop. The seen set lasts the app run and only grows.
