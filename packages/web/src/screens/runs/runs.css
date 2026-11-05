@@ -875,6 +875,10 @@
   overflow-wrap: anywhere;
 }
 
+.merge-result {
+  max-width: 72ch;
+}
+
 .merge-why,
 .merge-error,
 .merge-status {
