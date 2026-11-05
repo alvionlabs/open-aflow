@@ -179,6 +179,26 @@ describe('attention items', () => {
     expect(other.map((i) => i.id)).toEqual(['chess\nfix-merged:36'])
   })
 
+  test('a key whose last send failed raises its item again', () => {
+    const repoAt = (ago: number) => chess([onlyQueue()], { claims: [fixClaim], agents: [fixEngineer, fixReviewer], prs: [gh(36, 'merged', { branch: FIX, mergedAt: NOW - ago * MIN })] })
+    const entry = (result: 'started' | 'failed', auto: boolean, at = NOW - MIN, run = FIX) =>
+      ({ at, action: 'resume', repoId: 'chess', repo: 'chess', target: `${run} · continue`, result, reply: 'continue', auto }) as const
+    const on = (ago: number, actions: ReturnType<typeof entry>[]) =>
+      attentionItems(boardOf([repoAt(ago)], { autoContinue: [{ repoId: 'chess', run: FIX, lastKey: 'fix-merged:36' }], actions }), NOW).map((i) => i.id)
+    // An automatic send that failed, inside the 30 minutes.
+    expect(on(5, [entry('failed', true)])).toEqual(['chess\nfix-merged:36'])
+    // A press that failed.
+    expect(on(45, [entry('failed', false)])).toEqual(['chess\nfix-merged:36'])
+    // A send that started stays quiet, and the newest entry is what counts (the log is newest first).
+    expect(on(5, [entry('started', true)])).toEqual([])
+    expect(on(45, [entry('started', false), entry('failed', true, NOW - 2 * MIN)])).toEqual([])
+    expect(on(45, [entry('failed', false), entry('started', true, NOW - 2 * MIN)])).toEqual(['chess\nfix-merged:36'])
+    // Another run's failure doesn't count.
+    expect(on(5, [entry('failed', true, NOW - MIN, 'fix-other')])).toEqual([])
+    // No log on the Board reads as sent.
+    expect(on(5, [])).toEqual([])
+  })
+
   test('a bad repo is quiet', () => {
     const good = chess([manual, onlyQueue(BLOCKED)], { id: 'good', path: '/g' })
     const error = chess([manual, onlyQueue(BLOCKED)], { error: 'cannot read repo' })

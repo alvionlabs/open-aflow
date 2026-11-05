@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { AgentRun, Board, BoardRepo, Claim, PrStatus } from './board.ts'
 import { buildFixPipeline, fixRunAgents, fixRunNames, otherActivity, OTHER_CAP, OTHER_WINDOW_MS } from './fix-runs.ts'
 import { roleOf } from './pipeline.ts'
-import { runReplies } from './replies.ts'
+import { replySession, runReplies } from './replies.ts'
 import { buildRepoModel, type RepoFiles } from './run-model.ts'
 import { activeRuns, listRuns } from './runs.ts'
 
@@ -162,6 +162,26 @@ describe('fix runs on the runs list', () => {
 
     it('freeing the claim ends it', () => {
       expect(rows(repo({ agents: old, prs: [mergedPr(36, 45)] }))).toEqual([[undefined, undefined, 'no active plan', 'idle']])
+    })
+
+    it('with its session past the transcript window: its steps read as run, and only Copy is left', () => {
+      const r = repo({ claims: [claim('fix-scroll')], prs: [mergedPr(36, 40 * 24 * 60)] })
+      const steps = buildFixPipeline(r, 'fix-scroll', NOW)!.stages.flatMap((s) => s.steps)
+      expect(steps.find((s) => s.key === 'engineer')).toMatchObject({ state: 'done', detail: 'no transcript' })
+      expect(steps.find((s) => s.key === 'round-1')).toMatchObject({ state: 'done', detail: 'no transcript' })
+      expect(steps.map((s) => s.detail)).not.toContain('not started')
+      expect(steps.find((s) => s.key === 'pr')).toMatchObject({ state: 'done', detail: 'PR #36 · merged' })
+      // Pod still waits for the word, so the card offers it to copy. With no session, nothing can send it.
+      expect(runReplies(r, 'fix-scroll', NOW).map((x) => x.key)).toEqual(['fix-merged:36'])
+      expect(replySession(r, 'fix-scroll', NOW)).toBeUndefined()
+    })
+
+    it('a step with an agent keeps its own figures, and an open PR still reads not started', () => {
+      const r = repo({ claims: [claim('fix-scroll')], agents: [engineer('fix-scroll', 60, 40, { ended: true })], prs: [mergedPr(36, 5)] })
+      const steps = buildFixPipeline(r, 'fix-scroll', NOW)!.stages.flatMap((s) => s.steps)
+      expect(steps.find((s) => s.key === 'engineer')?.detail).not.toBe('no transcript')
+      const open = repo({ claims: [claim('fix-scroll')], prs: [pr(36, 'open')] })
+      expect(buildFixPipeline(open, 'fix-scroll', NOW)!.stages[0]!.steps[0]).toMatchObject({ state: 'wait', detail: 'not started' })
     })
 
     it('an old merge still offers Continue', () => {

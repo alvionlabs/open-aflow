@@ -780,24 +780,26 @@ describe('transcript cache', () => {
     expect(parsedIds()).toEqual(['eng1'])
   })
 
-  test("a claimed fix run's session stays on the Board past the window", async () => {
+  test('a session past the window stays off the Board, whatever a fix claim names', async () => {
     const repo = copyFixture()
     await register(repo)
-    await transcript(repo, 'eng1', 'pod:engineer', '- **branch name:** fix-old\n')
+    // A plan's reviewer, whose prompt only mentions the fix run in a sentence.
+    await transcript(repo, 'rev1', 'pod:reviewer', '- **plan:** sparring-ladder\nThis follows fix-old.\n')
     await writeFile(join(portsDir, '3100'), `${repo} fix-old\n`)
     const old = new Date(NOW - 40 * 24 * 60 * 60_000)
     const session = dirname(subagentsOf(repo))
     await utimes(subagentsOf(repo), old, old)
     await utimes(session, old, old)
 
-    const service = createBoardService(deps())
-    const onBoard = (await service.build()).repos[0]!
-    expect(onBoard.agents.map((x) => x.id)).toEqual(['eng1'])
-    expect(model.buildFixPipeline(onBoard, 'fix-old', NOW)?.stages[0]?.steps[0]?.state).not.toBe('wait')
-
-    // With the claim gone, it leaves.
-    await rm(join(portsDir, '3100'))
-    expect((await service.build()).repos[0]!.agents).toEqual([])
+    const board = await createBoardService(deps()).build()
+    const onBoard = board.repos[0]!
+    expect(onBoard.agents).toEqual([])
+    // The plan gets no session from it, so no send.
+    const key = caseless ? normalizeRepoPath(repo, platform).toLowerCase() : normalizeRepoPath(repo, platform)
+    expect(model.autoSends(board, [{ path: key, run: 'sparring-ladder' }], NOW, () => true)).toEqual([])
+    // The fix run stays listed, with no session to send to.
+    expect(model.listRuns(board, NOW).map((r) => r.plan)).toContain('fix-old')
+    expect(model.replySession(onBoard, 'fix-old', NOW)).toBeUndefined()
   })
 
   test('a transcript deleted after a build drops off the Board', async () => {
