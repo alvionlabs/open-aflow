@@ -146,6 +146,14 @@ describe('attention items', () => {
     expect(items(bare)).toMatchObject([{ id: `bare\nentry:${UNJOINED}`, hash: '#/bare' }])
   })
 
+  test('a fix PR merged long after its review still raises its Continue', () => {
+    const late = { ...fixReviewer, lastAt: NOW - 44 * MIN }
+    const repoAt = (ago: number) => chess([onlyQueue()], { claims: [fixClaim], agents: [fixEngineer, late], prs: [gh(36, 'merged', { branch: FIX, mergedAt: NOW - ago * MIN })] })
+    expect(items(repoAt(1))).toMatchObject([{ id: 'chess\nfix-merged:36', hash: `#/chess/${FIX}` }])
+    // A leftover claim, 30 minutes after the merge, raises nothing.
+    expect(items(repoAt(30))).toEqual([])
+  })
+
   test('a bad repo is quiet', () => {
     const good = chess([manual, onlyQueue(BLOCKED)], { id: 'good', path: '/g' })
     const error = chess([manual, onlyQueue(BLOCKED)], { error: 'cannot read repo' })

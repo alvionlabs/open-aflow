@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { AgentRun, Board, BoardRepo, Claim, PrStatus } from './board.ts'
 import { buildFixPipeline, fixRunAgents, fixRunNames, otherActivity, OTHER_CAP, OTHER_WINDOW_MS } from './fix-runs.ts'
 import { roleOf } from './pipeline.ts'
+import { runReplies } from './replies.ts'
 import { buildRepoModel, type RepoFiles } from './run-model.ts'
 import { activeRuns, listRuns } from './runs.ts'
 
@@ -46,6 +47,8 @@ const reviewer = (from: number, to: number, over: Partial<AgentRun> = {}) =>
   agent({ type: 'pod:reviewer', kind: 'fix', branch: 'fix-scroll', ...span(from, to), ...over })
 
 const pr = (number: number, state: PrStatus['state'], branch = 'fix-scroll'): PrStatus => ({ number, state, checks: 'none', checkedAt: NOW, branch })
+/** A PR that merged `ago` minutes ago. */
+const mergedPr = (number: number, ago: number): PrStatus => ({ ...pr(number, 'merged'), mergedAt: NOW - ago * MIN })
 
 function repo(extra: Partial<BoardRepo> = {}, files: RepoFiles = NO_PLANS): BoardRepo {
   return { id: 'id-web', name: 'web', path: '/r/web', source: 'claim', model: buildRepoModel(files), agents: [], prs: [], claims: [], ...extra }
@@ -129,14 +132,56 @@ describe('fix runs on the runs list', () => {
     expect(rows(repo({ claims: [claim('fix-scroll')], agents }))).toEqual([['fix-scroll', 'scroll', 'build', 'idle']])
   })
 
-  it('a merged PR with no agent in the last 30 minutes is a leftover claim: the run drops off', () => {
-    const agents = [engineer('fix-scroll', 120, 40, { ended: true })]
-    expect(rows(repo({ claims: [claim('fix-scroll')], agents, prs: [pr(36, 'merged')] }))).toEqual([[undefined, undefined, 'no active plan', 'idle']])
-    // Within 30 minutes it stays, at PR.
-    const recent = [engineer('fix-scroll', 120, 10, { ended: true })]
-    expect(rows(repo({ claims: [claim('fix-scroll')], agents: recent, prs: [pr(36, 'merged')] }))).toEqual([['fix-scroll', 'scroll', 'PR', 'idle']])
-    // No agent at all and a merged PR: gone.
-    expect(rows(repo({ claims: [claim('fix-scroll')], prs: [pr(36, 'merged')] }))).toEqual([[undefined, undefined, 'no active plan', 'idle']])
+  it('the reviewer wrote at 3:17 PM and the human merged at 4:00 PM: the run stays, with Continue', () => {
+    // 43 minutes between the last write and the merge; the board reads it one minute later.
+    const agents = [engineer('fix-scroll', 120, 90, { ended: true, session: 's1' }), reviewer(80, 44, { ended: true, session: 's1' })]
+    const r = repo({ claims: [claim('fix-scroll')], agents, prs: [mergedPr(36, 1)] })
+    expect(rows(r)).toEqual([['fix-scroll', 'scroll', 'PR', 'idle']])
+    expect(runReplies(r, 'fix-scroll', NOW).map((x) => x.key)).toEqual(['fix-merged:36'])
+  })
+
+  describe('a merged PR: how long the claim stays listed', () => {
+    const old = [engineer('fix-scroll', 300, 240, { ended: true })]
+    const listed = [['fix-scroll', 'scroll', 'PR', 'idle']]
+    const gone = [[undefined, undefined, 'no active plan', 'idle']]
+    const at = (mergedAt: number | undefined, agents: AgentRun[] = old) =>
+      rows(repo({ claims: [claim('fix-scroll')], agents, prs: [{ ...pr(36, 'merged'), ...(mergedAt === undefined ? {} : { mergedAt }) }] }))
+
+    it('stays until 30 minutes after the merge, then is a leftover claim', () => {
+      expect(at(NOW - 30 * MIN + 1)).toEqual(listed)
+      expect(at(NOW - 30 * MIN)).toEqual(gone)
+      expect(at(NOW - 3 * 24 * 60 * MIN)).toEqual(gone)
+    })
+
+    it('a merge time ahead of the clock reads as just merged', () => {
+      expect(at(NOW + 5 * MIN)).toEqual(listed)
+    })
+
+    it('an agent that wrote in the last 30 minutes keeps it listed long after the merge (cleanup at work)', () => {
+      expect(at(NOW - 120 * MIN, [engineer('fix-scroll', 120, 10, { ended: true })])).toEqual(listed)
+    })
+
+    it('no agent at all: the merge alone decides', () => {
+      expect(at(NOW - 5 * MIN, [])).toEqual(listed)
+      expect(at(NOW - 45 * MIN, [])).toEqual(gone)
+    })
+
+    it('no merge time from gh: it stays, since only the listed run can clean its claim up', () => {
+      expect(at(undefined)).toEqual(listed)
+      expect(at(undefined, [])).toEqual(listed)
+    })
+
+    it('a leftover claim offers no reply', () => {
+      const r = repo({ claims: [claim('fix-scroll')], agents: old, prs: [mergedPr(36, 45)] })
+      expect(runReplies(r, 'fix-scroll', NOW)).toEqual([])
+    })
+
+    it('its agents stay out of Other activity until it leaves the list', () => {
+      const late = [reviewer(80, 44, { ended: true })]
+      const others = (ago: number) => otherActivity(repo({ claims: [claim('fix-scroll')], agents: late, prs: [mergedPr(36, ago)] }), NOW).map((a) => a.role)
+      expect(others(1)).toEqual([])
+      expect(others(30)).toEqual(['reviewer'])
+    })
   })
 
   it('an open or closed PR keeps the claim listed however old its agents are', () => {
