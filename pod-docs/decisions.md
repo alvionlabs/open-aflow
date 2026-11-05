@@ -173,7 +173,7 @@ Consequences: an error or a merge reason is plain text with a colored dot before
 
 ## 2026-10-28 — app manifest colors follow the Dark default
 
-The installed app's `manifest.webmanifest` uses `#000000` for `background_color` and `theme_color`, matching the new Dark default (plan `calm-dashboard`), so no white splash or browser bar shows before a dark page. `pwa.test.ts` checks them against the dark `--bg`. Chosen by the human at gate 1 of the calm-screen sprint.
+The installed app's `manifest.webmanifest` uses `#000000` for `background_color` and `theme_color`, matching the new Dark default (plan `calm-dashboard`), so no white splash or browser bar shows before a dark page. `pwa.test.ts` checks them against the dark `--bg`. Chosen by the human at gate 1 of the calm-screen sprint. Superseded 2026-11-05: the manifest is removed.
 
 ## 2026-10-28 — Next step card wording (agent default — override anytime)
 
@@ -249,3 +249,8 @@ Consequences: until that page exists, nothing in the app turns the login item on
 Context: a merged fix run left the list once no agent had written in 30 minutes, and then 30 minutes after the merge. A human who merged late, or came back late, lost the card, Continue, and the cleanup. A claim that remains after a merge means cleanup hasn't run.
 Decision: the human's decision: a merged fix run stays on the list, with its card, Continue, and toast item, for as long as its claim exists, however long ago the merge was. Cleanup freeing the claim is what ends it. Safety rule: auto-continue sends `continue` only within 30 minutes of the merge, and never with no merge time. The Continue button has no such limit. A sent key never sends again.
 Consequences: a run whose session crashed, or whose claim was never freed, stays listed, and the tray dot stays on. The app has no way to remove it: the human deletes the claim file `<os temp>\pod-ports\<port base>` by hand. The cheapest way to add one is a `Forget this run` item in the run's ⋯ menu that deletes that file. It isn't built. Limit: a claimed run keeps Continue while its session is inside the 30-day transcript window. Past it, the run stays listed, its steps read as run with `no transcript`, and it offers Copy with no Continue. A `fix-merged` the toggle already sent raises no toast or dot, also when that send failed. A fix for a failed send is in the queue for its own PR.
+
+## 2026-11-05 — The desktop app is the only way users run Pod Board (human decision)
+Context: the page could also be installed from a browser as a PWA, and the README led with `pnpm dev`. The Windows app now exists. The human wrote: "keep the web for you as agent to test and see is brilliant".
+Decision: the human's decision: users run the desktop app. The web app (`packages/web`) stays as the desktop app's interface and as the agents' test bench: they run `pnpm dev` against the mock repo, or `pnpm start`, to see and check the UI. The PWA manifest and what only it used are removed.
+Consequences: no manifest file, link tag, `apple-touch-icon`, maskable icon, or `.webmanifest` content type. `icon-512.png` stays as the source of the desktop and tray icons, and `icon-192.png` as the tab icon. `/sw.js` still answers 404. The README presents the installer and keeps `pnpm dev` and `pnpm start` under Development. The 2026-10-28 manifest-colors decision no longer applies.

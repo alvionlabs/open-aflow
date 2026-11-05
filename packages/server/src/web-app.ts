@@ -21,7 +21,6 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.txt': 'text/plain; charset=utf-8',
   '.woff2': 'font/woff2',
-  '.webmanifest': 'application/manifest+json',
 }
 
 /** Every regular file under `dir`, by its URL path. Links aren't followed, so none leads outside. */

@@ -41,7 +41,6 @@ beforeEach(async () => {
   await put('index.html', INDEX)
   await put('assets/app-abc.js', 'console.log(1)')
   await put('assets/app-abc.css', 'body{}')
-  await put('manifest.webmanifest', '{"name":"Pod Board"}')
   await put('data.json', '{}')
   await put('icons/icon.png', 'png')
   await put('icons/icon.svg', '<svg/>')
@@ -95,7 +94,6 @@ test('files keep their content types', async () => {
   const types: Record<string, string> = {
     '/assets/app-abc.js': 'text/javascript; charset=utf-8',
     '/assets/app-abc.css': 'text/css; charset=utf-8',
-    '/manifest.webmanifest': 'application/manifest+json',
     '/data.json': 'application/json',
     '/icons/icon.png': 'image/png',
     '/icons/icon.svg': 'image/svg+xml',
@@ -109,7 +107,6 @@ test('files keep their content types', async () => {
     expect(res.status, path).toBe(200)
     expect(res.headers.get('content-type'), path).toBe(type)
   }
-  expect(await (await app.request('/manifest.webmanifest')).text()).toBe('{"name":"Pod Board"}')
   // Only the root page gets the token.
   expect(await (await app.request('/sub/page.html')).text()).toBe('<p>plain</p>')
 })
@@ -118,7 +115,6 @@ test('cache headers by file kind', async () => {
   const immutable = 'public, max-age=31536000, immutable'
   expect((await app.request('/assets/app-abc.js')).headers.get('cache-control')).toBe(immutable)
   expect((await app.request('/assets/app-abc.css')).headers.get('cache-control')).toBe(immutable)
-  expect((await app.request('/manifest.webmanifest')).headers.get('cache-control')).toBe('no-cache')
   expect((await app.request('/fonts/geist.woff2')).headers.get('cache-control')).toBe('no-cache')
 })
 
@@ -210,7 +206,6 @@ test('every web answer refuses to be framed', async () => {
     app.request('/index.html'),
     app.request('/some/route'),
     app.request('/assets/app-abc.js'),
-    app.request('/manifest.webmanifest'),
     app.request('/', { method: 'HEAD' }),
     app.request('/missing.js'),
     app.request('/api/nothing'),
