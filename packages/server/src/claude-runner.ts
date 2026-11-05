@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 import type { ReplyWord } from '@pod-board/model'
-import { envKey, isFile, resolveBin, safeChildEnv } from './bin-path.ts'
+import { envKey, isAbsoluteFor, isFile, resolveBin, safeChildEnv } from './bin-path.ts'
 import { envValue, type Env } from './config.ts'
 
 export { resolveBin }
@@ -28,8 +28,12 @@ const TAIL_CHARS = 500
  */
 const SESSION = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/
 const WORDS: readonly string[] = ['continue', 'go']
-/** Env names passed on although they match a dropped prefix, compared upper-cased. */
-const KEPT_ENV = new Set(['CLAUDE_CONFIG_DIR'])
+const BASH_PATH_ENV = 'CLAUDE_CODE_GIT_BASH_PATH'
+/**
+ * Env names passed on although they match a dropped prefix, compared upper-cased. Exact names
+ * only, never a prefix: `CLAUDE_CODE_*` also holds `CLAUDE_CODE_OAUTH_TOKEN` and session state.
+ */
+const KEPT_ENV = new Set(['CLAUDE_CONFIG_DIR', BASH_PATH_ENV, 'CLAUDE_CODE_MAX_OUTPUT_TOKENS'])
 /** Characters cmd.exe would act on even inside quotes, or that end the quoting. */
 const CMD_UNSAFE = /["%!^&|<>\r\n]/
 // CSI sequences, OSC sequences, and other two-byte escapes.
@@ -76,15 +80,22 @@ export function claudeBin(env: Env): string {
  * `ANTHROPIC_*` variable (keys, tokens, base URL, model) and every `CLAUDE*` one (Claude
  * Code's own session state: `CLAUDECODE`, `CLAUDE_CODE_*`, `CLAUDE_PID`, `CLAUDE_EFFORT`,
  * the Bedrock and Vertex switches) is dropped, so the run uses the human's own login and
- * settings, not those of a session that happened to launch the board. `CLAUDE_CONFIG_DIR`
- * is kept: it names where the human's login and sessions live, the same folder the board
- * reads transcripts from, and without it `--resume` couldn't find the session.
+ * settings, not those of a session that happened to launch the board. `KEPT_ENV` names the
+ * exceptions, which are machine settings and not credentials or session state:
+ * `CLAUDE_CONFIG_DIR` names where the human's login and sessions live, the same folder the
+ * board reads transcripts from, and without it `--resume` couldn't find the session;
+ * `CLAUDE_CODE_GIT_BASH_PATH` and `CLAUDE_CODE_MAX_OUTPUT_TOKENS` may be set only in the
+ * shell, and a run can fail to start without them on a machine that needs them.
  */
 const passesOn = (name: string): boolean => {
   const u = name.toUpperCase()
   if (KEPT_ENV.has(u)) return true
   return !u.startsWith('ANTHROPIC_') && !u.startsWith('CLAUDE')
 }
+
+/** A relative bash path would resolve in the repo folder the run starts in, so a cloned repo could plant it. */
+const safeValue = (name: string, value: string | undefined, win: boolean): boolean =>
+  name.toUpperCase() !== BASH_PATH_ENV || isAbsoluteFor(value ?? '', win)
 
 /**
  * The board's env for a resumed run: see `passesOn`, then `safeChildEnv` (absolute PATH
@@ -93,7 +104,7 @@ const passesOn = (name: string): boolean => {
  */
 export function childEnv(env: NodeJS.ProcessEnv, platform: NodeJS.Platform = process.platform): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = {}
-  for (const [k, v] of Object.entries(env)) if (passesOn(k)) out[k] = v
+  for (const [k, v] of Object.entries(env)) if (passesOn(k) && safeValue(k, v, platform === 'win32')) out[k] = v
   return safeChildEnv(out, platform)
 }
 
@@ -112,12 +123,17 @@ export function cmdPath(env: NodeJS.ProcessEnv): string | undefined {
   return resolveBin('cmd', env, 'win32', { exts: ['.exe'] })
 }
 
+type ShimRun = { file: string; pre: string[] }
+
+/** The node of last resort: the board's own, unless the board runs in Electron, whose exe would open an app. */
+const defaultFallbackNode = (): string | undefined => (process.versions.electron ? undefined : process.execPath)
+
 /**
  * What an npm `.cmd` shim runs, read from its text: the last quoted `%dp0%\…` path before `%*`.
  * A native `.exe` runs as is; a script runs with the shim's own `node.exe`, else `node` on
- * PATH, else the board's own node. Anything else → `undefined`.
+ * PATH, else `fallbackNode`. With none of these → `no node`. Anything else → `undefined`.
  */
-export function shimTarget(file: string, env: NodeJS.ProcessEnv): { file: string; pre: string[] } | undefined {
+function readShim(file: string, env: NodeJS.ProcessEnv, fallbackNode: string | undefined): ShimRun | 'no node' | undefined {
   let text: string
   try {
     text = readFileSync(file, 'utf8')
@@ -133,8 +149,14 @@ export function shimTarget(file: string, env: NodeJS.ProcessEnv): { file: string
   if (/\.exe$/i.test(target)) return { file: target, pre: [] }
   if (!/\.[cm]?js$/i.test(target)) return undefined
   const own = path.win32.join(dir, 'node.exe')
-  const node = isFile(own) ? own : (resolveBin('node', env, 'win32') ?? process.execPath)
-  return { file: node, pre: [target] }
+  const node = isFile(own) ? own : (resolveBin('node', env, 'win32') ?? fallbackNode)
+  return node === undefined ? 'no node' : { file: node, pre: [target] }
+}
+
+/** `readShim` with the default fallback, for callers that can't report a missing node. */
+export function shimTarget(file: string, env: NodeJS.ProcessEnv): ShimRun | undefined {
+  const run = readShim(file, env, defaultFallbackNode())
+  return run === 'no node' ? undefined : run
 }
 
 /** The tail of the child's stderr log: escape codes removed, at most 500 chars. */
@@ -144,13 +166,20 @@ export function stderrTail(text: string): string {
 
 const failed = (message: string): StartResult => ({ outcome: 'failed', message })
 
+/**
+ * `bin` and `env` may be functions, read at each start. A function's `bin` is the tool finder's
+ * absolute path, with no lookup: `undefined` or a file since gone is `claude not found`.
+ */
 export function createClaudeRunner(o: {
-  bin: string
+  bin: string | (() => string | undefined)
   logDir: string
-  env?: NodeJS.ProcessEnv
+  env?: NodeJS.ProcessEnv | (() => NodeJS.ProcessEnv)
   windowMs?: number
+  /** Runs a shim's script when no node is found. Left out: `defaultFallbackNode`. Given as `undefined`: none. */
+  fallbackNode?: string | undefined
 }): ClaudeRunner {
   const windowMs = o.windowMs ?? RESUME_WINDOW_MS
+  const fallbackNode = 'fallbackNode' in o ? o.fallbackNode : defaultFallbackNode()
   const live = new Map<string, number>()
   const track = (session: string, by: number) => {
     const n = (live.get(session) ?? 0) + by
@@ -161,8 +190,14 @@ export function createClaudeRunner(o: {
   async function start(r: { session: string; word: ResumeWord; cwd: string }): Promise<StartResult> {
     if (!SESSION.test(r.session)) return failed('bad session id')
     if (!WORDS.includes(r.word)) return failed('bad reply word')
-    const env = childEnv(o.env ?? process.env)
-    const file = resolveBin(o.bin, env)
+    const env = childEnv((typeof o.env === 'function' ? o.env() : o.env) ?? process.env)
+    let file: string | undefined
+    if (typeof o.bin === 'function') {
+      const found = o.bin()
+      file = found !== undefined && isFile(found) ? found : undefined
+    } else {
+      file = resolveBin(o.bin, env)
+    }
     if (!file) return failed('claude not found')
     let isDir = false
     try {
@@ -173,7 +208,8 @@ export function createClaudeRunner(o: {
     const args = ['-p', '--resume', r.session, r.word]
     const isShim = process.platform === 'win32' && /\.(cmd|bat)$/i.test(file)
     // npm's shim names what it runs, so that runs directly; only an unknown shim needs cmd.exe.
-    const target = isShim ? shimTarget(file, env) : { file, pre: [] }
+    const target = isShim ? readShim(file, env, fallbackNode) : { file, pre: [] }
+    if (target === 'no node') return failed('node not found')
     const shim = target === undefined
     // Absolute, so cmd.exe's redirect can't land in the repo folder the run starts in.
     const logPath = path.resolve(o.logDir, `${r.session}-${Date.now()}.log`)

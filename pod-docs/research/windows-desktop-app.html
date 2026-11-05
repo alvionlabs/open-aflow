@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Research: Pod Board as a Windows desktop app</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--card:#f4f5f7;--bd:#d0d4da;--ok:#1a7f37;--mid:#9a6700;--bad:#b42318;--ac:#0b57d0}
+@media(prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e8e8e8;--card:#1e2127;--bd:#3a3f47;--ok:#4cc26b;--mid:#e3b341;--bad:#f47067;--ac:#7ab0ff}}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;max-width:1100px;margin:auto}
+h1{font-size:1.6rem}h2{margin-top:2rem;border-bottom:1px solid var(--bd);padding-bottom:4px}
+a{color:var(--ac)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px}
+.card h3{margin:0 0 6px;font-size:1.05rem}
+.meter{display:flex;gap:3px;margin:6px 0}
+.meter i{flex:1;height:8px;border-radius:2px;background:var(--bd)}
+.meter.g i.on{background:var(--ok)}.meter.m i.on{background:var(--mid)}.meter.b i.on{background:var(--bad)}
+.tag{display:inline-block;font-size:.85rem;border:1px solid var(--bd);border-radius:10px;padding:0 8px;margin-right:4px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;margin-top:8px}
+.opt{border:1px dashed var(--bd);border-radius:6px;padding:6px;background:var(--bg)}
+.ladder{display:flex;flex-direction:column;gap:8px}
+.step{border-left:6px solid var(--ok);padding:8px 12px;background:var(--card);border-radius:0 8px 8px 0}
+.step.s2{border-color:#6aa84f}.step.s3{border-color:var(--mid)}.step.s4{border-color:#d2691e}.step.s5{border-color:var(--bad)}
+table{border-collapse:collapse;width:100%;display:block;overflow-x:auto}td,th{border:1px solid var(--bd);padding:6px;text-align:left;vertical-align:top}
+.dis{border-left:4px solid var(--mid);padding-left:8px}
+small{font-size:.9rem}
+</style></head><body>
+<h1>Pod Board as a native Windows desktop app</h1>
+<p><small>Generated 2026-11-02 · standard depth · 4 researchers · 30 searches · about 82 pages read. Assumed: audience undecided, Windows first, Node backend stays. No source tested Hono, chokidar or the Claude CLI inside a wrapper.</small></p>
+
+<h2>Questions first</h2>
+<div class="grid">
+<div class="card"><h3>1. Who installs it besides you?</h3><p>Unsigned is fine for you. Strangers meet a SmartScreen block. Smart App Control may block it outright. Signing costs about $120-300/year.</p>
+<div class="opts"><div class="opt">Me only</div><div class="opt">Friends, click-through note</div><div class="opt">Public, signed</div></div></div>
+<div class="card"><h3>2. Electron or Tauri?</h3><p>Electron keeps Node in the shell. Tauri needs Rust, a SEA binary and manual cleanup. Its size win is unclear on WebView2. Linux is its weak spot.</p>
+<div class="opts"><div class="opt">Electron</div><div class="opt">Tauri + SEA sidecar</div><div class="opt">PWA + launcher</div></div></div>
+<div class="card"><h3>3. Tray and OS toasts in v1?</h3><p>They are the main reason to leave the PWA. Toasts need an installed app.</p>
+<div class="opts"><div class="opt">Skip</div><div class="opt">In-app only</div><div class="opt">Electron tray</div><div class="opt">Tauri tray</div></div></div>
+<div class="card"><h3>4. How must children die?</h3><p>Plugin and hook cleanup kill one PID. Crashes skip hooks.</p>
+<div class="opts"><div class="opt">Hook tree-kill</div><div class="opt">Job Object launcher</div><div class="opt">PID-file sweep</div></div></div>
+<div class="card"><h3>5. Server in-process or child?</h3><p>In-process exits with the app. A server crash then takes the UI down.</p>
+<div class="opts"><div class="opt">In-process</div><div class="opt">Fork child</div><div class="opt">SEA sidecar</div></div></div>
+<div class="card"><h3>6. Where do git, gh, claude come from?</h3><p>A Start-menu launch may inherit a stale PATH.</p>
+<div class="opts"><div class="opt">Inherited PATH</div><div class="opt">Merge registry Path</div><div class="opt">User-set paths</div><div class="opt">Probe known folders</div></div></div>
+<div class="card"><h3>7. Auto-update?</h3><p>electron-updater needs <code>verifyUpdateCodeSignature: false</code> when unsigned. Tauri needs a private key you must keep.</p>
+<div class="opts"><div class="opt">Manual download</div><div class="opt">electron-updater opt-out</div><div class="opt">Tauri updater</div></div></div>
+<div class="card"><h3>8. Bundle and pnpm layout?</h3><p>Junctions failed once. Hoisted costs about 135 MB and has electron-builder bugs.</p>
+<div class="opts"><div class="opt">Pre-bundled server only</div><div class="opt">Hoisted in CI</div><div class="opt">Pin builder 26.3.0</div></div></div>
+</div>
+
+<h2>What exists: shells</h2>
+<div class="grid">
+<div class="card"><h3>Electron</h3><div class="meter g" title="closeness 5 of 5"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div><span class="tag">alive: 42.5.0, 2026-06-23</span>
+<p>Ships Chromium and Node. <code>utilityProcess.fork</code> runs the server as is. No Rust. Closest fit. <a href="https://www.electronjs.org/docs/latest/api/utility-process">docs</a></p></div>
+<div class="card"><h3>Tauri v2 + Node sidecar</h3><div class="meter m"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div><span class="tag">alive: active 2026</span>
+<p>WebView2 window. The server ships as a binary in <code>externalBin</code>. Needs Rust. <a href="https://tauri.app/learn/sidecar-nodejs">guide</a></p></div>
+<div class="card"><h3>Node SEA</h3><div class="meter m"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div><span class="tag">Stability 1.1</span>
+<p>Bakes one script into a <code>.exe</code>. Only needed for a Tauri sidecar. One build per OS. <a href="https://nodejs.org/api/single-executable-applications.html">docs</a></p></div>
+<div class="card"><h3>Wails</h3><div class="meter b"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div><span class="tag">alive: v2.12.0</span>
+<p>Go backend. Node would be a sidecar again. <a href="https://www.digitalapplied.com/blog/desktop-apps-web-stack-tauri-electron-deno-wails-2026">source</a></p></div>
+<div class="card"><h3>Neutralinojs</h3><div class="meter b"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div><span class="tag">docs only</span>
+<p>Docs show no Node backend. <a href="https://neutralino.js.org/docs/">docs</a></p></div>
+<div class="card"><h3>Deno desktop</h3><div class="meter b"><i class="on"></i><i></i><i></i><i></i><i></i></div><span class="tag">canary only</span>
+<p>Deno, not Node. Not a fit. <a href="https://www.digitalapplied.com/blog/desktop-apps-web-stack-tauri-electron-deno-wails-2026">source</a></p></div>
+</div>
+
+<h2>What exists: similar tools</h2>
+<div class="grid">
+<div class="card"><h3>Paseo</h3><p>Node daemon like Pod Board. Tried Tauri, returned to Electron (2026-05-28). <a href="https://paseo.sh/blog/i-was-wrong-about-electron">post</a></p></div>
+<div class="card"><h3>DoltHub Workbench</h3><p>Built Tauri with a <code>pkg</code> server. "Holding off" on migrating (2025-11-13). <a href="http://www.dolthub.com/blog/2025-11-13-electron-vs-tauri/">post</a></p></div>
+<div class="card"><h3>etherpad-desktop</h3><p>Electron plus pnpm Node server on Windows. PR only. <a href="https://github.com/ether/etherpad-desktop/pull/54">PR 54</a></p></div>
+<div class="card"><h3>opcode</h3><p>Tauri 2, 22.4k stars, AGPL-3.0. No release; build from source. <a href="https://github.com/winfunc/opcode">repo</a></p></div>
+<div class="card"><h3>OpenCovibe</h3><p>Tauri v2, Apache-2.0. "mainly tested on macOS". <a href="https://www.hnshowcase.com/post/47242137/opencovibe-a-local-first-desktop-ui-for-claude-code">HN</a></p></div>
+<div class="card"><h3>Claude Code Desktop</h3><p>Electron, 0 stars, no release. README warns of SmartScreen. <a href="https://github.com/oldpilluwu/Claude-Code-Desktop">repo</a></p></div>
+<div class="card"><h3>Vibe Kanban</h3><p>Ships via <code>npx</code>. 28.6k stars. README says "sunsetting". <a href="https://github.com/BloopAI/vibe-kanban">repo</a></p></div>
+</div>
+
+<h2>Gaps and angles</h2>
+<div class="card dis"><h3>Angles disagree: regret about Tauri</h3><p>Part 1 found no maintainer's regret. Part 2 found Paseo's: the sidecar "became its own project" and "I was building Electron with extra steps". Windows was not where Tauri hurt. <a href="https://paseo.sh/blog/i-was-wrong-about-electron">Paseo</a></p></div>
+<div class="card dis" style="margin-top:12px"><h3>Angles disagree: orphan sidecars</h3><p>Part 1 reports orphans on exit. Part 4 read the plugin source: it calls <code>child.kill()</code> on stored children at exit, but one PID, not the tree, and not on a crash. <a href="http://timetobuildbob.com/blog/the-launcher-is-not-the-process/">write-up</a>, <a href="https://raw.githubusercontent.com/tauri-apps/plugins-workspace/v2/plugins/shell/src/lib.rs">lib.rs</a>, <a href="https://github.com/tauri-apps/tauri/issues/1896">tauri#1896</a></p></div>
+<ul>
+<li><b>Size win is uncertain.</b> Tauri about 2.5 MB vs Electron about 85 MB on one Windows 11 app (blog). A 2022 Windows 10 test (possibly stale) had Tauri larger. A sidecar adds tens of MB (own inference). <a href="https://github.com/tauri-apps/tauri/issues/5889">issue 5889</a>, <a href="https://github.com/tauri-apps/tauri/issues/15134">issue 15134</a></li>
+<li><b>Crash cleanup.</b> A force-killed Tauri host left Node running and broke the next build. Fix: Job Object plus parent-PID poll. <a href="https://github.com/diffplug/dormouse/pull/41">Dormouse PR 41</a>, <a href="https://github.com/diffplug/mouseterm/pull/32">MouseTerm PR 32</a></li>
+<li><b>Electron exit.</b> <code>utilityProcess</code> docs are silent on exit cleanup. <code>will-quit</code> does not fire on Windows shutdown. <a href="https://www.electronjs.org/docs/latest/api/app">app API</a></li>
+<li><b>Console flashes.</b> <code>windowsHide</code> defaults to false. <a href="https://nodejs.org/api/child_process.html">child_process</a></li>
+<li><b>.cmd shims.</b> Need <code>shell: true</code> since April 2024 (stale date, still in force). <a href="https://nodejs.org/en/blog/vulnerability/april-2024-security-releases-2">advisory</a></li>
+<li><b>PATH.</b> A child inherits the parent's environment; a Start-menu app may see a stale PATH (inference). <a href="https://learn.microsoft.com/en-us/windows/win32/procthread/environment-variables">Microsoft</a></li>
+<li><b>Hono static root</b> is relative to cwd. <a href="https://hono.dev/docs/getting-started/nodejs">Hono</a></li>
+<li><b>pnpm.</b> Junctions dangled; hoisted fixed it for about 135 MB; electron-builder 26.3.1 broke hoisted. <a href="https://github.com/ether/etherpad-desktop/pull/54">PR 54</a>, <a href="https://github.com/electron-userland/electron-builder/issues/9580">issue 9580</a></li>
+<li><b>Updates unsigned.</b> electron-updater on master rejects unsigned updates unless opted out. Tauri updater needs its own key. <a href="https://github.com/electron-userland/electron-builder/blob/master/packages/electron-updater/src/NsisUpdater.ts">NsisUpdater.ts</a>, <a href="https://v2.tauri.app/plugin/updater/">Tauri updater</a></li>
+<li><b>Linux next.</b> Tauri: "Linux does not emit tray icon events". WebKitGTK is the most-reported weak point. <a href="https://v2.tauri.app/learn/system-tray/">tray</a></li>
+</ul>
+
+<h2>Signing options</h2>
+<table><tr><th>Option</th><th>Cost</th><th>Limits</th></tr>
+<tr><td>Azure Artifact Signing</td><td>about $9.99/month</td><td>Individuals: USA and Canada only</td></tr>
+<tr><td>OV certificate</td><td>$150-300/year</td><td>Worldwide, token or cloud HSM</td></tr>
+<tr><td>EV certificate</td><td>$400+/year</td><td>No SmartScreen benefit</td></tr>
+<tr><td>Store MSIX</td><td>Free</td><td>Microsoft re-signs; no warning</td></tr>
+<tr><td>SignPath Foundation</td><td>Free</td><td>Open-source only</td></tr></table>
+<p><small>Source: <a href="https://learn.microsoft.com/windows/apps/package-and-deploy/code-signing-options">Microsoft Learn</a>, 2026-08-29. Windows 11 Smart App Control "blocks unknown unsigned apps": <a href="https://v2.tauri.app/distribute/sign/windows/">Tauri signing</a>.</small></p>
+
+<h2>Best practices</h2>
+<ul>
+<li>Kill the tree: <code>taskkill /pid N /t /f</code>. <a href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/taskkill">taskkill</a></li>
+<li>For crashes, use a Job Object with kill-on-close. <a href="https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects">Job Objects</a></li>
+<li><code>windowsHide: true</code> on every spawn. <a href="https://github.com/Effect-TS/effect/pull/7154">Effect PR 7154</a></li>
+<li>Spawn real <code>.exe</code> files with argument arrays. <a href="https://nodejs.org/api/child_process.html">child_process</a></li>
+<li>Bundle the server to one file with esbuild. Anchor the static root. <a href="https://esbuild.github.io/getting-started/">esbuild</a></li>
+<li>Serve from 127.0.0.1. <a href="https://tauri.app/learn/sidecar-nodejs">Tauri guide</a></li>
+<li>Per-user NSIS installs need no admin. <a href="https://v2.tauri.app/distribute/windows-installer/">Tauri</a>, <a href="https://www.electron.build/docs/nsis">electron-builder</a></li>
+<li>In CI, fail if the installer shrinks or the app does not start. <a href="https://github.com/electron-userland/electron-builder/issues/9580">issue 9580</a></li>
+<li>Measure on your own machine. <a href="https://github.com/tauri-apps/tauri/issues/5889">issue 5889</a></li>
+</ul>
+
+<h2>Ideas, minimal to bold</h2>
+<div class="ladder">
+<div class="step"><b>1. Harden the server, one-port mode.</b> <code>windowsHide</code>, <code>.cmd</code> handling, parent-PID self-exit, <code>serveStatic</code>. No shell.</div>
+<div class="step s2"><b>2. Zip plus Start-menu shortcut.</b> No installer, no signing. Test notifications first.</div>
+<div class="step s2"><b>3. Electron shell forks the bundled server.</b> Load 127.0.0.1; use <code>extraResources</code>.</div>
+<div class="step s3"><b>4. Shared tree-kill helper.</b> <code>taskkill /t /f</code>, PID file, orphan sweep at next start.</div>
+<div class="step s3"><b>5. Tool resolver.</b> Find git, gh, claude; merge registry Path; settings override; "tool not found" screen.</div>
+<div class="step s4"><b>6. Tray-first mode.</b> Close hides; server keeps running; tray has Open and Quit.</div>
+<div class="step s4"><b>7. Two-day spike.</b> Electron vs Tauri + SEA; compare size, RAM, exit cleanup.</div>
+<div class="step s5"><b>8. Signed, auto-updating installer</b> for outside users (Artifact Signing or Store MSIX).</div>
+</div>
+
+<h2>Suspect pages</h2><p>none</p>
+
+<h2>Not found</h2>
+<p><small>A Tauri maintainer's regret in part 1; electron-updater with the GitHub provider; Electron <code>utilityProcess</code> at Windows parent exit; a Node-level Job Object API; winget portable and nvm-windows folders; esbuild <code>require</code> fix after 2023. Full source list: see the report file <code>windows-desktop-app.md</code>.</small></p>
+</body></html>

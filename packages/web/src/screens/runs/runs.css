@@ -841,7 +841,6 @@
 
 .merge-confirm {
   margin-top: 8px;
-  max-width: 640px;
 }
 
 .merge-confirm:focus {
@@ -856,6 +855,7 @@
 .merge-head {
   display: grid;
   gap: 4px;
+  max-width: 72ch;
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -875,10 +875,15 @@
   overflow-wrap: anywhere;
 }
 
+.merge-result {
+  max-width: 72ch;
+}
+
 .merge-why,
 .merge-error,
 .merge-status {
   margin: 0;
+  max-width: 72ch;
   font-size: var(--size-small);
   overflow-wrap: anywhere;
 }
@@ -1106,7 +1111,8 @@
   min-width: 0;
 }
 
-.reply-session {
+.reply-session,
+.reply-folder {
   margin: 0;
   overflow-wrap: anywhere;
 }

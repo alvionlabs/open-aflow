@@ -16,7 +16,8 @@ const SENDABLE_SESSION = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/
  * the run has a session id the runner accepts. Without it the row keeps only Copy.
  */
 export type ReplyRowView = { key: string; word: ReplyWord; why: string; send?: 'continue' | 'go' }
-export type ReplySessionView = { line: string; time?: string; path: string; cd: string; resume?: string }
+/** `cd`: absent for a Windows path no one quoting keeps safe (see `cdCommand`); the panel then shows `path` alone. */
+export type ReplySessionView = { line: string; time?: string; path: string; cd?: string; resume?: string }
 export type ReplyPanelView = { target: { repoId: string; run: string }; rows: ReplyRowView[]; session?: ReplySessionView; noSession?: string }
 
 /** Local `HH:MM`. */
@@ -26,13 +27,21 @@ const clock = (ms: number) => {
 }
 
 /**
- * The `cd` line to copy. A POSIX path (starts with `/`) goes in single quotes, each `'` written
- * `'\''`, so a shell runs no `$(...)` or backtick in it. A Windows path keeps `cd "<path>"`:
- * it can't hold a `"`.
+ * What a shell can act on inside `"<path>"`: `$`, `(`, `)` and a backtick in PowerShell or Git Bash,
+ * and the curly double quotes, which PowerShell reads as closing the string. No one quoting is
+ * safe in cmd.exe, PowerShell and bash at once. `%NAME%` isn't here: cmd.exe puts the variable's
+ * value in, so the `cd` can fail or land elsewhere, but a folder name can't make it run a command.
  */
-function cdCommand(repoPath: string): string {
+const WINDOWS_UNSAFE = /[$()`\u201C\u201D\u201E]/
+
+/**
+ * The `cd` line to copy. A POSIX path (starts with `/`) goes in single quotes, each `'` written
+ * `'\''`, so a shell runs no `$(...)` or backtick in it. A Windows path keeps `cd "<path>"`: it
+ * can't hold a `"`. With a WINDOWS_UNSAFE character it gets no line at all.
+ */
+function cdCommand(repoPath: string): string | undefined {
   if (repoPath.startsWith('/')) return `cd '${repoPath.replaceAll("'", "'\\''")}'`
-  return `cd "${repoPath}"`
+  return WINDOWS_UNSAFE.test(repoPath) ? undefined : `cd "${repoPath}"`
 }
 
 /** The panel for the selected plan or fix run, when pod waits for a reply; undefined for a repo row or no reply. */
@@ -42,7 +51,7 @@ export function replyPanel(run: RunSummary | undefined, repo: BoardRepo | undefi
   if (replies.length === 0) return undefined
   const plan = run.plan
   const s = replySession(repo, plan, now)
-  const canSend = s !== undefined && SENDABLE_SESSION.test(s.id)
+  const canSend = s?.resume !== undefined && SENDABLE_SESSION.test(s.id)
   const rows = replies.map((r): ReplyRowView => {
     const row: ReplyRowView = { key: r.reply, word: r.reply, why: r.why }
     if (canSend && r.reply !== 'try' && sendableReply(repo, plan, r.reply, now)?.key === r.key) row.send = r.reply
@@ -50,7 +59,9 @@ export function replyPanel(run: RunSummary | undefined, repo: BoardRepo | undefi
   })
   const target = { repoId: repo.id, run: plan }
   if (!s) return { target, rows, noSession: NO_SESSION }
-  const session: ReplySessionView = { line: `Session ${s.id}`, path: s.repoPath, cd: cdCommand(s.repoPath) }
+  const session: ReplySessionView = { line: `Session ${s.id}`, path: s.repoPath }
+  const cd = cdCommand(s.repoPath)
+  if (cd !== undefined) session.cd = cd
   if (s.startedAt !== undefined) session.time = `first agent ${clock(s.startedAt)}`
   if (s.resume !== undefined) session.resume = s.resume
   return { target, rows, session }

@@ -3,7 +3,7 @@
 // route, so the two never start a second run on one session. The rules and why are in
 // pod-docs/feature-details/resume.md.
 
-import { autoSends, type Board, type BoardRepo, type NewActionEntry, type ResumeResult } from '@pod-board/model'
+import { autoSends, repoPathKey, type Board, type BoardRepo, type NewActionEntry, type ResumeResult } from '@pod-board/model'
 import type { AutoContinueStore } from './auto-continue-store.ts'
 import type { ClaudeRunner, ResumeWord, StartResult } from './claude-runner.ts'
 
@@ -61,6 +61,8 @@ export function createAutoContinue(
   d: ResumeDeps & {
     subscribe(fn: (b: Board) => void): () => void
     tickMs?: number
+    /** Whether this server may send now (owner-file.ts). With none, it may. */
+    owner?: () => boolean
     /** Reports a check that threw; logs to the console unless a test passes one. */
     onError?: (err: unknown) => void
   },
@@ -83,6 +85,7 @@ export function createAutoContinue(
     let board: Board
     let due: ReturnType<typeof autoSends>
     try {
+      if (d.owner && !d.owner()) return Promise.resolve()
       board = d.board()
       due = autoSends(board, d.store.list(), now(), idle).filter((s) => !isResuming(d, s.session))
     } catch (err) {
@@ -97,7 +100,7 @@ export function createAutoContinue(
         try {
           const repo = board.repos.find((r) => r.id === s.repoId)!
           // The key first: a failed save sends nothing, and the next check tries again.
-          const saved = await settle(() => d.store.saveKey(s.repoId, s.run, s.key))
+          const saved = await settle(() => d.store.saveKey(repoPathKey(repo), s.run, s.key))
           if (saved !== true) return
           await runResume(d, { repo, run: s.run, session: s.session, word: 'continue', auto: true })
           await settle(d.rebuild)

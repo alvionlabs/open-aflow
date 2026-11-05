@@ -11,6 +11,11 @@ export type AgentRun = {
   session: string
   type: string
   /**
+   * Set when its session's own file doesn't show the session started in this repo: no readable `cwd`, or one
+   * outside the repo. The agent stays listed, but the board offers no send on its session (`replySession`).
+   */
+  sessionUnproven?: true
+  /**
    * Never set: the dispatcher's Task description is assistant-written text, and no page shows it,
    * so it stays off the Board. Optional only until the test helpers that still write it drop it.
    */
@@ -66,16 +71,27 @@ export type GhStatus = 'ok' | 'missing' | 'logged-out' | 'unknown'
 
 export type Claim = { portBase: number; repoPath: string; plan: string }
 
+/**
+ * One PR the server asks gh about, by number or by head branch, and whether gh has answered that ask once.
+ * A failed read isn't one. A branch with no PR is. `staging`: the ask comes from another PR's base, so
+ * a PR read can bring it. How the toasts use it is in pod-docs/feature-details/toasts.md.
+ */
+export type GhRead = { pr: number; read: boolean } | { branch: string; staging?: true; read: boolean }
+
 export type BoardRepo = {
   id: string
   name: string
   path: string
+  /** Set when the repo's file system ignores case: `repoPathKey` folds the path, as `sameRepoPath` does. */
+  caseless?: true
   source: 'registered' | 'claim' | 'both'
   error?: string
   model: RepoModel
   agents: AgentRun[]
   prs: PrStatus[]
   claims: Claim[]
+  /** Each PR the server asks gh about. Missing when it asks about none. */
+  ghReads?: GhRead[]
 }
 
 export type Board = {
@@ -88,7 +104,7 @@ export type Board = {
   /** The action log, newest first, at most 50. */
   actions?: ActionEntry[]
   /** The runs whose auto-continue toggle is on. Missing means all off. */
-  autoContinue?: { repoId: string; run: string }[]
+  autoContinue?: { repoId: string; run: string; lastKey?: string }[]
   /** POD_BOARD_TRANSCRIPT_DAYS: agents come only from transcripts written in this many days. Missing on older Boards (read as 30). */
   transcriptDays?: number
 }

@@ -214,7 +214,7 @@ describe('runReplies', () => {
     const rev = ended({ type: 'pod:reviewer', kind: 'fix', branch: name, startedAt: NOW - 50 * MIN, lastAt: NOW - 40 * MIN })
     const fix = (extra: Partial<BoardRepo>) => runReplies(repo({ 'pod-docs/README.md': README }, { claims: [claim(name)], ...extra }), name, NOW)
     const open = gh(36, 'open', { branch: name })
-    const merged = gh(36, 'merged', { branch: name })
+    const merged = gh(36, 'merged', { branch: name, mergedAt: NOW - 45 * MIN })
 
     // Reviewed and open: merge first.
     expect(fix({ agents: [eng, rev], prs: [open] })).toEqual([{ reply: 'continue', signal: 'fix-waiting', why: 'Merge PR #36, then reply continue.', pr: 36, key: 'fix-waiting:36' }])
@@ -224,8 +224,13 @@ describe('runReplies', () => {
     expect(fix({ agents: [eng, { ...rev, lastAt: NOW - 5 * MIN }], prs: [merged] })).toEqual([
       { reply: 'continue', signal: 'fix-merged', why: 'PR #36 merged.', pr: 36, key: 'fix-merged:36' },
     ])
-    // Merged and stale: the run isn't listed, so nothing.
-    expect(fix({ agents: [eng, rev], prs: [merged] })).toEqual([])
+    // Merged 45 minutes ago with quiet agents: the claim still stands, so continue.
+    const fixMerged = [{ reply: 'continue', signal: 'fix-merged', why: 'PR #36 merged.', pr: 36, key: 'fix-merged:36' }]
+    expect(fix({ agents: [eng, rev], prs: [merged] })).toEqual(fixMerged)
+    // Merged long after the last write: continue.
+    expect(fix({ agents: [eng, rev], prs: [{ ...merged, mergedAt: NOW - MIN }] })).toEqual(fixMerged)
+    // No merge time from gh: continue.
+    expect(fix({ agents: [eng, rev], prs: [gh(36, 'merged', { branch: name })] })).toEqual(fixMerged)
     // A running fix agent: nothing.
     expect(fix({ agents: [eng, rev, running({ branch: name })], prs: [open] })).toEqual([])
     expect(fix({ agents: [eng, running({ type: 'pod:reviewer', kind: 'fix', branch: name })], prs: [merged] })).toEqual([])
@@ -413,6 +418,14 @@ describe('answered stop', () => {
   })
 })
 describe('replySession', () => {
+  it('a session the board cannot prove is the repo’s gives no resume, so nothing can send it', () => {
+    const a = { id: 'a', session: 'sess-1', type: 'pod:engineer', tokens: 0, ended: true, plan: 'alpha', lastAt: NOW - 90 * MIN, sessionUnproven: true as const }
+    const repo = pushed({ agents: [a] })
+    const s = replySession(repo, 'alpha', NOW)
+    expect(s?.id).toBe('sess-1')
+    expect(s?.resume).toBeUndefined()
+  })
+
   it('finds the chat to paste in', () => {
     const old = ended({ plan: 'alpha', session: 'sess-old', startedAt: NOW - 90 * MIN, lastAt: NOW - 30 * MIN })
     const newest = ended({ sprint: 'one', slice: 'B1', session: 'sess-new', startedAt: NOW - 20 * MIN, lastAt: NOW - 5 * MIN })

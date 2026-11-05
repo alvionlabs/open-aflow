@@ -6,7 +6,7 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 
 ## How it works
 
-- **Serving.** Vite serves the React app on the web port and proxies `/api` to the API port; both bind `127.0.0.1`.
+- **Serving.** In dev, Vite serves the React app on the web port and proxies `/api` to the API port; both bind `127.0.0.1`. In production, the API server also serves the web build on its one port, with the token in the page (rules in [server.md](server.md)). A page route gets the page in both modes. `/sw.js` differs: production answers 404 JSON, and dev still answers it with HTML from Vite.
 - **Theme.** `pod-board-theme` in `localStorage`: `dark`, `light`, or `system`. Nothing stored, an unknown value, or storage that throws reads as `dark` (`readChoice`). `light` and `dark` set `data-theme` on `<html>`; `system` removes it so `prefers-color-scheme` decides. The ⋯ menu's `.seg` shows the choice with `aria-pressed`.
 - **Theme boot.** An inline script before the module script applies the same rule, and a `color-scheme` meta plus `:root[data-theme]` rules make the browser canvas follow. `theme-color` metas are `#000000` / `#ffffff`; the manifest's colors are `#000000`.
 - **Tokens.** Only theme files define colors and fonts. One token per Look palette entry: `--bg --surface --hover --border --border-strong --fg --muted --faint --primary-bg --primary-fg --focus`, status `--blocked --needs-you --running --ready --idle`, and `--shadow` (the menu only). `:root` holds light values; `[data-theme="dark"]` and the dark media query hold dark ones.
@@ -17,6 +17,7 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - **Sidebar.** A sticky, full-height left column (260 px by default, resizable from 200 to 400 px by the handle on its right edge; see runs-and-pipeline.md, Layout) with a right border: the title row, the runs, then `Add repo` (`.btn.sm.lead`, the `plus` icon) pinned to the bottom. At 820 px and below it stacks above the main column with a bottom border. No top bar.
 - **Add repo dialog** (`AddRepoDialog`): a native `<dialog>` opened with `showModal()`, so the browser makes the page behind inert and sends Escape as `cancel`. A press that starts and ends on the backdrop closes it (`backdropClose`); the Close button, Escape and a successful Add close it too, and focus goes back to `Add repo`. The backdrop is `--bg` at 72 % opacity; the dialog is at most 720 px wide, and 16 px narrower than the screen at 480 px or less.
 - **PWA.** `/manifest.webmanifest` and `/icons/icon-192.png`; Chrome offers to install from `127.0.0.1`.
+- **Setup check** (`screens/setup`, production only). `SetupGate` in `main.tsx` wraps `App`. On load it asks `GET /api/tools` and renders nothing until the answer, so the board's stream starts only once the gate says board. A tool not `found` → the setup check replaces the board, with no way past it. All found, any non-200 answer (dev's 404 included), an answer it can't read, no page token, a network failure, or no answer in 5 s → the board. One row per tool: `found` a ready dot and its path; `missing` and `bad path` a blocked dot, the tool's install link, and a path field. A `bad path` from `POD_BOARD_CLAUDE_BIN` names the variable and has no field, because settings can't override it. One Recheck button, and a note, always on the screen, on `CLAUDE*` variables. Recheck and Save have a 15 s limit and run one at a time. A check or save that shows all found brings the board up; a failed one keeps the rows and says why.
 
 ## Why it's this way
 
@@ -25,14 +26,18 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - **States are dots plus words, never text color** ([decision](../decisions.md#2026-10-28--states-are-dots-plus-words-the-ink-tokens-go)): `--faint` and the light status colors fail 4.5:1 as text. This made the 2026-10-19 darker-ink-tokens decision obsolete.
 - **An inline boot script plus `color-scheme`**, not `main.tsx`: in dev Vite loads the CSS from the module script, so a stored Dark choice painted white first.
 - **Self-hosted fonts:** the plan rules out requests to other hosts.
-- **A local web app with a PWA window**, not Tauri or Electron; a wrapper can come later.
+- **A local web app with a PWA window, and now an Electron shell around it** ([desktop.md](desktop.md)). The plan [windows-app](../plans/windows-app.md) chose Electron over Tauri; the page itself doesn't change, and the PWA stays.
 
 ## Watch out
 
+- The dev and preview servers refuse framing with the same two headers as production (`server.headers` and `preview.headers` in `vite.config.ts`), because the dev page holds the token too. A framed page's own token and `Origin` pass the guards. Change both places or neither.
 - Build to `pod-docs/plans/calm-dashboard.md` `## Look` and its draft, not `docs/design/preview.html`.
 - `tokens.test.ts` fails on a CSS file under `packages/web/src` that sets `color` to `--faint` or a status token (rules targeting an `svg`, such as the flow's status marks, may), uses an old token name (`--panel`, `--line`, `--accent`, `--ok`, `--warn`, `--bad`, `--*-soft`, `--*-ink`, `--display`, `--body`), or drops text below 4.5:1.
 - `controls.test.ts` fails on any color literal in `base.css` (`transparent` and `currentColor` are allowed). Both tests find rules by selector text: write `textarea.input {` exactly and keep it after `.input`.
 - The boot script and the app share `THEME_KEY` and the dark default; change both or neither. `pwa.test.ts` checks the manifest against the dark `--bg`.
+- Saving an empty path field clears the saved path (`path: null`). That's the only way back to the search from a saved path that no longer works. The field also strips the quotes that Windows' Copy as path adds.
+- A check slower than 5 s on load shows the board even with a tool missing (accepted: a hung check must not lock anyone out). Recheck and Save wait 15 s, because a check can take two 5 s registry reads; a failed Recheck never opens the board, though the same answer on load does.
+- The install links open with `target="_blank"`. The desktop shell sends them to the system browser (`setWindowOpenHandler`, see [desktop.md](desktop.md)).
 - A render error shows `render failed` in place of the board and recovers on the next changed Board; keep the stream in `App`, above the `ErrorBoundary`.
 - `showModal()` runs in a layout effect so the dialog is open before the picker's own effect focuses the path box, and the dialog closes before focus goes back to `Add repo`: a focus call while the dialog is still modal lands on an inert button and is lost.
 - Native modal focus leaves the dialog for the browser's own UI after the last control (in headless Chrome, `body`); it never reaches the page.
@@ -58,3 +63,8 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - 2026-11-01 · fix-remove-repo review round 4 · fixed: a run the user opens while a remove is in flight stays when the reply comes (the page moves only while it still shows the removed repo's run, the planned run, or none); the sidebar ⋯ label drops the bracketed repo when the run is named after it.
 - 2026-11-01 · fix-remove-repo human review · one ghost icon button style (`.btn.ghost`) for the header and sidebar ⋯: transparent at rest, a see-through fill on hover, focus, and while open. `Remove repo` gets a red tint on hover and focus, and a stronger one on press. `--danger` in light goes from #d0262f to #b81d25, since #d0262f is only 4.04:1 on its own 14% tint; #b81d25 is 4.91:1 at 14% and 4.58:1 at 18%.
 - 2026-11-01 · fix-remove-repo review round 10 · fixed: the remove confirm gives focus back only when nothing else took it, so `Open run` keeps focus on the run title.
+- 2026-11-02 · one-port-server S1: the production server can serve the web build on the API's port; `/sw.js` answers 404 there. Dev serving doesn't change.
+- 2026-11-02 · outside-terminal U1: the setup check. In production, a tool that isn't found replaces the board with one row per tool, an install link, a path field, and Recheck. The board's stream waits for the gate.
+- 2026-11-03 · desktop-shell T1: an Electron window shows the page. The page doesn't change.
+- 2026-11-03 · windows-app plan fix · the install note names pod and says the setup check doesn't look for it. A real check for pod is the human's call.
+- 2026-11-03 · windows-app plan fix 2 · fixed: another page can no longer frame the `pnpm dev` page and take clicks. Vite sends `Content-Security-Policy: frame-ancestors 'none'` and `X-Frame-Options: DENY`.

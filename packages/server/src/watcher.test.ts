@@ -70,7 +70,7 @@ function collect(w: BoardWatcher) {
       }
     }
   })
-  const next = (test: (b: Board) => boolean = () => true, ms = 5000) =>
+  const next = (test: (b: Board) => boolean = () => true, ms = EVENT_MS) =>
     new Promise<Board>((resolve, reject) => {
       const timer = setTimeout(() => {
         const seen = events.map((b) => t1Status(b) ?? '-').join(', ')
@@ -88,6 +88,61 @@ function collect(w: BoardWatcher) {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** How long a test waits for an event: it ends as soon as the event comes, so this bound only catches a lost one. */
+const EVENT_MS = 20_000
+
+/** Waits until `check` holds, for a test whose count depends on real timers. */
+async function until(check: () => boolean, ms = EVENT_MS) {
+  const end = Date.now() + ms
+  while (!check()) {
+    if (Date.now() > end) throw new Error('timed out waiting')
+    await sleep(25)
+  }
+}
+
+/** One temp-folder cycle, in ms: about 6 on a free disk, and hundreds while other work competes for it. */
+async function diskCycleMs(): Promise<number> {
+  const started = performance.now()
+  const dir = await mkdtemp(join(tmpdir(), 'pod-board-a1-probe-'))
+  for (let i = 0; i < 5; i++) await writeFile(join(dir, `${i}.md`), 'x'.repeat(2000))
+  for (let i = 0; i < 5; i++) await readFile(join(dir, `${i}.md`))
+  await rm(dir, { recursive: true, force: true })
+  return performance.now() - started
+}
+
+/** Times temp-folder cycles from now on, because a disk is busy in bursts. `worst` stops and gives the slowest. */
+function sampleDisk() {
+  let stop = false
+  let worst = 0
+  const loop = (async () => {
+    while (!stop) {
+      worst = Math.max(worst, await diskCycleMs())
+      await sleep(100)
+    }
+  })()
+  return {
+    worst: async () => {
+      stop = true
+      await loop
+      return worst
+    },
+  }
+}
+
+/**
+ * Starts the clock for the 5 s promise, which holds on a free disk. Past 5 s the test fails unless the disk was busy
+ * during the wait: a rebuild is file reads, so a busy disk delays it with no fault of the watcher's.
+ */
+function promiseClock() {
+  const started = Date.now()
+  const disk = sampleDisk()
+  return async () => {
+    const took = Date.now() - started
+    const worst = await disk.worst()
+    if (took >= 5000) expect(worst, `took ${took} ms with the disk free (slowest temp cycle ${Math.round(worst)} ms)`).toBeGreaterThan(100)
+  }
+}
 
 // Real timers, kept before any test fakes them, so the watcher's real `stat` calls can finish between fake steps.
 const realSetTimeout = globalThis.setTimeout
@@ -163,12 +218,12 @@ describe('board watcher', () => {
       await quiet(poll ? 1500 : 800)
 
       // A burst of edits is pinned in 'a burst of real edits', with fake time, so a runner stall can't split it.
-      const started = Date.now()
+      const clock = promiseClock()
       await setT1(repo, 'pushed')
-      const got = await next((b) => t1Status(b) === 'pushed', 5000)
-      expect(Date.now() - started).toBeLessThan(5000)
+      const got = await next((b) => t1Status(b) === 'pushed')
+      await clock()
       expect(watcher.board()).toBe(got)
-    }, 15_000) // The 5 s bound is checked above; the whole test, with its waits, takes longer.
+    }, 60_000) // Its waits add up: start-up, the quiet time, and EVENT_MS.
   }
 
   // Polling is the same chokidar option on every watch, so the polling test above covers it here too.
@@ -183,18 +238,18 @@ describe('board watcher', () => {
     // Let the start-up rebuilds finish, so only the watcher can see the edits below.
     await quiet(800)
 
-    let started = Date.now()
+    let clock = promiseClock()
     await writeFile(configFile, '{ not json')
-    const broken = await next((b) => b.configError === 'config unreadable', 5000)
-    expect(Date.now() - started).toBeLessThan(5000)
+    const broken = await next((b) => b.configError === 'config unreadable')
+    await clock()
     expect(broken.repos).toHaveLength(1)
 
     await quiet(800)
-    started = Date.now()
+    clock = promiseClock()
     await register(repo)
-    await next((b) => b.configError === undefined, 5000)
-    expect(Date.now() - started).toBeLessThan(5000)
-  }, 20_000)
+    await next((b) => b.configError === undefined)
+    await clock()
+  }, 60_000)
 
   test('in poll mode, events up to one poll interval apart give one rebuild', async () => {
     vi.useFakeTimers()
@@ -411,8 +466,7 @@ describe('board watcher', () => {
     watcher = createBoardWatcher({ service: svc, configFile, portsDir, claudeDir, tickMs: 100 })
     await watcher.start()
     const { events } = collect(watcher)
-    await sleep(600)
-    expect(events.length).toBeGreaterThanOrEqual(2)
+    await until(() => events.length >= 2)
     const times = events.map((b) => b.ghCheckedAt!)
     expect(times).toEqual([...times].sort((a, b) => a - b))
     expect(new Set(times).size).toBe(times.length)
@@ -530,8 +584,7 @@ describe('board watcher', () => {
     }
     watcher = createBoardWatcher({ service: counting, configFile, portsDir, claudeDir, tickMs: 100 })
     await watcher.start()
-    await sleep(450)
     // One right after start, then one per tick.
-    expect(refreshes).toBeGreaterThanOrEqual(3)
+    await until(() => refreshes >= 3)
   })
 })

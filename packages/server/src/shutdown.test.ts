@@ -84,6 +84,50 @@ describe('createShutdown', () => {
     expect(f.calls).not.toContain('exit 0')
   })
 
+  test('releases after the drain', async () => {
+    let finish!: () => void
+    const work = new Promise<void>((r) => (finish = r))
+    const f = fakes({ work, workSize: 1 })
+    const stop = createShutdown({ ...f.deps, release: () => void f.calls.push('release') })
+    stop()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(f.calls).not.toContain('release')
+    finish()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.calls.slice(-3)).toEqual(['watcher.close', 'release', 'exit 0'])
+
+    // A throwing release still exits.
+    const g = fakes()
+    const stopG = createShutdown({
+      ...g.deps,
+      release: () => {
+        g.calls.push('release')
+        throw new Error('x')
+      },
+    })
+    stopG()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(g.calls.slice(-2)).toEqual(['release', 'exit 0'])
+
+    // A drain that hits its cap is still a normal stop.
+    const h = fakes({ work: new Promise<void>(() => {}), workSize: 1 })
+    const stopH = createShutdown({ ...h.deps, release: () => void h.calls.push('release') })
+    stopH()
+    await vi.advanceTimersByTimeAsync(DRAIN_CAP_MS)
+    expect(h.calls.slice(-2)).toEqual(['release', 'exit 0'])
+  })
+
+  test('a forced quit does not release', async () => {
+    const f = fakes({ work: new Promise<void>(() => {}), workSize: 1 })
+    const stop = createShutdown({ ...f.deps, release: () => void f.calls.push('release') })
+    stop()
+    await vi.advanceTimersByTimeAsync(0)
+    stop()
+    expect(f.calls.at(-1)).toBe('exit 1')
+    await vi.advanceTimersByTimeAsync(DRAIN_CAP_MS)
+    expect(f.calls).not.toContain('release')
+  })
+
   test('a watcher that fails to close still exits 0', async () => {
     const f = fakes()
     f.deps.watcher.close = async () => {

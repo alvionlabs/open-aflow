@@ -17,15 +17,17 @@ import {
   type Board,
   type BoardRepo,
   type Claim,
+  type GhRead,
   type PrStatus,
   type RepoModel,
+  repoPathKey,
 } from '@pod-board/model'
 import { readClaims } from './claims.ts'
 import type { GhReader } from './gh.ts'
-import { ignoresCase as probeIgnoresCase, normalizeRepoPath, repoId, sameRepoPath } from './guard.ts'
+import { ignoresCase as probeIgnoresCase, normalizeRepoPath, repoIds, sameRepoPath } from './guard.ts'
 import { readRepoFiles } from './repo-files.ts'
 import { loadRepos } from './repos-config.ts'
-import { createAgentFileCache, listAgentFiles, type AgentFile } from './transcript-files.ts'
+import { agentOfRepo, createAgentFileCache, createSessionCwdCache, listAgentFiles, sessionFileOf, type AgentFile } from './transcript-files.ts'
 
 export type BoardServiceDeps = {
   configFile: string
@@ -56,6 +58,8 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
   const ignoresCase = deps.ignoresCase ?? probeIgnoresCase
   // Each transcript's AgentRun (or undefined for a non-pod agent), never its text.
   const agentRuns = createAgentFileCache((text) => parseAgentTranscript(text))
+  // Which folder each session started in, from the head of its own file: its agents are placed by it.
+  const sessionCwds = createSessionCwdCache()
   // An unreadable config (a half-saved edit, say) keeps the last list it read.
   let lastRegistered: string[] = []
 
@@ -95,14 +99,27 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
   }
 
   /** The repo's pod agents. Adds its listed files to `listed`, so the build keeps their cache. */
-  async function agentsOf(repoPath: string, listed: AgentFile[]): Promise<AgentRun[]> {
-    const files = await listAgentFiles(deps.claudeDir, repoPath, deps.transcriptDays, now())
+  async function agentsOf(entry: RepoEntry, listed: AgentFile[], sessionFiles: string[]): Promise<AgentRun[]> {
+    const files = await listAgentFiles(deps.claudeDir, entry.path, deps.transcriptDays, now())
     listed.push(...files)
+    // One stat per session this build, however many agents it has.
+    const cwdOf = new Map<string, Promise<string | undefined>>()
+    const sessionCwd = (session: string) => {
+      let cwd = cwdOf.get(session)
+      if (!cwd) {
+        const file = sessionFileOf(deps.claudeDir, entry.path, session)
+        sessionFiles.push(file)
+        cwd = sessionCwds.read(file)
+        cwdOf.set(session, cwd)
+      }
+      return cwd
+    }
     const runs: AgentRun[] = []
     for (const file of files) {
       try {
         const run = await agentRuns.read(file)
-        if (run) runs.push(run)
+        const agent = run && agentOfRepo(run, await sessionCwd(file.session), entry, deps.platform)
+        if (agent) runs.push(agent)
       } catch {
         // A transcript deleted between listing and reading is left out.
       }
@@ -110,11 +127,23 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
     return runs
   }
 
-  async function buildRepo(entry: RepoEntry, listed: AgentFile[]): Promise<BoardRepo> {
+  /** What gh has answered, for the asks `refresh` makes. A head asked both ways counts as a plain head there too. */
+  function readsOf(repoPath: string, numbers: number[], heads: string[], stagingHeads: string[]): GhRead[] {
+    const { prRead, branchRead } = deps.gh
+    if (!prRead || !branchRead) return []
+    return [
+      ...numbers.map((pr) => ({ pr, read: prRead(repoPath, pr) })),
+      ...heads.map((branch) => ({ branch, read: branchRead(repoPath, branch) })),
+      ...stagingHeads.filter((b) => !heads.includes(b)).map((branch) => ({ branch, staging: true as const, read: branchRead(repoPath, branch) })),
+    ]
+  }
+
+  async function buildRepo(entry: RepoEntry, id: string, listed: AgentFile[], sessionFiles: string[]): Promise<BoardRepo> {
     const base = {
-      id: repoId(entry.path, deps.platform, entry.caseless),
+      id,
       name: pathFor(deps.platform).basename(entry.path) || entry.path,
       path: entry.path,
+      ...(entry.caseless ? { caseless: true as const } : {}),
       source: entry.registered ? (entry.claims.length > 0 ? 'both' : 'registered') : 'claim',
       claims: entry.claims,
     } as const
@@ -124,39 +153,52 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
     } catch (err) {
       return { ...base, error: folderError(err), model: buildRepoModel({}), agents: [], prs: [] }
     }
-    const numbered = livePrNumbers(model, entry.claims)
+    const numbers = livePrNumbers(model, entry.claims)
+    const numbered = numbers
       .map((n) => deps.gh.get(entry.path, n))
       .filter((pr): pr is PrStatus => pr !== undefined)
     // A fix run's PR or a plan's final PR, found by its head branch; it replaces the same PR found by number.
-    const byBranch = prBranches({ model, claims: entry.claims })
+    const heads = prBranches({ model, claims: entry.claims })
+    const byBranch = heads
       .map((b) => deps.gh.getBranch(entry.path, b))
       .filter((pr): pr is PrStatus => pr !== undefined)
     const found = [...numbered.filter((p) => !byBranch.some((b) => b.number === p.number)), ...byBranch]
     // A staging branch's PR to main, once a plan reached its final PR (its base may name the branch). It
     // replaces the same PR found by number (a pending gate 7 names it), which has no `branch`, so the staging
     // rules still find it; a PR a fix or plan branch found stays as it is.
-    const staging = stagingBranches({ model, claims: entry.claims, prs: found })
+    const stagingHeads = stagingBranches({ model, claims: entry.claims, prs: found })
+    const staging = stagingHeads
       .map((b) => deps.gh.getBranch(entry.path, b))
       .filter((pr): pr is PrStatus => pr !== undefined && !byBranch.some((p) => p.number === pr.number))
     const prs = [...found.filter((p) => !staging.some((s) => s.number === p.number)), ...staging]
-    return { ...base, model, agents: await agentsOf(entry.path, listed), prs }
+    // Before the first await after the reads above, so a read mark and its PR are from one moment.
+    const ghReads = readsOf(entry.path, numbers, heads, stagingHeads)
+    return { ...base, model, agents: await agentsOf(entry, listed, sessionFiles), prs, ...(ghReads.length > 0 ? { ghReads } : {}) }
   }
 
   return {
     async build() {
       const { entries, configUnreadable } = await repoEntries()
       const listed: AgentFile[] = []
-      const repos = await Promise.all(entries.map((e) => buildRepo(e, listed)))
+      const sessionFiles: string[] = []
+      const { ids } = repoIds(entries, deps.platform)
+      const repos = await Promise.all(entries.map((e, i) => buildRepo(e, ids[i]!, listed, sessionFiles)))
       // Forget transcripts no repo listed this time: out of the day window, deleted, or their repo gone.
       agentRuns.retain(listed)
+      sessionCwds.retain(sessionFiles)
       repos.sort((a, b) => compare(a.name.toLowerCase(), b.name.toLowerCase()) || compare(a.path, b.path))
       const board: Board = { generatedAt: now(), gh: deps.gh.status(), repos, transcriptDays: deps.transcriptDays }
       const checkedAt = deps.gh.checkedAt()
       if (checkedAt !== undefined) board.ghCheckedAt = checkedAt
       if (configUnreadable) board.configError = 'config unreadable'
       if (deps.actions) board.actions = deps.actions()
-      // The stop keys stay in the store; the Board only says which toggles are on.
-      if (deps.autoContinue) board.autoContinue = deps.autoContinue().map(({ repoId, run }) => ({ repoId, run }))
+      // The toggles that are on, under each repo's id now, with the stop each last sent, so a sent stop raises no toast.
+      if (deps.autoContinue) {
+        board.autoContinue = deps.autoContinue().flatMap(({ path, run, lastKey }) => {
+          const repo = repos.find((r) => repoPathKey(r) === path)
+          return repo ? [{ repoId: repo.id, run, ...(lastKey === undefined ? {} : { lastKey }) }] : []
+        })
+      }
       return board
     },
     async refreshGh(board) {

@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
@@ -53,7 +53,7 @@ let tmp: string
 let child: ChildProcess | undefined
 
 /** Starts main.ts on temp folders and resolves once it logs its listening line. */
-const boot = async (): Promise<{ child: ChildProcess; api: number; out: () => string }> => {
+const boot = async (o: { env?: Record<string, string>; ipc?: boolean } = {}): Promise<{ child: ChildProcess; api: number; out: () => string }> => {
   const api = await freePort()
   const web = await freePort()
   const env: NodeJS.ProcessEnv = { ...process.env }
@@ -65,10 +65,12 @@ const boot = async (): Promise<{ child: ChildProcess; api: number; out: () => st
     POD_BOARD_PORTS_DIR: join(tmp, 'ports'),
     POD_BOARD_CLAUDE_DIR: join(tmp, 'claude'),
     POD_BOARD_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
+    ...o.env,
   })
   const c = spawn(process.execPath, ['--import', TSX, MAIN], {
     env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: o.ipc ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
   })
   child = c // so teardown kills it even if boot fails
   let text = ''
@@ -155,5 +157,75 @@ describe('main.ts', () => {
     child = b.child
     b.child.kill('SIGTERM')
     expect(await exitOf(b.child)).toBe(0)
+  }, 60_000)
+})
+
+/** Runs an entry on temp folders with `over` on top, until it exits. */
+const runToExit = async (entry: string, over: Record<string, string>): Promise<{ code: number | null; text: string }> => {
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  for (const k of Object.keys(env)) if (k.startsWith('POD_BOARD_')) delete env[k]
+  Object.assign(env, {
+    POD_BOARD_CONFIG_DIR: join(tmp, 'cfg'),
+    POD_BOARD_PORTS_DIR: join(tmp, 'ports'),
+    POD_BOARD_CLAUDE_DIR: join(tmp, 'claude'),
+    POD_BOARD_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
+    ...over,
+  })
+  const c = spawn(process.execPath, ['--import', TSX, entry], { env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+  child = c
+  let text = ''
+  c.stdout!.on('data', (d) => (text += String(d)))
+  c.stderr!.on('data', (d) => (text += String(d)))
+  const code = await new Promise<number | null>((resolve) => c.once('close', (n) => resolve(n)))
+  return { code, text }
+}
+
+describe('the dev entry', () => {
+  test('the dev API serves no page', async () => {
+    const b = await boot()
+    child = b.child
+    const res = await fetch(`http://127.0.0.1:${b.api}/`)
+    expect(res.status).toBe(404)
+    expect(await res.text()).not.toContain('<html')
+  }, 60_000)
+
+  test('dev has no parent link', async () => {
+    // A value production would refuse, and a stop message production would obey.
+    const b = await boot({ env: { POD_BOARD_PARENT_PID: 'abc' }, ipc: true })
+    child = b.child
+    const messages: unknown[] = []
+    b.child.on('message', (m) => messages.push(m))
+    b.child.send({ type: 'pod-board:stop' })
+    await new Promise((r) => setTimeout(r, 3000))
+    expect(b.child.exitCode).toBeNull()
+    expect((await fetch(`http://127.0.0.1:${b.api}/api/health`)).status).toBe(200)
+    expect(messages).toEqual([])
+  }, 60_000)
+
+  test('dev ignores a parent that is gone', async () => {
+    const gone = spawnSync(process.execPath, ['-e', '0'], { windowsHide: true }).pid
+    const b = await boot({ env: { POD_BOARD_PARENT_PID: String(gone) } })
+    child = b.child
+    await new Promise((r) => setTimeout(r, 3000))
+    expect(b.child.exitCode).toBeNull()
+    expect((await fetch(`http://127.0.0.1:${b.api}/api/health`)).status).toBe(200)
+  }, 60_000)
+
+  test('a bad port stops the dev server', async () => {
+    const { code, text } = await runToExit(MAIN, { POD_BOARD_API_PORT: 'abc' })
+    expect(code).toBe(1)
+    expect(text).toContain('pod-board: POD_BOARD_API_PORT')
+    expect(text).not.toContain('listening')
+  }, 60_000)
+})
+
+describe('the production entry', () => {
+  // No web build sits beside the source file, so the entry stops and names its own folder.
+  test('with no web folder beside it, it stops naming the folder', async () => {
+    const { code, text } = await runToExit(join(here, 'main-production.ts'), { POD_BOARD_API_PORT: String(await freePort()) })
+    expect(code).toBe(1)
+    expect(text).toContain('pod-board: ')
+    expect(text).toContain(join(here, 'web'))
+    expect(text).not.toContain('listening')
   }, 60_000)
 })

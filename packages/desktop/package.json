@@ -1,0 +1,27 @@
+{
+  "name": "@pod-board/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "tsx scripts/bundle.ts",
+    "start": "electron .",
+    "typecheck": "tsc -p tsconfig.json",
+    "package": "tsx scripts/package.ts"
+  },
+  "devDependencies": {
+    "@electron/asar": "4.3.1",
+    "@pod-board/model": "workspace:*",
+    "@pod-board/server": "workspace:*",
+    "@pod-board/web": "workspace:*",
+    "@types/pngjs": "6.0.5",
+    "electron": "45.2.1",
+    "electron-builder": "26.18.1",
+    "electron-updater": "6.8.12",
+    "esbuild": "^0.28.2",
+    "pngjs": "7.0.0",
+    "tsx": "^4.23.15",
+    "yaml": "2.9.1"
+  }
+}

@@ -1,6 +1,7 @@
 {
   "name": "pod-board",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@11.1.2",
   "engines": {
@@ -10,7 +11,13 @@
     "dev": "pnpm --parallel --filter @pod-board/server --filter @pod-board/web dev",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
-    "build": "pnpm -r build",
+    "build": "pnpm -r build && pnpm --filter @pod-board/server bundle",
+    "start": "node packages/server/dist/app/server.mjs",
+    "desktop": "pnpm --filter @pod-board/desktop start",
+    "test:electron": "node packages/desktop/scripts/real-tests.mjs",
+    "package": "pnpm --filter @pod-board/desktop package",
+    "test:install": "node packages/desktop/scripts/install-tests.mjs",
+    "release:check": "pnpm --filter @pod-board/desktop exec tsx scripts/release-check.ts",
     "verify": "pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {

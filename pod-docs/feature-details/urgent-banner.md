@@ -37,10 +37,10 @@ On each Board update (server-sent events), `RunsScreen` calls `elsewhere(runs, b
 
 1. For every listed run, it reads only `nextSteps(run, repo, now).card`, never `rest`. A run whose repo is missing is skipped.
 2. Rank by tier: `blocked` 4, `merge` 3, `reply` 2, `pending` 1, `nothing` 0.
-3. Another run's card can raise a banner if its tier is `blocked`, `merge` or `reply`, or `pending` with kind `now`, `decision` or `before`.
-4. It must rank strictly higher than the selected card. The selected card ranks by tier alone.
+3. Another run's card can raise a banner if its tier is `blocked`, `merge` or `reply`, or `pending` and it stops its run (`stopsRun`), of any kind. An entry with no plan heads only a repo row's card: from there a BLOCKED raises a banner, a gate doesn't.
+4. It must rank strictly higher than the selected card. A selected entry pod goes on without ranks 0, like `nothing`.
 5. Winner: the highest rank. In `blocked` and `pending`, the oldest entry date wins (an undated entry loses). Then the earlier run in the sidebar wins.
-6. `more` counts the other outranking items. A run is matched by `repoId` plus item `key`, so a shared entry counts once.
+6. `more` counts the other outranking items. A run is matched by `repoId` plus item `key`, so an item counts once.
 
 The banner renders inside a `.urgent-slot` with `role="status"`. The slot is always there on screen 1 and is empty when there is no winner, so a new item is announced once. "Open run" is a link to `hashFor(run)`; the app's hash routing selects the run. A plain click also stores the target hash, and focus moves to the run's `h1` only when that run arrives.
 
@@ -79,7 +79,6 @@ flowchart TD
 
 - The banner never holds Answer, Merge, Close, Keep, Continue, Go or Copy, and never calls an action route. `urgent-banner.test.ts` pins this.
 - Screen 1 keeps one `btn primary`, on the Next step card. "Open run" is `btn sm quiet trail`, not primary.
-- A sidebar dot can read `needs you` for a run with only `someday` entries, and that run raises no banner. That is correct: the dot follows state, the banner follows urgency.
 - `.urgent-slot` needs `min-width: 0`. It is a grid item of `.main`; without it a long title widens the column and the page scrolls sideways.
 - `.urgent-slot` must have no padding, margin, border, gap or min-height, so an empty slot takes no space. It is the `urgent` container with inline size only, so its height stays 0 when empty.
 - The layers use a negative `z-index`, so `.urgent-slot` holds the stacking context (`isolation: isolate`). `.urgent` must never become a stacking context (no `isolation`, `transform`, `opacity`, `filter` or `z-index`): its own layers would then paint over its fill.
@@ -99,3 +98,5 @@ flowchart TD
 - 2026-11-01 · next-step-across-runs · added: the elsewhere picker, the one-line banner above the run header, and focus on the opened run's title; Ctrl+click no longer moves focus (review fix) · [report](../reports/next-step-across-runs.html), [PR #67](https://github.com/iamphduc/pod-board/pull/67)
 - 2026-11-01 · fix-urgent-tint · changed: the banner is tinted by status, and "Open run" is a text button (look B of draft 2) · [PR #70](https://github.com/iamphduc/pod-board/pull/70)
 - 2026-11-01 · fix-urgent-stack · changed: other items stack behind the banner, the count is a pill beside "Open run", and the narrow layout follows the banner's own width (stack A of draft 3, option 4 of draft 4) · [PR #71](https://github.com/iamphduc/pod-board/pull/71)
+- 2026-11-03 · fix-run-state · changed: a pending card raises a banner only when it stops its run (`stopsRun`), of any kind, instead of by the kinds `now`, `decision` and `before`. A selected card pod goes on without ranks 0, so a stop elsewhere still shows. An entry with no plan raises none, unless it is a BLOCKED to you, a halt gate or a hand-back.
+- 2026-11-03 · fix-run-state review round 1 · changed: an entry with no plan no longer heads a plan or fix run's card, so it raises no banner from one; a plan-less gate raises none from a repo row either.

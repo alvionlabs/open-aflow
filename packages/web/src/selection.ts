@@ -80,6 +80,24 @@ export function resolveSelection(
   return { run, view, slice, agent, hash: hashFor(run, view, view === 'agent' ? agent : slice) }
 }
 
+type RepoRef = { id: string; path: string }
+
+/** Adds each repo's id and path to `known`, which `followRepoId` reads. */
+export function rememberRepoPaths(known: Map<string, string>, repos: readonly RepoRef[]): void {
+  for (const r of repos) known.set(r.id, r.path)
+}
+
+/**
+ * A repo's id changes when a clash with another repo forms or ends. A hash under an id no repo has now moves
+ * to the id of the repo that last had it, found by path, so the page stays on that repo. Any other hash stays.
+ */
+export function followRepoId(hash: string, known: ReadonlyMap<string, string>, repos: readonly RepoRef[]): string {
+  const key = parseHash(hash)
+  if (!key || repos.some((r) => r.id === key.repoId)) return hash
+  const moved = repos.find((r) => r.path === known.get(key.repoId))
+  return moved ? hash.replace(/^#\/[^/]+/, () => `#/${enc(moved.id)}`) : hash
+}
+
 /** Calls `onNow` with the time every `every` ms until the returned stop is called. */
 export function startClock(onNow: (now: number) => void, every = LIVE_TICK_MS): () => void {
   const id = setInterval(() => onNow(Date.now()), every)

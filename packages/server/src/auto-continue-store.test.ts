@@ -24,6 +24,38 @@ const put = (text: string) => {
 }
 
 describe('auto-continue store', () => {
+  test('forgetPath forgets every toggle of that path, saved, and keeps the rest', async () => {
+    const store = createAutoContinueStore({ file })
+    await store.set('/old', 'alpha', true)
+    await store.set('/old', 'beta', true)
+    await store.set('/keep', 'alpha', true)
+    await store.forgetPath('/old')
+    expect(store.list()).toEqual([{ path: '/keep', run: 'alpha' }])
+    expect(saved()).toEqual({ runs: [{ path: '/keep', run: 'alpha' }] })
+    expect(createAutoContinueStore({ file }).list()).toEqual([{ path: '/keep', run: 'alpha' }])
+  })
+
+  test('forgetPath with nothing to forget writes nothing, and a failed write changes nothing', async () => {
+    let writes = 0
+    put(JSON.stringify({ runs: [{ path: '/r1', run: 'alpha' }] }))
+    const store = createAutoContinueStore({
+      file,
+      write: async () => {
+        writes += 1
+        throw new Error('disk full')
+      },
+    })
+    await store.forgetPath('/none')
+    expect(writes).toBe(0)
+    await expect(store.forgetPath('/r1')).rejects.toThrow('disk full')
+    expect(store.list()).toEqual([{ path: '/r1', run: 'alpha' }])
+  })
+
+  test('a toggle with no path reads off', () => {
+    put(JSON.stringify({ runs: [{ repoId: 'old', run: 'alpha' }, { path: '/r', run: 'alpha' }, { path: 7, run: 'beta' }] }))
+    expect(createAutoContinueStore({ file }).list()).toEqual([{ path: '/r', run: 'alpha' }])
+  })
+
   test('reads fail closed and writes atomically', async () => {
     // Missing → all off.
     expect(createAutoContinueStore({ file }).list()).toEqual([])
@@ -38,37 +70,37 @@ describe('auto-continue store', () => {
     put(
       JSON.stringify({
         runs: [
-          { repoId: 'r1', run: 'alpha', lastKey: 'wave-merged:7' },
+          { path: 'r1', run: 'alpha', lastKey: 'wave-merged:7' },
           null,
           'x',
-          { repoId: 'r1' },
+          { path: 'r1' },
           { run: 'alpha' },
           { repoId: 7, run: 'alpha' },
-          { repoId: 'r1', run: 'beta', lastKey: 9 },
-          { repoId: 'r2', run: 'fix-scroll' },
-          { repoId: 'r1', run: 'alpha', lastKey: 'other' },
+          { path: 'r1', run: 'beta', lastKey: 9 },
+          { path: 'r2', run: 'fix-scroll' },
+          { path: 'r1', run: 'alpha', lastKey: 'other' },
         ],
       }),
     )
     const store = createAutoContinueStore({ file })
     expect(store.list()).toEqual([
-      { repoId: 'r1', run: 'alpha', lastKey: 'wave-merged:7' },
-      { repoId: 'r2', run: 'fix-scroll' },
+      { path: 'r1', run: 'alpha', lastKey: 'wave-merged:7' },
+      { path: 'r2', run: 'fix-scroll' },
     ])
 
     // The next write replaces the bad file with good JSON.
     await store.set('r3', 'gamma', true)
     expect(saved()).toEqual({
       runs: [
-        { repoId: 'r1', run: 'alpha', lastKey: 'wave-merged:7' },
-        { repoId: 'r2', run: 'fix-scroll' },
-        { repoId: 'r3', run: 'gamma' },
+        { path: 'r1', run: 'alpha', lastKey: 'wave-merged:7' },
+        { path: 'r2', run: 'fix-scroll' },
+        { path: 'r3', run: 'gamma' },
       ],
     })
 
     // On again clears lastKey (how to retry a failed send); off removes.
     await store.set('r1', 'alpha', true)
-    expect(store.list()).toContainEqual({ repoId: 'r1', run: 'alpha' })
+    expect(store.list()).toContainEqual({ path: 'r1', run: 'alpha' })
     expect(store.list().find((t) => t.run === 'alpha')).not.toHaveProperty('lastKey')
     await store.set('r2', 'fix-scroll', false)
     expect(store.list().map((t) => t.run)).toEqual(['alpha', 'gamma'])
@@ -79,7 +111,7 @@ describe('auto-continue store', () => {
     // saveKey sets the key of a toggle that exists, and does nothing for one that doesn't.
     expect(await store.saveKey('r3', 'gamma', 'sprint-done:one')).toBe(true)
     expect(await store.saveKey('r9', 'nope', 'x')).toBe(false)
-    expect(store.list()).toContainEqual({ repoId: 'r3', run: 'gamma', lastKey: 'sprint-done:one' })
+    expect(store.list()).toContainEqual({ path: 'r3', run: 'gamma', lastKey: 'sprint-done:one' })
 
     // A new store on the same file (a restart) reads what was saved.
     expect(createAutoContinueStore({ file }).list()).toEqual(store.list())
@@ -96,7 +128,7 @@ describe('auto-continue store', () => {
     // An answered key is the lastKey and joins answeredKeys; another key moves lastKey only.
     expect(await store.saveKey('r1', 'alpha', 'answered:alpha:1:aaaaaaaa')).toBe(true)
     expect(await store.saveKey('r1', 'alpha', 'sprint-done:one')).toBe(true)
-    expect(store.list()).toEqual([{ repoId: 'r1', run: 'alpha', lastKey: 'sprint-done:one', answeredKeys: ['answered:alpha:1:aaaaaaaa'] }])
+    expect(store.list()).toEqual([{ path: 'r1', run: 'alpha', lastKey: 'sprint-done:one', answeredKeys: ['answered:alpha:1:aaaaaaaa'] }])
     // The same answered key again isn't listed twice.
     await store.saveKey('r1', 'alpha', 'answered:alpha:1:aaaaaaaa')
     expect(store.list()[0]?.answeredKeys).toEqual(['answered:alpha:1:aaaaaaaa'])
@@ -109,10 +141,10 @@ describe('auto-continue store', () => {
     expect(keys.at(-1)).toBe('answered:alpha:1:00000024')
     expect(keys).not.toContain('answered:alpha:1:aaaaaaaa')
     // A bad answeredKeys in the file is dropped, the toggle kept.
-    put(JSON.stringify({ runs: [{ repoId: 'r1', run: 'alpha', answeredKeys: 'x' }, { repoId: 'r2', run: 'beta', answeredKeys: ['ok', 7] }] }))
+    put(JSON.stringify({ runs: [{ path: 'r1', run: 'alpha', answeredKeys: 'x' }, { path: 'r2', run: 'beta', answeredKeys: ['ok', 7] }] }))
     expect(createAutoContinueStore({ file }).list()).toEqual([
-      { repoId: 'r1', run: 'alpha' },
-      { repoId: 'r2', run: 'beta', answeredKeys: ['ok'] },
+      { path: 'r1', run: 'alpha' },
+      { path: 'r2', run: 'beta', answeredKeys: ['ok'] },
     ])
   })
 
@@ -130,7 +162,7 @@ describe('auto-continue store', () => {
     await expect(failing.set('r1', 'beta', true)).rejects.toThrow('disk full')
     await expect(failing.set('r1', 'alpha', false)).rejects.toThrow('disk full')
     await expect(failing.saveKey('r1', 'alpha', 'k')).rejects.toThrow('disk full')
-    expect(failing.list()).toEqual([{ repoId: 'r1', run: 'alpha' }])
+    expect(failing.list()).toEqual([{ path: 'r1', run: 'alpha' }])
     expect(readFileSync(file, 'utf8')).toBe(before)
   })
 

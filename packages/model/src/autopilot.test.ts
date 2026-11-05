@@ -57,7 +57,8 @@ const repo = (o: Opts, prs: PrStatus[] = []): BoardRepo => ({
   path: '/r',
   source: 'registered',
   model: buildRepoModel(files(o)),
-  agents: [],
+  // pod is alive: an engineer of the plan handed back 10 minutes ago, so a pushed slice is pod's.
+  agents: [{ id: 'e', session: 's', type: 'pod:engineer', tokens: 0, ended: true, plan: 'alpha', lastAt: NOW - 10 * 60_000 }],
   prs,
   claims: [],
 })
@@ -209,10 +210,11 @@ describe('autopilot run, stopped at a PENDING gate', () => {
 
   it.each(NOTES)('is no stop: %s', (_, body) => {
     const r = repo({ sprintMarker: MARKER, queue: [gate(body)] })
-    // Pod still merges the PR, but every one of these notes is a pending entry to you, so the run (and the
-    // wave in progress) needs you.
-    expect(listRuns({ generatedAt: NOW, gh: 'ok', repos: [r] }, NOW)[0]?.state).toBe('needs-you')
-    expect(stopOf(body)).toEqual({ key: 'one/wave-1', label: 'Wave 1', state: 'you', detail: 'PR #9 · autopilot merges' })
+    // None is an autopilot stop, so pod still merges the PR and no wave PR waits on you. A note leaves the run
+    // running. A plan-complete hand-back or an ask stops the run (`stopsRun`), and that reads first on the wave.
+    const quiet = !/^\W*plan\b.*complete|^Needs your decision/i.test(body)
+    expect(listRuns({ generatedAt: NOW, gh: 'ok', repos: [r] }, NOW)[0]?.state).toBe(quiet ? 'running' : 'needs-you')
+    expect(stopOf(body)).toEqual({ key: 'one/wave-1', label: 'Wave 1', state: quiet ? 'live' : 'you', detail: 'PR #9 · autopilot merges' })
     // No wave PR waits on you (the hand-back case still lists its final PR, the Ship step's own rule).
     expect(waitingPrs(r, NOW).filter((w) => w.kind === 'wave')).toEqual([])
   })

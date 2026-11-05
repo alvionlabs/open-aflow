@@ -40,6 +40,8 @@ export type ShutdownDeps = {
   server: { close(): unknown }
   work: { size(): number; settled(): Promise<void> }
   watcher: { close(): Promise<void> }
+  /** The last step of a normal stop. A forced quit skips it. */
+  release?: () => void
   exit: (code: number) => void
   log?: (msg: string) => void
   capMs?: number
@@ -74,6 +76,10 @@ export function createShutdown(d: ShutdownDeps): () => void {
     void Promise.race([Promise.all([d.auto.settled(), d.work.settled()]), cap])
       .finally(() => clearTimeout(timer))
       .then(() => d.watcher.close())
+      .catch(() => {})
+      .then(() => {
+        if (!exited) d.release?.()
+      })
       .catch(() => {})
       .then(() => exit(0))
   }

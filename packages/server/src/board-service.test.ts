@@ -7,10 +7,10 @@ import type { Board } from '@pod-board/model'
 import * as model from '@pod-board/model'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createBoardService, finalPrBranches, livePrNumbers, type BoardServiceDeps } from './board-service.ts'
-import type { GhReader, GhStatus, PrStatus } from './gh.ts'
+import { createGhReader, PR_CACHE_MS, type GhExec, type GhReader, type GhStatus, type PrStatus } from './gh.ts'
 import { normalizeRepoPath, repoId } from './guard.ts'
 import { projectDirName } from './transcript-files.ts'
-import { createBoardWatcher } from './watcher.ts'
+import { boardSignature, createBoardWatcher } from './watcher.ts'
 
 // The model as is, with handBackPr and parseAgentTranscript watched, so the test can see the
 // server uses the model's rule and parses only the transcripts that changed.
@@ -157,11 +157,15 @@ describe('board service', () => {
     let toggles: model.AutoToggle[] = []
     const withToggles = createBoardService({ ...deps(), autoContinue: () => toggles })
     expect((await withToggles.build()).autoContinue).toEqual([])
-    toggles = [{ repoId: 'id-r', run: 'alpha', lastKey: 'sprint-done:one' }, { repoId: 'id-x', run: 'fix-scroll' }]
-    // Read on every build; the stop keys stay in the store, off the Board.
+    const repo = copyFixture()
+    await register(repo)
+    const key = caseless ? normalizeRepoPath(repo, platform).toLowerCase() : normalizeRepoPath(repo, platform)
+    toggles = [{ path: key, run: 'alpha', lastKey: 'sprint-done:one' }, { path: key, run: 'fix-scroll' }, { path: '/not/on/the/board', run: 'alpha' }]
+    // Read on every build, under the repo's id now, with the stop it last sent. A repo that isn't on the Board reads off.
+    const id = repoId(repo, platform, caseless)
     expect((await withToggles.build()).autoContinue).toEqual([
-      { repoId: 'id-r', run: 'alpha' },
-      { repoId: 'id-x', run: 'fix-scroll' },
+      { repoId: id, run: 'alpha', lastKey: 'sprint-done:one' },
+      { repoId: id, run: 'fix-scroll' },
     ])
     expect(await createBoardService(deps()).build()).not.toHaveProperty('autoContinue')
   })
@@ -450,6 +454,35 @@ describe('board service', () => {
     expect(ship).toEqual([{ key: 'final-pr', label: 'Final PR', state: 'wait', detail: 'PR #91 · after review' }])
   })
 
+  test('every sprint done in a repo with a staging decision: 6 hours cost 288 asks per branch, with a real gh reader', async () => {
+    const repo = join(root, 'repos', 'done-plan')
+    await mkdir(join(repo, 'pod-docs', 'plans'), { recursive: true })
+    await mkdir(join(repo, 'pod-docs', 'sprints'), { recursive: true })
+    await writeFile(join(repo, 'pod-docs', 'README.md'), '# pod docs\n\npod docs: 2\n')
+    await writeFile(join(repo, 'pod-docs', 'decisions.md'), '# Decisions\n\n## 2026-10-18 — merge target: staging\n\nLand on `pod-staging`.\n')
+    await writeFile(
+      join(repo, 'pod-docs', 'plans', 'alpha.md'),
+      '# Plan: alpha\n\n_Generated: 2026-10-21 · Status: active · Grilled-with: grilling_\n\n## Sprint sequence\n\n| Sprint | Goal | Status | Depends on |\n|--------|------|--------|------------|\n| one | goal | done | — |\n',
+    )
+    await register(repo)
+    let t = NOW
+    const asks = new Map<string, number>()
+    const exec: GhExec = async (args) => {
+      if (args[0] === 'auth') return { status: 'ok', stdout: '' }
+      const head = args[3] ?? ''
+      asks.set(head, (asks.get(head) ?? 0) + 1)
+      const stdout = head === 'pod-staging' ? JSON.stringify([{ number: 5, state: 'MERGED', url: 'https://github.com/o/r/pull/5', statusCheckRollup: [], headRefName: head }]) : '[]'
+      return { status: 'ok', stdout }
+    }
+    const service = createBoardService(deps(createGhReader({ exec, now: () => t })))
+    const board = await service.build()
+    for (let tick = 0; tick < 720; tick++) {
+      await service.refreshGh(board)
+      t += PR_CACHE_MS
+    }
+    expect(Object.fromEntries(asks)).toEqual({ alpha: 288, 'pod-staging': 288 })
+  })
+
   test("a final PR into a staging branch: refreshGh asks gh for that branch too, and the Board has its PR", async () => {
     // ui-polish's final PR #91 merged into `ui-polish-staging`; the staging PR #95 to main is open.
     const repo = copyFixture('chess-web', 'chess-web-ui-polish')
@@ -498,6 +531,79 @@ describe('board service', () => {
     expect(ship?.map((s) => [s.label, s.state, s.detail])).toContainEqual(['Staging → main', 'you', 'PR #95 · you merge'])
   })
 
+  describe('gh reads on the Board', () => {
+    const noPrs: GhExec = async (args) => (args[0] === 'auth' ? { status: 'ok', stdout: '' } : { status: 'ok', stdout: '[]' })
+
+    test('each ask says whether its first read is done', async () => {
+      const repo = copyFixture()
+      await claim(3200, repo, 'fix-clock')
+      const service = createBoardService(deps(createGhReader({ exec: noPrs, now: () => NOW })))
+      const first = await service.build()
+      expect(first.repos[0]!.ghReads).toContainEqual({ branch: 'fix-clock', read: false })
+      await service.refreshGh(first)
+      expect((await service.build()).repos[0]!.ghReads).toContainEqual({ branch: 'fix-clock', read: true })
+    })
+
+    test('a read that finds nothing still reaches the subscribers', async () => {
+      // No PR changed, so only this field can tell the notifier that the read is done.
+      const repo = copyFixture()
+      await claim(3200, repo, 'fix-clock')
+      let t = NOW
+      let answers = false
+      const exec: GhExec = async (args) => (args[0] === 'auth' || answers ? noPrs(args, '') : { status: 'failed', stdout: '' })
+      const service = createBoardService(deps(createGhReader({ exec, now: () => t })))
+      const board = await service.build()
+      await service.refreshGh(board)
+      // gh is ok by now and its first read failed, so nothing else can change from here.
+      const before = boardSignature(await service.build())
+      answers = true
+      t += PR_CACHE_MS
+      await service.refreshGh(board)
+      expect(boardSignature(await service.build())).not.toBe(before)
+    })
+
+    test('a failed read stays unread, and a PR number is asked by number', async () => {
+      const repo = copyFixture()
+      const queue = join(repo, 'pod-docs', 'handoff-queue.md')
+      const handBack = '- `[2026-10-20 · PENDING · orchestrator → human · plan: sparring-ladder]` plan sparring-ladder complete — final PR https://github.com/o/r/pull/77 **Resolution:** pending'
+      await writeFile(queue, `${await readFile(queue, 'utf8')}\n${handBack}\n`)
+      await register(repo)
+      const failing: GhExec = async (args) => (args[0] === 'auth' ? { status: 'ok', stdout: '' } : { status: 'failed', stdout: '' })
+      const service = createBoardService(deps(createGhReader({ exec: failing, now: () => NOW })))
+      await service.refreshGh(await service.build())
+      expect((await service.build()).repos[0]!.ghReads).toContainEqual({ pr: 77, read: false })
+    })
+
+    test('a staging ask is marked, because a PR read can bring it', async () => {
+      const repo = copyFixture('chess-web', 'chess-web-ui-polish')
+      await writeFile(join(repo, 'pod-docs', 'handoff-queue.md'), '# Handoff Queue\n')
+      await claim(3200, repo, 'ui-polish')
+      const final: PrStatus = { number: 91, state: 'merged', checks: 'pass', checkedAt: NOW, branch: 'ui-polish', base: 'ui-polish-staging' }
+      const gh: GhReader = { ...fakeGh({}, 'ok', { 'ui-polish': final }), prRead: () => false, branchRead: (_p, b) => b === 'ui-polish' }
+      const board = await createBoardService(deps(gh)).build()
+      expect(board.repos[0]!.ghReads).toEqual(expect.arrayContaining([{ branch: 'ui-polish', read: true }, { branch: 'ui-polish-staging', staging: true, read: false }]))
+    })
+
+    test('a reader with no read state adds no field', async () => {
+      const repo = copyFixture()
+      await claim(3200, repo, 'fix-clock')
+      expect((await createBoardService(deps()).build()).repos[0]).not.toHaveProperty('ghReads')
+    })
+
+    test('a repo that asks for nothing adds no field, and neither does a bad repo', async () => {
+      const bare = join(root, 'bare')
+      await mkdir(join(bare, 'pod-docs'), { recursive: true })
+      await register(bare)
+      const service = createBoardService(deps(createGhReader({ exec: noPrs, now: () => NOW })))
+      expect((await service.build()).repos[0]).not.toHaveProperty('ghReads')
+
+      await rm(bare, { recursive: true, force: true })
+      const gone = (await service.build()).repos[0]!
+      expect(gone.error).toBeDefined()
+      expect(gone).not.toHaveProperty('ghReads')
+    })
+  })
+
   test('a PR found by branch that is also a numbered live PR is on the Board once', async () => {
     const repo = copyFixture()
     // A hand-back linking #77 makes #77 a live PR by number too.
@@ -525,7 +631,7 @@ describe('board service', () => {
     const changed = new Promise<Board>((resolve) => watcher.subscribe(resolve))
     // A new claim outside the repo makes one watch cycle.
     await claim(3100, repo, 'sparring-ladder')
-    const next = await withTimeout(changed, 5000)
+    const next = await withTimeout(changed, 20_000)
     expect(next.repos[0]!.claims).toHaveLength(1)
     await watcher.close()
 
@@ -549,6 +655,52 @@ async function snapshot(dir: string): Promise<Record<string, { bytes?: string; m
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms))])
 }
+
+describe('repo ids', () => {
+  const idsByPath = (board: Board) => Object.fromEntries(board.repos.map((r) => [r.path, r.id]))
+
+  test('a config repo and a claim repo that clash get distinct ids', async () => {
+    const hyphen = copyFixture('chess-web')
+    const underscore = copyFixture('chess_web')
+    await register(hyphen)
+    await claim(3100, underscore, 'sparring-ladder')
+    const board = await createBoardService(deps()).build()
+    expect(board.repos.map((r) => [r.name, r.source])).toEqual([['chess-web', 'registered'], ['chess_web', 'claim']])
+    const [a, b] = board.repos.map((r) => r.id)
+    expect(a).not.toBe(b)
+    expect(a).toMatch(/-[0-9a-f]{6}$/)
+    expect(b).toMatch(/-[0-9a-f]{6}$/)
+  })
+
+  test('a repo with no clash has today’s id, byte for byte', async () => {
+    const repo = copyFixture('chess-web')
+    const other = copyFixture('plain')
+    const underscore = copyFixture('plain_two')
+    const hyphen = copyFixture('plain-two')
+    await register(repo, other, underscore, hyphen)
+    const ids = idsByPath(await createBoardService(deps()).build())
+    expect(ids[normalizeRepoPath(repo, platform)]).toBe(repoId(repo, platform, caseless))
+    expect(ids[normalizeRepoPath(other, platform)]).toBe(repoId(other, platform, caseless))
+  })
+
+  test('ids do not change when the config is reordered', async () => {
+    const paths = [copyFixture('chess-web'), copyFixture('chess_web'), copyFixture('plain')]
+    await register(...paths)
+    const before = idsByPath(await createBoardService(deps()).build())
+    expect(new Set(Object.values(before)).size).toBe(3)
+    await register(...[...paths].reverse())
+    expect(idsByPath(await createBoardService(deps()).build())).toEqual(before)
+  })
+
+  test('two spellings of one repo on a file system that ignores case are one repo, with no suffix', async () => {
+    const repo = copyFixture('chess-web')
+    await register(repo)
+    await claim(3100, repo.toUpperCase(), 'sparring-ladder')
+    const board = await createBoardService({ ...deps(), ignoresCase: async () => true }).build()
+    expect(board.repos.map((r) => r.source)).toEqual(['both'])
+    expect(board.repos[0]!.id).toBe(repoId(repo, platform, true))
+  })
+})
 
 describe('transcript cache', () => {
   const parsed = vi.mocked(model.parseAgentTranscript)
@@ -626,6 +778,28 @@ describe('transcript cache', () => {
     await utimes(session, back, back)
     expect((await service.build()).repos[0]!.agents.map((x) => x.id)).toEqual(['eng1'])
     expect(parsedIds()).toEqual(['eng1'])
+  })
+
+  test('a session past the window stays off the Board, whatever a fix claim names', async () => {
+    const repo = copyFixture()
+    await register(repo)
+    // A plan's reviewer, whose prompt only mentions the fix run in a sentence.
+    await transcript(repo, 'rev1', 'pod:reviewer', '- **plan:** sparring-ladder\nThis follows fix-old.\n')
+    await writeFile(join(portsDir, '3100'), `${repo} fix-old\n`)
+    const old = new Date(NOW - 40 * 24 * 60 * 60_000)
+    const session = dirname(subagentsOf(repo))
+    await utimes(subagentsOf(repo), old, old)
+    await utimes(session, old, old)
+
+    const board = await createBoardService(deps()).build()
+    const onBoard = board.repos[0]!
+    expect(onBoard.agents).toEqual([])
+    // The plan gets no session from it, so no send.
+    const key = caseless ? normalizeRepoPath(repo, platform).toLowerCase() : normalizeRepoPath(repo, platform)
+    expect(model.autoSends(board, [{ path: key, run: 'sparring-ladder' }], NOW, () => true)).toEqual([])
+    // The fix run stays listed, with no session to send to.
+    expect(model.listRuns(board, NOW).map((r) => r.plan)).toContain('fix-old')
+    expect(model.replySession(onBoard, 'fix-old', NOW)).toBeUndefined()
   })
 
   test('a transcript deleted after a build drops off the Board', async () => {

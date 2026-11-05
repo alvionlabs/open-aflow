@@ -6,7 +6,7 @@
 import type { AgentRun, AgentState, BoardRepo, PrStatus } from './board.ts'
 import { isPlanAgent, prByBranch, spend, type Stage, type Step, type StepState } from './pipeline.ts'
 import { formatTokens } from './pod-flow/model.ts'
-import { agentState, STALE_MS } from './transcript.ts'
+import { agentState } from './transcript.ts'
 
 /** How far back the Other activity strip looks, and how many agents it shows at most. */
 export const OTHER_WINDOW_MS = 2 * 60 * 60 * 1000
@@ -96,21 +96,11 @@ function matchFixAgents(repo: BoardRepo, name: string): { engineers: AgentRun[];
   }
 }
 
-/** Listed while its claim exists, unless its PR merged and none of its agents wrote in the last STALE_MS (a leftover claim). */
-function isListed(repo: BoardRepo, name: string, agents: FixAgent[], now: number): boolean {
-  if (fixPr(repo, name)?.state !== 'merged') return true
-  return agents.some(({ a }) => a.lastAt !== undefined && now - a.lastAt < STALE_MS)
-}
-
 /** The run's PR while it waits on you: open and reviewed. The Ship step reads `you merge` exactly then. */
 export function fixWaitingPr(repo: BoardRepo, name: string, now: number): PrStatus | undefined {
   const pr = fixPr(repo, name)
   return pr?.state === 'open' && isReviewed(fixAgents(repo, name, now)) ? pr : undefined
 }
-
-/** The listed fix runs' names. */
-export const listedFixRuns = (repo: BoardRepo, now: number): string[] =>
-  fixRunNames(repo).filter((n) => isListed(repo, n, fixAgents(repo, n, now), now))
 
 const phase = (x: FixAgent): string => (x.role === 'reviewer' ? (x.round !== undefined && x.round >= 2 ? 'review round 2' : 'review') : x.role === 'engineer' ? 'build' : 'fix pass')
 
@@ -152,12 +142,9 @@ function summary(repo: BoardRepo, name: string, agents: FixAgent[]): FixRunSumma
   return run
 }
 
-/** The repo's listed fix runs, in claim order. */
+/** The repo's fix runs, in claim order. A run is listed while its claim exists, also long after its PR merged: only cleanup frees the claim. */
 export function fixRuns(repo: BoardRepo, now: number): FixRunSummary[] {
-  return fixRunNames(repo).flatMap((name) => {
-    const agents = fixAgents(repo, name, now)
-    return isListed(repo, name, agents, now) ? [summary(repo, name, agents)] : []
-  })
+  return fixRunNames(repo).map((name) => summary(repo, name, fixAgents(repo, name, now)))
 }
 
 const plural = (n: number, word: string) => `${n} ${n === 1 ? word : word.endsWith('s') ? `${word}es` : `${word}s`}`
@@ -197,12 +184,14 @@ export function buildFixPipeline(repo: BoardRepo, name: string, now: number): Fi
       : { key: 'pr', label: 'PR', state: PR_STEP[pr.state].state, detail: `PR #${pr.number} · ${PR_STEP[pr.state].text}` }
   const waiting = fixWaitingPr(repo, name, now)
   if (waiting) ship.merge = { number: waiting.number }
+  /** A merged PR was built and reviewed. With no agent at all, its session is past the transcript window, so no figures. */
+  const ran = (step: Step): Step => (pr?.state === 'merged' && agents.length === 0 ? { ...step, state: 'done', detail: 'no transcript' } : step)
   const stages: Stage[] = [
     {
       key: 'build',
       caption: 'Build',
       steps: [
-        agentStep('engineer', 'Engineer', of((x) => x.role === 'engineer'), 'not started', now),
+        ran(agentStep('engineer', 'Engineer', of((x) => x.role === 'engineer'), 'not started', now)),
         agentStep('fix-pass', 'Fix pass', of((x) => x.role === 'fix pass'), 'only if review fails', now),
       ],
     },
@@ -210,7 +199,7 @@ export function buildFixPipeline(repo: BoardRepo, name: string, now: number): Fi
       key: 'review',
       caption: 'Review',
       steps: [
-        agentStep('round-1', 'Round 1', of((x) => x.role === 'reviewer' && x.round === 1), 'not started', now),
+        ran(agentStep('round-1', 'Round 1', of((x) => x.role === 'reviewer' && x.round === 1), 'not started', now)),
         agentStep('round-2', 'Round 2', of((x) => x.role === 'reviewer' && x.round !== 1), 'only after a fix pass', now),
       ],
     },
@@ -229,11 +218,11 @@ export function buildFixPipeline(repo: BoardRepo, name: string, now: number): Fi
 
 /**
  * The repo's agents tied to no run, newest first: not an agent of any plan in the repo, and not
- * one of a listed fix run's. Only those that wrote in the last OTHER_WINDOW_MS, OTHER_CAP at most.
+ * one of a fix run's. Only those that wrote in the last OTHER_WINDOW_MS, OTHER_CAP at most.
  * Each has its role (the type without `pod:`) and one dispatch field (branch, else plan, else sprint), never text.
  */
 export function otherActivity(repo: BoardRepo, now: number): OtherAgent[] {
-  const fixIds = new Set(listedFixRuns(repo, now).flatMap((n) => fixAgents(repo, n, now).map((x) => x.a.id)))
+  const fixIds = new Set(fixRunNames(repo).flatMap((n) => fixAgents(repo, n, now).map((x) => x.a.id)))
   return repo.agents
     .filter((a) => a.lastAt !== undefined && now - a.lastAt < OTHER_WINDOW_MS)
     .filter((a) => !fixIds.has(a.id) && !repo.model.plans.some((p) => isPlanAgent(a, p)))

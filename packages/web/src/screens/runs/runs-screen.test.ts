@@ -282,7 +282,8 @@ describe('run flow', () => {
     expect(idle.cls).toMatch(/\bwait\b.*\bdim\b/)
     expect(idle.text).toMatch(/waiting/)
     // Autopilot merging T1's pushed PR #78: the run is running, so is the wave (highlighted), with no engineer.
-    const merging = flowOf(render({ repo: chess([onlyQueue(), t1Pushed]) }).html).cards.find((c) => c.text.startsWith('Wave 3'))!
+    const pod = { id: 'e', session: 's', type: 'pod:engineer', tokens: 0, ended: true, plan: 'sparring-ladder', lastAt: NOW - 10 * 60_000 }
+    const merging = flowOf(render({ repo: chess([onlyQueue(), t1Pushed], { agents: [pod] }) }).html).cards.find((c) => c.text.startsWith('Wave 3'))!
     expect(merging.cls).toMatch(/\blive\b/)
     expect(merging.cls).toMatch(/\bhi\b/)
     expect(merging.text).toMatch(/running/)
@@ -425,6 +426,9 @@ describe('sidebar', () => {
     expect(text(html)).toMatch(/Add repo/)
     expect(text(html)).not.toMatch(/in the bar/)
     expect(sideOf(html)).toMatch(ADD)
+    // A friend with no pod sees why the board is empty, and the fix.
+    expect(text(html)).toContain('/plugin marketplace add iamphduc/claude-pod')
+    expect(text(html)).toContain('/plugin install pod@pod')
   })
 
   it("reads the started time against the Board's transcript window", () => {

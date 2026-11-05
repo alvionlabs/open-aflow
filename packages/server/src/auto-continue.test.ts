@@ -39,7 +39,7 @@ function fakeRunner(result: () => Promise<StartResult> | StartResult = () => ({ 
 }
 
 /** The check over a Board you set, with fakes for everything outside the server. */
-function setup(o: { board: Board; store?: AutoContinueStore; runner?: ReturnType<typeof fakeRunner>; idle?: (repo: BoardRepo, session: string) => boolean; inFlight?: Set<string>; onError?: (err: unknown) => void }) {
+function setup(o: { board: Board; store?: AutoContinueStore; runner?: ReturnType<typeof fakeRunner>; idle?: (repo: BoardRepo, session: string) => boolean; inFlight?: Set<string>; onError?: (err: unknown) => void; owner?: () => boolean }) {
   let board = o.board
   const subscribers = new Set<(b: Board) => void>()
   const logged: NewActionEntry[] = []
@@ -70,6 +70,7 @@ function setup(o: { board: Board; store?: AutoContinueStore; runner?: ReturnType
     inFlight,
     now: () => NOW,
     onError: o.onError,
+    ...(o.owner ? { owner: o.owner } : {}),
   })
   /** A new Board from the watcher. */
   const emit = (b: Board = board) => {
@@ -101,21 +102,71 @@ describe('automatic check', () => {
     s.auto.stop()
   })
 
+  test('only the owner sends', async () => {
+    const store = createAutoContinueStore({ file })
+    await store.set('/r', 'alpha', true)
+    let owns = false
+    const asked: boolean[] = []
+    const s = setup({
+      board: boardOf(planRepo(SPRINT_DONE)),
+      store,
+      owner: () => {
+        asked.push(owns)
+        return owns
+      },
+    })
+    await s.auto.check()
+    expect(asked).toEqual([false])
+    expect(s.runner.starts).toEqual([])
+    expect(s.logged).toEqual([])
+    expect(s.inFlight.size).toBe(0)
+    // The key isn't saved either, so the stop stays due for the owner.
+    expect(s.store.list()).toEqual([{ path: '/r', run: 'alpha' }])
+
+    owns = true
+    await s.auto.check()
+    expect(s.runner.starts).toHaveLength(1)
+
+    // With no owner check, it sends as it always did.
+    const free = createAutoContinueStore({ file: join(root, 'cfg', 'other.json') })
+    await free.set('/r', 'alpha', true)
+    const none = setup({ board: boardOf(planRepo(SPRINT_DONE)), store: free })
+    await none.auto.check()
+    expect(none.runner.starts).toHaveLength(1)
+  })
+
+  test('an owner check that throws sends nothing and is logged', async () => {
+    const store = createAutoContinueStore({ file })
+    await store.set('/r', 'alpha', true)
+    const errors: unknown[] = []
+    const s = setup({
+      board: boardOf(planRepo(SPRINT_DONE)),
+      store,
+      onError: (e) => errors.push(e),
+      owner: () => {
+        throw new Error('owner failed')
+      },
+    })
+    await s.auto.check()
+    expect(s.runner.starts).toEqual([])
+    expect(errors).toHaveLength(1)
+  })
+
   test('sends only with the toggle on', async () => {
     const s = setup({ board: boardOf(planRepo(SPRINT_DONE)) })
     await s.auto.check()
     expect(s.runner.starts).toEqual([])
     expect(s.logged).toEqual([])
 
-    await s.store.set('id-r', 'alpha', true)
+    await s.store.set('/r', 'alpha', true)
     await s.auto.check()
     expect(s.runner.starts).toEqual([{ session: 'sess-1', word: 'continue', cwd: '/r' }])
     expect(s.logged).toEqual([{ action: 'resume', repoId: 'id-r', repo: 'r', target: 'alpha · continue', result: 'started', reply: 'continue', auto: true }])
     expect(s.events).toEqual(['log', 'rebuild'])
-    expect(s.store.list()).toEqual([{ repoId: 'id-r', run: 'alpha', lastKey: 'sprint-done:one' }])
+    expect(s.store.list()).toEqual([{ path: '/r', run: 'alpha', lastKey: 'sprint-done:one' }])
 
     // Off again: nothing more, on any Board.
-    await s.store.set('id-r', 'alpha', false)
+    await s.store.set('/r', 'alpha', false)
     s.emit(boardOf(planRepo(NEXT_SPRINT_DONE)))
     await s.auto.check()
     expect(s.runner.starts).toHaveLength(1)
@@ -125,7 +176,7 @@ describe('automatic check', () => {
     const results: StartResult[] = [{ outcome: 'failed', message: 'claude not found' }]
     const runner = fakeRunner(() => results.shift() ?? { outcome: 'started' })
     const store = createAutoContinueStore({ file })
-    await store.set('id-r', 'alpha', true)
+    await store.set('/r', 'alpha', true)
     const s = setup({ board: boardOf(planRepo(SPRINT_DONE)), store, runner })
     s.auto.start()
     await s.auto.settled()
@@ -162,7 +213,7 @@ describe('automatic check', () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     expect(AUTO_TICK_MS).toBe(15_000)
     const store = createAutoContinueStore({ file })
-    await store.set('id-r', 'alpha', true)
+    await store.set('/r', 'alpha', true)
     const s = setup({ board: boardOf(planRepo(SPRINT_DONE)), store, idle: () => false })
     s.auto.start()
     await s.auto.settled()
@@ -183,11 +234,12 @@ describe('automatic check', () => {
 
   test('no send without a saved key', async () => {
     const real = createAutoContinueStore({ file })
-    await real.set('id-r', 'alpha', true)
+    await real.set('/r', 'alpha', true)
     let fail = true
     const store: AutoContinueStore = {
       list: () => real.list(),
       set: (...a) => real.set(...a),
+      forgetPath: (...a) => real.forgetPath(...a),
       saveKey: async (...a) => {
         if (fail) throw new Error('disk full')
         return real.saveKey(...a)
@@ -208,7 +260,7 @@ describe('automatic check', () => {
 
   test('skips a session already resuming', async () => {
     const store = createAutoContinueStore({ file })
-    await store.set('id-r', 'alpha', true)
+    await store.set('/r', 'alpha', true)
     const s = setup({ board: boardOf(planRepo(SPRINT_DONE)), store })
 
     // A request in flight (the route, or another check) for that session.
@@ -239,7 +291,7 @@ describe('automatic check', () => {
 
   test('a runner that throws is logged as failed', async () => {
     const store = createAutoContinueStore({ file })
-    await store.set('id-r', 'alpha', true)
+    await store.set('/r', 'alpha', true)
     const runner = fakeRunner(() => {
       throw new Error('spawn EPERM')
     })
@@ -254,8 +306,8 @@ describe('automatic check', () => {
   test('never sends go', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     const store = createAutoContinueStore({ file })
-    await store.set('id-r', 'alpha', true)
-    await store.set('id-d', 'alpha', true)
+    await store.set('/r', 'alpha', true)
+    await store.set('/id-d', 'alpha', true)
     // A fresh plan beside a run at a send stop, both toggled on: only the send stop gets one continue.
     const done = () => planRepo(SPRINT_DONE, { id: 'id-d', session: 'sess-2' })
     const s = setup({ board: boardOf(planRepo(FRESH), done()), store })
@@ -268,7 +320,7 @@ describe('automatic check', () => {
     s.emit(boardOf(planRepo(WAVE_WAITING), done()))
     await vi.advanceTimersByTimeAsync(AUTO_TICK_MS)
     await s.auto.settled()
-    expect(s.runner.starts).toEqual([{ session: 'sess-2', word: 'continue', cwd: '/r' }])
+    expect(s.runner.starts).toEqual([{ session: 'sess-2', word: 'continue', cwd: '/id-d' }])
     expect(s.logged.map((e) => e.target)).toEqual(['alpha · continue'])
     expect(s.logged.every((e) => e.action === 'resume' && e.reply === 'continue')).toBe(true)
     s.auto.stop()
@@ -276,7 +328,7 @@ describe('automatic check', () => {
 
   test('an idle check that throws counts as busy', async () => {
     const store = createAutoContinueStore({ file })
-    await store.set('id-r', 'alpha', true)
+    await store.set('/r', 'alpha', true)
     const s = setup({
       board: boardOf(planRepo(SPRINT_DONE)),
       store,
@@ -374,7 +426,7 @@ function planRepo(stop: Stop, o: { session?: string; id?: string; path?: string 
   return {
     id: o.id ?? 'id-r',
     name: 'r',
-    path: o.path ?? '/r',
+    path: o.path ?? (o.id === undefined || o.id === 'id-r' ? '/r' : `/${o.id}`),
     source: 'registered',
     model: buildRepoModel(files),
     agents: session === '' ? [] : [agent({ plan: 'alpha', session })],

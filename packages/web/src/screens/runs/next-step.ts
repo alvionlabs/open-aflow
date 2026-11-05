@@ -1,10 +1,12 @@
 // The Next step card and the Waiting tab: the selected run's most urgent item and its one action,
 // then everything else that waits on you. Picks from the model's rules only (the queue entries,
 // waitingPrs, the reply panel), in the plan's order: blocked → merge → reply → pending → info,
-// the pending tier sorted by kind (entry-kind.ts).
+// the pending tier sorted by stops first (the model's `stopsRun`), then by kind (entry-kind.ts).
+// An entry that doesn't stop the run wears the run's own status; an entry that joins no plan stays
+// listed but never takes a run's card (a repo row keeps a real stop as its card).
 // Pure; the card and the tab only render these.
 
-import { haltGate, isAnswerable, waitingPrs, type BoardRepo, type QueueItem, type RunSummary, type WaitingPr } from '@pod-board/model'
+import { haltGate, holdsRun, isAnswerable, stopsRun, waitingPrs, type BoardRepo, type QueueItem, type RunSummary, type WaitingPr } from '@pod-board/model'
 import { KIND_ORDER } from './entry-kind.ts'
 import { waitingEntries, waitingRows, type WaitingRow } from './queue-view.ts'
 import { kindChip } from './waiting-tab.ts'
@@ -32,6 +34,8 @@ export type NextItem = {
   entry?: WaitingRow
   /** A pending or blocked entry's kind as a dot and word (kindChip); none for `other`. */
   kind?: Chip
+  /** A pending entry that doesn't stop the run (`stopsRun`), or that joins no plan: it raises no banner and ranks as nothing. */
+  goesOn?: true
   action: NextAction
 }
 /** `card` is the first action item; `rest` is every other item (the Waiting tab's count is its length). */
@@ -40,6 +44,8 @@ export type NextSteps = { card: NextItem; rest: NextItem[] }
 export const NOTHING_TITLE = 'Nothing to do'
 export const BLOCKED_DETAIL = 'The run is stopped until you answer.'
 export const PENDING_DETAIL = 'pod goes on with the value in use until you answer.'
+/** A gate or hand-back that holds nothing right now: an engineer works past it (`holdsRun`). */
+export const AT_WORK_DETAIL = 'An engineer is at work on this run. Answer when you can.'
 
 const TITLE_MAX = 80
 
@@ -54,10 +60,11 @@ function short(text: string): string {
 const ACTION_TIERS = new Set<NextItem['tier']>(['blocked', 'merge', 'reply', 'pending'])
 const TIER_ORDER: NextItem['tier'][] = ['blocked', 'merge', 'reply', 'pending', 'info']
 
-/** Tier first; inside the pending tier, by the entry's kind (now → decision → before → other → someday). */
+/** Tier first; inside the pending tier, a stop first, then by the entry's kind (now → decision → before → other → someday). */
 function byTier(a: NextItem, b: NextItem): number {
   const tier = TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier)
   if (tier !== 0 || a.tier !== 'pending') return tier
+  if (!a.goesOn !== !b.goesOn) return a.goesOn ? 1 : -1
   return KIND_ORDER.indexOf(a.entry?.kind ?? 'other') - KIND_ORDER.indexOf(b.entry?.kind ?? 'other')
 }
 
@@ -71,16 +78,18 @@ function entryKeys(rows: WaitingRow[]): string[] {
   })
 }
 
-function entryItem(e: QueueItem, row: WaitingRow, key: string, repoId: string): NextItem {
+function entryItem(e: QueueItem, row: WaitingRow, key: string, repoId: string, stops: boolean, lifted: boolean, joined: boolean, run: RunSummary): NextItem {
   const answer: NextAction = { kind: 'answer', repoId, line: row.line }
   const blocked = e.type === 'BLOCKED'
   // The title is the body without its kind prefix; the kind shows as a dot and word, as on the rows.
-  const title = entryTitle(row.text)
+  // Only an entry that holds the run reads as a halt: the title of a gate that doesn't is its own words.
+  const title = blocked || stops ? entryTitle(row.text) : { title: short(row.text) }
   if (isAnswerable(e)) {
     const kind = row.kind === 'other' ? {} : { kind: kindChip(row) }
-    return blocked
-      ? { key, tier: 'blocked', status: 'blocked', ...title, ...kind, detail: BLOCKED_DETAIL, entry: row, action: answer }
-      : { key, tier: 'pending', status: 'needs-you', ...title, ...kind, detail: PENDING_DETAIL, entry: row, action: answer }
+    // A plan's own BLOCKED says what the run says (`planState`): blocked when halted, else needs you.
+    if (blocked) return { key, tier: 'blocked', status: joined && run.state !== 'blocked' ? 'needs-you' : 'blocked', ...title, ...kind, detail: BLOCKED_DETAIL, entry: row, action: answer }
+    if (!stops) return { key, tier: 'pending', status: runStatus(run), goesOn: true, ...title, ...kind, detail: lifted ? AT_WORK_DETAIL : PENDING_DETAIL, entry: row, action: answer }
+    return { key, tier: 'pending', status: 'needs-you', ...(joined ? {} : { goesOn: true as const }), ...title, ...kind, detail: BLOCKED_DETAIL, entry: row, action: answer }
   }
   return { key, tier: 'info', status: blocked ? 'blocked' : 'idle', ...title, detail: row.yourAnswer ?? row.route, entry: row, action: { kind: 'none' } }
 }
@@ -115,8 +124,12 @@ function replyItem(panel: ReplyPanelView): NextItem | undefined {
   }
 }
 
+/** What the run does, for a card that isn't asking you to stop anything. */
+const runStatus = (run: RunSummary): NextStatus =>
+  run.state === 'blocked' || run.state === 'needs-you' || run.state === 'running' ? run.state : 'idle'
+
 function nothingCard(run: RunSummary, repo: BoardRepo): NextItem {
-  const status: NextStatus = run.state === 'blocked' ? 'blocked' : run.state === 'running' ? 'running' : 'idle'
+  const status = runStatus(run)
   const empty = run.state === 'error' || run.state === 'unsupported' || run.plan === undefined
   return { key: 'nothing', tier: 'nothing', status, title: NOTHING_TITLE, detail: empty ? emptyMessage(run, repo) : run.where, action: { kind: 'none' } }
 }
@@ -128,7 +141,17 @@ export function nextSteps(run: RunSummary | undefined, repo: BoardRepo | undefin
   const entries = waitingEntries(repo, run)
   const rows = waitingRows(repo, run)
   const keys = entryKeys(rows)
-  const items: NextItem[] = entries.map((e, i) => entryItem(e, rows[i]!, keys[i]!, repo.id))
+  const plan = run.fix === undefined ? repo.model.plans.find((p) => p.slug === run.plan) : undefined
+  const joined = new Set(plan?.queue.map((e) => e.line))
+  const own = (e: QueueItem) => (plan !== undefined && joined.has(e.line) ? plan : undefined)
+  const stops = entries.map((e) => {
+    const p = own(e)
+    return p ? holdsRun(repo, p, e, now) : stopsRun(e)
+  })
+  const items: NextItem[] = entries.map((e, i) => entryItem(e, rows[i]!, keys[i]!, repo.id, stops[i]!, !stops[i] && own(e) !== undefined && stopsRun(e, own(e)), joined.has(e.line), run))
+  // An entry that joins no plan never heads a run; a repo row, with nowhere else to show it, keeps a real stop.
+  const repoRow = run.plan === undefined
+  const unjoined = new Set(entries.flatMap((e, i) => (joined.has(e.line) || (repoRow && stops[i]) ? [] : [items[i]!.key])))
   // A repo row names no plan, so it has no PRs; a fix run's PRs carry its claim name.
   if (run.plan !== undefined) items.push(...waitingPrs(repo, now).filter((pr) => pr.run === run.plan).map((pr) => prItem(pr, repo.id)))
   const panel = replyPanel(run, repo, now)
@@ -136,8 +159,8 @@ export function nextSteps(run: RunSummary | undefined, repo: BoardRepo | undefin
   if (reply) items.push(reply)
   // A stable sort: list order holds within a tier, and within a kind in the pending tier.
   const sorted = items.sort(byTier)
-  const first = sorted[0]
-  if (first && ACTION_TIERS.has(first.tier)) return { card: first, rest: sorted.slice(1) }
+  const first = sorted.find((i) => !unjoined.has(i.key))
+  if (first && ACTION_TIERS.has(first.tier)) return { card: first, rest: sorted.filter((i) => i !== first) }
   return { card: nothingCard(run, repo), rest: sorted }
 }
 

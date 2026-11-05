@@ -2,8 +2,8 @@
 // Pure. The rules and why are in pod-docs/feature-details/queue-and-replies.md.
 
 import type { AgentRun, BoardRepo } from './board.ts'
-import { fixPr, fixRunAgents, fixRunNames, fixWaitingPr, listedFixRuns } from './fix-runs.ts'
-import { handBackPr, isAutopilot, isBlockedSlice, isHalted, isPlanAgent, isRun, isRunning, isSliceDone, pendingHandBack, planAgentRunning, waveWaitingPr } from './pipeline.ts'
+import { fixPr, fixRunAgents, fixRunNames, fixWaitingPr } from './fix-runs.ts'
+import { autopilotHoldsPushed, handBackPr, isAutopilot, isBlockedSlice, isHalted, isPlanAgent, isRun, isRunning, isSliceDone, pendingHandBack, planAgentRunning, waitsOnWave, waveWaitingPr } from './pipeline.ts'
 import { asksYou } from './queue-answer.ts'
 import type { PlanModel } from './run-model.ts'
 
@@ -50,7 +50,7 @@ export function runReplies(repo: BoardRepo, run: string, now: number): RunReply[
 }
 
 function planReplies(repo: BoardRepo, plan: PlanModel, now: number): RunReply[] {
-  if (!isRun(repo, plan, now) || planAgentRunning(repo, plan, now)) return []
+  if (!isRun(repo, plan, now) || planAgentRunning(repo, plan, now) || waitsOnWave(repo, plan, now) || autopilotHoldsPushed(repo, plan, now)) return []
   // A halt hides the stop replies: only answering it moves pod on. Any stop reply wins over answered.
   const stop = isHalted(plan) ? [] : stopReplies(repo, plan, now)
   if (stop.length > 0) return stop
@@ -119,7 +119,6 @@ function stopReplies(repo: BoardRepo, plan: PlanModel, now: number): RunReply[] 
 }
 
 function fixReplies(repo: BoardRepo, name: string, now: number): RunReply[] {
-  if (!listedFixRuns(repo, now).includes(name)) return []
   if (fixRunAgents(repo, name, now).some((a) => isRunning(a, now))) return []
   const waiting = fixWaitingPr(repo, name, now)
   if (waiting) return [mergeFirst('fix-waiting', waiting.number)]
@@ -137,7 +136,7 @@ function runAgents(repo: BoardRepo, run: string, now: number): AgentRun[] {
 /**
  * The chat to paste a reply in: the session of the run's agent that wrote last (ties: the newer
  * start, then the smaller agent id). Its start is the earliest of any repo agent in that session;
- * the main chat is never read. `resume` only for an id safe in a shell command.
+ * the main chat is never read. `resume` only for an id safe in a shell command and a session that is provably this repo's.
  */
 export function replySession(repo: BoardRepo, run: string, now: number): ReplySession | undefined {
   const newest = runAgents(repo, run, now)
@@ -148,6 +147,6 @@ export function replySession(repo: BoardRepo, run: string, now: number): ReplySe
   const out: ReplySession = { id, repoPath: repo.path }
   const starts = repo.agents.filter((a) => a.session === id && a.startedAt !== undefined).map((a) => a.startedAt!)
   if (starts.length > 0) out.startedAt = Math.min(...starts)
-  if (SESSION_ID.test(id)) out.resume = `claude --resume ${id}`
+  if (SESSION_ID.test(id) && !newest.sessionUnproven) out.resume = `claude --resume ${id}`
   return out
 }

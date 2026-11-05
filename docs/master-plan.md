@@ -1,6 +1,6 @@
 # Pod Board: master plan
 
-_Written: 2026-10-18 · Status: phases 1 and 2 built (pod plans `board-read`, `board-actions`) · Design: [docs/design/preview.html](design/preview.html) ([published preview](https://claude.ai/artifact/H2xCmKqGwKRvvUyqCnx6P8))_
+_Written: 2026-10-18 · Updated: 2026-11-02 · Status: phases 1 and 2 built (pod plans `board-read`, `board-actions`); next is the Windows app (plan `windows-app`) · Design: [docs/design/preview.html](design/preview.html) ([published preview](https://claude.ai/artifact/H2xCmKqGwKRvvUyqCnx6P8))_
 
 This is the long-range plan. Each phase below is built as one or more pod plans (`/pod:ship` or `/pod:plan`), because a pod plan holds at most four sprints. Start each pod plan from this file: paste its phase section into the plan interview as the brief.
 
@@ -20,17 +20,18 @@ A local app that shows every [pod](https://github.com/iamphduc/claude-pod) run a
 - Phase 1: with three repos running pod, one browser tab shows each run's stage, the current wave's slices, what needs you, and each engineer's live activity, within 5 seconds of pod writing it.
 - Phase 2: you can merge a wave PR and answer a `PENDING` from the board, and pod picks both up exactly as if you had done it in chat.
 - The board never breaks a run: phase 1 only reads; every phase 2 action does exactly what the human would do by hand.
-- Works on Windows, macOS, and Linux.
+- Ship on Windows: a friend goes from one installer to their runs without a terminal.
+- Ships on Windows first, then Linux, then Mac. Mobile and accessibility work stopped on 2026-11-02.
 
 ## Users and scope
 
-One developer running pod on their own machine, in one or more repos. No accounts, no cloud, no team sharing.
+One developer running pod on their own machine, in one or more repos: first the author, then friends, then the public. No accounts, no cloud, no team sharing.
 
 **Out of scope for now:** hosting, multi-user access, mobile app (a phone ping comes in phase 3), editing plans or sprint docs from the board, any non-pod agent workflow.
 
 ## Look
 
-Keep the design in [docs/design/preview.html](design/preview.html). It is the approved look: the plan interview records it as the plan's `## Look` instead of proposing three new directions.
+`DESIGN.md` and `packages/web/src/theme/tokens.css` now hold the look (plan `calm-dashboard`). The text below is the first look, kept as history.
 
 - **Thesis:** a quiet control room. Neutral slate surfaces, one cobalt accent, and state shown by colored chips and card edges, so what needs you stands out at a glance.
 - **Palette (light / dark):**
@@ -44,7 +45,7 @@ Keep the design in [docs/design/preview.html](design/preview.html). It is the ap
   - Semantic colors: ok `#1d8a55` / `#4fc58a`, needs you `#b26a00` / `#f0ae47`, blocked `#c2373a` / `#f07a7c`, idle `#7a8194` / `#8b92a6`. Each has a soft background for chips; the values are in the file.
 - **Fonts:** Bricolage Grotesque (display), Instrument Sans (body), JetBrains Mono (codes, numbers, logs). All on Google Fonts; self-host them in the app.
 - **Screens:** runs list and pipeline (screen 1), wave board with dependency lines and the critical path (screen 2), engineer view with a live transcript (screen 3).
-- **Rules:** both themes from day one; works at 375 px (the runs list stacks above the main view, the board scrolls sideways inside its frame); state is shown in form (chip, card edge), not only in text.
+- **Rules:** both themes from day one; state is shown in form (chip, card edge), not only in text.
 
 ## How the board integrates with pod
 
@@ -126,7 +127,7 @@ Claude Code + pod plugin ──writes──▶ <repo>/pod-docs/*.md, worktrees
 - Server: Hono or Fastify. File watching with chokidar. Live updates to the browser over server-sent events.
 - Web: React + Vite. No database: state is rebuilt from files on start and kept in memory.
 - Tests: Vitest for `model` (fixture-driven) and `server`, and browser checks with agent-browser per pod's rules.
-- ~~Ship as `npx pod-board` later.~~ Dropped: [no npm publishing](../pod-docs/decisions.md#2026-10-21--no-npm-publishing). The board runs with `pnpm dev`.
+- ~~Ship as `npx pod-board` later.~~ Dropped: [no npm publishing](../pod-docs/decisions.md#2026-10-21--no-npm-publishing). The board ran only with `pnpm dev` until plan `windows-app`, which adds an installer from GitHub Releases, still with no npm package.
 - **Security:**
   - Bind to `127.0.0.1` only.
   - Check the `Host` header against DNS rebinding.
@@ -164,6 +165,17 @@ Verification: run it against the four existing pod repos and one live `/pod:code
 - Copy-the-reply for `continue` / `go` / `try`.
 - Action log in the UI, and the security token and host check.
 - Verification: in a scratch repo running `/pod:code`, merge a wave PR and answer a `PENDING` from the board; the next wave starts with that answer in use.
+
+### Ship on Windows (pod plan `windows-app`, 4 sprints; next)
+
+Planned in [pod-docs/plans/windows-app.md](../pod-docs/plans/windows-app.md). The evidence is in [pod-docs/research/windows-desktop-app.md](../pod-docs/research/windows-desktop-app.md).
+
+- **One-port server:** `pnpm start` runs the bundled server and web app on one port.
+- **Outside a terminal:** tool finder, setup check, clean stop.
+- **Desktop shell:** Electron window, tray, toasts, single instance, start at login.
+- **Installer and updates:** per-user NSIS installer, release workflow, auto-update, install note.
+
+After it: code signing and a public launch, then Linux, then Mac. Each is its own plan.
 
 ### Phase 3 — watch and step in, phone ping (decide after using phases 1–2)
 

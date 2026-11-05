@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import type { Context, MiddlewareHandler } from 'hono'
@@ -114,12 +114,59 @@ export function sameRepoPath(a: string, b: string, platform: NodeJS.Platform, ig
 }
 
 /**
- * A URL-safe id for a repo: its normalized path with each non-alphanumeric
- * character as `-`, lowercased when its file system ignores case.
+ * A repo's plain id: its normalized path with each non-alphanumeric character
+ * as `-`, lowercased when its file system ignores case. Two paths that differ
+ * only in symbols get one plain id; `repoIds` keeps the Board's ids unique.
  */
 export function repoId(p: string, platform: NodeJS.Platform, ignoresCase: boolean): string {
   const id = normalizeRepoPath(p, platform).replace(/[^A-Za-z0-9]/g, '-')
   return ignoresCase ? id.toLowerCase() : id
+}
+
+const sha256 = (key: string) => createHash('sha256').update(key).digest('hex')
+
+/** The values that occur more than once. */
+function repeated(values: readonly string[]): Set<string> {
+  return new Set(values.filter((v, i) => values.indexOf(v) !== i))
+}
+
+/**
+ * One unique id per repo, in order, from the whole list of repos. A repo with no clash keeps its plain id. Every member of a clash gets `-` and 6 hex
+ * characters of a hash of its path, so an id depends only on the path and the set, never on list order,
+ * and removing one member passes its id to nobody who still clashes. Suffixed ids that still collide
+ * (with each other, or with another repo's plain id) double their suffix until they differ.
+ */
+export function repoIds(
+  repos: readonly { path: string; caseless: boolean }[],
+  platform: NodeJS.Platform,
+  hash: (key: string) => string = sha256,
+): { ids: string[] } {
+  const plain = repos.map((r) => repoId(r.path, platform, r.caseless))
+  const clashed = repeated(plain)
+  const hex = repos.map((r, i) => {
+    if (!clashed.has(plain[i]!)) return ''
+    const p = normalizeRepoPath(r.path, platform)
+    // The mark keeps a case-sensitive path apart from a caseless one that folds to the same text.
+    return hash(r.caseless ? p.toLowerCase() : `${p}\0`)
+  })
+  const sizes = hex.map((h) => (h === '' ? 0 : 6))
+  for (;;) {
+    const ids = plain.map((id, i) => (sizes[i] === 0 ? id : `${id}-${hex[i]!.slice(0, sizes[i])}`))
+    const collide = repeated(ids)
+    const grow = ids.flatMap((id, i) => (sizes[i]! > 0 && sizes[i]! < hex[i]!.length && collide.has(id) ? [i] : []))
+    if (grow.length === 0) return { ids }
+    for (const i of grow) sizes[i]! *= 2
+  }
+}
+
+/** Whether an absolute path is the repo's folder or under it, by the same case rule as `sameRepoPath`. A relative path isn't. */
+export function isInsideRepo(p: string, repo: string, platform: NodeJS.Platform, ignoresCase: boolean): boolean {
+  const { isAbsolute, sep } = pathFor(platform)
+  if (!isAbsolute(p)) return false
+  const fold = (s: string) => (ignoresCase ? s.toLowerCase() : s)
+  const x = fold(normalizeRepoPath(p, platform))
+  const y = fold(normalizeRepoPath(repo, platform))
+  return x === y || x.startsWith(y.endsWith(sep) ? y : y + sep)
 }
 
 /**

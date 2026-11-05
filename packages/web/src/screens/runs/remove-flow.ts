@@ -96,8 +96,8 @@ export function createRemoveFlow(
 
 
 /**
- * The Board repo a run belongs to. Two paths that differ only in non-alphanumeric characters
- * (`chess-web`, `chess_web`) share an id, so a run's repo name picks between them.
+ * The Board repo a run belongs to. Board ids are unique; if two repos ever share one, the run's
+ * repo name picks between them.
  */
 export function repoOfRun(repos: BoardRepo[], run: RunSummary | undefined): BoardRepo | undefined {
   if (!run) return undefined
@@ -107,7 +107,7 @@ export function repoOfRun(repos: BoardRepo[], run: RunSummary | undefined): Boar
 
 /**
  * What Remove acts on, or undefined for a repo only a port claim lists (the board would list it again
- * from the claim) and for a repo whose id another Board repo shares (the rest of the page can't tell them apart).
+ * from the claim), and, as a safety check, for a repo whose id another Board repo shares (the page couldn't tell them apart).
  */
 export function removeTarget(
   repo: BoardRepo | undefined,
@@ -119,7 +119,7 @@ export function removeTarget(
   return { repoId: repo.id, name: repo.name, path: repo.path, alsoClaimed: repo.source === 'both', runs, place: ctx.place, returnTo: ctx.returnTo }
 }
 
-/** Whether a run is this repo's: its id and, since two repos can share an id, its name. */
+/** Whether a run is this repo's: its id and, as a safety check, its name. */
 const isRunOf = (run: RunSummary, repoId: string, name: string) => run.repoId === repoId && run.repo === name
 
 export type RemoveView = { heading: string; body: string; path: string; runsLine?: string; claimNote?: string; busy: boolean; status?: string; error?: string }
