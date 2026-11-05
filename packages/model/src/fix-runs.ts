@@ -184,8 +184,8 @@ export function buildFixPipeline(repo: BoardRepo, name: string, now: number): Fi
       : { key: 'pr', label: 'PR', state: PR_STEP[pr.state].state, detail: `PR #${pr.number} · ${PR_STEP[pr.state].text}` }
   const waiting = fixWaitingPr(repo, name, now)
   if (waiting) ship.merge = { number: waiting.number }
-  /** A merged PR was built and reviewed. With no agent, its session is past the transcript window, so no figures. */
-  const ran = (step: Step): Step => (pr?.state === 'merged' && step.state === 'wait' ? { ...step, state: 'done', detail: 'no transcript' } : step)
+  /** A merged PR was built and reviewed. With no agent at all, its session is past the transcript window, so no figures. */
+  const ran = (step: Step): Step => (pr?.state === 'merged' && agents.length === 0 ? { ...step, state: 'done', detail: 'no transcript' } : step)
   const stages: Stage[] = [
     {
       key: 'build',
