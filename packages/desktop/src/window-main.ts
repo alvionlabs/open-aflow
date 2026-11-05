@@ -1,8 +1,8 @@
-// Glue: the window and the tray. The rules are in window-rules, window-state, tray-menu, and login-item.
+// Glue: the window and the tray. The rules are in window-rules, window-state, tray-menu, and login-item (the --hidden start).
 
 import { join } from 'node:path'
 import { app, BrowserWindow, Menu, nativeImage, screen, shell, Tray } from 'electron'
-import { createLoginItem, isLoginStart } from './login-item.ts'
+import { isLoginStart } from './login-item.ts'
 import { APP_NAME } from './shell-config.ts'
 import type { ShellContext } from './shell-main.ts'
 import { trayMenu } from './tray-menu.ts'
@@ -20,12 +20,6 @@ export function startWindow(ctx: ShellContext): void {
   const assets = join(app.getAppPath(), 'assets')
   // A path with no file gives an empty image: an empty tray icon, and no throw.
   const icon = (name: string) => nativeImage.createFromPath(join(assets, name))
-
-  const login = createLoginItem({
-    packaged: app.isPackaged,
-    appPath: app.getAppPath(),
-    api: { get: (query) => app.getLoginItemSettings(query), set: (options) => app.setLoginItemSettings(options) },
-  })
 
   const openWindow = (url: string): WindowHandle => {
     const state = readWindowState(
@@ -85,24 +79,11 @@ export function startWindow(ctx: ShellContext): void {
 
   const flow = createWindowFlow({ hiddenStart: isLoginStart(process.argv), open: openWindow })
 
-  const refreshMenu = (loginOn: boolean) => {
-    tray?.setContextMenu(
-      Menu.buildFromTemplate(
-        trayMenu({
-          loginOn,
-          onOpen: () => bus.showWindow(),
-          onLogin: (on) => refreshMenu(login.set(on)),
-          onQuit: () => app.quit(),
-        }),
-      ),
-    )
-  }
-
   // Tray first: a login start has nothing else on the screen.
   tray = new Tray(icon('tray.png'))
   tray.setToolTip(APP_NAME)
   tray.on('click', () => bus.showWindow())
-  refreshMenu(login.isOn())
+  tray.setContextMenu(Menu.buildFromTemplate(trayMenu({ onOpen: () => bus.showWindow(), onQuit: () => app.quit() })))
   bus.onAttention((on) => tray?.setImage(icon(on ? 'tray-dot.png' : 'tray.png')))
 
   // shell-main's listener holds the quit. This one lets the window close when the quit goes through.
