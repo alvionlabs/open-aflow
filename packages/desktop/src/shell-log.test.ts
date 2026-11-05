@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createLogFile, LOG_FILE, LOG_MAX_BYTES, logLines, type LogFs } from './shell-log.ts'
+import { createLogFile, LOG_FILE, LOG_MAX_BYTES, logLines, teeConsole, type LogFs } from './shell-log.ts'
 
 const fakeFs = () => {
   const files = new Map<string, string>()
@@ -38,6 +38,21 @@ describe('log lines', () => {
 
   test('a very long line is cut', () => {
     expect(logLines(['x'.repeat(5000)])[0]).toHaveLength(500)
+  })
+})
+
+describe('the console', () => {
+  test('each line still reaches the console, and also the file', () => {
+    const seen: unknown[][] = []
+    const target = { log: (...a: unknown[]) => void seen.push(['log', ...a]), error: (...a: unknown[]) => void seen.push(['error', ...a]), warn: (...a: unknown[]) => void seen.push(['warn', ...a]) }
+    const written: unknown[][] = []
+    teeConsole(target, { write: (args) => void written.push(args) })
+    const err = new Error('entry text')
+    target.log('a')
+    target.error('b', err)
+    target.warn('c')
+    expect(seen).toEqual([['log', 'a'], ['error', 'b', err], ['warn', 'c']])
+    expect(written).toEqual([['a'], ['b', err], ['c']])
   })
 })
 
