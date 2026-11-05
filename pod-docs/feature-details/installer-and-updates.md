@@ -7,6 +7,7 @@
 ## How it works
 
 - **Package.** One-click NSIS, no admin rights, a Start-menu entry named `Pod Board`, no desktop shortcut. `resources/app.asar` holds `dist/main.cjs`, `assets/`, and `package.json`. `resources/server` holds the bundle. `THIRD-PARTY-NOTICES.txt` comes from each bundle's esbuild metafile. A package with no licence file and no override stops the step.
+- **After the install.** A normal install opens the app (`runAfterFinish`). A silent install stays closed, so a proof never starts the app with no temp env. The update path is silent with `--force-run`, which starts its one new copy, as it always did. The template rule is `${ifNot} ${Silent} ${orIf} ${isForceRun}` in `installSection.nsh`, and `build-config.test.ts` fails if a new electron-builder changes it.
 - **Release.** `release.yml` runs only on a tag `v<major>.<minor>.<patch>` that equals `version` in `packages/desktop/package.json`. Job `build` has a read token: it runs `pnpm verify`, `pnpm package`, and `pnpm release:check`. Job `publish` needs `build`, has the write token, and runs no repo code.
 - **Check.** `pnpm release:check` checks the size, `latest.yml`, and the blockmap, then installs, starts, and uninstalls the app. `pnpm test:install` runs the longer proofs. Each ends with `state diff: []`.
 - **Update.** Only in a packaged app. First check 30 s after the first server ready, then every 6 h. `autoDownload` on. `autoInstallOnAppQuit` and `allowDowngrade` off.
@@ -67,3 +68,4 @@ To pull a bad release, delete it on the Releases page, then tag a higher version
 - 2026-11-03 · installer-and-updates U1 · auto-update, the test feed, and the local two-version proof · [PR #82](https://github.com/iamphduc/pod-board/pull/82)
 - 2026-11-03 · installer-and-updates R1 · the release workflow, its local check, and the install note · [PR #82](https://github.com/iamphduc/pod-board/pull/82)
 - 2026-11-03 · windows-app · final PR #83, verdict fix at round 2 · [report](../reports/windows-app.html)
+- 2026-11-04 · fix-late-merge-continue · a normal install opens the app. A silent install still stays closed.

@@ -7,7 +7,7 @@ Pod Board runs on your Windows PC. It shows your pod runs across your repos.
 1. Open the [latest release](https://github.com/iamphduc/pod-board/releases/latest).
 2. Download `pod-board-setup-<version>.exe`.
 3. Double-click the file. Pod Board installs for your user only. You don't need admin rights.
-4. Open **Pod Board** from the Start menu.
+4. Pod Board opens when the install ends. Later, open **Pod Board** from the Start menu.
 
 ## If Windows stops the installer
 
@@ -45,6 +45,10 @@ Pod Board drops every other `CLAUDE*` variable. To use another one, put it in th
 ## Updates
 
 The app checks for updates and downloads them for you. When an update is ready, it asks you. Select **Restart now** to install, or **Later** to wait. It asks again the next time you start the app. Your running `claude` sessions keep running through an update.
+
+## Report a bug
+
+The app keeps a small log at `%APPDATA%\Pod Board\desktop.log`. It holds no queue text and no tokens. Attach it to your report.
 
 ## Uninstall
 
