@@ -137,14 +137,58 @@ export function createSessionCwdCache(read: (file: string) => Promise<string | u
   }
 }
 
-/** Stub, replaced in the next commit. */
-export type ClaimedSessionScan = (sub: string, mtime: number, names: string[]) => Promise<boolean>
-export const createClaimedSessionScan = (): ClaimedSessionScan => async () => false
+/** The claims that can name a fix run. */
+export const fixClaimNames = (claims: readonly { plan: string }[]): string[] => claims.map((c) => c.plan).filter((plan) => plan.startsWith('fix-'))
+
+/** Whether a session folder past the window names one of these fix runs. */
+export type ClaimedSessionScan = (sub: string, mtime: number, names: readonly string[]) => Promise<boolean>
+
+/** A dispatch's fields are at the start of an agent's first record, so this much of each file is enough. */
+const AGENT_HEAD_BYTES = 64 * 1024
+
+async function headOf(file: string): Promise<string> {
+  const handle = await open(file, 'r').catch(() => undefined)
+  if (!handle) return ''
+  try {
+    const { buffer, bytesRead } = await handle.read(Buffer.alloc(AGENT_HEAD_BYTES), 0, AGENT_HEAD_BYTES, 0)
+    return buffer.toString('utf8', 0, bytesRead)
+  } finally {
+    await handle.close()
+  }
+}
+
+/**
+ * A merged fix run stays listed while its claim exists, so its session must stay readable past the window. Only a repo
+ * with a fix claim reads old sessions, only the head of each agent's file, and each session once per name until its date changes.
+ */
+export function createClaimedSessionScan(): ClaimedSessionScan {
+  const known = new Map<string, boolean>()
+  return async (sub, mtime, names) => {
+    for (const name of names) {
+      const key = `${sub}\u0000${mtime}\u0000${name}`
+      let found = known.get(key)
+      if (found === undefined) {
+        const word = new RegExp(`(?<![\\w-])${name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}(?![\\w-])`)
+        const files = (await namesIn(sub)).filter((n) => /^agent-.+\.jsonl$/.test(n))
+        found = false
+        for (const file of files) {
+          if (word.test(await headOf(path.join(sub, file)))) {
+            found = true
+            break
+          }
+        }
+        known.set(key, found)
+      }
+      if (found) return true
+    }
+    return false
+  }
+}
 
 /**
  * The subagent transcripts of a repo's sessions changed in the last
- * `maxAgeDays`, sorted by session then id. A session counts as changed when
- * its folder or its `subagents/` folder changed (a new agent adds a file to
+ * `maxAgeDays`, plus any older session a `claimed` fix run names, sorted by session then id. A session counts as
+ * changed when its folder or its `subagents/` folder changed (a new agent adds a file to
  * `subagents/` without touching the session folder). Missing folders give `[]`.
  */
 export async function listAgentFiles(
@@ -152,7 +196,7 @@ export async function listAgentFiles(
   repoPath: string,
   maxAgeDays: number,
   now: number,
-  _claimed?: { names: string[]; scan: ClaimedSessionScan },
+  claimed?: { names: readonly string[]; scan: ClaimedSessionScan },
 ): Promise<AgentFile[]> {
   const project = path.join(claudeDir, 'projects', projectDirName(repoPath))
   const sessions = await dirsIn(project)
@@ -161,7 +205,7 @@ export async function listAgentFiles(
   for (const session of sessions.sort()) {
     const sub = path.join(project, session, 'subagents')
     const changed = Math.max(await mtimeOf(path.join(project, session)), await mtimeOf(sub))
-    if (changed < oldest) continue
+    if (changed < oldest && !(claimed && claimed.names.length > 0 && (await claimed.scan(sub, changed, claimed.names)))) continue
     const ids = (await namesIn(sub))
       .map((n) => /^agent-(.+)\.jsonl$/.exec(n)?.[1])
       .filter((id): id is string => id !== undefined)

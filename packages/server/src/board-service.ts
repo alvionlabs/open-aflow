@@ -27,7 +27,7 @@ import type { GhReader } from './gh.ts'
 import { ignoresCase as probeIgnoresCase, normalizeRepoPath, repoIds, sameRepoPath } from './guard.ts'
 import { readRepoFiles } from './repo-files.ts'
 import { loadRepos } from './repos-config.ts'
-import { agentOfRepo, createAgentFileCache, createSessionCwdCache, listAgentFiles, sessionFileOf, type AgentFile } from './transcript-files.ts'
+import { agentOfRepo, createAgentFileCache, createClaimedSessionScan, createSessionCwdCache, fixClaimNames, listAgentFiles, sessionFileOf, type AgentFile } from './transcript-files.ts'
 
 export type BoardServiceDeps = {
   configFile: string
@@ -98,9 +98,11 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
     return { entries, configUnreadable: config.unreadable }
   }
 
+  const claimedSessions = createClaimedSessionScan()
+
   /** The repo's pod agents. Adds its listed files to `listed`, so the build keeps their cache. */
   async function agentsOf(entry: RepoEntry, listed: AgentFile[], sessionFiles: string[]): Promise<AgentRun[]> {
-    const files = await listAgentFiles(deps.claudeDir, entry.path, deps.transcriptDays, now())
+    const files = await listAgentFiles(deps.claudeDir, entry.path, deps.transcriptDays, now(), { names: fixClaimNames(entry.claims), scan: claimedSessions })
     listed.push(...files)
     // One stat per session this build, however many agents it has.
     const cwdOf = new Map<string, Promise<string | undefined>>()
@@ -192,11 +194,11 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
       if (checkedAt !== undefined) board.ghCheckedAt = checkedAt
       if (configUnreadable) board.configError = 'config unreadable'
       if (deps.actions) board.actions = deps.actions()
-      // The stop keys stay in the store; the Board only says which toggles are on, under each repo's id now.
+      // The toggles that are on, under each repo's id now, with the stop each last sent, so a sent stop raises no toast.
       if (deps.autoContinue) {
-        board.autoContinue = deps.autoContinue().flatMap(({ path, run }) => {
+        board.autoContinue = deps.autoContinue().flatMap(({ path, run, lastKey }) => {
           const repo = repos.find((r) => repoPathKey(r) === path)
-          return repo ? [{ repoId: repo.id, run }] : []
+          return repo ? [{ repoId: repo.id, run, ...(lastKey === undefined ? {} : { lastKey }) }] : []
         })
       }
       return board

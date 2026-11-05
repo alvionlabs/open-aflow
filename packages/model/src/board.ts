@@ -104,7 +104,7 @@ export type Board = {
   /** The action log, newest first, at most 50. */
   actions?: ActionEntry[]
   /** The runs whose auto-continue toggle is on. Missing means all off. */
-  autoContinue?: { repoId: string; run: string }[]
+  autoContinue?: { repoId: string; run: string; lastKey?: string }[]
   /** POD_BOARD_TRANSCRIPT_DAYS: agents come only from transcripts written in this many days. Missing on older Boards (read as 30). */
   transcriptDays?: number
 }

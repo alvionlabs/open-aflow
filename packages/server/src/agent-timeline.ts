@@ -4,7 +4,7 @@
 // holds tool names and short summaries only (see the model's timeline.ts).
 
 import { parseAgentTimeline, type AgentTimeline, type Board } from '@pod-board/model'
-import { listAgentFiles, readAgentFile } from './transcript-files.ts'
+import { createClaimedSessionScan, fixClaimNames, listAgentFiles, readAgentFile } from './transcript-files.ts'
 
 export type TimelineSourceDeps = {
   board: () => Board
@@ -24,13 +24,14 @@ export const AGENT_ID = /^[A-Za-z0-9_-]{1,64}$/
 export function createTimelineSource(deps: TimelineSourceDeps): TimelineSource {
   // No cache: the page asks again only when the agent's lastAt moves, so the file has changed
   // anyway, and a kept copy of every viewed transcript's text would only grow.
+  const scan = createClaimedSessionScan()
   return {
     async timeline(repoId, agentId) {
       if (!AGENT_ID.test(agentId)) return undefined
       const repo = deps.board().repos.find((r) => r.id === repoId)
       const agent = repo?.agents.find((a) => a.id === agentId)
       if (!repo || !agent) return undefined
-      const files = await listAgentFiles(deps.claudeDir, repo.path, deps.transcriptDays, deps.now())
+      const files = await listAgentFiles(deps.claudeDir, repo.path, deps.transcriptDays, deps.now(), { names: fixClaimNames(repo.claims), scan })
       const file = files.find((f) => f.id === agent.id && f.session === agent.session)
       if (!file) return undefined
       try {

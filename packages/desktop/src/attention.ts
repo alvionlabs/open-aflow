@@ -51,7 +51,9 @@ function replyKey(board: Board, repo: BoardRepo, item: NextItem, found: NextItem
   if (item.action.kind !== 'reply' || !stop) return undefined
   if (found.some((other) => other.action.kind === 'merge' && other.action.number === stop.pr)) return undefined
   const { target, rows } = item.action.panel
-  const toggled = board.autoContinue?.some((t) => t.repoId === target.repoId && t.run === target.run) === true
-  if (toggled && rows.some((r) => r.send === 'continue') && autoMaySend(repo, stop, now)) return undefined
+  const toggle = board.autoContinue?.find((t) => t.repoId === target.repoId && t.run === target.run)
+  // Sent already: a toast would only offer the same word again, into a session that may still be busy with it.
+  if (toggle?.lastKey === stop.key) return undefined
+  if (toggle && rows.some((r) => r.send === 'continue') && autoMaySend(repo, stop, now)) return undefined
   return stop.key
 }
