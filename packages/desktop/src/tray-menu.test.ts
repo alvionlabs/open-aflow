@@ -9,9 +9,13 @@ const menu = (loginOn: boolean) => {
 describe('tray menu', () => {
   test('the tray menu', () => {
     const { on, items } = menu(false)
-    expect(items.map((i) => i.label)).toEqual(['Open', 'Start at login', 'Quit'])
-    expect(items[1]).toMatchObject({ type: 'checkbox', checked: false })
-    expect(menu(true).items[1]).toMatchObject({ type: 'checkbox', checked: true })
+    expect(items.map((i) => i.label)).toEqual(['Open', 'Start at login: Off', 'Quit'])
+    expect(menu(true).items.map((i) => i.label)).toEqual(['Open', 'Start at login: On', 'Quit'])
+    // A checkbox row adds an empty check gutter to the menu, so the state is in the words.
+    for (const row of [...items, ...menu(true).items]) {
+      expect(row).not.toHaveProperty('type')
+      expect(row).not.toHaveProperty('checked')
+    }
 
     items[0]!.click()
     expect(on.onOpen).toHaveBeenCalledOnce()
@@ -21,7 +25,7 @@ describe('tray menu', () => {
     expect(on.onLogin).not.toHaveBeenCalled()
   })
 
-  test('the checkbox asks for the other value', () => {
+  test('Start at login asks for the other value', () => {
     const off = menu(false)
     off.items[1]!.click()
     expect(off.on.onLogin).toHaveBeenCalledWith(true)

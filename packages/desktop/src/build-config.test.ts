@@ -27,7 +27,7 @@ describe('electron-builder config', () => {
     expect(n.createDesktopShortcut).toBe(false)
     expect(n.createStartMenuShortcut).toBe(true)
     expect(n.shortcutName).toBe(APP_NAME)
-    expect(n.runAfterFinish).toBe(false)
+    expect(n.runAfterFinish).toBe(true)
     expect(n.deleteAppDataOnUninstall).toBe(false)
     expect(n.include).toBe('build/installer.nsh')
   })
@@ -108,6 +108,16 @@ describe('electron-builder config', () => {
     expect(() => parsePackageArgs(['--version=1.2'])).toThrow(/version/)
     expect(() => parsePackageArgs(['--output='])).toThrow(/output/)
     expect(() => parsePackageArgs(['--nope'])).toThrow(/--nope/)
+  })
+
+  test('the app opens after a normal install, and a silent install stays closed', () => {
+    // An install proof runs silent. The update path runs silent too, with --force-run, which starts the one new copy.
+    const builder = createRequire(join(pkg, 'package.json')).resolve('electron-builder')
+    const lib = dirname(createRequire(builder).resolve('app-builder-lib/package.json'))
+    const section = readFileSync(join(lib, 'templates', 'nsis', 'installSection.nsh'), 'utf8')
+    expect(section).toMatch(/!ifdef RUN_AFTER_FINISH\s+\$\{ifNot\} \$\{Silent\}\s+\$\{orIf\} \$\{isForceRun\}\s+!insertmacro doStartApp/)
+    const target = readFileSync(join(lib, 'out', 'targets', 'nsis', 'NsisTarget.js'), 'utf8')
+    expect(target).toMatch(/runAfterFinish !== false\) \{\s+defines\.RUN_AFTER_FINISH = null/)
   })
 
   test('the installed NSIS templates hold no tree kill', () => {
