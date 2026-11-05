@@ -137,6 +137,10 @@ export function createSessionCwdCache(read: (file: string) => Promise<string | u
   }
 }
 
+/** Stub, replaced in the next commit. */
+export type ClaimedSessionScan = (sub: string, mtime: number, names: string[]) => Promise<boolean>
+export const createClaimedSessionScan = (): ClaimedSessionScan => async () => false
+
 /**
  * The subagent transcripts of a repo's sessions changed in the last
  * `maxAgeDays`, sorted by session then id. A session counts as changed when
@@ -148,6 +152,7 @@ export async function listAgentFiles(
   repoPath: string,
   maxAgeDays: number,
   now: number,
+  _claimed?: { names: string[]; scan: ClaimedSessionScan },
 ): Promise<AgentFile[]> {
   const project = path.join(claudeDir, 'projects', projectDirName(repoPath))
   const sessions = await dirsIn(project)

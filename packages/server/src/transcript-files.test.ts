@@ -7,6 +7,7 @@ import {
   createAgentFileCache,
   createSessionCwdCache,
   firstCwdOfFile,
+  createClaimedSessionScan,
   listAgentFiles,
   projectDirName,
   readAgentFile,
@@ -101,6 +102,51 @@ describe('finds agent transcripts', () => {
     ])
     // A shorter window leaves out more.
     expect((await listAgentFiles(claude, repoPath, 2, now)).map((f) => f.id)).toEqual(['m1', 'a1', 'b2', 'c3'])
+  })
+
+  describe('a session past the window that a fix claim names', () => {
+    const OLD = () => now - 40 * 24 * 60 * 60_000
+    const agent = (branch: string) => ({ 'agent-e.jsonl': JSON.stringify({ type: 'user', message: { content: `- **branch name:** ${branch}\n` } }) + '\n', 'agent-r.jsonl': '{"type":"user"}\n' })
+    const ids = async (names: string[], scan = createClaimedSessionScan()) => (await listAgentFiles(claude, repoPath, 30, now, { names, scan })).map((f) => `${f.session}/${f.id}`)
+
+    test('comes back whole, and only that session', async () => {
+      await session('s-claimed', OLD(), agent('fix-old'))
+      await session('s-other', OLD(), agent('fix-older'))
+      await session('s-plan', OLD(), { 'agent-p.jsonl': '{"type":"user"}\n' })
+      expect(await ids(['fix-old'])).toEqual(['s-claimed/e', 's-claimed/r'])
+      expect(await ids(['fix-older'])).toEqual(['s-other/e', 's-other/r'])
+    })
+
+    test('no claim, or a name no session holds: nothing past the window', async () => {
+      await session('s-claimed', OLD(), agent('fix-old'))
+      expect(await ids([])).toEqual([])
+      expect(await ids(['fix-gone'])).toEqual([])
+      expect(await listAgentFiles(claude, repoPath, 30, now)).toEqual([])
+    })
+
+    test('a longer name does not count', async () => {
+      await session('s-claimed', OLD(), agent('fix-old-two'))
+      expect(await ids(['fix-old'])).toEqual([])
+      await session('s-prefix', OLD(), agent('my-fix-old'))
+      expect(await ids(['fix-old'])).toEqual([])
+    })
+
+    test('each session is read once for each name while it stays unchanged', async () => {
+      await session('s-claimed', OLD(), agent('fix-old'))
+      const scan = createClaimedSessionScan()
+      expect(await ids(['fix-old'], scan)).toHaveLength(2)
+      // The text goes, and the dates stay: the answer comes from memory, with no read.
+      await session('s-claimed', OLD(), { 'agent-e.jsonl': '{"type":"user"}\n' })
+      expect(await ids(['fix-old'], scan)).toHaveLength(2)
+      // A changed date reads it again.
+      await session('s-claimed', OLD() + 1000, { 'agent-e.jsonl': '{"type":"user"}\n' })
+      expect(await ids(['fix-old'], scan)).toEqual([])
+    })
+
+    test('reads only the head of each file', async () => {
+      await session('s-late', OLD(), { 'agent-e.jsonl': `${'x'.repeat(200 * 1024)} fix-old\n` })
+      expect(await ids(['fix-old'])).toEqual([])
+    })
   })
 
   test('reads an agent, with "" for a missing meta file', async () => {

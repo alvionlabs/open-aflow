@@ -161,10 +161,10 @@ describe('board service', () => {
     await register(repo)
     const key = caseless ? normalizeRepoPath(repo, platform).toLowerCase() : normalizeRepoPath(repo, platform)
     toggles = [{ path: key, run: 'alpha', lastKey: 'sprint-done:one' }, { path: key, run: 'fix-scroll' }, { path: '/not/on/the/board', run: 'alpha' }]
-    // Read on every build, under the repo's id now; the stop keys stay in the store, off the Board. A repo that isn't on the Board reads off.
+    // Read on every build, under the repo's id now, with the stop it last sent. A repo that isn't on the Board reads off.
     const id = repoId(repo, platform, caseless)
     expect((await withToggles.build()).autoContinue).toEqual([
-      { repoId: id, run: 'alpha' },
+      { repoId: id, run: 'alpha', lastKey: 'sprint-done:one' },
       { repoId: id, run: 'fix-scroll' },
     ])
     expect(await createBoardService(deps()).build()).not.toHaveProperty('autoContinue')
@@ -778,6 +778,26 @@ describe('transcript cache', () => {
     await utimes(session, back, back)
     expect((await service.build()).repos[0]!.agents.map((x) => x.id)).toEqual(['eng1'])
     expect(parsedIds()).toEqual(['eng1'])
+  })
+
+  test("a claimed fix run's session stays on the Board past the window", async () => {
+    const repo = copyFixture()
+    await register(repo)
+    await transcript(repo, 'eng1', 'pod:engineer', '- **branch name:** fix-old\n')
+    await writeFile(join(portsDir, '3100'), `${repo} fix-old\n`)
+    const old = new Date(NOW - 40 * 24 * 60 * 60_000)
+    const session = dirname(subagentsOf(repo))
+    await utimes(subagentsOf(repo), old, old)
+    await utimes(session, old, old)
+
+    const service = createBoardService(deps())
+    const onBoard = (await service.build()).repos[0]!
+    expect(onBoard.agents.map((x) => x.id)).toEqual(['eng1'])
+    expect(model.buildFixPipeline(onBoard, 'fix-old', NOW)?.stages[0]?.steps[0]).toMatchObject({ label: 'Engineer', state: 'done' })
+
+    // With the claim gone, it leaves.
+    await rm(join(portsDir, '3100'))
+    expect((await service.build()).repos[0]!.agents).toEqual([])
   })
 
   test('a transcript deleted after a build drops off the Board', async () => {

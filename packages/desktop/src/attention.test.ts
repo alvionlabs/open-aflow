@@ -166,6 +166,19 @@ describe('attention items', () => {
     expect(idsOf(undefined)).toEqual(['chess\nfix-merged:36'])
   })
 
+  test('a key the toggle already sent raises nothing, also past the 30 minutes', () => {
+    const repoAt = (ago: number) => chess([onlyQueue()], { claims: [fixClaim], agents: [fixEngineer, fixReviewer], prs: [gh(36, 'merged', { branch: FIX, mergedAt: NOW - ago * MIN })] })
+    const idsOf = (ago: number, lastKey?: string) =>
+      attentionItems(boardOf([repoAt(ago)], { autoContinue: [{ repoId: 'chess', run: FIX, ...(lastKey === undefined ? {} : { lastKey }) }] }), NOW).map((i) => i.id)
+    expect(idsOf(45, 'fix-merged:36')).toEqual([])
+    expect(idsOf(3 * 24 * 60, 'fix-merged:36')).toEqual([])
+    // Another stop's key doesn't count, and neither does another run's.
+    expect(idsOf(45, 'fix-merged:99')).toEqual(['chess\nfix-merged:36'])
+    expect(idsOf(45)).toEqual(['chess\nfix-merged:36'])
+    const other = attentionItems(boardOf([repoAt(45)], { autoContinue: [{ repoId: 'chess', run: 'fix-other', lastKey: 'fix-merged:36' }] }), NOW)
+    expect(other.map((i) => i.id)).toEqual(['chess\nfix-merged:36'])
+  })
+
   test('a bad repo is quiet', () => {
     const good = chess([manual, onlyQueue(BLOCKED)], { id: 'good', path: '/g' })
     const error = chess([manual, onlyQueue(BLOCKED)], { error: 'cannot read repo' })

@@ -61,6 +61,45 @@ describe('the home folder', () => {
     }
   })
 
+  test('every sign a folder name can hold makes it another folder', () => {
+    for (const other of ['Name+old\\x', 'Name@work\\x', 'Name(2)\\x', 'Name#b\\x', "Name'b\\x", 'Name&b\\x', 'Name=b\\x', 'Name!b\\x', 'Name[2]\\x', 'Name~1\\x', 'Name$b\\x', 'Name%b\\x']) {
+      expect(line(`C:\\Users\\${other}`), other).toBe(`C:\\Users\\${other}`)
+    }
+  })
+
+  test('a space always swaps: prose and a folder with a space can not be told apart, and a wrong swap only mislabels', () => {
+    expect(line('in C:\\Users\\Name and more')).toBe('in ~ and more')
+    expect(line('C:\\Users\\Name Smith\\x')).toBe('~ Smith\\x')
+  })
+
+  test('punctuation that ends a path in prose or a list swaps', () => {
+    expect(line('(C:\\Users\\Name)')).toBe('(~)')
+    expect(line('see C:\\Users\\Name).')).toBe('see ~).')
+    expect(line('C:\\Users\\Name;C:\\x')).toBe('~;C:\\x')
+    expect(line('C:\\Users\\Name,C:\\x')).toBe('~,C:\\x')
+    expect(line('C:\\Users\\Name:12:3')).toBe('~:12:3')
+  })
+
+  test('a URL-encoded home swaps, as in a stack frame', () => {
+    const smith = 'C:\\Users\\John Smith'
+    const jose = 'C:\\Users\\Jos\u00e9'
+    expect(logLines(['at file:///C:/Users/John%20Smith/app/a.mjs:1:2'], smith)).toEqual(['at file:///~/app/a.mjs:1:2'])
+    expect(logLines(['at file:///C:/Users/Jos%C3%A9/x'], jose)).toEqual(['at file:///~/x'])
+    expect(logLines(['at file:///c:/users/jos%c3%a9/x'], jose)).toEqual(['at file:///~/x'])
+    expect(logLines(['at file:///C:/Users/JOS%C3%89/x'], jose)).toEqual(['at file:///~/x'])
+    // A sign pathToFileURL leaves plain, and the same sign encoded.
+    expect(logLines(['file:///C:/Users/a+b/x file:///C:/Users/a%2Bb/x'], 'C:\\Users\\a+b')).toEqual(['file:///~/x file:///~/x'])
+    expect(logLines(['file:///C:/Users/100%25/x'], 'C:\\Users\\100%')).toEqual(['file:///~/x'])
+    // The plain spelling of the same home still swaps.
+    expect(logLines(['C:\\Users\\John Smith\\x'], smith)).toEqual(['~\\x'])
+  })
+
+  test('an encoded folder that only starts with the same letters stays', () => {
+    expect(line('file:///C:/Users/Name%20Smith/x')).toBe('file:///C:/Users/Name%20Smith/x')
+    expect(line('file:///C:/Users/Nam%C3%A9/x')).toBe('file:///C:/Users/Nam%C3%A9/x')
+    expect(logLines(['file:///C:/Users/Jos%C3%A9/x'], 'C:\\Users\\Jos')).toEqual(['file:///C:/Users/Jos%C3%A9/x'])
+  })
+
   test('a name with signs in it is read as plain text', () => {
     expect(logLines(['C:\\Users\\a.b (c)+\\x', 'C:\\Users\\aXb (c)+\\x'], 'C:\\Users\\a.b (c)+')[0]).toBe('~\\x C:\\Users\\aXb (c)+\\x')
   })

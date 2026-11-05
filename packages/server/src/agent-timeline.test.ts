@@ -1,6 +1,6 @@
-import { appendFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { Board } from '@pod-board/model'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createTimelineSource } from './agent-timeline.ts'
@@ -56,6 +56,19 @@ async function setup(): Promise<{ board: Board; source: ReturnType<typeof create
 }
 
 describe('timeline source', () => {
+  test("reads a claimed fix run's agent past the transcript window", async () => {
+    const file = join(subagents(), 'agent-eng1.jsonl')
+    await mkdir(subagents(), { recursive: true })
+    await writeFile(join(subagents(), 'agent-eng1.meta.json'), JSON.stringify({ agentType: 'pod:engineer', description: 'Build' }))
+    await writeFile(file, line({ type: 'user', timestamp: ts(0), message: { role: 'user', content: '- **branch name:** fix-old\n' } }) + toolUse(1, 't1', 'Read', { file_path: join(repo, 'a.ts') }))
+    await writeFile(join(root, 'ports', '3100'), `${repo} fix-old\n`)
+    const old = new Date(NOW - 40 * 24 * 60 * 60_000)
+    await utimes(subagents(), old, old)
+    await utimes(dirname(subagents()), old, old)
+    const { board, source } = await setup()
+    expect(await source.timeline(board.repos[0]!.id, 'eng1')).toMatchObject({ agentId: 'eng1', total: 1 })
+  })
+
   test('finds only board agents', async () => {
     const file = await transcript('eng1', 'pod:engineer', toolUse(1, 't1', 'Read', { file_path: join(repo, 'src', 'a.ts') }))
     await transcript('other', 'general-purpose', toolUse(1, 't1', 'Read', { file_path: 'x' }))
