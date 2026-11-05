@@ -39,6 +39,7 @@ flowchart TD
 
 ## Watch out
 
+- **Start the app's exe with `windowsHide: false` in a proof.** `windowsHide` starts it with SW_HIDE, and Windows applies that to the first `ShowWindow`, so the window never shows on a sound app. The exe has no console, so nothing extra opens. `hidden-processes.test.ts` allows this only in the files it names. After a failed `installed app runs`, the next tests fail too: that test throws before it stops the app, so the app keeps the lock and later launches exit at once.
 - **Quit and update must never tree-kill.** electron-builder 26.18.1 uses `Stop-Process -Id` or `taskkill /IM`. `build-config.test.ts` fails if a bump adds `taskkill /T`.
 - **The workflow has never run on GitHub.** Its launch check on `windows-latest`, `gh release create`, and the GitHub provider are unproved.
 - **Open queue item (now):** the updater starts after the first server ready, so a build whose server can't start on one machine can't update itself out.
@@ -69,3 +70,4 @@ To pull a bad release, delete it on the Releases page, then tag a higher version
 - 2026-11-03 · installer-and-updates R1 · the release workflow, its local check, and the install note · [PR #82](https://github.com/iamphduc/pod-board/pull/82)
 - 2026-11-03 · windows-app · final PR #83, verdict fix at round 2 · [report](../reports/windows-app.html)
 - 2026-11-04 · fix-late-merge-continue · a normal install opens the app. A silent install still stays closed.
+- 2026-11-04 · fix-late-merge-continue · fixed: `proof-install` failed its window check since 2026-11-03 (`b32d1a2`), when `windowsHide: true` reached the proof's app start. A login start's no-window check also meant nothing while that flag was on.
