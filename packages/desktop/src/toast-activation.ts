@@ -10,8 +10,9 @@ export type ShortcutRead = { target: string; toastActivatorClsid?: string }
 
 const escapeXml = (text: string) =>
   text
-    // XML can't hold these, and one makes Windows refuse the whole toast. Tab and newline stay.
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
+    // XML can't hold these, and one makes Windows refuse the whole toast. Tab, newline, and CR stay. With the `u` flag
+    // a surrogate pair is one character, so an emoji stays, and only a surrogate with no partner matches.
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff￾￿]/gu, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
