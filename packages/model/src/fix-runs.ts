@@ -96,9 +96,15 @@ function matchFixAgents(repo: BoardRepo, name: string): { engineers: AgentRun[];
   }
 }
 
-/** Listed while its claim exists, unless its PR merged and none of its agents wrote in the last STALE_MS (a leftover claim). */
+/**
+ * Listed while its claim exists. Once its PR merged, a claim means cleanup hasn't run, so the run stays
+ * for STALE_MS after the merge, however long the agents were quiet before it, and while an agent wrote
+ * in the last STALE_MS. After both it is a leftover claim. With no merge time it stays: a hidden run
+ * can't be cleaned up, and a listed one can.
+ */
 function isListed(repo: BoardRepo, name: string, agents: FixAgent[], now: number): boolean {
-  if (fixPr(repo, name)?.state !== 'merged') return true
+  const pr = fixPr(repo, name)
+  if (pr?.state !== 'merged' || pr.mergedAt === undefined || now - pr.mergedAt < STALE_MS) return true
   return agents.some(({ a }) => a.lastAt !== undefined && now - a.lastAt < STALE_MS)
 }
 
