@@ -69,6 +69,8 @@ const removeWithRetry = async (path: string) => {
     }
   }
 }
+const POWERSHELL = join(WINDIR, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+const mainWindow = (pid: number) => spawnSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', `(Get-Process -Id ${pid}).MainWindowHandle`], { encoding: 'utf8', windowsHide: true }).stdout.trim()
 const INSTALLED_LNK = join(START_MENU, 'Pod Board.lnk')
 const DEV_LNK = join(START_MENU, 'Electron.lnk')
 const stamp = (file: string) => (existsSync(file) ? statSync(file).mtimeMs : 'none')
@@ -146,6 +148,10 @@ describe.runIf(process.env.POD_BOARD_REAL_ELECTRON === '1' && process.platform =
     try {
       await until('ready', () => (status()?.readyPorts.length ?? 0) >= 1 && status()?.clsid !== undefined, BOOT_MS, details)
       clsid = status()!.clsid!
+
+      // An activator registered at the start must leave the normal start alone: the window comes up.
+      const pid = shell.pid!
+      await until('the window', () => !['', '0'].includes(mainWindow(pid)), 30_000, details)
 
       // No toast ever showed in this run, as after a restart with old toasts still in the center.
       expect(await activate(clsid, 'pod-board-toast:#/repo%20x/fix-a')).toBe(0)

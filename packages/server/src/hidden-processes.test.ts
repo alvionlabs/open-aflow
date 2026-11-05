@@ -16,6 +16,12 @@ const CALL_MAX = 1500
 /** Options built just above the call, each with `windowsHide` in the file: the call only spreads them. */
 const SPREADS = ['...opts', '...options']
 
+/**
+ * Files that start the app's own windowed exe. It has no console to open, and `windowsHide` starts it with SW_HIDE,
+ * which Windows applies to its first ShowWindow: the window never shows. Only here may a call say `windowsHide: false`.
+ */
+const WINDOWED = ['packages/desktop/src/install-check.ts', 'packages/desktop/src/real-toast.test.ts']
+
 /** The names a file imports from `child_process`, in an import line or a helper's text. */
 function startNames(text: string): string[] {
   const names = new Set<string>()
@@ -29,7 +35,7 @@ function startNames(text: string): string[] {
 }
 
 /** Each call with no `windowsHide`, as `name at line N`. Brackets count from the call's own `(`. */
-function unhiddenStarts(text: string): string[] {
+function unhiddenStarts(text: string, windowed = false): string[] {
   const out: string[] = []
   const names = startNames(text)
   if (names.length === 0) return out
@@ -43,7 +49,7 @@ function unhiddenStarts(text: string): string[] {
       end++
     }
     const call = text.slice(start, end)
-    const hidden = depth === 0 && (call.includes('windowsHide: true') || (SPREADS.some((s) => call.includes(s)) && text.includes('windowsHide: true')))
+    const hidden = depth === 0 && (call.includes('windowsHide: true') || (windowed && call.includes('windowsHide: false')) || (SPREADS.some((s) => call.includes(s)) && text.includes('windowsHide: true')))
     if (!hidden) out.push(`${m[1]} at line ${text.slice(0, m.index).split('\n').length}`)
   }
   return out
@@ -70,12 +76,25 @@ describe('every process start hides its window', () => {
     expect(unhiddenStarts(`${head}spawn('(', { windowsHide: true })`)).toEqual(['spawn at line 2'])
     // A helper script a test writes, as text, is read the same way.
     expect(unhiddenStarts(`"import { spawn } from 'node:child_process'",\n"const c = spawn(a, [b], { env })"`)).toEqual(['spawn at line 2'])
+    // `windowsHide: false` counts only in a file that starts the app's own exe.
+    expect(unhiddenStarts(`${head}spawn(a, [b], { windowsHide: false })`)).toEqual(['spawn at line 2'])
+    expect(unhiddenStarts(`${head}spawn(a, [b], { windowsHide: false })`, true)).toEqual([])
+    expect(unhiddenStarts(`${head}spawn(a, [b])`, true)).toEqual(['spawn at line 2'])
   })
 
   test('none in the server or the desktop shell, or in their tests and scripts', () => {
     const found = FOLDERS.flatMap((f) => sources(join(ROOT, f)))
       .filter((path) => !path.endsWith('hidden-processes.test.ts'))
-      .flatMap((path) => unhiddenStarts(readFileSync(path, 'utf8')).map((hit) => `${relative(ROOT, path).replaceAll('\\', '/')}: ${hit}`))
+      .flatMap((path) => {
+        const name = relative(ROOT, path).replaceAll('\\', '/')
+        return unhiddenStarts(readFileSync(path, 'utf8'), WINDOWED.includes(name)).map((hit) => `${name}: ${hit}`)
+      })
     expect(found).toEqual([])
+  })
+
+  test("the install proof starts the app's exe with its window able to show", () => {
+    // Hidden, the proof's window check times out on a sound app, and its check that a login start shows no window means nothing.
+    const text = readFileSync(join(ROOT, 'packages/desktop/src/install-check.ts'), 'utf8')
+    expect(text).toMatch(/spawn\(join\(place\.installDir, EXE_NAME\), args, \{[^}]*windowsHide: false[^}]*\}\)/)
   })
 })
