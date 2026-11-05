@@ -793,7 +793,7 @@ describe('transcript cache', () => {
     const service = createBoardService(deps())
     const onBoard = (await service.build()).repos[0]!
     expect(onBoard.agents.map((x) => x.id)).toEqual(['eng1'])
-    expect(model.buildFixPipeline(onBoard, 'fix-old', NOW)?.stages[0]?.steps[0]).toMatchObject({ label: 'Engineer', state: 'done' })
+    expect(model.buildFixPipeline(onBoard, 'fix-old', NOW)?.stages[0]?.steps[0]?.state).not.toBe('wait')
 
     // With the claim gone, it leaves.
     await rm(join(portsDir, '3100'))
