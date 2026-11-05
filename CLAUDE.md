@@ -16,4 +16,4 @@ Read `DESIGN.md` before any UI change. It holds all design rules.
 ## Desktop app and browser version
 
 - Users run the desktop app (`packages/desktop`). You can't see its window.
-- To see and test the UI, run the browser version: `pnpm dev` against the mock repo as above, or `pnpm start` after `pnpm build`.
+- To see and test the UI, run the browser version: `pnpm dev` against the mock repo as above, or `pnpm start` after `pnpm build`. `pnpm start` also needs the mock's `POD_BOARD_CONFIG_DIR`, `POD_BOARD_PORTS_DIR`, and `POD_BOARD_CLAUDE_DIR` from the block above, and its own `POD_BOARD_API_PORT`. Without them it uses the user's real config folder.
