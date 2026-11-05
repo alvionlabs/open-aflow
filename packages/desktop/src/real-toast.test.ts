@@ -140,7 +140,8 @@ describe.runIf(process.env.POD_BOARD_REAL_ELECTRON === '1' && process.platform =
         POD_BOARD_PROBE_QUIT: join(tmp, 'quit'),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
+      // Not hidden: SW_HIDE would swallow the window's first show.
+      windowsHide: false,
     })
     shell.stdout!.on('data', (d) => (text += String(d)))
     shell.stderr!.on('data', (d) => (text += String(d)))
