@@ -2,7 +2,7 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -171,6 +171,9 @@ describe.runIf(process.env.POD_BOARD_REAL_ELECTRON === '1' && process.platform =
       const log = readFileSync(join(data, LOG_FILE), 'utf8')
       expect(log).toContain('pod-board API listening on http://127.0.0.1:')
       expect(log).not.toMatch(/token/i)
+      // Its config line names a temp folder under the home folder.
+      expect(log).toMatch(/pod-board config: ~[\\/]/)
+      expect(log.toLowerCase()).not.toContain(homedir().toLowerCase())
       // A dev run never touches a real install's shortcut, which holds its activator.
       expect(stamp(INSTALLED_LNK)).toBe(installedBefore)
     } finally {

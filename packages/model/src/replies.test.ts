@@ -224,12 +224,12 @@ describe('runReplies', () => {
     expect(fix({ agents: [eng, { ...rev, lastAt: NOW - 5 * MIN }], prs: [merged] })).toEqual([
       { reply: 'continue', signal: 'fix-merged', why: 'PR #36 merged.', pr: 36, key: 'fix-merged:36' },
     ])
-    // Merged 45 minutes ago and stale: a leftover claim, the run isn't listed, so nothing.
-    expect(fix({ agents: [eng, rev], prs: [merged] })).toEqual([])
-    // Merged long after the last write: still continue.
+    // Merged 45 minutes ago with quiet agents: the claim still stands, so continue.
     const fixMerged = [{ reply: 'continue', signal: 'fix-merged', why: 'PR #36 merged.', pr: 36, key: 'fix-merged:36' }]
+    expect(fix({ agents: [eng, rev], prs: [merged] })).toEqual(fixMerged)
+    // Merged long after the last write: continue.
     expect(fix({ agents: [eng, rev], prs: [{ ...merged, mergedAt: NOW - MIN }] })).toEqual(fixMerged)
-    // No merge time from gh: the run stays listed, so continue.
+    // No merge time from gh: continue.
     expect(fix({ agents: [eng, rev], prs: [gh(36, 'merged', { branch: name })] })).toEqual(fixMerged)
     // A running fix agent: nothing.
     expect(fix({ agents: [eng, rev, running({ branch: name })], prs: [open] })).toEqual([])

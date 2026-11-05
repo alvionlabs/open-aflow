@@ -150,8 +150,20 @@ describe('attention items', () => {
     const late = { ...fixReviewer, lastAt: NOW - 44 * MIN }
     const repoAt = (ago: number) => chess([onlyQueue()], { claims: [fixClaim], agents: [fixEngineer, late], prs: [gh(36, 'merged', { branch: FIX, mergedAt: NOW - ago * MIN })] })
     expect(items(repoAt(1))).toMatchObject([{ id: 'chess\nfix-merged:36', hash: `#/chess/${FIX}` }])
-    // A leftover claim, 30 minutes after the merge, raises nothing.
-    expect(items(repoAt(30))).toEqual([])
+    // However old the merge, while the claim stands.
+    expect(items(repoAt(3 * 24 * 60))).toMatchObject([{ id: 'chess\nfix-merged:36' }])
+  })
+
+  test('on a toggled fix run, only a merge the board will send for stays quiet', () => {
+    const repoAt = (mergedAt: number | undefined) =>
+      chess([onlyQueue()], { claims: [fixClaim], agents: [fixEngineer, fixReviewer], prs: [gh(36, 'merged', { branch: FIX, ...(mergedAt === undefined ? {} : { mergedAt }) })] })
+    const on = { autoContinue: [{ repoId: 'chess', run: FIX }] }
+    const idsOf = (mergedAt: number | undefined) => attentionItems(boardOf([repoAt(mergedAt)], on), NOW).map((i) => i.id)
+    // Auto-continue sends this one by itself.
+    expect(idsOf(NOW - MIN)).toEqual([])
+    // It won't send these, so they wait on you.
+    expect(idsOf(NOW - 45 * MIN)).toEqual(['chess\nfix-merged:36'])
+    expect(idsOf(undefined)).toEqual(['chess\nfix-merged:36'])
   })
 
   test('a bad repo is quiet', () => {

@@ -43,6 +43,9 @@ export function sendableReply(repo: BoardRepo, run: string, word: 'continue' | '
   return sendableFrom(runReplies(repo, run, now), word)
 }
 
+/** Stub, replaced in the next commit. */
+export const autoMaySend = (_repo: BoardRepo, _reply: RunReply, _now: number): boolean => true
+
 /**
  * The `continue` sends due now: for each toggle, in order, its repo on the Board, a sendable
  * `continue` whose key isn't the toggle's `lastKey`, a session with a safe id, and that session idle.
