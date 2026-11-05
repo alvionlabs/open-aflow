@@ -184,6 +184,18 @@ describe('fix runs on the runs list', () => {
       expect(buildFixPipeline(open, 'fix-scroll', NOW)!.stages[0]!.steps[0]).toMatchObject({ state: 'wait', detail: 'not started' })
     })
 
+    it('a run with an agent on the Board never reads a step as run with no transcript', () => {
+      const steps = (agents: AgentRun[]) => buildFixPipeline(repo({ claims: [claim('fix-scroll')], agents, prs: [mergedPr(36, 5)] }), 'fix-scroll', NOW)!.stages.flatMap((s) => s.steps)
+      const round1 = (agents: AgentRun[]) => steps(agents).find((s) => s.key === 'round-1')
+      const waiting = { state: 'wait', detail: 'not started' }
+      // fix-live: its engineer is running.
+      expect(round1([engineer('fix-scroll', 10, 1)])).toMatchObject(waiting)
+      // fix-noreview: its engineer ended 10 minutes ago, with no reviewer.
+      expect(round1([engineer('fix-scroll', 60, 10, { ended: true })])).toMatchObject(waiting)
+      // A reviewer with no engineer on the Board leaves the engineer not started too.
+      expect(steps([reviewer(30, 10, { ended: true })]).find((s) => s.key === 'engineer')).toMatchObject(waiting)
+    })
+
     it('an old merge still offers Continue', () => {
       const r = repo({ claims: [claim('fix-scroll')], agents: old, prs: [mergedPr(36, 3 * 24 * 60)] })
       expect(runReplies(r, 'fix-scroll', NOW).map((x) => x.key)).toEqual(['fix-merged:36'])
