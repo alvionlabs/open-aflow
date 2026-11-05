@@ -6,7 +6,7 @@ The API server (`packages/server`) finds the repos to show, reads their pod docs
 
 ## How it works
 
-- **Old sessions:** agents come only from sessions changed in the last 30 days (`POD_BOARD_TRANSCRIPT_DAYS`), with no exception for a claim. So a claimed run keeps Continue while its session is inside the 30-day transcript window. Past it, a merged fix run stays listed, its Engineer and Round 1 read `done` with `no transcript`, and it offers Copy with no Continue.
+- **Old sessions:** agents come only from sessions changed in the last 30 days (`POD_BOARD_TRANSCRIPT_DAYS`), with no exception for a claim. So a claimed run keeps Continue while its session is inside the 30-day transcript window. Past that window, a merged fix run with no agent on the Board stays listed, its Engineer and Round 1 read `done` with `no transcript`, and it offers Copy with no Continue.
 - **Repos:** paths in the config file plus every repo a claim file names, merged by normalized path (case-blind where the file system is). `source` is `registered`, `claim`, or `both`.
 - **Each repo:** pod docs → the model (a doc whose real path leaves the repo's real path is skipped); recent pod-agent transcripts → parsed runs through a cache keyed by size and mtime, never text; PRs from a `gh` cache refreshed every 30 s (a head branch with no open PR after 240 asks, which is 2 hours at that rate: every 5 minutes). One bad repo sets its `error`; the others still build.
 - **`gh`:** run by the absolute path of the first `gh.exe` / `gh.com` (`gh` on POSIX) in an absolute `PATH` entry; asked only about live PRs (current-sprint PRs, hand-back PRs, a fix claim's or a plan's PR by head branch).
