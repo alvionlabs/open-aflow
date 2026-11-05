@@ -239,3 +239,8 @@ Answering a plan's `BLOCKED` raises its `Send continue` reply at once, so the tr
 
 ## 2026-11-03 — pod in the setup check (agent default — override anytime)
 The setup check looks for `git`, `gh`, and `claude`. The install note and the no-runs states name pod and its install step. Value in use: no setup row for pod.
+
+## 2026-11-04 — Start at login leaves the tray menu (human decision)
+Context: the tray menu held Open, Start at login, and Quit, and the human's install test found its labels looked misaligned.
+Decision: the human's decision: the tray menu is Open and Quit. Start at login has no point in the tray, and it belongs on a settings page. That page comes later, and isn't part of this change.
+Consequences: until that page exists, nothing in the app turns the login item on or off. `createLoginItem` stays for the page. A login item from an earlier version still starts the app in the tray, and only Windows' startup settings or an uninstall removes it.

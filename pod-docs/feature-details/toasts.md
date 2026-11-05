@@ -83,7 +83,7 @@ flowchart TD
 2. Hide the window. Add a second such line, and click its banner while it shows. The window opens on that run.
 3. Hide the window. Add a third line, and wait for its banner to leave the screen. Click it in the notification center. The window opens on that run.
 4. Quit from the tray. Click the toast from step 3 in the notification center. The app starts and opens on that run. If nothing opens, read `%APPDATA%\Pod Board\desktop.log`.
-5. Right-click the tray icon. Open, `Start at login: Off`, and Quit line up. Pick Start at login, and open the menu again: it reads `Start at login: On`, and the labels still line up. Sign out and in. The tray icon shows, and no window opens.
+5. Right-click the tray icon. The menu holds Open and Quit, and their labels line up.
 6. The taskbar and `Pod Board.exe` show the app icon.
 7. A normal install opened the app by itself. Run the same installer again with the app open: one copy of the app runs after it ends.
 

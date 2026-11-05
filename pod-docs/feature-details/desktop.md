@@ -13,7 +13,8 @@
 - **Port and token.** The shell sets no port and never holds the token. It reads the port from the server's ready message, and the page gets the token from the server.
 - **Server host.** One restart after a failure. A failure is an exit outside a stop, a `fork` that throws, or no ready in 60 s. A second failure shows a native error box and quits. 60 s of ready earns the restart back. A new port fires `onReady` again, and the window and notifier move.
 - **Window.** The normal Windows frame, no app menu, no preload, the page isolated. Close hides it. Off-origin `http` and `https` links open in the system browser, and anything else opens nothing. A `--hidden` start shows only the tray.
-- **Tray.** Open, `Start at login: On` or `Off`, Quit. All three are plain rows, because a checkbox row adds an empty check gutter to the menu. The dot comes from `bus.onAttention`. The app writes the login item only on the toggle, so it stays off by default.
+- **Tray.** Open and Quit. The dot comes from `bus.onAttention`.
+- **Login item.** No part of the app turns it on today: it moves to a settings page ([decision](../decisions.md#2026-11-04--start-at-login-leaves-the-tray-menu-human-decision)). `createLoginItem` stays for that page. A login item from an earlier version still starts the app with `--hidden`, in the tray with no window. Uninstall still removes it.
 
 ```mermaid
 sequenceDiagram
@@ -73,3 +74,4 @@ sequenceDiagram
 - 2026-11-03 · installer-and-updates U1: auto-update, the test feed, the local two-version proof, and the first release hand-off.
 - 2026-11-03 · windows-app · final PR #83, verdict fix at round 2; the installer and updates moved to their own file · [report](../reports/windows-app.html)
 - 2026-11-04 · fix-late-merge-continue · the shell saves its log lines and the server's to `desktop.log`. The tray shows Start at login's state in words.
+- 2026-11-04 · fix-late-merge-continue · the human's decision: Start at login leaves the tray menu, which is now Open and Quit.
