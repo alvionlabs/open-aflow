@@ -10,6 +10,7 @@ import { createServerHost, type ServerHost } from './server-host.ts'
 import { serverEntry, serverEnv } from './server-launch.ts'
 import { createShellBus, type ShellBus } from './shell-bus.ts'
 import { APP_ID, APP_NAME, dataDirOverride } from './shell-config.ts'
+import { createLogFile, LOG_FILE, nodeLogFs, teeConsole } from './shell-log.ts'
 import { applyTestEnv, TEST_ENV_FILE } from './update-feed.ts'
 import { startUpdater } from './updater-main.ts'
 import { startWindow } from './window-main.ts'
@@ -17,13 +18,21 @@ import { startWindow } from './window-main.ts'
 /** `pnpm package --test-feed` sets this. In every other build the test feed's code is removed. */
 declare const __POD_BOARD_TEST_FEED__: boolean
 
-export type ShellContext = { host: ServerHost; bus: ShellBus; env: NodeJS.ProcessEnv }
+export type ShellContext = {
+  host: ServerHost
+  bus: ShellBus
+  env: NodeJS.ProcessEnv
+  /** Registers the toast activator at the start. Electron then writes a Start-menu shortcut, so a dev run doesn't. */
+  activatorAtStart: boolean
+}
 
 export type ShellOptions = {
   env: NodeJS.ProcessEnv
   /** The probe runs from a temp folder, so it names the package. Default: `app.getAppPath()`. */
   appPath?: string | undefined
   onServer?(pid: number): void
+  /** Default: only a packaged app. The real toast test turns it on and removes what it leaves. */
+  activatorAtStart?: boolean
   /** In place of the error box, which waits for a click. The app quits after either. */
   onFailed?(error: string): void
 }
@@ -46,6 +55,9 @@ export function startShell(o: ShellOptions): ShellContext | undefined {
     return undefined
   }
 
+  // After the lock, so one file has one writer.
+  teeConsole(console, createLogFile({ file: join(app.getPath('userData'), LOG_FILE), fs: nodeLogFs, now: () => new Date() }))
+
   Menu.setApplicationMenu(null)
   // With this listener, the app stays alive with no window.
   app.on('window-all-closed', () => {})
@@ -55,7 +67,7 @@ export function startShell(o: ShellOptions): ShellContext | undefined {
     fork: () => forkServer({ entry, env: serverEnv(o.env, process.pid), onSpawn: o.onServer }),
   })
   const bus = createShellBus()
-  const ctx: ShellContext = { host, bus, env: o.env }
+  const ctx: ShellContext = { host, bus, env: o.env, activatorAtStart: o.activatorAtStart ?? app.isPackaged }
 
   const flow = createQuitFlow({
     stop: () => host.stop(),
