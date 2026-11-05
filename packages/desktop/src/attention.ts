@@ -2,7 +2,7 @@
 // web page's: the Next step card and its rest, cut to three tiers. Pure. The rules are in
 // pod-docs/feature-details/toasts.md.
 
-import { listRuns, runReplies, type Board, type RunReply, type RunSummary } from '@pod-board/model'
+import { autoMaySend, listRuns, runReplies, type Board, type BoardRepo, type RunReply, type RunSummary } from '@pod-board/model'
 import { nextSteps, type NextItem } from '@pod-board/web/next-step'
 import { runName } from '@pod-board/web/plan-view'
 import { hashFor } from '@pod-board/web/selection'
@@ -34,7 +34,7 @@ export function attentionItems(board: Board, now: number): AttentionItem[] {
     if (!repo || !steps) continue
     const found = [steps.card, ...steps.rest].filter(isAttention)
     for (const item of found) {
-      const key = item.action.kind === 'reply' ? replyKey(board, item, found, runReplies(repo, item.action.panel.target.run, now)[0]) : item.key
+      const key = item.action.kind === 'reply' ? replyKey(board, repo, item, found, runReplies(repo, item.action.panel.target.run, now)[0], now) : item.key
       if (key === undefined) continue
       const id = `${repo.id}\n${key}`
       if (!items.has(id)) items.set(id, { id, tier: item.tier, run: runName(run, repo), title: item.title, hash: hashFor(run) })
@@ -45,13 +45,13 @@ export function attentionItems(board: Board, now: number): AttentionItem[] {
 
 /**
  * The reply's own stop key, or undefined when it isn't an item of its own: the reply that follows a
- * merge the run already lists, or a `continue` the board sends by itself on a toggled run.
+ * merge the run already lists, or a `continue` the board sends by itself on a toggled run. It won't send an old `fix-merged`, so that stays an item.
  */
-function replyKey(board: Board, item: NextItem, found: NextItem[], stop: RunReply | undefined): string | undefined {
+function replyKey(board: Board, repo: BoardRepo, item: NextItem, found: NextItem[], stop: RunReply | undefined, now: number): string | undefined {
   if (item.action.kind !== 'reply' || !stop) return undefined
   if (found.some((other) => other.action.kind === 'merge' && other.action.number === stop.pr)) return undefined
   const { target, rows } = item.action.panel
   const toggled = board.autoContinue?.some((t) => t.repoId === target.repoId && t.run === target.run) === true
-  if (toggled && rows.some((r) => r.send === 'continue')) return undefined
+  if (toggled && rows.some((r) => r.send === 'continue') && autoMaySend(repo, stop, now)) return undefined
   return stop.key
 }

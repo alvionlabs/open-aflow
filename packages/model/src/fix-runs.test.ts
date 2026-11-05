@@ -382,7 +382,7 @@ describe('otherActivity', () => {
     ])
   })
 
-  it('leaves out agents of any plan in the repo and of a listed fix run', () => {
+  it('leaves out agents of any plan in the repo and of a fix run', () => {
     const agents = [
       engineer('one-A1', 10, 1, { sprint: 'one', slice: 'A1' }),
       agent({ type: 'pod:reporter', plan: 'alpha', ...span(10, 1) }),
@@ -393,7 +393,7 @@ describe('otherActivity', () => {
     expect(of(repo({ agents, claims: [claim('fix-scroll')] }, withPlan('alpha')))).toEqual([['researcher', undefined, 'running']])
   })
 
-  it('an unlisted fix run’s agents (its claim gone) are other activity, with their branch', () => {
+  it('a fix run’s agents with its claim gone are other activity, with their branch', () => {
     expect(of(repo({ agents: [engineer('fix-scroll', 10, 2, { ended: true })] }))).toEqual([['engineer', 'fix-scroll', 'ended']])
   })
 
