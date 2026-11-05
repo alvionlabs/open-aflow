@@ -25,6 +25,27 @@ describe('toast xml', () => {
   })
 })
 
+describe('characters Windows refuses in a toast', () => {
+  test('U+FFFE and U+FFFF leave the text', () => {
+    expect(toastXml(toast({ title: 'a￾b', body: 'c￿d' }))).toContain('<text>ab</text><text>cd</text>')
+  })
+
+  test('a surrogate with no partner leaves the text, on either side', () => {
+    expect(toastXml(toast({ title: 'a\uD83Db', body: 'c\uDE00d' }))).toContain('<text>ab</text><text>cd</text>')
+    // Two in the wrong order are no pair, and one at the very end has nothing after it.
+    expect(toastXml(toast({ title: 'a\uDE00\uD83Db', body: 'c\uD83D' }))).toContain('<text>ab</text><text>c</text>')
+  })
+
+  test('the same characters leave the hash', () => {
+    const xml = toastXml(toast({ hash: '#/repo/￿fix\uD83D-a' }))
+    expect(hashFromActivation(unescape(launchOf(xml)!))).toBe('#/repo/fix-a')
+  })
+
+  test('an emoji, U+0085, tab, newline, and CR stay', () => {
+    expect(toastXml(toast({ title: 'ok \u{1F600} done', body: 'a\u0085b\tc\nd\re' }))).toContain('<text>ok \u{1F600} done</text><text>a\u0085b\tc\nd\re</text>')
+  })
+})
+
 describe('the run from an activation', () => {
   test.each([
     ['empty: a toast from a version before this one', ''],
