@@ -196,7 +196,7 @@ describe('runs.css main column and run cards', () => {
     for (const sel of ['.next-title', '.next-detail']) expect(styles.get(sel)?.['max-width'], sel).toBe('72ch')
     // The merge confirm lines up with the card above it; only its text stops near 72 characters.
     expect(styles.get('.merge-confirm')?.['max-width']).toBeUndefined()
-    for (const sel of ['.merge-head', '.merge-why', '.merge-error', '.merge-status']) expect(styles.get(sel)?.['max-width'], sel).toBe('72ch')
+    for (const sel of ['.merge-head', '.merge-why', '.merge-error', '.merge-status', '.merge-result']) expect(styles.get(sel)?.['max-width'], sel).toBe('72ch')
     // The wave board keeps the full width.
     expect(styles.get('.main.wide')?.['max-width']).toBe('none')
   })
