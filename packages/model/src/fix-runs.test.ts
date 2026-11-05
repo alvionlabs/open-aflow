@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { AgentRun, Board, BoardRepo, Claim, PrStatus } from './board.ts'
 import { buildFixPipeline, fixRunAgents, fixRunNames, otherActivity, OTHER_CAP, OTHER_WINDOW_MS } from './fix-runs.ts'
 import { roleOf } from './pipeline.ts'
+import { replySession, runReplies } from './replies.ts'
 import { buildRepoModel, type RepoFiles } from './run-model.ts'
 import { activeRuns, listRuns } from './runs.ts'
 
@@ -46,6 +47,8 @@ const reviewer = (from: number, to: number, over: Partial<AgentRun> = {}) =>
   agent({ type: 'pod:reviewer', kind: 'fix', branch: 'fix-scroll', ...span(from, to), ...over })
 
 const pr = (number: number, state: PrStatus['state'], branch = 'fix-scroll'): PrStatus => ({ number, state, checks: 'none', checkedAt: NOW, branch })
+/** A PR that merged `ago` minutes ago. */
+const mergedPr = (number: number, ago: number): PrStatus => ({ ...pr(number, 'merged'), mergedAt: NOW - ago * MIN })
 
 function repo(extra: Partial<BoardRepo> = {}, files: RepoFiles = NO_PLANS): BoardRepo {
   return { id: 'id-web', name: 'web', path: '/r/web', source: 'claim', model: buildRepoModel(files), agents: [], prs: [], claims: [], ...extra }
@@ -129,14 +132,81 @@ describe('fix runs on the runs list', () => {
     expect(rows(repo({ claims: [claim('fix-scroll')], agents }))).toEqual([['fix-scroll', 'scroll', 'build', 'idle']])
   })
 
-  it('a merged PR with no agent in the last 30 minutes is a leftover claim: the run drops off', () => {
-    const agents = [engineer('fix-scroll', 120, 40, { ended: true })]
-    expect(rows(repo({ claims: [claim('fix-scroll')], agents, prs: [pr(36, 'merged')] }))).toEqual([[undefined, undefined, 'no active plan', 'idle']])
-    // Within 30 minutes it stays, at PR.
-    const recent = [engineer('fix-scroll', 120, 10, { ended: true })]
-    expect(rows(repo({ claims: [claim('fix-scroll')], agents: recent, prs: [pr(36, 'merged')] }))).toEqual([['fix-scroll', 'scroll', 'PR', 'idle']])
-    // No agent at all and a merged PR: gone.
-    expect(rows(repo({ claims: [claim('fix-scroll')], prs: [pr(36, 'merged')] }))).toEqual([[undefined, undefined, 'no active plan', 'idle']])
+  it('the reviewer wrote at 3:17 PM and the human merged at 4:00 PM: the run stays, with Continue', () => {
+    // 43 minutes between the last write and the merge; the board reads it one minute later.
+    const agents = [engineer('fix-scroll', 120, 90, { ended: true, session: 's1' }), reviewer(80, 44, { ended: true, session: 's1' })]
+    const r = repo({ claims: [claim('fix-scroll')], agents, prs: [mergedPr(36, 1)] })
+    expect(rows(r)).toEqual([['fix-scroll', 'scroll', 'PR', 'idle']])
+    expect(runReplies(r, 'fix-scroll', NOW).map((x) => x.key)).toEqual(['fix-merged:36'])
+  })
+
+  describe('a merged PR: the claim stays listed until cleanup frees it', () => {
+    const old = [engineer('fix-scroll', 300, 240, { ended: true })]
+    const listed = [['fix-scroll', 'scroll', 'PR', 'idle']]
+    const at = (mergedAt: number | undefined, agents: AgentRun[] = old) =>
+      rows(repo({ claims: [claim('fix-scroll')], agents, prs: [{ ...pr(36, 'merged'), ...(mergedAt === undefined ? {} : { mergedAt }) }] }))
+
+    it('however long ago the merge was', () => {
+      for (const ago of [0, 30 * MIN - 1, 30 * MIN, 45 * MIN, 3 * 24 * 60 * MIN]) expect(at(NOW - ago), String(ago)).toEqual(listed)
+    })
+
+    it('a merge time ahead of the clock changes nothing', () => {
+      expect(at(NOW + 5 * MIN)).toEqual(listed)
+    })
+
+    it('with no agent, and with no merge time', () => {
+      expect(at(NOW - 45 * MIN, [])).toEqual(listed)
+      expect(at(undefined)).toEqual(listed)
+      expect(at(undefined, [])).toEqual(listed)
+    })
+
+    it('freeing the claim ends it', () => {
+      expect(rows(repo({ agents: old, prs: [mergedPr(36, 45)] }))).toEqual([[undefined, undefined, 'no active plan', 'idle']])
+    })
+
+    it('with its session past the transcript window: its steps read as run, and only Copy is left', () => {
+      const r = repo({ claims: [claim('fix-scroll')], prs: [mergedPr(36, 40 * 24 * 60)] })
+      const steps = buildFixPipeline(r, 'fix-scroll', NOW)!.stages.flatMap((s) => s.steps)
+      expect(steps.find((s) => s.key === 'engineer')).toMatchObject({ state: 'done', detail: 'no transcript' })
+      expect(steps.find((s) => s.key === 'round-1')).toMatchObject({ state: 'done', detail: 'no transcript' })
+      expect(steps.map((s) => s.detail)).not.toContain('not started')
+      expect(steps.find((s) => s.key === 'pr')).toMatchObject({ state: 'done', detail: 'PR #36 · merged' })
+      // Pod still waits for the word, so the card offers it to copy. With no session, nothing can send it.
+      expect(runReplies(r, 'fix-scroll', NOW).map((x) => x.key)).toEqual(['fix-merged:36'])
+      expect(replySession(r, 'fix-scroll', NOW)).toBeUndefined()
+    })
+
+    it('a step with an agent keeps its own figures, and an open PR still reads not started', () => {
+      const r = repo({ claims: [claim('fix-scroll')], agents: [engineer('fix-scroll', 60, 40, { ended: true })], prs: [mergedPr(36, 5)] })
+      const steps = buildFixPipeline(r, 'fix-scroll', NOW)!.stages.flatMap((s) => s.steps)
+      expect(steps.find((s) => s.key === 'engineer')?.detail).not.toBe('no transcript')
+      const open = repo({ claims: [claim('fix-scroll')], prs: [pr(36, 'open')] })
+      expect(buildFixPipeline(open, 'fix-scroll', NOW)!.stages[0]!.steps[0]).toMatchObject({ state: 'wait', detail: 'not started' })
+    })
+
+    it('a run with an agent on the Board never reads a step as run with no transcript', () => {
+      const steps = (agents: AgentRun[]) => buildFixPipeline(repo({ claims: [claim('fix-scroll')], agents, prs: [mergedPr(36, 5)] }), 'fix-scroll', NOW)!.stages.flatMap((s) => s.steps)
+      const round1 = (agents: AgentRun[]) => steps(agents).find((s) => s.key === 'round-1')
+      const waiting = { state: 'wait', detail: 'not started' }
+      // fix-live: its engineer is running.
+      expect(round1([engineer('fix-scroll', 10, 1)])).toMatchObject(waiting)
+      // fix-noreview: its engineer ended 10 minutes ago, with no reviewer.
+      expect(round1([engineer('fix-scroll', 60, 10, { ended: true })])).toMatchObject(waiting)
+      // A reviewer with no engineer on the Board leaves the engineer not started too.
+      expect(steps([reviewer(30, 10, { ended: true })]).find((s) => s.key === 'engineer')).toMatchObject(waiting)
+    })
+
+    it('an old merge still offers Continue', () => {
+      const r = repo({ claims: [claim('fix-scroll')], agents: old, prs: [mergedPr(36, 3 * 24 * 60)] })
+      expect(runReplies(r, 'fix-scroll', NOW).map((x) => x.key)).toEqual(['fix-merged:36'])
+    })
+
+    it('its agents stay out of Other activity while its claim exists, and join it once the claim goes', () => {
+      const late = [reviewer(80, 44, { ended: true })]
+      const others = (claims: Claim[]) => otherActivity(repo({ claims, agents: late, prs: [mergedPr(36, 45)] }), NOW).map((a) => a.role)
+      expect(others([claim('fix-scroll')])).toEqual([])
+      expect(others([])).toEqual(['reviewer'])
+    })
   })
 
   it('an open or closed PR keeps the claim listed however old its agents are', () => {
@@ -344,7 +414,7 @@ describe('otherActivity', () => {
     ])
   })
 
-  it('leaves out agents of any plan in the repo and of a listed fix run', () => {
+  it('leaves out agents of any plan in the repo and of a fix run', () => {
     const agents = [
       engineer('one-A1', 10, 1, { sprint: 'one', slice: 'A1' }),
       agent({ type: 'pod:reporter', plan: 'alpha', ...span(10, 1) }),
@@ -355,7 +425,7 @@ describe('otherActivity', () => {
     expect(of(repo({ agents, claims: [claim('fix-scroll')] }, withPlan('alpha')))).toEqual([['researcher', undefined, 'running']])
   })
 
-  it('an unlisted fix run’s agents (its claim gone) are other activity, with their branch', () => {
+  it('a fix run’s agents with its claim gone are other activity, with their branch', () => {
     expect(of(repo({ agents: [engineer('fix-scroll', 10, 2, { ended: true })] }))).toEqual([['engineer', 'fix-scroll', 'ended']])
   })
 

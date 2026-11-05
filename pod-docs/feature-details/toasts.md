@@ -9,7 +9,8 @@ The Electron shell's notifier reads the live Board in the main process, so it wo
 **Items.** For each run of `listRuns(board, now)`, take `card` plus `rest` of the web's `nextSteps`, and keep the tiers `blocked`, `merge`, and `reply`. `pending` and `info` never count. These cases give no item of their own:
 
 - a reply on a PR that is already a merge item of that run
-- a `continue` on a run with auto-continue on and a session, because the board sends it itself
+- a `continue` on a run with auto-continue on and a session, because the board sends it itself. An old `fix-merged` is an item, because the board won't send it (`autoMaySend`)
+- a `fix-merged` whose key the run's toggle already sent (`lastKey` on `Board.autoContinue`), by the board or by your press. The key is saved before the start, so **a failed send on a toggled run shows no toast or item**, and a send that started and then stalled has only its card. A fix for this is in the queue for its own PR
 - anything from a repo in `error` or `unsupported`
 
 **Identity.** `<repoId>\n<key>`, where the key is `entry:<line>`, `pr:<number>`, or the model's key for one stop. The seen set lasts the app run and only grows.
@@ -41,14 +42,17 @@ flowchart TD
 
 **The stream.** A `fetch` of `GET /api/events` on the shell's port. Bad JSON is skipped. A failed or closed stream retries after 5 s. 45 s with no bytes counts as lost. `host.onReady` moves it to a new port. The clock waits while the stream is lost.
 
-**A toast.** The title is the run's name, and the body is the item's title. A click calls `bus.showWindow(hashFor(run))`. Each send logs `pod-board desktop: toast sent`, with no entry text.
+**A toast.** The title is the run's name, and the body is the item's title. Each send logs `pod-board desktop: toast sent`, with no entry text.
+
+**A click.** The toast's XML (`toastXml`) has `launch="pod-board-toast:<hash>"`. A click on a live banner reaches the toast's `click` event and `Notification.handleActivation`. Both call `bus.showWindow(hash)`, which is safe to repeat. A click in the notification center reaches only `handleActivation`: Windows calls the activator (COM, by the CLSID on the Start-menu shortcut) with the `launch` text. A `launch` that isn't ours, such as on a toast from 0.1.0, opens the window on no run. A packaged app registers the activator at its start, with its own shortcut's CLSID (`activatorClsid`). So a click also works before this run's first toast, and on an app that isn't running: Windows starts it with `-Embedding`, which is a normal start.
 
 **Example.** The app starts offline, with a queue `BLOCKED` open and the staging branch's PR #901 open on GitHub. The first Board marks the `BLOCKED` seen, lights the dot, and notes the staging ask. No toast. `gh auth status` fails, so `gh` reads `logged-out`. At 8 s a slice's row becomes `#78 | pushed`: the docs name that merge, so one toast sends at once. An hour later `gh` comes back, and the first read finds #901: seen, no toast. Later a new `BLOCKED` line arrives: one toast, and one log line. A click opens that run. After the human answers it, the plan's `Send continue` reply appears and sends one more toast.
 
-**Logic lives in:** `packages/desktop/src/attention.ts`, `notifier.ts`, and `board-stream.ts`. The read marks are in `packages/server/src/gh.ts` and `board-service.ts`.
+**Logic lives in:** `packages/desktop/src/attention.ts`, `notifier.ts`, `board-stream.ts`, and `toast-activation.ts`. The read marks are in `packages/server/src/gh.ts` and `board-service.ts`.
 
 ## Why it's this way
 
+- **The run in the toast's `launch`, not a table in memory.** A toast outlives the app run, and a file of ids would need its own cleanup. Trade-off: the shell writes the toast's XML itself, so it must escape the text and drop what XML can't hold: control characters, U+FFFE, U+FFFF, and a surrogate with no partner. One of these makes Windows refuse the whole toast, and the log reads `toast sent`, then `toast failed`.
 - **One rule set.** `attention.ts` imports `nextSteps`, `hashFor`, and `runName` from `@pod-board/web`. Turned down: a copy of the rules. Trade-off: the web package exports three pure subpaths, and the shell must import only those.
 - **`fetch`, not `EventSource`.** The main process has no `EventSource`, and `/api/events` needs only a loopback `Host`. So the shell never holds the token.
 - **Only three tiers.** `pending` entries aren't urgent enough to interrupt. Trade-off: a pending decision never toasts.
@@ -59,6 +63,10 @@ flowchart TD
 
 ## Watch out
 
+- **A toast's `click` event ends when the toast leaves the screen.** Holding the `Notification` object doesn't help: a real activation after `close` fired no `click` on a held object. Only `handleActivation` hears it, and only the `launch` text says which run, because Electron's own toast has no `launch`.
+- **Nothing registers the activator until the first `Notification` call.** Electron starts with a random CLSID, and takes the shortcut's CLSID only at that call. Before it, a click starts a second copy, which loses its run to the single-instance lock. That is why the shell calls `Notification.isSupported()` at the start.
+- **That first call writes a Start-menu shortcut named for the exe,** so an unpackaged run would leave `Electron.lnk` at each start. Only a packaged app makes the call at its start (`activatorAtStart`). `real-toast.test.ts` turns it on and removes what it leaves.
+- **Each new shortcut CLSID leaves a key** under `HKCU\Software\Classes\CLSID`, and uninstall doesn't remove it. Each toast from an unpackaged run or a temp install has left one. The key does nothing once its exe is gone.
 - **A PR that opens while `gh` is out reads as old, on an ask noted at the first Board.** Its first read is the only sign of it, so that first read can't tell "opened at 9:00" from "opened last week". The same holds for a PR that merged while `gh` was out. No toast sends, but the dot and the card show it. A PR on an ask that came up after the first Board, or whose first read found no PR, always sends.
 - **A really new staging PR can go quiet.** This happens only if its ask first shows on the same Board where a noted read found a PR.
 - **A forgotten PR doesn't wait again.** A merge route's `forget` and a server restart both set `read` back to false. Only the first Board of an app run notes asks, and the seen set still covers what already showed.
@@ -73,9 +81,12 @@ flowchart TD
 `pnpm test:install` proves the Start-menu AppID and one `toast sent` on the installed app. No agent can see the items below. Do them after the last proof, because a real install stops the proofs. First delete `Electron.lnk` if it exists, then run `pnpm package`, run the installer, and open Pod Board from the Start menu.
 
 1. Register a temp copy of `E:\Projects\pod-trial-mock`, and add a `BLOCKED · orchestrator → human` line to its queue. A toast shows, with the name `Pod Board` and its icon.
-2. Wait for it to leave the screen. Click it in the notification center. The window opens on that run.
-3. Turn on Start at login, then sign out and in. The tray icon shows, and no window opens.
-4. The taskbar and `Pod Board.exe` show the app icon.
+2. Hide the window. Add a second such line, and click its banner while it shows. The window opens on that run.
+3. Hide the window. Add a third line, and wait for its banner to leave the screen. Click it in the notification center. The window opens on that run.
+4. Quit from the tray. Click the toast from step 3 in the notification center. The app starts and opens on that run. If nothing opens, read `%APPDATA%\Pod Board\desktop.log`.
+5. Right-click the tray icon. The menu holds Open and Quit, and their labels line up.
+6. The taskbar and `Pod Board.exe` show the app icon.
+7. A normal install opened the app by itself. Run the same installer again with the app open: one copy of the app runs after it ends.
 
 To uninstall: Settings, Apps, Installed apps, Pod Board, Uninstall.
 
@@ -84,3 +95,5 @@ To uninstall: Settings, Apps, Installed apps, Pod Board, Uninstall.
 - 2026-11-03 · windows-app plan fix · fixed: old items that only `gh` can name no longer send at every app start. The baseline holds merge and reply items until `gh` has answered or reads as unavailable.
 - 2026-11-03 · windows-app · final PR #83, verdict fix at round 2, with the hold's timing open · [report](../reports/windows-app.html)
 - 2026-11-03 · windows-app plan fix 2 · fixed: the 20 s hold is gone. The baseline now comes from gh's first read of each PR (`ghReads` on the Board). An old PR stays quiet when `gh` comes back, and a new doc-named merge sends at once.
+- 2026-11-04 · fix-late-merge-continue · fixed: a click on a toast in the notification center opened nothing. The toast now carries its run, and `Notification.handleActivation` opens it, also from a closed app.
+- 2026-11-04 · fix-late-merge-continue review · fixed: a queue line with U+FFFE, U+FFFF, or a surrogate with no partner sent no toast. Those characters now leave the toast, and an emoji stays.

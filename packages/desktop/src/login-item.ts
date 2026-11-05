@@ -1,4 +1,5 @@
-// Start at login. Nothing writes until the user toggles it, so it stays off by default. On Windows a read
+// Start at login. A settings page will use createLoginItem: nothing in the app turns it on today, though a login
+// item an earlier version wrote still starts the app with --hidden. Nothing writes until the user toggles it. On Windows a read
 // compares the arguments too, so a read and a write always carry the same ones.
 
 export const HIDDEN_FLAG = '--hidden'

@@ -259,7 +259,8 @@ const launched = new Set<number>()
 let lastOutput: () => string = () => ''
 
 export async function launch(place: ProofPlace, args: string[] = []): Promise<{ pid: number; output(): string }> {
-  const child = spawn(join(place.installDir, EXE_NAME), args, { cwd: place.root, env: place.env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+  // Not hidden: the exe has no console, and SW_HIDE would swallow its window's first show, as no real launch does.
+  const child = spawn(join(place.installDir, EXE_NAME), args, { cwd: place.root, env: place.env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: false })
   let text = ''
   child.stdout.on('data', (d) => (text += String(d)))
   child.stderr.on('data', (d) => (text += String(d)))

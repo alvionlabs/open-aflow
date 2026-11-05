@@ -17,6 +17,8 @@ const status = {
   readyPorts: [] as number[],
   failed: undefined as string | undefined,
   showWindow: 0,
+  hashes: [] as (string | null)[],
+  clsid: undefined as string | undefined,
   lockLost: false,
   reporter: undefined as unknown,
 }
@@ -26,6 +28,7 @@ save()
 const shell = startShell({
   env,
   appPath: env.POD_BOARD_PROBE_APP_PATH,
+  activatorAtStart: env.POD_BOARD_PROBE_ACTIVATOR === '1',
   onServer: (pid) => {
     status.servers.push(pid)
     save()
@@ -45,8 +48,13 @@ if (!shell) {
     status.readyPorts.push(port)
     save()
   })
-  shell.bus.onShowWindow(() => {
+  void app.whenReady().then(() => {
+    status.clsid = app.toastActivatorCLSID
+    save()
+  })
+  shell.bus.onShowWindow((hash) => {
     status.showWindow++
+    status.hashes.push(hash ?? null)
     save()
   })
   const reporter = env.POD_BOARD_PROBE_REPORTER

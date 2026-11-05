@@ -192,11 +192,11 @@ export function createBoardService(deps: BoardServiceDeps): BoardService {
       if (checkedAt !== undefined) board.ghCheckedAt = checkedAt
       if (configUnreadable) board.configError = 'config unreadable'
       if (deps.actions) board.actions = deps.actions()
-      // The stop keys stay in the store; the Board only says which toggles are on, under each repo's id now.
+      // The toggles that are on, under each repo's id now, with the stop each last sent, so a sent stop raises no toast.
       if (deps.autoContinue) {
-        board.autoContinue = deps.autoContinue().flatMap(({ path, run }) => {
+        board.autoContinue = deps.autoContinue().flatMap(({ path, run, lastKey }) => {
           const repo = repos.find((r) => repoPathKey(r) === path)
-          return repo ? [{ repoId: repo.id, run }] : []
+          return repo ? [{ repoId: repo.id, run, ...(lastKey === undefined ? {} : { lastKey }) }] : []
         })
       }
       return board

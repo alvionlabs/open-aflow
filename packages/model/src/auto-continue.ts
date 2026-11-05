@@ -43,9 +43,23 @@ export function sendableReply(repo: BoardRepo, run: string, word: 'continue' | '
   return sendableFrom(runReplies(repo, run, now), word)
 }
 
+/** How long after a fix PR's merge the board may still send `continue` by itself. */
+export const AUTO_MERGED_MS = 30 * 60 * 1000
+
+/**
+ * Whether auto-continue may send this reply. A merged fix run stays listed until cleanup frees its claim, so its
+ * `fix-merged` can be days old, with a session long gone quiet. Only a merge in the last AUTO_MERGED_MS sends, and never
+ * one with no merge time. The Continue button has no such limit.
+ */
+export function autoMaySend(repo: BoardRepo, reply: RunReply, now: number): boolean {
+  if (reply.signal !== 'fix-merged') return true
+  const mergedAt = repo.prs.find((p) => p.number === reply.pr)?.mergedAt
+  return mergedAt !== undefined && now - mergedAt < AUTO_MERGED_MS
+}
+
 /**
  * The `continue` sends due now: for each toggle, in order, its repo on the Board, a sendable
- * `continue` whose key isn't the toggle's `lastKey`, a session with a safe id, and that session idle.
+ * `continue` whose key isn't the toggle's `lastKey` and that `autoMaySend` allows, a session with a safe id, and that session idle.
  * At most one per session, the first toggle's. Never `go`, `try`, or a queue answer. `idle` is only
  * asked about a safe session id.
  */
@@ -58,6 +72,7 @@ export function autoSends(board: Board, toggles: AutoToggle[], now: number, idle
     const reply = sendableFrom(runReplies(repo, t.run, now), 'continue')
     if (!reply || reply.reply !== 'continue' || reply.key === t.lastKey) continue
     if (reply.signal === 'answered' && t.answeredKeys?.includes(reply.key)) continue
+    if (!autoMaySend(repo, reply, now)) continue
     const session = replySession(repo, t.run, now)
     if (!session?.resume || taken.has(session.id)) continue
     if (!idle(repo, session.id)) continue

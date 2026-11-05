@@ -214,7 +214,7 @@ describe('runReplies', () => {
     const rev = ended({ type: 'pod:reviewer', kind: 'fix', branch: name, startedAt: NOW - 50 * MIN, lastAt: NOW - 40 * MIN })
     const fix = (extra: Partial<BoardRepo>) => runReplies(repo({ 'pod-docs/README.md': README }, { claims: [claim(name)], ...extra }), name, NOW)
     const open = gh(36, 'open', { branch: name })
-    const merged = gh(36, 'merged', { branch: name })
+    const merged = gh(36, 'merged', { branch: name, mergedAt: NOW - 45 * MIN })
 
     // Reviewed and open: merge first.
     expect(fix({ agents: [eng, rev], prs: [open] })).toEqual([{ reply: 'continue', signal: 'fix-waiting', why: 'Merge PR #36, then reply continue.', pr: 36, key: 'fix-waiting:36' }])
@@ -224,8 +224,13 @@ describe('runReplies', () => {
     expect(fix({ agents: [eng, { ...rev, lastAt: NOW - 5 * MIN }], prs: [merged] })).toEqual([
       { reply: 'continue', signal: 'fix-merged', why: 'PR #36 merged.', pr: 36, key: 'fix-merged:36' },
     ])
-    // Merged and stale: the run isn't listed, so nothing.
-    expect(fix({ agents: [eng, rev], prs: [merged] })).toEqual([])
+    // Merged 45 minutes ago with quiet agents: the claim still stands, so continue.
+    const fixMerged = [{ reply: 'continue', signal: 'fix-merged', why: 'PR #36 merged.', pr: 36, key: 'fix-merged:36' }]
+    expect(fix({ agents: [eng, rev], prs: [merged] })).toEqual(fixMerged)
+    // Merged long after the last write: continue.
+    expect(fix({ agents: [eng, rev], prs: [{ ...merged, mergedAt: NOW - MIN }] })).toEqual(fixMerged)
+    // No merge time from gh: continue.
+    expect(fix({ agents: [eng, rev], prs: [gh(36, 'merged', { branch: name })] })).toEqual(fixMerged)
     // A running fix agent: nothing.
     expect(fix({ agents: [eng, rev, running({ branch: name })], prs: [open] })).toEqual([])
     expect(fix({ agents: [eng, running({ type: 'pod:reviewer', kind: 'fix', branch: name })], prs: [merged] })).toEqual([])

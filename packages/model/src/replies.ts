@@ -2,7 +2,7 @@
 // Pure. The rules and why are in pod-docs/feature-details/queue-and-replies.md.
 
 import type { AgentRun, BoardRepo } from './board.ts'
-import { fixPr, fixRunAgents, fixRunNames, fixWaitingPr, listedFixRuns } from './fix-runs.ts'
+import { fixPr, fixRunAgents, fixRunNames, fixWaitingPr } from './fix-runs.ts'
 import { autopilotHoldsPushed, handBackPr, isAutopilot, isBlockedSlice, isHalted, isPlanAgent, isRun, isRunning, isSliceDone, pendingHandBack, planAgentRunning, waitsOnWave, waveWaitingPr } from './pipeline.ts'
 import { asksYou } from './queue-answer.ts'
 import type { PlanModel } from './run-model.ts'
@@ -119,7 +119,6 @@ function stopReplies(repo: BoardRepo, plan: PlanModel, now: number): RunReply[] 
 }
 
 function fixReplies(repo: BoardRepo, name: string, now: number): RunReply[] {
-  if (!listedFixRuns(repo, now).includes(name)) return []
   if (fixRunAgents(repo, name, now).some((a) => isRunning(a, now))) return []
   const waiting = fixWaitingPr(repo, name, now)
   if (waiting) return [mergeFirst('fix-waiting', waiting.number)]

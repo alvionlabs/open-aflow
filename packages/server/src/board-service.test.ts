@@ -161,10 +161,10 @@ describe('board service', () => {
     await register(repo)
     const key = caseless ? normalizeRepoPath(repo, platform).toLowerCase() : normalizeRepoPath(repo, platform)
     toggles = [{ path: key, run: 'alpha', lastKey: 'sprint-done:one' }, { path: key, run: 'fix-scroll' }, { path: '/not/on/the/board', run: 'alpha' }]
-    // Read on every build, under the repo's id now; the stop keys stay in the store, off the Board. A repo that isn't on the Board reads off.
+    // Read on every build, under the repo's id now, with the stop it last sent. A repo that isn't on the Board reads off.
     const id = repoId(repo, platform, caseless)
     expect((await withToggles.build()).autoContinue).toEqual([
-      { repoId: id, run: 'alpha' },
+      { repoId: id, run: 'alpha', lastKey: 'sprint-done:one' },
       { repoId: id, run: 'fix-scroll' },
     ])
     expect(await createBoardService(deps()).build()).not.toHaveProperty('autoContinue')
@@ -778,6 +778,28 @@ describe('transcript cache', () => {
     await utimes(session, back, back)
     expect((await service.build()).repos[0]!.agents.map((x) => x.id)).toEqual(['eng1'])
     expect(parsedIds()).toEqual(['eng1'])
+  })
+
+  test('a session past the window stays off the Board, whatever a fix claim names', async () => {
+    const repo = copyFixture()
+    await register(repo)
+    // A plan's reviewer, whose prompt only mentions the fix run in a sentence.
+    await transcript(repo, 'rev1', 'pod:reviewer', '- **plan:** sparring-ladder\nThis follows fix-old.\n')
+    await writeFile(join(portsDir, '3100'), `${repo} fix-old\n`)
+    const old = new Date(NOW - 40 * 24 * 60 * 60_000)
+    const session = dirname(subagentsOf(repo))
+    await utimes(subagentsOf(repo), old, old)
+    await utimes(session, old, old)
+
+    const board = await createBoardService(deps()).build()
+    const onBoard = board.repos[0]!
+    expect(onBoard.agents).toEqual([])
+    // The plan gets no session from it, so no send.
+    const key = caseless ? normalizeRepoPath(repo, platform).toLowerCase() : normalizeRepoPath(repo, platform)
+    expect(model.autoSends(board, [{ path: key, run: 'sparring-ladder' }], NOW, () => true)).toEqual([])
+    // The fix run stays listed, with no session to send to.
+    expect(model.listRuns(board, NOW).map((r) => r.plan)).toContain('fix-old')
+    expect(model.replySession(onBoard, 'fix-old', NOW)).toBeUndefined()
   })
 
   test('a transcript deleted after a build drops off the Board', async () => {

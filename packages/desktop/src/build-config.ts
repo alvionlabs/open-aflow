@@ -83,8 +83,9 @@ export function buildConfig(o: BuildOptions): Configuration {
       createDesktopShortcut: false,
       createStartMenuShortcut: true,
       shortcutName: APP_NAME,
-      // A run after a silent install would start with no temp env and open the real config folder.
-      runAfterFinish: false,
+      // A normal install opens the app. A silent one (an install proof, which has temp env only for its own start) doesn't,
+      // and the update path's silent install starts its one new copy through --force-run. build-config.test.ts holds this.
+      runAfterFinish: true,
       deleteAppDataOnUninstall: false,
       installerIcon: 'assets/icon.ico',
       uninstallerIcon: 'assets/icon.ico',

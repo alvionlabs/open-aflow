@@ -146,6 +146,54 @@ describe('attention items', () => {
     expect(items(bare)).toMatchObject([{ id: `bare\nentry:${UNJOINED}`, hash: '#/bare' }])
   })
 
+  test('a fix PR merged long after its review still raises its Continue', () => {
+    const late = { ...fixReviewer, lastAt: NOW - 44 * MIN }
+    const repoAt = (ago: number) => chess([onlyQueue()], { claims: [fixClaim], agents: [fixEngineer, late], prs: [gh(36, 'merged', { branch: FIX, mergedAt: NOW - ago * MIN })] })
+    expect(items(repoAt(1))).toMatchObject([{ id: 'chess\nfix-merged:36', hash: `#/chess/${FIX}` }])
+    // However old the merge, while the claim stands.
+    expect(items(repoAt(3 * 24 * 60))).toMatchObject([{ id: 'chess\nfix-merged:36' }])
+  })
+
+  test('on a toggled fix run, only a merge the board will send for stays quiet', () => {
+    const repoAt = (mergedAt: number | undefined) =>
+      chess([onlyQueue()], { claims: [fixClaim], agents: [fixEngineer, fixReviewer], prs: [gh(36, 'merged', { branch: FIX, ...(mergedAt === undefined ? {} : { mergedAt }) })] })
+    const on = { autoContinue: [{ repoId: 'chess', run: FIX }] }
+    const idsOf = (mergedAt: number | undefined) => attentionItems(boardOf([repoAt(mergedAt)], on), NOW).map((i) => i.id)
+    // Auto-continue sends this one by itself.
+    expect(idsOf(NOW - MIN)).toEqual([])
+    // It won't send these, so they wait on you.
+    expect(idsOf(NOW - 45 * MIN)).toEqual(['chess\nfix-merged:36'])
+    expect(idsOf(undefined)).toEqual(['chess\nfix-merged:36'])
+  })
+
+  test('a key the toggle already sent raises nothing, also past the 30 minutes', () => {
+    const repoAt = (ago: number) => chess([onlyQueue()], { claims: [fixClaim], agents: [fixEngineer, fixReviewer], prs: [gh(36, 'merged', { branch: FIX, mergedAt: NOW - ago * MIN })] })
+    const idsOf = (ago: number, lastKey?: string) =>
+      attentionItems(boardOf([repoAt(ago)], { autoContinue: [{ repoId: 'chess', run: FIX, ...(lastKey === undefined ? {} : { lastKey }) }] }), NOW).map((i) => i.id)
+    expect(idsOf(45, 'fix-merged:36')).toEqual([])
+    expect(idsOf(3 * 24 * 60, 'fix-merged:36')).toEqual([])
+    // Another stop's key doesn't count, and neither does another run's.
+    expect(idsOf(45, 'fix-merged:99')).toEqual(['chess\nfix-merged:36'])
+    expect(idsOf(45)).toEqual(['chess\nfix-merged:36'])
+    const other = attentionItems(boardOf([repoAt(45)], { autoContinue: [{ repoId: 'chess', run: 'fix-other', lastKey: 'fix-merged:36' }] }), NOW)
+    expect(other.map((i) => i.id)).toEqual(['chess\nfix-merged:36'])
+  })
+
+  test('a plan run reads its sent key as it always did: with no session to send to, it waits for you', () => {
+    const noSession = chess([manual, pushed(78), onlyQueue()], { prs: [gh(78, 'merged')] })
+    const on = { autoContinue: [{ repoId: 'chess', run: PLAN, lastKey: 'wave-merged:78' }] }
+    expect(attentionItems(boardOf([noSession], on), NOW).map((i) => i.id)).toEqual(['chess\nwave-merged:78'])
+    // With a session it stays quiet, whatever the key.
+    expect(attentionItems(boardOf([sendable()], on), NOW)).toEqual([])
+  })
+
+  test('a failed send on a toggled fix run raises no item', () => {
+    const repoAt = chess([onlyQueue()], { claims: [fixClaim], agents: [fixEngineer, fixReviewer], prs: [gh(36, 'merged', { branch: FIX, mergedAt: NOW - 5 * MIN })] })
+    const actions = [{ at: NOW - MIN, action: 'resume', repoId: 'chess', repo: 'chess', target: `${FIX} · continue`, result: 'failed', reply: 'continue', auto: true }] as const
+    const board = boardOf([repoAt], { autoContinue: [{ repoId: 'chess', run: FIX, lastKey: 'fix-merged:36' }], actions: [...actions] })
+    expect(attentionItems(board, NOW)).toEqual([])
+  })
+
   test('a bad repo is quiet', () => {
     const good = chess([manual, onlyQueue(BLOCKED)], { id: 'good', path: '/g' })
     const error = chess([manual, onlyQueue(BLOCKED)], { error: 'cannot read repo' })

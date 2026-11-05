@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as model from './index.ts'
 import type { AgentRun, Board, BoardRepo, Claim, PrStatus } from './board.ts'
-import { autoSends, sendableFrom, sendableReply, type AutoToggle, repoPathKey } from './auto-continue.ts'
+import { autoMaySend, autoSends, sendableFrom, sendableReply, type AutoToggle, repoPathKey } from './auto-continue.ts'
 import { SEND_SIGNALS, runReplies, type ReplySignal, type ReplyWord, type RunReply } from './replies.ts'
 import { buildRepoModel, type RepoFiles } from './run-model.ts'
 
@@ -109,7 +109,7 @@ function fixRepo(state: PrStatus['state'], session = 'sess-1'): BoardRepo {
     source: 'registered',
     model: buildRepoModel({ 'pod-docs/README.md': README }),
     agents: [eng, rev],
-    prs: [gh(36, state, { branch: FIX })],
+    prs: [gh(36, state, { branch: FIX, ...(state === 'merged' ? { mergedAt: NOW - MIN } : {}) })],
     claims: [claim(FIX)],
   }
 }
@@ -196,6 +196,53 @@ describe('sendableReply', () => {
   it('is exported from the package entry', () => {
     expect(model.sendableReply).toBe(sendableReply)
     expect(model.autoSends).toBe(autoSends)
+  })
+})
+
+describe('auto-continue on a merged fix run', () => {
+  const merged = (mergedAt: number | undefined) => {
+    const r = fixRepo('merged')
+    return { ...r, prs: [gh(36, 'merged', { branch: FIX, ...(mergedAt === undefined ? {} : { mergedAt }) })] }
+  }
+  const toggle = (r: BoardRepo, lastKey?: string): AutoToggle => ({ path: repoPathKey(r), run: FIX, ...(lastKey === undefined ? {} : { lastKey }) })
+  const sends = (r: BoardRepo, lastKey?: string) => autoSends({ generatedAt: NOW, gh: 'ok', repos: [r] }, [toggle(r, lastKey)], NOW, () => true).map((s) => s.key)
+
+  it('sends within 30 minutes of the merge', () => {
+    expect(sends(merged(NOW))).toEqual(['fix-merged:36'])
+    expect(sends(merged(NOW - 30 * MIN + 1))).toEqual(['fix-merged:36'])
+    // A merge time ahead of the clock reads as just merged.
+    expect(sends(merged(NOW + 5 * MIN))).toEqual(['fix-merged:36'])
+  })
+
+  it('never on an old merge, or with no merge time', () => {
+    expect(sends(merged(NOW - 30 * MIN))).toEqual([])
+    expect(sends(merged(NOW - 3 * 24 * 60 * MIN))).toEqual([])
+    expect(sends(merged(undefined))).toEqual([])
+  })
+
+  it('a sent key never sends again', () => {
+    expect(sends(merged(NOW - MIN), 'fix-merged:36')).toEqual([])
+  })
+
+  it('the Continue button has no limit', () => {
+    for (const r of [merged(NOW - 3 * 24 * 60 * MIN), merged(undefined)]) {
+      expect(sendableReply(r, FIX, 'continue', NOW)?.key).toBe('fix-merged:36')
+    }
+  })
+
+  it('autoMaySend says the same for each', () => {
+    const reply = (r: BoardRepo) => sendableReply(r, FIX, 'continue', NOW)!
+    const recent = merged(NOW - MIN)
+    expect(autoMaySend(recent, reply(recent), NOW)).toBe(true)
+    const old = merged(NOW - 45 * MIN)
+    expect(autoMaySend(old, reply(old), NOW)).toBe(false)
+    const none = merged(undefined)
+    expect(autoMaySend(none, reply(none), NOW)).toBe(false)
+  })
+
+  it('leaves every other signal alone', () => {
+    const { repo, run } = BY_SIGNAL['wave-merged']
+    expect(autoMaySend(repo, sendableReply(repo, run, 'continue', NOW)!, NOW)).toBe(true)
   })
 })
 

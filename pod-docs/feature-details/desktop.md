@@ -9,10 +9,12 @@
 - **Layout.** Only `main.ts` and `*-main.ts` import `electron` or `electron-updater`. All logic sits in plain modules with fakes, and `no-electron.test.ts` holds this rule.
 - **Start.** Name, `APP_ID`, data folder, single-instance lock. A second launch exits here and shows the first window. On `ready`: window and tray, notifier, updater, server.
 - **Folders.** The shell data folder holds Chromium's data, the lock, and `window-state.json`. The server's config folder stays the server's own, so a shell and `pnpm dev` share it.
+- **Log file.** `desktop.log` in the shell data folder (installed: `%APPDATA%\Pod Board\desktop.log`; `POD_BOARD_DESKTOP_DATA_DIR` moves it). It holds each line the console shows, the server's too, with a time. At 256 KB it moves to `desktop.log.1`, so at most two files stay. In every line, the home folder becomes `~`, in any case, with either slash, with doubled backslashes, or URL-encoded as in a stack frame. A folder that goes on past the home with a sign and a letter or digit (`Name2`, `Name+old`, `Name(2)`) stays. A space swaps, because a folder with a space can't be told from prose: `Name Smith\x` reads `~ Smith\x`, which only mislabels it. A line that names a token is left out. An `Error` the shell itself logs keeps only its name. A server line is text by the time the shell reads it, so a server error keeps its message and stack as the server printed them. No code logs entry text on purpose, but a server error's message could quote what it read. The user's name can also stay where it isn't part of the home path, such as in a Claude project folder name (`C--Users-name-…`). A second launch writes nothing.
 - **Port and token.** The shell sets no port and never holds the token. It reads the port from the server's ready message, and the page gets the token from the server.
 - **Server host.** One restart after a failure. A failure is an exit outside a stop, a `fork` that throws, or no ready in 60 s. A second failure shows a native error box and quits. 60 s of ready earns the restart back. A new port fires `onReady` again, and the window and notifier move.
 - **Window.** The normal Windows frame, no app menu, no preload, the page isolated. Close hides it. Off-origin `http` and `https` links open in the system browser, and anything else opens nothing. A `--hidden` start shows only the tray.
-- **Tray.** Open, Start at login, Quit. The dot comes from `bus.onAttention`. The app writes the login item only on the toggle, so it stays off by default.
+- **Tray.** Open and Quit. The dot comes from `bus.onAttention`.
+- **Login item.** No part of the app turns it on today: it moves to a settings page ([decision](../decisions.md#2026-11-04--start-at-login-leaves-the-tray-menu-human-decision)). `createLoginItem` stays for that page. A login item from an earlier version still starts the app with `--hidden`, in the tray with no window. Uninstall still removes it.
 
 ```mermaid
 sequenceDiagram
@@ -71,3 +73,6 @@ sequenceDiagram
 - 2026-11-03 · installer-and-updates P1: the per-user installer, the app icon, the licence notices, and the install proof.
 - 2026-11-03 · installer-and-updates U1: auto-update, the test feed, the local two-version proof, and the first release hand-off.
 - 2026-11-03 · windows-app · final PR #83, verdict fix at round 2; the installer and updates moved to their own file · [report](../reports/windows-app.html)
+- 2026-11-04 · fix-late-merge-continue · the shell saves its log lines and the server's to `desktop.log`. The tray shows Start at login's state in words.
+- 2026-11-04 · fix-late-merge-continue · the human's decision: Start at login leaves the tray menu, which is now Open and Quit.
+- 2026-11-05 · fix-late-merge-continue · `desktop.log` writes the home folder as `~`.
