@@ -1,4 +1,4 @@
-// The shell's log file: what the console shows, kept small, with no entry text and no token. The rules are in
+// The shell's log file: what the console shows, kept small, with no token and no home folder. The rules are in
 // pod-docs/feature-details/desktop.md.
 
 import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs'
@@ -29,16 +29,34 @@ const wordOf = (arg: unknown): string => {
   return `[${typeof arg}]`
 }
 
-export function logLines(args: unknown[]): string[] {
+/** A letter, digit, or other sign that would make the text a longer folder name: `Name2`, `Name-old`, `Name.old`. */
+const NAME_GOES_ON = '(?![\\p{L}\\p{N}_~$-]|\\.[\\p{L}\\p{N}_~$-])'
+
+/**
+ * Finds the home folder in any spelling: any case, either slash, doubled backslashes as in JSON text. Undefined with
+ * no home, or a drive root, which would match too much.
+ */
+function homePattern(home: string | undefined): RegExp | undefined {
+  const parts = (home ?? '').split(/[\\/]+/).filter((part) => part !== '')
+  if (parts.length < 2) return undefined
+  const lead = /^[\\/]/.test(home!) ? '[\\\\/]+' : ''
+  const body = parts.map((part) => part.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')).join('[\\\\/]+')
+  return new RegExp(`${lead}${body}${NAME_GOES_ON}`, 'giu')
+}
+
+/** Each line for the file. The home folder holds the user's name, so it becomes `~`, before a cut can leave part of it. */
+export function logLines(args: unknown[], home?: string): string[] {
+  const pattern = homePattern(home)
   return args
     .map(wordOf)
     .join(' ')
     .split(/\r?\n/)
     .filter((line) => line.trim() !== '')
+    .map((line) => (pattern ? line.replace(pattern, () => '~') : line))
     .map((line) => (TOKEN.test(line) ? LEFT_OUT : line.slice(0, LINE_MAX)))
 }
 
-export function createLogFile(o: { file: string; fs: LogFs; now(): Date; maxBytes?: number }): { write(args: unknown[]): void } {
+export function createLogFile(o: { file: string; fs: LogFs; now(): Date; maxBytes?: number; home?: string }): { write(args: unknown[]): void } {
   const maxBytes = o.maxBytes ?? LOG_MAX_BYTES
   const sizeOf = () => {
     try {
@@ -52,7 +70,7 @@ export function createLogFile(o: { file: string; fs: LogFs; now(): Date; maxByte
       // A log must never stop the app.
       try {
         const stamp = o.now().toISOString()
-        const lines = logLines(args)
+        const lines = logLines(args, o.home)
         if (lines.length === 0) return
         if (sizeOf() >= maxBytes) o.fs.rename(o.file, `${o.file}.1`)
         o.fs.append(o.file, lines.map((line) => `${stamp} ${line}\n`).join(''))

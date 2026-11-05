@@ -56,7 +56,7 @@ export function startShell(o: ShellOptions): ShellContext | undefined {
   }
 
   // After the lock, so one file has one writer.
-  teeConsole(console, createLogFile({ file: join(app.getPath('userData'), LOG_FILE), fs: nodeLogFs, now: () => new Date() }))
+  teeConsole(console, createLogFile({ file: join(app.getPath('userData'), LOG_FILE), fs: nodeLogFs, now: () => new Date(), home: app.getPath('home') }))
 
   Menu.setApplicationMenu(null)
   // With this listener, the app stays alive with no window.
