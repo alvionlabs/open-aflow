@@ -184,12 +184,14 @@ export function buildFixPipeline(repo: BoardRepo, name: string, now: number): Fi
       : { key: 'pr', label: 'PR', state: PR_STEP[pr.state].state, detail: `PR #${pr.number} · ${PR_STEP[pr.state].text}` }
   const waiting = fixWaitingPr(repo, name, now)
   if (waiting) ship.merge = { number: waiting.number }
+  /** A merged PR was built and reviewed. With no agent, its session is past the transcript window, so no figures. */
+  const ran = (step: Step): Step => (pr?.state === 'merged' && step.state === 'wait' ? { ...step, state: 'done', detail: 'no transcript' } : step)
   const stages: Stage[] = [
     {
       key: 'build',
       caption: 'Build',
       steps: [
-        agentStep('engineer', 'Engineer', of((x) => x.role === 'engineer'), 'not started', now),
+        ran(agentStep('engineer', 'Engineer', of((x) => x.role === 'engineer'), 'not started', now)),
         agentStep('fix-pass', 'Fix pass', of((x) => x.role === 'fix pass'), 'only if review fails', now),
       ],
     },
@@ -197,7 +199,7 @@ export function buildFixPipeline(repo: BoardRepo, name: string, now: number): Fi
       key: 'review',
       caption: 'Review',
       steps: [
-        agentStep('round-1', 'Round 1', of((x) => x.role === 'reviewer' && x.round === 1), 'not started', now),
+        ran(agentStep('round-1', 'Round 1', of((x) => x.role === 'reviewer' && x.round === 1), 'not started', now)),
         agentStep('round-2', 'Round 2', of((x) => x.role === 'reviewer' && x.round !== 1), 'only after a fix pass', now),
       ],
     },

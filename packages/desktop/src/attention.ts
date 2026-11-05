@@ -43,6 +43,10 @@ export function attentionItems(board: Board, now: number): AttentionItem[] {
   return [...items.values()]
 }
 
+/** The newest `continue` the action log holds for this run failed to start. */
+const lastSendFailed = (board: Board, target: { repoId: string; run: string }): boolean =>
+  board.actions?.find((a) => a.action === 'resume' && a.reply === 'continue' && a.repoId === target.repoId && a.target === `${target.run} · continue`)?.result === 'failed'
+
 /**
  * The reply's own stop key, or undefined when it isn't an item of its own: the reply that follows a
  * merge the run already lists, or a `continue` the board sends by itself on a toggled run. It won't send an old `fix-merged`, so that stays an item.
@@ -52,8 +56,9 @@ function replyKey(board: Board, repo: BoardRepo, item: NextItem, found: NextItem
   if (found.some((other) => other.action.kind === 'merge' && other.action.number === stop.pr)) return undefined
   const { target, rows } = item.action.panel
   const toggle = board.autoContinue?.find((t) => t.repoId === target.repoId && t.run === target.run)
-  // Sent already: a toast would only offer the same word again, into a session that may still be busy with it.
-  if (toggle?.lastKey === stop.key) return undefined
+  // Sent already: a toast would only offer the same word again, into a session that may still be busy with it. The key is
+  // saved before the start, so a send that failed holds it too, and only you can act on that one.
+  if (toggle?.lastKey === stop.key) return lastSendFailed(board, target) ? stop.key : undefined
   if (toggle && rows.some((r) => r.send === 'continue') && autoMaySend(repo, stop, now)) return undefined
   return stop.key
 }
