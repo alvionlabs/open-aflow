@@ -1,24 +1,31 @@
 # pod-board
 
-A local, read-only web app that shows every pod run across your repos: each
-run's stage, the current wave's slices, what needs you, and each engineer's
-live activity. See [docs/master-plan.md](docs/master-plan.md).
+A local, read-only desktop app that shows every pod run across your repos:
+each run's stage, the current wave's slices, what needs you, and each
+engineer's live activity. See [docs/master-plan.md](docs/master-plan.md).
 
-To install the Windows app, follow [the install note](docs/install.md).
+## Install
 
-## Requirements
+Use the Windows desktop app. To install it, follow [the install note](docs/install.md).
+
+## Development
+
+The browser version of the board is for development. You and the agents run it
+to see and check the UI. Users run the desktop app.
+
+### Requirements
 
 - Node.js 22 or later.
 - pnpm. The version is pinned in `package.json` (`packageManager`). If you
   don't have pnpm, run `corepack enable pnpm`.
 
-## Install
+### Install dependencies
 
 ```sh
 pnpm install
 ```
 
-## Run
+### Run the browser version
 
 ```sh
 pnpm dev
@@ -44,7 +51,7 @@ $env:POD_BOARD_API_PORT = '3010'; $env:POD_BOARD_WEB_PORT = '3011'; pnpm dev
 A port must be an integer from 1 to 65535, or the server stops with an error
 that names the variable.
 
-### Run the production build
+#### Run the production build
 
 ```sh
 pnpm build
