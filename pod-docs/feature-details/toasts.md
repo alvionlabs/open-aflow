@@ -78,17 +78,17 @@ flowchart TD
 
 ### Human list
 
-`pnpm test:install` proves the Start-menu AppID and one `toast sent` on the installed app. No agent can see the items below. Do them after the last proof, because a real install stops the proofs. First delete `Electron.lnk` if it exists, then run `pnpm package`, run the installer, and open Pod Board from the Start menu.
+`pnpm test:install` proves the Start-menu AppID and one `toast sent` on the installed app. No agent can see the items below. Do them after the last proof, because a real install stops the proofs. First delete `Electron.lnk` if it exists, then run `pnpm package`, run the installer, and open Open AFlow from the Start menu.
 
-1. Register a temp copy of `E:\Projects\pod-trial-mock`, and add a `BLOCKED · orchestrator → human` line to its queue. A toast shows, with the name `Pod Board` and its icon.
+1. Register a temp copy of `E:\Projects\pod-trial-mock`, and add a `BLOCKED · orchestrator → human` line to its queue. A toast shows, with the name `Open AFlow` and its icon.
 2. Hide the window. Add a second such line, and click its banner while it shows. The window opens on that run.
 3. Hide the window. Add a third line, and wait for its banner to leave the screen. Click it in the notification center. The window opens on that run.
-4. Quit from the tray. Click the toast from step 3 in the notification center. The app starts and opens on that run. If nothing opens, read `%APPDATA%\Pod Board\desktop.log`.
+4. Quit from the tray. Click the toast from step 3 in the notification center. The app starts and opens on that run. If nothing opens, read `%APPDATA%\Open AFlow\desktop.log`.
 5. Right-click the tray icon. The menu holds Open and Quit, and their labels line up.
-6. The taskbar and `Pod Board.exe` show the app icon.
+6. The taskbar and `Open AFlow.exe` show the app icon.
 7. A normal install opened the app by itself. Run the same installer again with the app open: one copy of the app runs after it ends.
 
-To uninstall: Settings, Apps, Installed apps, Pod Board, Uninstall.
+To uninstall: Settings, Apps, Installed apps, Open AFlow, Uninstall.
 
 ## History
 
@@ -97,3 +97,4 @@ To uninstall: Settings, Apps, Installed apps, Pod Board, Uninstall.
 - 2026-11-03 · windows-app plan fix 2 · fixed: the 20 s hold is gone. The baseline now comes from gh's first read of each PR (`ghReads` on the Board). An old PR stays quiet when `gh` comes back, and a new doc-named merge sends at once.
 - 2026-11-04 · fix-late-merge-continue · fixed: a click on a toast in the notification center opened nothing. The toast now carries its run, and `Notification.handleActivation` opens it, also from a closed app.
 - 2026-11-04 · fix-late-merge-continue review · fixed: a queue line with U+FFFE, U+FFFF, or a surrogate with no partner sent no toast. Those characters now leave the toast, and an emoji stays.
+- 2026-11-05 · fix-rename-open-aflow · renamed: a toast shows the app name Open AFlow, from the `Open AFlow.lnk` Start-menu shortcut and the app ID `com.alvionlabs.openaflow`.

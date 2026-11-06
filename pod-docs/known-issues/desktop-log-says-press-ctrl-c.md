@@ -3,7 +3,7 @@
 Severity: low
 Status: open · found 2026-11-05 · real run test on the installed app
 
-**Who it affects:** anyone who reads `%APPDATA%\Pod Board\desktop.log`.
+**Who it affects:** anyone who reads `%APPDATA%\Open AFlow\desktop.log`.
 
 **What you see:** on Quit while a send runs, the log reads `pod-board: waiting for 1 action to finish; press Ctrl+C again to quit now`. The desktop app has no console, so Ctrl+C means nothing there.
 

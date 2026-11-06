@@ -2,7 +2,7 @@
 
 ## What it is
 
-The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the full-height left sidebar ("Pod Board" with `lost · retrying` only while the connection is lost, the runs list, and `Add repo` at the bottom, which opens the folder picker in a modal dialog), the ⋯ menu at the right end of the run header, the theme (System, Dark, Light, in the ⋯ menu; Dark when nothing is stored), the theme applied before first paint, the shared look (tokens, fonts, controls, icons). Covers the features.md rows Web shell, Theme, and Theme boot. Theme code lives in `packages/web/src/theme/`; the boot script is inline in `packages/web/index.html`.
+The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the full-height left sidebar ("Open AFlow" with `lost · retrying` only while the connection is lost, the runs list, and `Add repo` at the bottom, which opens the folder picker in a modal dialog), the ⋯ menu at the right end of the run header, the theme (System, Dark, Light, in the ⋯ menu; Dark when nothing is stored), the theme applied before first paint, the shared look (tokens, fonts, controls, icons). Covers the features.md rows Web shell, Theme, and Theme boot. Theme code lives in `packages/web/src/theme/`; the boot script is inline in `packages/web/index.html`.
 
 ## How it works
 
@@ -68,3 +68,4 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - 2026-11-03 · windows-app plan fix · the install note names pod and says the setup check doesn't look for it. A real check for pod is the human's call.
 - 2026-11-03 · windows-app plan fix 2 · fixed: another page can no longer frame the `pnpm dev` page and take clicks. Vite sends `Content-Security-Policy: frame-ancestors 'none'` and `X-Frame-Options: DENY`.
 - 2026-11-05 · fix-desktop-only-web-bench · removed the PWA manifest, its link tags, its maskable icon, and its tests; the browser version is for development and agents
+- 2026-11-05 · fix-rename-open-aflow · renamed: the page `<title>` and the sidebar brand say Open AFlow.
