@@ -497,3 +497,71 @@ describe('stop', () => {
     await expect(send(port, '/api/health')).rejects.toThrow()
   })
 })
+
+// No OPEN_AFLOW_CONFIG_DIR here, so the server picks its own folder. APPDATA and XDG_CONFIG_HOME point into the
+// test's temp folder, so the real folder is never read. macOS takes the folder from the home folder: not run there.
+describe.runIf(process.platform === 'win32' || process.platform === 'linux')('the config folder before the rename', () => {
+  const base = () => join(tmp, 'appdata')
+  const oldDir = () => join(base(), 'pod-board')
+  const newDir = () => join(base(), 'open-aflow-server')
+  const ownEnv = (over: Record<string, string> = {}): Record<string, string> => {
+    const { OPEN_AFLOW_CONFIG_DIR: _cfg, ...rest } = envFor({ APPDATA: base(), XDG_CONFIG_HOME: base(), ...over })
+    return rest
+  }
+
+  /** The old folder with a registered repo, the toggles, the log, a resume log, and a live owner file. */
+  const writeOld = async () => {
+    const repo = join(tmp, 'repo')
+    await mkdir(join(repo, 'pod-docs'), { recursive: true })
+    await writeFile(join(repo, 'pod-docs', 'README.md'), '# pod docs\n\npod docs: 2\n')
+    await mkdir(join(oldDir(), 'resume-logs'), { recursive: true })
+    await writeFile(join(oldDir(), 'config.json'), JSON.stringify({ version: 1, repos: [{ path: repo }] }))
+    await writeFile(join(oldDir(), 'auto-continue.json'), '{"version":1,"runs":[]}\n')
+    await writeFile(join(oldDir(), 'actions.jsonl'), '')
+    await writeFile(join(oldDir(), 'resume-logs', 'a.log'), 'stderr\n')
+    await writeFile(join(oldDir(), 'auto-continue-owner.json'), JSON.stringify({ pid: process.pid, startedAt: Date.now() }))
+    return repo
+  }
+
+  const repoNames = async (port: number) => {
+    const { text } = await send(port, '/api/board')
+    return (JSON.parse(text) as { repos: { name: string; source: string }[] }).repos.map((r) => `${r.name}:${r.source}`)
+  }
+
+  test('a first start copies the old folder, so the registered repos come back', async () => {
+    await writeOld()
+    const { started } = await startProduction(ownEnv())
+    expect(await repoNames(started.port)).toEqual(['repo:registered'])
+    expect(existsSync(join(newDir(), 'resume-logs', 'a.log'))).toBe(true)
+    expect(existsSync(join(newDir(), 'auto-continue.json'))).toBe(true)
+    // The old owner file names a live process; the copy leaves it, so this server owns auto-continue.
+    expect(spies.autoStarts).toBe(1)
+    expect(existsSync(join(oldDir(), 'auto-continue-owner.json'))).toBe(true)
+    expect(logs.filter((l) => l.includes(oldDir()) && l.includes(newDir()))).toHaveLength(1)
+  })
+
+  test('the copy runs before the dev token file is written', async () => {
+    await writeOld()
+    const api = await freePort()
+    const { started } = await start(ownEnv({ OPEN_AFLOW_API_PORT: String(api), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
+    expect(await repoNames(started.port)).toEqual(['repo:registered'])
+    expect(existsSync(join(newDir(), 'session-token'))).toBe(true)
+  })
+
+  test('an existing new folder is never overwritten', async () => {
+    await writeOld()
+    await mkdir(newDir(), { recursive: true })
+    const { started } = await startProduction(ownEnv())
+    expect(await repoNames(started.port)).toEqual([])
+    expect(existsSync(join(newDir(), 'config.json'))).toBe(false)
+  })
+
+  test('a set OPEN_AFLOW_CONFIG_DIR never copies from the folder the server would pick', async () => {
+    await writeOld()
+    const { started } = await startProduction({ ...ownEnv(), OPEN_AFLOW_CONFIG_DIR: cfg })
+    expect(await repoNames(started.port)).toEqual([])
+    expect(existsSync(newDir())).toBe(false)
+    expect(existsSync(join(cfg, 'config.json'))).toBe(false)
+    expect(logs.some((l) => l.includes(oldDir()))).toBe(false)
+  })
+})

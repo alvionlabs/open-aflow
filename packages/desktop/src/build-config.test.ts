@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import { buildConfig, builderOptions, checkVersion, EXE_NAME, parsePackageArgs, UPDATER_CACHE_DIR } from './build-config.ts'
+import { CONFIG_DIR_NAME } from '@open-aflow/server/config'
 import { APP_ID, APP_NAME } from './shell-config.ts'
 
 const pkg = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -33,9 +34,11 @@ describe('electron-builder config', () => {
   })
 
   test("the app's file name is never the server's config folder", () => {
-    // NSIS's `--delete-app-data` removes %APPDATA%\<this name>. The server's config folder is `pod-board`.
+    // NSIS's `--delete-app-data` removes %APPDATA%\<this name> and %APPDATA%\<product name>. Windows folder names
+    // ignore case.
     const name = config().extraMetadata?.name as string
-    expect(name).not.toBe('pod-board')
+    expect(name.toLowerCase()).not.toBe(CONFIG_DIR_NAME.toLowerCase())
+    expect(APP_NAME.toLowerCase()).not.toBe(CONFIG_DIR_NAME.toLowerCase())
     expect(name).not.toMatch(/[@/\s]/)
     expect(UPDATER_CACHE_DIR).toBe(`${name}-updater`)
   })

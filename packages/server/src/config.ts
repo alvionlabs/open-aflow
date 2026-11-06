@@ -51,3 +51,11 @@ export function configPath(env: Env, platform: NodeJS.Platform, home: string): s
   const base = xdg && p.isAbsolute(xdg) ? xdg : p.join(home, '.config')
   return p.join(base, 'pod-board', 'config.json')
 }
+
+/** The server's config folder name. Not built yet. */
+export const CONFIG_DIR_NAME = 'pod-board'
+
+/** Not built yet. */
+export function oldConfigDir(_env: Env, _platform: NodeJS.Platform, _home: string): string | undefined {
+  return undefined
+}
