@@ -2,7 +2,7 @@
 // serves the web app on one port and keeps the token in memory. The table is in
 // pod-docs/feature-details/server.md.
 
-import { mkdir, mkdtemp } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { serve } from '@hono/node-server'
@@ -18,7 +18,7 @@ import { createBoardService } from './board-service.ts'
 import { listFolders, nodeFolderFs } from './folder-list.ts'
 import { portsDir } from './claims.ts'
 import { claudeBin, createClaudeRunner } from './claude-runner.ts'
-import { configPath, listenConfig, oldConfigDir, portFromEnv, type Env } from './config.ts'
+import { configPath, listenConfig, liveConfigDir, oldConfigDir, portFromEnv, type Env } from './config.ts'
 import { moveOldConfig } from './config-move.ts'
 import { createFoundGhExec, createGhReader, defaultGhExec } from './gh.ts'
 import { openWithFallback, wantedPort } from './listen.ts'
@@ -50,15 +50,13 @@ function portPlan(env: Env, production: Production | undefined) {
 
 /**
  * The config folder for this start. First the one-time copy of the old folder, before anything writes there. If the
- * copy fails, this start runs on a new empty temp folder and leaves the real one uncreated, so the next start tries
- * the copy again and nothing is written over the human's data.
+ * copy fails, the new folder stays uncreated, so `liveConfigDir` picks the old folder: this start keeps the human's
+ * real data, and the next start tries the copy again.
  */
 async function pickConfigDir(env: Env, platform: NodeJS.Platform): Promise<string> {
-  const dir = dirname(configPath(env, platform, homedir()))
-  if ((await moveOldConfig({ from: oldConfigDir(env, platform, homedir()), to: dir })) !== 'failed') return dir
-  const temp = await mkdtemp(join(tmpdir(), 'open-aflow-config-'))
-  console.error(`open-aflow: this start uses the empty temp config folder ${temp}; repos added now are gone at the next start`)
-  return temp
+  const home = homedir()
+  await moveOldConfig({ from: oldConfigDir(env, platform, home), to: dirname(configPath(env, platform, home)) })
+  return liveConfigDir(env, platform, home)
 }
 
 export async function startServer(env: Env, o: { production?: Production; exit?: (code: number) => void } = {}): Promise<Started> {

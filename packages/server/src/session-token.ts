@@ -64,6 +64,7 @@ export function injectTokenMeta(html: string, token?: string): string {
  * Puts the current token in index.html on every page load. `apply: 'serve'`,
  * so `vite build` never bakes a token into `dist`.
  */
-export function tokenMetaPlugin(dir: string): TokenMetaPlugin {
-  return { name: 'open-aflow-token', apply: 'serve', transformIndexHtml: (html) => injectTokenMeta(html, readSessionToken(dir)) }
+export function tokenMetaPlugin(dir: string | (() => string)): TokenMetaPlugin {
+  const at = typeof dir === 'function' ? dir : () => dir
+  return { name: 'open-aflow-token', apply: 'serve', transformIndexHtml: (html) => injectTokenMeta(html, readSessionToken(at())) }
 }

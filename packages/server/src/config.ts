@@ -1,3 +1,4 @@
+import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 export type Env =Record<string, string | undefined>
@@ -72,7 +73,14 @@ export function oldConfigDir(env: Env, platform: NodeJS.Platform, home: string):
   return p.join(base, OLD_CONFIG_DIR_NAME)
 }
 
-/** Not built yet. */
+/**
+ * The config folder the server uses, after the one-time copy: the new folder, except while only the old folder
+ * exists (a start whose copy failed runs there, and leaves the new one uncreated). The server and the Vite dev
+ * server both ask here, so the dev page reads the token from the folder the server writes it to.
+ */
 export function liveConfigDir(env: Env, platform: NodeJS.Platform, home: string): string {
-  return path.dirname(configPath(env, platform, home))
+  const dir = path.dirname(configPath(env, platform, home))
+  const old = oldConfigDir(env, platform, home)
+  if (old === undefined || existsSync(dir)) return dir
+  return statSync(old, { throwIfNoEntry: false })?.isDirectory() ? old : dir
 }
