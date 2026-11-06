@@ -2,11 +2,12 @@
 // pod-docs/feature-details/server.md, under "Config folder".
 
 import { randomUUID } from 'node:crypto'
-import { copyFile, mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
+import { processAlive } from './parent-link.ts'
 
-/** `copied`: done now. `none`: no old folder. `kept`: the new folder exists, so nothing is copied. `failed`: logged. */
-export type MoveResult = 'copied' | 'none' | 'kept' | 'failed'
+/** `copied`: done now. `none`: no old folder. `kept`: the new folder exists. `failed`: logged. `in-use`: a live server runs on the old folder. */
+export type MoveResult = 'copied' | 'none' | 'kept' | 'failed' | 'in-use'
 
 export type CopyFile = (from: string, to: string) => Promise<void>
 
@@ -23,7 +24,8 @@ export type MoveOptions = {
 }
 
 /** It names a live process of the old folder's server: a copy would make this server think another one owns auto-continue. */
-const NOT_COPIED = new Set(['auto-continue-owner.json'])
+const OWNER_FILE = 'auto-continue-owner.json'
+const NOT_COPIED = new Set([OWNER_FILE])
 /** A lock another program holds for a moment. Windows also says EPERM for a file open with no sharing. */
 const BUSY = new Set(['EBUSY', 'EPERM'])
 /** A copy takes seconds, so a part copy this old has no live owner. */
@@ -43,6 +45,18 @@ async function removeStaleParts(to: string): Promise<void> {
     const info = await stat(path).catch(() => undefined)
     if (info && Date.now() - info.mtimeMs > STALE_MS) await rm(path, { recursive: true, force: true }).catch(() => {})
   }
+}
+
+/** The live process the old folder's owner file names, if any. No file, a bad file, or a dead pid: none. */
+async function liveHolder(from: string): Promise<number | undefined> {
+  const text = await readFile(join(from, OWNER_FILE), 'utf8').catch(() => '')
+  let pid: unknown
+  try {
+    pid = (JSON.parse(text) as { pid?: unknown }).pid
+  } catch {
+    return undefined
+  }
+  return typeof pid === 'number' && Number.isInteger(pid) && pid > 0 && processAlive(pid) ? pid : undefined
 }
 
 /** Every file under `dir`, relative to it. Folders that can't be read count as having no files. */
@@ -74,6 +88,12 @@ export async function moveOldConfig(o: MoveOptions): Promise<MoveResult> {
   await removeStaleParts(to)
   if (await exists(to)) return 'kept'
   if (from === undefined || !(await isFolder(from))) return 'none'
+  // A server still runs on the old folder (a start whose copy failed): a copy now would split its writes from ours.
+  const holder = await liveHolder(from)
+  if (holder !== undefined) {
+    log(`open-aflow: the old config folder ${from} is in use by process ${holder}; this start uses it too, and a later start copies it`)
+    return 'in-use'
+  }
 
   const part = `${to}.moving-${randomUUID()}`
   let failedFile = ''
