@@ -29,7 +29,7 @@ describe('bundleDesktop', () => {
     expect(text).toMatch(/require\("electron"\)/)
     // CommonJS, with the shell's code inside and nothing of Electron's npm package.
     expect(text).not.toMatch(/^\s*import\s.+from\s/m)
-    expect(text).toContain('com.iamphduc.podboard')
+    expect(text).toContain('com.alvionlabs.openaflow')
     expect(text).not.toContain('Electron failed to install correctly')
 
     // pnpm package reads the bundle's packages from this file.

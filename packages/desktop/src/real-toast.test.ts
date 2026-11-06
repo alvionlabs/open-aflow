@@ -71,7 +71,7 @@ const removeWithRetry = async (path: string) => {
 }
 const POWERSHELL = join(WINDIR, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 const mainWindow = (pid: number) => spawnSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', `(Get-Process -Id ${pid}).MainWindowHandle`], { encoding: 'utf8', windowsHide: true }).stdout.trim()
-const INSTALLED_LNK = join(START_MENU, 'Pod Board.lnk')
+const INSTALLED_LNK = join(START_MENU, 'Open AFlow.lnk')
 const DEV_LNK = join(START_MENU, 'Electron.lnk')
 const stamp = (file: string) => (existsSync(file) ? statSync(file).mtimeMs : 'none')
 

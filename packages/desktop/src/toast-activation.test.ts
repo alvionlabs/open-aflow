@@ -60,7 +60,7 @@ describe('the run from an activation', () => {
 })
 
 describe('the activator the app registers', () => {
-  const EXE = 'C:\\Users\\a\\AppData\\Local\\Programs\\pod-board-desktop\\Pod Board.exe'
+  const EXE = 'C:\\Users\\a\\AppData\\Local\\Programs\\open-aflow\\Open AFlow.exe'
   const CLSID = '{D6B1EDA6-9DC7-427D-B544-15863FECE7EB}'
 
   test("the shortcut's own CLSID, the one Windows calls for every toast", () => {

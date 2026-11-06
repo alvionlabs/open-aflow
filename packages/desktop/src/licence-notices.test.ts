@@ -121,6 +121,10 @@ describe('licence notices', () => {
     expect(text).toContain('SIL Open Font License')
   })
 
+  test("the notice names the app", () => {
+    expect(renderNotices({ roots: [], overrides: {}, extras: [] })).toMatch(/^Open AFlow includes the third-party software named below\./)
+  })
+
   test('the same input gives the same text', () => {
     const a = plant(dir, 'a-pkg', '1.0.0', { licence: 'a' })
     const b = plant(dir, 'b-pkg', '1.0.0', { licence: 'b' })
