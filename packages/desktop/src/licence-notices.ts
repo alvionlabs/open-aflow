@@ -4,6 +4,7 @@
 
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { APP_NAME } from './shell-config.ts'
 
 export type BundleMeta = { workingDir: string; metafile: { inputs: Record<string, unknown>; outputs: Record<string, unknown> } }
 export type NoticeExtra = { title: string; text: string }
@@ -89,5 +90,5 @@ export function renderNotices(o: { roots: string[]; overrides: Record<string, st
     ...o.extras,
   ]
   const body = sections.map(({ title, text }) => `${RULE}\n${title}\n${RULE}\n\n${text}\n`).join('\n')
-  return `Pod Board includes the third-party software named below.\n\n${body}`
+  return `${APP_NAME} includes the third-party software named below.\n\n${body}`
 }

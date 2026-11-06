@@ -63,6 +63,7 @@ describe('setup rows', () => {
     expect(row.field).toBe(false)
     expect(row.path).toBe('C:\\gone\\claude.exe')
     expect(fixText(row.fix)).toContain('POD_BOARD_CLAUDE_BIN')
+    expect(fixText(row.fix)).toContain('then restart Open AFlow.')
   })
 
   it('the note on CLAUDE variables', () => {

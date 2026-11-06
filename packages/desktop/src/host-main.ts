@@ -3,13 +3,14 @@
 import { dirname } from 'node:path'
 import { utilityProcess } from 'electron'
 import type { ServerProcess } from './server-host.ts'
+import { SERVER_SERVICE_NAME } from './shell-config.ts'
 
 export function forkServer(o: { entry: string; env: NodeJS.ProcessEnv; onSpawn?(pid: number): void }): ServerProcess {
   const child = utilityProcess.fork(o.entry, [], {
     stdio: 'pipe',
     cwd: dirname(o.entry),
     env: o.env,
-    serviceName: 'Pod Board server',
+    serviceName: SERVER_SERVICE_NAME,
   })
   child.on('spawn', () => {
     if (child.pid !== undefined) o.onSpawn?.(child.pid)

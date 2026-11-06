@@ -73,7 +73,7 @@ function startFeed(folder: string) {
         res.writeHead(500).end('no')
       } else if (mode === 'bad-yml' && name === 'latest.yml') {
         res.writeHead(200).end(': [ not yaml')
-      } else if (!/^(latest\.yml|pod-board-setup-[\d.]+\.exe(\.blockmap)?)$/.test(name) || !existsSync(join(folder, name))) {
+      } else if (!/^(latest\.yml|open-aflow-setup-[\d.]+\.exe(\.blockmap)?)$/.test(name) || !existsSync(join(folder, name))) {
         res.writeHead(404).end()
       } else {
         const bytes = readFileSync(join(folder, name))
@@ -132,7 +132,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
   // Windows keeps four parts: 0.1.0.0.
   const exeVersion = () => powershell(`(Get-Item -LiteralPath '${exe()}' -ErrorAction SilentlyContinue).VersionInfo.ProductVersion`).replace(/\.0$/, '')
   const packagedVersion = () => (JSON.parse(extractFile(join(place.installDir, 'resources', 'app.asar'), 'package.json').toString('utf8')) as { version: string }).version
-  const installerFor = (version: string) => join(builds, version, `pod-board-setup-${version}.exe`)
+  const installerFor = (version: string) => join(builds, version, `open-aflow-setup-${version}.exe`)
 
   const pack = (args: string) => {
     const env: NodeJS.ProcessEnv = { ...process.env }
@@ -314,7 +314,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       const script = [
         `Add-Type -AssemblyName System.Drawing`,
         `Add-Type 'using System;using System.Runtime.InteropServices;public class W{[DllImport("user32.dll",CharSet=CharSet.Unicode)]public static extern IntPtr FindWindow(string c,string t);[DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr h,out R r);[DllImport("user32.dll")]public static extern bool PrintWindow(IntPtr h,IntPtr d,uint f);public struct R{public int L,T,Ri,B;}}'`,
-        `$h=[W]::FindWindow('#32770','Pod Board')`,
+        `$h=[W]::FindWindow('#32770','Open AFlow')`,
         `$r=New-Object W+R;[void][W]::GetWindowRect($h,[ref]$r)`,
         `$b=New-Object Drawing.Bitmap(($r.Ri-$r.L),($r.B-$r.T))`,
         `$g=[Drawing.Graphics]::FromImage($b);$d=$g.GetHdc();[void][W]::PrintWindow($h,$d,2);$g.ReleaseHdc($d)`,
@@ -411,10 +411,10 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       pack(`--output=${shipped}`)
       const resources = join(shipped, 'win-unpacked', 'resources')
       const update = parse(readFileSync(join(resources, 'app-update.yml'), 'utf8')) as Record<string, unknown>
-      expect(update).toMatchObject({ provider: 'github', owner: 'iamphduc', repo: 'pod-board' })
+      expect(update).toMatchObject({ provider: 'github', owner: 'alvionlabs', repo: 'open-aflow' })
       // The signature check is off: the field that turns it on is absent.
       expect(update.publisherName).toBeUndefined()
-      expect(update.updaterCacheDirName).toBe('pod-board-desktop-updater')
+      expect(update.updaterCacheDirName).toBe('open-aflow-updater')
 
       // A shipped build can't use the test feed, and a test build does hold it.
       expect(extractFile(join(resources, 'app.asar'), 'dist/main.cjs').toString('utf8')).not.toContain('POD_BOARD_UPDATE_TEST')
@@ -435,7 +435,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       finished = true
       expect(stateDiff(before!, await machineState())).toEqual([])
       expect(JSON.stringify((await machineState()).startMenu)).toBe(startMenuBefore)
-      expect(existsSync(join(PROGRAMS, 'Pod Board.lnk'))).toBe(false)
+      expect(existsSync(join(PROGRAMS, 'Open AFlow.lnk'))).toBe(false)
       expect(diff).toEqual([])
       console.log(proofLastLine(diff))
     },

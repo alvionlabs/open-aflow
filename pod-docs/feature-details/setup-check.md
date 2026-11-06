@@ -62,3 +62,4 @@ flowchart TD
 - 2026-11-02 · outside-terminal U1 · the setup check screen and its gate · [PR #76](https://github.com/iamphduc/pod-board/pull/76)
 - 2026-11-03 · windows-app plan fix · the install note and the no-runs states name pod and its install step · [PR #84](https://github.com/iamphduc/pod-board/pull/84)
 - 2026-11-03 · windows-app · final PR #83, verdict fix at round 2 · [report](../reports/windows-app.html)
+- 2026-11-05 · fix-rename-open-aflow · renamed: the setup check intro and the env-path fix ("then restart Open AFlow") say Open AFlow.

@@ -72,7 +72,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
 
   const base = () => `http://127.0.0.1:${place.port}`
   const exe = () => join(place.installDir, EXE_NAME)
-  const installer = () => join(RELEASE, `pod-board-setup-${version()}.exe`)
+  const installer = () => join(RELEASE, `open-aflow-setup-${version()}.exe`)
   const configDir = () => place.env.POD_BOARD_CONFIG_DIR!
   const fakePids = () => (existsSync(pidsFile) ? readFileSync(pidsFile, 'utf8').split('\n').filter(Boolean).map(Number) : [])
   const runValue = async () => (await machineState()).runValue
@@ -172,7 +172,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       expect(run.status, `${run.stdout}\n${run.stderr}`).toBe(0)
       expect(`${run.stdout}${run.stderr}`).not.toMatch(/\b(publishing|uploading|uploaded)\b/i)
 
-      const name = `pod-board-setup-${version()}.exe`
+      const name = `open-aflow-setup-${version()}.exe`
       expect(existsSync(join(RELEASE, name))).toBe(true)
       expect(existsSync(join(RELEASE, `${name}.blockmap`))).toBe(true)
       const update = parse(readFileSync(join(RELEASE, 'latest.yml'), 'utf8')) as { version: string; path: string; sha512: string }

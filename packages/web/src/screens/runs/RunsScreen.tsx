@@ -178,7 +178,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
           <div className="side-head">
             <span className="logo">
               <i aria-hidden="true" />
-              Pod Board
+              Open AFlow
             </span>
             {lost && (
               <span className={`status ${lost.cls}`} role="status">

@@ -342,11 +342,11 @@ describe('sidebar', () => {
     const { html } = render({ repo: chess([onlyQueue()]) })
     const side = sideOf(html)
     const at = (needle: string) => side.indexOf(needle)
-    expect(at('Pod Board')).toBeGreaterThan(-1)
+    expect(at('Open AFlow')).toBeGreaterThan(-1)
     // Just "Runs": the cards already show each run's state, so no `· N active` count.
     expect(side).toMatch(/<span class="eyebrow runs-head">Runs<\/span>/)
     expect(text(side)).not.toMatch(/active/)
-    expect(at('runs-head')).toBeGreaterThan(at('Pod Board'))
+    expect(at('runs-head')).toBeGreaterThan(at('Open AFlow'))
     expect(at('class="run-list"')).toBeGreaterThan(at('runs-head'))
     expect(side).toMatch(ADD)
     expect(side.search(ADD)).toBeGreaterThan(at('class="run-list"'))
@@ -380,7 +380,7 @@ describe('sidebar', () => {
   it('shows lost · retrying beside the title only while lost', () => {
     const repo = chess([onlyQueue()])
     const lost = sideOf(render({ repo, stream: 'lost' }).html)
-    expect(lost).toMatch(/class="side-head"[\s\S]*Pod Board[\s\S]*lost · retrying/)
+    expect(lost).toMatch(/class="side-head"[\s\S]*Open AFlow[\s\S]*lost · retrying/)
     expect(sideOf(render({ repo, stream: 'live' }).html)).not.toMatch(/retrying/)
   })
 

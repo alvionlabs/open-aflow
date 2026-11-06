@@ -129,7 +129,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
     async () => {
       const small = join(work, 'small')
       mkdirSync(small)
-      for (const name of readdirSync(good).filter((n) => /^pod-board-setup-.*\.exe(\.blockmap)?$/.test(n) || n === 'latest.yml')) copyFileSync(join(good, name), join(small, name))
+      for (const name of readdirSync(good).filter((n) => /^open-aflow-setup-.*\.exe(\.blockmap)?$/.test(n) || n === 'latest.yml')) copyFileSync(join(good, name), join(small, name))
       const installer = join(small, readdirSync(small).find((name) => name.endsWith('.exe'))!)
       writeFileSync(installer, readFileSync(installer).subarray(0, 1024 * 1024))
       const shrunk = await releaseCheck(small)

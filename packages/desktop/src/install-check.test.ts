@@ -27,7 +27,7 @@ describe('stateDiff', () => {
     const cases: [Partial<MachineState>, RegExp][] = [
       [{ uninstallKeys: ['HKEY_CURRENT_USER\\key-a'] }, /uninstall key.*key-a/],
       [{ runValue: '"x.exe" --hidden' }, /Run value.*x\.exe/],
-      [{ startMenu: ['C:\\sm\\Pod Board.lnk'] }, /Start-menu.*Pod Board\.lnk/],
+      [{ startMenu: ['C:\\sm\\Open AFlow.lnk'] }, /Start-menu.*Open AFlow\.lnk/],
       [{ apps: [4242] }, /app process.*4242/],
       [{ updaterCache: true }, /updater cache/],
       [{ realConfig: ['config.json 1', 'new.json 5'] }, /real config.*new\.json/],
@@ -105,8 +105,8 @@ describe('refuseRealInstall', () => {
     expect(() => refuseRealInstall(clean())).not.toThrow()
     expect(() => refuseRealInstall({ ...clean(), realConfig: null, updaterCache: true })).not.toThrow()
     expect(() => refuseRealInstall({ ...clean(), uninstallKeys: ['HKEY_CURRENT_USER\\the-key'] })).toThrow(/the-key/)
-    expect(() => refuseRealInstall({ ...clean(), startMenu: ['C:\\sm\\Pod Board.lnk'] })).toThrow(/Pod Board\.lnk/)
-    expect(() => refuseRealInstall({ ...clean(), runValue: '"C:\\real\\Pod Board.exe" --hidden' })).toThrow(/Run value/)
+    expect(() => refuseRealInstall({ ...clean(), startMenu: ['C:\\sm\\Open AFlow.lnk'] })).toThrow(/Open AFlow\.lnk/)
+    expect(() => refuseRealInstall({ ...clean(), runValue: '"C:\\real\\Open AFlow.exe" --hidden' })).toThrow(/Run value/)
     expect(() => refuseRealInstall({ ...clean(), apps: [99] })).toThrow(/99/)
   })
 })
