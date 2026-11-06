@@ -1,5 +1,6 @@
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
 import { request } from 'node:http'
 import { createServer, type Server } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -81,6 +82,8 @@ vi.mock('./tool-finder.ts', async (original) => {
   }
 })
 
+/** The pid of a process that has ended. */
+const DEAD_PID = spawnSync(process.execPath, ['-e', ''], { windowsHide: true }).pid!
 const META = /<meta name="open-aflow-token" content="([^"]+)">/
 const INDEX = '<!doctype html><html><head><title>Board</title></head><body>page body</body></html>'
 
@@ -534,7 +537,8 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     await writeFile(join(oldDir(), 'auto-continue.json'), '{"version":1,"runs":[]}\n')
     await writeFile(join(oldDir(), 'actions.jsonl'), '')
     await writeFile(join(oldDir(), 'resume-logs', 'a.log'), 'stderr\n')
-    await writeFile(join(oldDir(), 'auto-continue-owner.json'), JSON.stringify({ pid: process.pid, startedAt: Date.now() }))
+    // A pid that has ended: the old server is gone, as after an update.
+    await writeFile(join(oldDir(), 'auto-continue-owner.json'), JSON.stringify({ pid: DEAD_PID, startedAt: Date.now() }))
     return repo
   }
 
@@ -552,7 +556,7 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     expect(await repoNames(started.port)).toEqual(['repo:registered'])
     expect(existsSync(join(newDir(), 'resume-logs', 'a.log'))).toBe(true)
     expect(existsSync(join(newDir(), 'auto-continue.json'))).toBe(true)
-    // The old owner file names a live process; the copy leaves it, so this server owns auto-continue.
+    // The copy leaves the old owner file, so this server owns auto-continue in the new folder.
     expect(spies.autoStarts).toBe(1)
     expect(existsSync(join(oldDir(), 'auto-continue-owner.json'))).toBe(true)
     expect(logs.filter((l) => l.includes(oldDir()) && l.includes(newDir()))).toHaveLength(1)
@@ -574,9 +578,9 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     expect(existsSync(join(newDir(), 'config.json'))).toBe(false)
   })
 
-  /** The old config.json can't be read: what a file another program denies gives. */
-  const configUnreadable = (source: string) =>
-    source === join(oldDir(), 'config.json') ? Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' }) : undefined
+  /** The old auto-continue.json can't be read: a needed file the server doesn't need to start, as one another program denies. */
+  const togglesUnreadable = (source: string) =>
+    source === join(oldDir(), 'auto-continue.json') ? Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' }) : undefined
 
   const stopAll = async () => {
     for (const { started, exited } of running.splice(0)) {
@@ -585,20 +589,20 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     }
   }
 
-  test('an unreadable config.json: the start uses the old folder, an Add repo stays, and a later start copies it', async () => {
+  test('an unreadable auto-continue.json: the start uses the old folder, an Add repo stays, and a later start copies it', async () => {
     await writeOld()
     const second = join(tmp, 'second')
     await mkdir(join(second, 'pod-docs'), { recursive: true })
     await writeFile(join(second, 'pod-docs', 'README.md'), '# pod docs\n\npod docs: 2\n')
 
-    spies.copyFails = configUnreadable
+    spies.copyFails = togglesUnreadable
     const first = await startOwn(ownEnv())
     expect(await repoNames(first.started.port)).toEqual(['repo:registered'])
     const failed = logs.filter((l) => l.includes('could not copy'))
     expect(failed).toHaveLength(1)
     expect(failed[0]).toContain(oldDir())
     expect(failed[0]).toContain(newDir())
-    expect(failed[0]).toContain('config.json')
+    expect(failed[0]).toContain('auto-continue.json')
     expect(failed[0]).toContain('EPERM')
     const token = await pageToken(first.started.port)
     const added = await send(first.started.port, '/api/repos', {
@@ -624,9 +628,43 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     expect(logs.filter((l) => l.includes('copied the old config folder'))).toHaveLength(1)
   })
 
+  test('A is live on the old folder when B starts: B runs there too and copies nothing, so A loses no write', async () => {
+    await writeOld()
+    const second = join(tmp, 'second')
+    await mkdir(join(second, 'pod-docs'), { recursive: true })
+    await writeFile(join(second, 'pod-docs', 'README.md'), '# pod docs\n\npod docs: 2\n')
+
+    spies.copyFails = togglesUnreadable
+    const a = await startOwn(ownEnv())
+    spies.copyFails = undefined
+    const b = await startOwn(ownEnv())
+    expect(existsSync(newDir())).toBe(false)
+    expect(liveConfigDir(ownEnv(), process.platform, tmp)).toBe(oldDir())
+    const inUse = logs.filter((l) => l.includes('in use'))
+    expect(inUse).toHaveLength(1)
+    expect(inUse[0]).toContain(oldDir())
+    // One owner for both: A took the old folder's owner file, so B runs no automatic check.
+    expect(spies.autoStarts).toBe(1)
+    expect(await repoNames(b.started.port)).toEqual(['repo:registered'])
+
+    const token = await pageToken(a.started.port)
+    const added = await send(a.started.port, '/api/repos', {
+      method: 'POST',
+      headers: { Origin: `http://127.0.0.1:${a.started.port}`, 'Content-Type': 'application/json', 'X-Open-AFlow-Token': token },
+      body: JSON.stringify({ path: second }),
+    })
+    expect(added.status).toBe(201)
+    await stopAll()
+
+    // A is gone: the next start copies the old folder with A's write in it.
+    const c = await startOwn(ownEnv())
+    expect((await repoNames(c.started.port)).sort()).toEqual(['repo:registered', 'second:registered'])
+    expect(existsSync(join(newDir(), 'config.json'))).toBe(true)
+  })
+
   test('dev: after a failed copy the token file is in the old folder, where the dev page looks for it', async () => {
     await writeOld()
-    spies.copyFails = configUnreadable
+    spies.copyFails = togglesUnreadable
     const { started } = await start(ownEnv({ OPEN_AFLOW_API_PORT: String(await freePort()), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
     expect(await repoNames(started.port)).toEqual(['repo:registered'])
     expect(liveConfigDir(ownEnv(), process.platform, tmp)).toBe(oldDir())

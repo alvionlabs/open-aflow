@@ -1,9 +1,13 @@
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, realpathSync } from 'node:fs'
 import { copyFile, mkdir, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { moveOldConfig } from './config-move.ts'
+
+/** The pid of a process that has ended: the old folder's server is gone. */
+const DEAD_PID = spawnSync(process.execPath, ['-e', ''], { windowsHide: true }).pid!
 
 // Temp folders only: `from` and `to` are always under a fresh mkdtemp root.
 let root: string
@@ -28,7 +32,7 @@ const OLD_FILES: Record<string, string> = {
   'tool-paths.json': '{"gh":"C:\\gh.exe"}\n',
   'resume-logs/one.log': 'stderr one\n',
   'resume-logs/deep/two.log': 'stderr two\n',
-  'auto-continue-owner.json': '{"pid":1}\n',
+  'auto-continue-owner.json': `{"pid":${DEAD_PID}}\n`,
 }
 
 const writeOld = async () => {
@@ -95,6 +99,23 @@ describe('moveOldConfig', () => {
     expect(existsSync(to)).toBe(false)
     expect(logs).toEqual([])
     expect(errors).toEqual([])
+  })
+
+  test('an old folder a live server holds is not copied: the start runs there, and one line says so', async () => {
+    await writeOld()
+    await writeFile(join(from, 'auto-continue-owner.json'), JSON.stringify({ pid: process.pid, startedAt: Date.now() }))
+    expect(await moveOldConfig({ from, to, ...io() })).toBe('in-use')
+    expect(existsSync(to)).toBe(false)
+    expect(await readdir(root)).toEqual(['pod-board'])
+    expect(logs).toHaveLength(1)
+    expect(logs[0]).toContain(from)
+    expect(logs[0]).toContain(String(process.pid))
+  })
+
+  test('an owner file with no usable pid does not hold the old folder', async () => {
+    await writeOld()
+    await writeFile(join(from, 'auto-continue-owner.json'), 'not json')
+    expect(await moveOldConfig({ from, to, ...io() })).toBe('copied')
   })
 
   test('an old path that is a file, not a folder, copies nothing', async () => {
