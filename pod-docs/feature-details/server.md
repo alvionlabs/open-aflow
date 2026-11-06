@@ -86,6 +86,21 @@ flowchart TD
   Example: `?path=E:/Projects` → `{ path: "E:\\Projects", parent: "E:\\", locked: false, truncated: false, folders: [{ name: "open-aflow", path: "E:\\Projects\\open-aflow", podDocs: true }, …] }`. With no token → `403 {"error":"bad token"}`; `?path=%5C%5Chost%5Cshare` → `400 {"error":"not a local path"}`.
   - A link counts as a folder only when it ends at a local folder. On Windows each target is read with `readlink` and a network or device target is dropped before anything follows it; a linked `pod-docs` reads `false`. Files and broken links are left out. It reads names, types and link targets, never a file, and stores nothing.
 
+### Settings
+
+All optional, set as environment variables:
+
+| Variable | What it does | Default |
+|---|---|---|
+| `OPEN_AFLOW_API_PORT` | Port of the API server. In production, the one port, with no fallback | `3000`. In production, `47800`, or a free port if it's busy |
+| `OPEN_AFLOW_WEB_PORT` | Port of the web app. Only `pnpm dev` reads it | `3001` |
+| `OPEN_AFLOW_CONFIG_DIR` | Folder for `config.json` | `%APPDATA%\open-aflow-server` on Windows, `~/Library/Application Support/open-aflow-server` on macOS, `$XDG_CONFIG_HOME/open-aflow-server` (or `~/.config/open-aflow-server`) elsewhere |
+| `OPEN_AFLOW_PORTS_DIR` | Where pod writes its run claims | `<temp>/pod-ports` |
+| `OPEN_AFLOW_CLAUDE_DIR` | Claude's folder, for agent transcripts (read only) | `CLAUDE_CONFIG_DIR`, else `~/.claude` |
+| `OPEN_AFLOW_CLAUDE_BIN` | The `claude` program that Continue, Go, and auto-continue start | `claude` on `PATH` |
+| `OPEN_AFLOW_TRANSCRIPT_DAYS` | How many days of sessions to read | `30` |
+| `OPEN_AFLOW_POLL` | `1` watches files by polling, for network drives | off |
+
 ## Why it's this way
 
 - **Loopback, a Host check, and an `Origin` check for writes:** DNS rebinding is the risk even for a read-only server, and a 2026 advisory showed Host alone isn't enough for a server with write tools ([research](../research/board-actions.md)).
