@@ -16,6 +16,8 @@ const spies = vi.hoisted(() => ({
   watcherCloses: 0,
   autoStarts: 0,
   watcherStartsAtFirstCheck: undefined as number | undefined,
+  /** The folders the fake `gh` was asked to run in. */
+  ghCwds: [] as string[],
   /** Set: the config folder copy's `copyFile` throws what this returns for a source, as an unreadable file would. */
   copyFails: undefined as ((source: string) => NodeJS.ErrnoException | undefined) | undefined,
 }))
@@ -64,6 +66,17 @@ vi.mock('./auto-continue.ts', async (original) => {
       return a
     },
   }
+})
+
+// No real `gh`: a run starts in the repo's folder and can outlive the server's stop, and on Windows its working
+// folder can't be removed. The fake answers `not-found` at once and records each folder it was asked to run in.
+vi.mock('./gh.ts', async (original) => {
+  const real = await original<typeof import('./gh.ts')>()
+  const fake: typeof real.defaultGhExec = (_args, cwd) => {
+    spies.ghCwds.push(cwd)
+    return Promise.resolve({ status: 'not-found', stdout: '' })
+  }
+  return { ...real, defaultGhExec: fake, createFoundGhExec: () => fake }
 })
 
 vi.mock('./tool-finder.ts', async (original) => {
@@ -213,6 +226,7 @@ beforeEach(async () => {
   spies.autoStarts = 0
   spies.watcherStartsAtFirstCheck = undefined
   spies.copyFails = undefined
+  spies.ghCwds = []
 })
 
 afterEach(async () => {
@@ -568,6 +582,8 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     const { started } = await start(ownEnv({ OPEN_AFLOW_API_PORT: String(api), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
     expect(await repoNames(started.port)).toEqual(['repo:registered'])
     expect(existsSync(join(newDir(), 'session-token'))).toBe(true)
+    // The board asks gh in the repo's folder: a real gh there could still hold it at teardown.
+    expect(spies.ghCwds).toContain(join(tmp, 'repo'))
   })
 
   test('an existing new folder is never overwritten', async () => {
