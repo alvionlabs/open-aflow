@@ -33,7 +33,7 @@ flowchart TD
 
 - **Unsigned, with `verifyUpdateCodeSignature: false`.** Friends won't rebuild, and an unsigned build needs the check off. Turned down for now: signing, which waits for the next plan. Trade-off: nothing proves who published an update, so the GitHub account is the trust boundary. Signing comes before a public launch.
 - **Only the human's tag publishes.** The sprint contract replaced the plan's two throwaway test releases with a local feed. Trade-off: the GitHub path stays unproved until the first two tags.
-- **`open-aflow` as the packaged name.** It names the install folder and the updater's cache folder. NSIS's `--delete-app-data` removes `%APPDATA%\<name>`, so it must never be `pod-board`, the server's config folder.
+- **`open-aflow` as the packaged name.** It names the install folder and the updater's cache folder. NSIS's `--delete-app-data` removes `%APPDATA%\<name>`, and `%APPDATA%\<product name>` (`Open AFlow`), so neither may be the server's config folder, `open-aflow-server`. `build-config.test.ts` checks it against `CONFIG_DIR_NAME`.
 - **The server stops first on Restart now.** The installer's `Stop-Process` would end it with no drain.
 - **The test feed is compiled out.** A build-time flag removes it from every shipped build, and `release:check` refuses a build that holds its text.
 
@@ -46,7 +46,7 @@ flowchart TD
 - **Open queue item (before hosting):** no Electron fuses are set, so `ELECTRON_RUN_AS_NODE` still works on the shipped exe.
 - A real install makes `refuseRealInstall` stop every proof. Uninstall first.
 - `pnpm package --test-feed` is for proofs only. Never upload its files.
-- An uninstall leaves `%LOCALAPPDATA%\open-aflow-updater`, about 122 MB. It keeps `%APPDATA%\pod-board`.
+- An uninstall leaves `%LOCALAPPDATA%\open-aflow-updater`, about 122 MB. It keeps `%APPDATA%\open-aflow-server`, and the old config folder that the first start copied from.
 - `quitAndInstall` often emits `error` and doesn't throw, so the flow treats that as a failed install: it logs and quits.
 - The templates match a process by `StartsWith($INSTDIR)`, so an exe in a sibling folder with that prefix also ends.
 - The local proof shows the full-download fallback, not a differential download.
@@ -72,3 +72,4 @@ To pull a bad release, delete it on the Releases page, then tag a higher version
 - 2026-11-04 · fix-late-merge-continue · a normal install opens the app. A silent install still stays closed.
 - 2026-11-04 · fix-late-merge-continue · fixed: `proof-install` failed its window check since 2026-11-03 (`b32d1a2`), when `windowsHide: true` reached the proof's app start. A login start's no-window check also meant nothing while that flag was on.
 - 2026-11-05 · fix-rename-open-aflow · renamed: the app is Open AFlow. New installer and exe names, app ID, install folder, updater cache folder, and the update feed at `alvionlabs/open-aflow`.
+- 2026-11-05 · fix-rename-internals · renamed: every internal name is `open-aflow`; the server's config folder is `%APPDATA%\open-aflow-server`, copied once from the old folder.

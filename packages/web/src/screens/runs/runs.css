@@ -300,7 +300,7 @@
 /*
  * Stacked by default: name at full width, status, then the repo line. At 256 px of content or less (a card of
  * 290 px, a sidebar of 323 px, so the default 260 px too) a two-column name is under 156 px, and a long word such
- * as `pod_board_long_repo` would break. Above that, a word with a hyphen or an underscore breaks only there. A
+ * as `open_aflow_long_repo` would break. Above that, a word with a hyphen or an underscore breaks only there. A
  * single token over 157 px with no separator may still break mid-word just above the threshold; that limit is
  * accepted. Stacked, only a word wider than the whole line may break.
  */

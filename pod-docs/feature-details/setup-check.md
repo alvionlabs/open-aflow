@@ -20,13 +20,13 @@ flowchart TD
 
 **Find order, first match wins per tool.** A check only looks for a file. It starts no tool and shows no window.
 
-1. `claude` only: `POD_BOARD_CLAUDE_BIN`, with no search.
+1. `claude` only: `OPEN_AFLOW_CLAUDE_BIN`, with no search.
 2. A path in `<config dir>/tool-paths.json`.
 3. The inherited `Path`, absolute entries only.
 4. The registry `Path`, HKLM then HKCU, through `reg.exe` with a 5 s limit.
 5. Known folders: Git, GitHub CLI, WinGet, scoop, `.local\bin`, `.claude\local`, and `%APPDATA%\npm`.
 
-**Rows.** `found` shows its path. `missing` shows an install link and a path field. `bad path` shows the path, what to do, and a field. A `bad path` from `POD_BOARD_CLAUDE_BIN` names the variable and has no field.
+**Rows.** `found` shows its path. `missing` shows an install link and a path field. `bad path` shows the path, what to do, and a field. A `bad path` from `OPEN_AFLOW_CLAUDE_BIN` names the variable and has no field.
 
 **Routes (production only; dev answers 404).** `GET /api/tools` needs the token and runs a new check. `POST /api/actions/tool-path` takes `{ tool, path }`, and `path: null` clears. A refused path gets `400` with one word: `bad request`, `not a local path`, `not absolute`, `not a file`, or `wrong tool`.
 

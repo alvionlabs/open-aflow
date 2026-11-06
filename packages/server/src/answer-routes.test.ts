@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { AnswerResult, Board, NewActionEntry } from '@pod-board/model'
+import type { AnswerResult, Board, NewActionEntry } from '@open-aflow/model'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createAnswerRoutes } from './answer-routes.ts'
@@ -14,7 +14,7 @@ import { createSessionToken } from './session-token.ts'
 const API = 3050
 const WEB = 3051
 const TOKEN = createSessionToken()
-const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-pod-board-token': TOKEN }
+const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-open-aflow-token': TOKEN }
 const NOW = Date.parse('2026-10-21T12:00:00Z')
 
 const PLAN = [
@@ -51,7 +51,7 @@ async function makeRepo(path: string, plan: string, queue: string[]) {
 }
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'pod-board-a1-routes-'))
+  root = await mkdtemp(join(tmpdir(), 'open-aflow-a1-routes-'))
   repoPath = join(root, 'repos', 'r')
   claimedPath = join(root, 'repos', 'c')
   await makeRepo(repoPath, 'alpha', [HALT, NOTE, DONE, ANSWERED, TO_POD, TO_POD_BLOCKED, ASK])
@@ -111,7 +111,7 @@ async function setup(opts: SetupOpts = {}) {
   })
   const app = createApp({ ports: [API, WEB], token: TOKEN, source, addRepo: async () => ({ error: 'not a directory' }), timeline: async () => undefined, actions: new Hono().route('/', routes) })
   const repoOf = (path: string) => board.repos.find((r) => r.path === path)!
-  const headers = opts.token === false ? { ...HEADERS, 'x-pod-board-token': '' } : HEADERS
+  const headers = opts.token === false ? { ...HEADERS, 'x-open-aflow-token': '' } : HEADERS
   const post = (body: unknown) => app.request('/api/actions/answer', { method: 'POST', headers, body: JSON.stringify(body) })
   return { post, logged, events, rebuilds: () => rebuilds, board: () => board, repoId: repoOf(repoPath).id, claimedId: repoOf(claimedPath).id, repoOf }
 }

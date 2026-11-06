@@ -11,7 +11,7 @@ const PACKAGE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /**
  * The packaged app's `name`. It sets the install folder and the updater's cache folder, and NSIS's
- * `--delete-app-data` removes `%APPDATA%\<name>`, so it must never be the server's config folder, `pod-board`.
+ * `--delete-app-data` removes `%APPDATA%\<name>`, so it must never be the server's config folder, `open-aflow-server`.
  */
 const PACKAGED_NAME = 'open-aflow'
 

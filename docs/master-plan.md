@@ -1,4 +1,4 @@
-# Pod Board: master plan
+# Open AFlow: master plan
 
 _Written: 2026-10-18 · Updated: 2026-11-02 · Status: phases 1 and 2 built (pod plans `board-read`, `board-actions`); next is the Windows app (plan `windows-app`) · Design: [docs/design/preview.html](design/preview.html) ([published preview](https://claude.ai/artifact/H2xCmKqGwKRvvUyqCnx6P8))_
 

@@ -7,7 +7,7 @@ import { createWebApp } from './web-app.ts'
 
 const TOKEN = 'test-token-value'
 const INDEX = '<!doctype html><html><head><title>Board</title></head><body>page body</body></html>'
-const META = `<meta name="pod-board-token" content="${TOKEN}">`
+const META = `<meta name="open-aflow-token" content="${TOKEN}">`
 
 let root: string
 let web: string
@@ -36,7 +36,7 @@ const expect404 = async (res: Response) => {
 }
 
 beforeEach(async () => {
-  root = await realpath(await mkdtemp(join(tmpdir(), 'pod-board-web-')))
+  root = await realpath(await mkdtemp(join(tmpdir(), 'open-aflow-web-')))
   web = join(root, 'web')
   await put('index.html', INDEX)
   await put('assets/app-abc.js', 'console.log(1)')

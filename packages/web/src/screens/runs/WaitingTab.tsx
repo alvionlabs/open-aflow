@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { BoardRepo, RunSummary } from '@pod-board/model'
+import type { BoardRepo, RunSummary } from '@open-aflow/model'
 import { Icon } from '../../theme/icons.tsx'
 import { AnswerForm } from './AnswerForm.tsx'
 import { INITIAL, createAnswerFlow, type AnswerState } from './answer-flow.ts'

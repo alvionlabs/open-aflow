@@ -54,7 +54,7 @@ describe('checkUpdateFile', () => {
 describe('checkNoTestFeed', () => {
   test('the test feed text in main.cjs fails', () => {
     expect(() => checkNoTestFeed('const a = 1')).not.toThrow()
-    expect(() => checkNoTestFeed('const a = process.env.POD_BOARD_UPDATE_TEST_FEED')).toThrow(/POD_BOARD_UPDATE_TEST/)
+    expect(() => checkNoTestFeed('const a = process.env.OPEN_AFLOW_UPDATE_TEST_FEED')).toThrow(/OPEN_AFLOW_UPDATE_TEST/)
   })
 })
 

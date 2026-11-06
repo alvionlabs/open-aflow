@@ -3,7 +3,7 @@
 // route, so the two never start a second run on one session. The rules and why are in
 // pod-docs/feature-details/resume.md.
 
-import { autoSends, repoPathKey, type Board, type BoardRepo, type NewActionEntry, type ResumeResult } from '@pod-board/model'
+import { autoSends, repoPathKey, type Board, type BoardRepo, type NewActionEntry, type ResumeResult } from '@open-aflow/model'
 import type { AutoContinueStore } from './auto-continue-store.ts'
 import type { ClaudeRunner, ResumeWord, StartResult } from './claude-runner.ts'
 
@@ -67,7 +67,7 @@ export function createAutoContinue(
     onError?: (err: unknown) => void
   },
 ): AutoContinue {
-  const onError = d.onError ?? ((err: unknown) => console.error('pod-board auto-continue:', err))
+  const onError = d.onError ?? ((err: unknown) => console.error('open-aflow auto-continue:', err))
   const now = d.now ?? Date.now
   let unsubscribe: (() => void) | undefined
   let timer: ReturnType<typeof setInterval> | undefined

@@ -1,4 +1,4 @@
-import { OTHER_CAP, OTHER_WINDOW_MS, type OtherAgent } from '@pod-board/model'
+import { OTHER_CAP, OTHER_WINDOW_MS, type OtherAgent } from '@open-aflow/model'
 import { Chip } from './Chip.tsx'
 import { otherRows } from './view.ts'
 

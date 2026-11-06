@@ -5,7 +5,7 @@
 
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
-import type { Board } from '@pod-board/model'
+import type { Board } from '@open-aflow/model'
 import { watch, type FSWatcher } from 'chokidar'
 import type { BoardService } from './board-service.ts'
 import { projectDirName } from './transcript-files.ts'
@@ -21,7 +21,7 @@ export type BoardWatcherOptions = {
   configFile: string
   portsDir: string
   claudeDir: string
-  /** Watch by polling (`POD_BOARD_POLL=1`): for network drives and file systems that miss events. */
+  /** Watch by polling (`OPEN_AFLOW_POLL=1`): for network drives and file systems that miss events. */
   poll?: boolean
   debounceMs?: number
   /** The longest a rebuild waits after the first event of a burst. */
@@ -93,7 +93,7 @@ export function createBoardWatcher(o: BoardWatcherOptions): BoardWatcher {
   const maxWaitMs = o.maxWaitMs ?? MAX_WAIT_MS
   const tickMs = o.tickMs ?? TICK_MS
   const openWatch = o.watch ?? watch
-  const onError = o.onError ?? ((err: unknown) => console.error('pod-board watcher:', err))
+  const onError = o.onError ?? ((err: unknown) => console.error('open-aflow watcher:', err))
   const subscribers = new Set<(b: Board) => void>()
   // Key → open watcher. A key names the folder and whether it is watched itself or through its nearest existing parent.
   const watchers = new Map<string, FSWatcher>()

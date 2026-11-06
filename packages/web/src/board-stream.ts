@@ -6,7 +6,7 @@
 // failed health check (or one slower than 4 s) while a stream is open counts
 // as an error too.
 
-import type { Board } from '@pod-board/model'
+import type { Board } from '@open-aflow/model'
 
 export type StreamState = 'connecting' | 'live' | 'lost'
 

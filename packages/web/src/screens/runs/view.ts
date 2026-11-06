@@ -14,7 +14,7 @@ import {
   type OtherAgent,
   type RunState,
   type RunSummary,
-} from '@pod-board/model'
+} from '@open-aflow/model'
 import type { StreamState } from '../../board-stream.ts'
 import { hashFor, type View } from '../../selection.ts'
 import type { NextStatus } from './next-step.ts'

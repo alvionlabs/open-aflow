@@ -1,5 +1,5 @@
 {
-  "name": "@pod-board/desktop",
+  "name": "@open-aflow/desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,9 +12,9 @@
   },
   "devDependencies": {
     "@electron/asar": "4.3.1",
-    "@pod-board/model": "workspace:*",
-    "@pod-board/server": "workspace:*",
-    "@pod-board/web": "workspace:*",
+    "@open-aflow/model": "workspace:*",
+    "@open-aflow/server": "workspace:*",
+    "@open-aflow/web": "workspace:*",
     "@types/pngjs": "6.0.5",
     "electron": "45.2.1",
     "electron-builder": "26.18.1",

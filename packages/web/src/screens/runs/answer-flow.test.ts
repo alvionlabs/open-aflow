@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AnswerResult } from '@pod-board/model'
+import type { AnswerResult } from '@open-aflow/model'
 import { NEED_RELOAD, RESTARTED, UNREACHABLE, type ActionReply } from '../../actions-client.ts'
 import { INITIAL, createAnswerFlow, formView, reduce, type AnswerState, type AnswerTarget, type Post } from './answer-flow.ts'
 import { ANSWER_NOTE } from './queue-view.ts'

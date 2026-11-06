@@ -4,18 +4,18 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createSessionToken, injectTokenMeta, readSessionToken, TOKEN_FILE, tokenMetaPlugin, writeSessionToken } from './session-token.ts'
 
-const HTML = '<!doctype html>\n<html>\n  <head>\n    <title>Pod Board</title>\n  </head>\n  <body></body>\n</html>\n'
+const HTML = '<!doctype html>\n<html>\n  <head>\n    <title>Open AFlow</title>\n  </head>\n  <body></body>\n</html>\n'
 
 let root: string
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'pod-board-s1-token-'))
+  root = await mkdtemp(join(tmpdir(), 'open-aflow-s1-token-'))
 })
 afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
 /** The token meta tags in an HTML text, with their `content`. */
-const metas = (html: string) => [...html.matchAll(/<meta name="pod-board-token" content="([^"]*)">/g)].map((m) => m[1])
+const metas = (html: string) => [...html.matchAll(/<meta name="open-aflow-token" content="([^"]*)">/g)].map((m) => m[1])
 
 describe('session token', () => {
   test('creates a fresh token each launch', () => {
@@ -82,6 +82,18 @@ describe('session token', () => {
 })
 
 describe('token meta', () => {
+  test('asks for the folder at each page load, so it follows the folder the server picked', async () => {
+    let dir = join(root, 'old')
+    const plugin = tokenMetaPlugin(() => dir)
+    const a = createSessionToken()
+    await writeSessionToken(dir, a)
+    expect(metas(plugin.transformIndexHtml(HTML))).toEqual([a])
+    dir = join(root, 'new')
+    const b = createSessionToken()
+    await writeSessionToken(dir, b)
+    expect(metas(plugin.transformIndexHtml(HTML))).toEqual([b])
+  })
+
   test('injects the token meta on each page load', async () => {
     const dir = join(root, 'cfg')
     const plugin = tokenMetaPlugin(dir)
@@ -104,7 +116,7 @@ describe('token meta', () => {
 
   test('the meta value is HTML-escaped', () => {
     const page = injectTokenMeta(HTML, `a"b<c>d&e'f`)
-    expect(page).toContain('<meta name="pod-board-token" content="a&quot;b&lt;c&gt;d&amp;e&#39;f">')
+    expect(page).toContain('<meta name="open-aflow-token" content="a&quot;b&lt;c&gt;d&amp;e&#39;f">')
     expect(page).not.toContain('a"b')
   })
 
@@ -119,6 +131,6 @@ describe('token meta', () => {
   test('plugin runs only on the dev server', () => {
     const plugin = tokenMetaPlugin(root)
     expect(plugin.apply).toBe('serve')
-    expect(plugin.name).toBe('pod-board-token')
+    expect(plugin.name).toBe('open-aflow-token')
   })
 })

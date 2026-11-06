@@ -2,7 +2,7 @@ import { realpathSync, rmSync } from 'node:fs'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildRepoModel, type AgentRun, type Board, type BoardRepo, type NewActionEntry, type PrStatus, type RepoFiles } from '@pod-board/model'
+import { buildRepoModel, type AgentRun, type Board, type BoardRepo, type NewActionEntry, type PrStatus, type RepoFiles } from '@open-aflow/model'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { AUTO_TICK_MS, createAutoContinue } from './auto-continue.ts'
 import { createAutoContinueStore, type AutoContinueStore } from './auto-continue-store.ts'
@@ -12,7 +12,7 @@ let root: string
 let file: string
 
 beforeEach(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), 'pod-board-s1-auto-')))
+  root = realpathSync(await mkdtemp(join(tmpdir(), 'open-aflow-s1-auto-')))
   file = join(root, 'cfg', 'auto-continue.json')
 })
 

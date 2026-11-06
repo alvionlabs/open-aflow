@@ -1,5 +1,5 @@
-import { STOP_MESSAGE } from '@pod-board/server/parent-link'
-import { DRAIN_CAP_MS } from '@pod-board/server/shutdown'
+import { STOP_MESSAGE } from '@open-aflow/server/parent-link'
+import { DRAIN_CAP_MS } from '@open-aflow/server/shutdown'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createServerHost, READY_LIMIT_MS, STABLE_MS, STOP_KILL_MS, type ServerProcess } from './server-host.ts'
 
@@ -28,7 +28,7 @@ function fakeProcess(pid: number): FakeProcess {
     onMessage: (fn) => void (onMessage = fn),
     onExit: (fn) => void (onExit = fn),
     onOutput: (fn) => void (onOutput = fn),
-    ready: (port) => onMessage({ type: 'pod-board:ready', port }),
+    ready: (port) => onMessage({ type: 'open-aflow:ready', port }),
     message: (m) => onMessage(m),
     exit: (code = 1) => onExit(code),
     output: (text) => onOutput(text),
@@ -72,18 +72,18 @@ describe('the server host', () => {
     for (const bad of [
       undefined,
       null,
-      'pod-board:ready',
+      'open-aflow:ready',
       7,
       [],
       {},
       { type: 'other', port: 3110 },
-      { type: 'pod-board:ready' },
-      { type: 'pod-board:ready', port: '3110' },
-      { type: 'pod-board:ready', port: 0 },
-      { type: 'pod-board:ready', port: -1 },
-      { type: 'pod-board:ready', port: 65536 },
-      { type: 'pod-board:ready', port: 3110.5 },
-      { type: 'pod-board:ready', port: Number.NaN },
+      { type: 'open-aflow:ready' },
+      { type: 'open-aflow:ready', port: '3110' },
+      { type: 'open-aflow:ready', port: 0 },
+      { type: 'open-aflow:ready', port: -1 },
+      { type: 'open-aflow:ready', port: 65536 },
+      { type: 'open-aflow:ready', port: 3110.5 },
+      { type: 'open-aflow:ready', port: Number.NaN },
     ]) {
       expect(() => p.message(bad)).not.toThrow()
     }

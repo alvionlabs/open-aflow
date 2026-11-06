@@ -14,3 +14,11 @@ describe('the Vite config refuses framing', () => {
     expect((config as { preview?: { headers?: object } }).preview?.headers).toMatchObject(NO_FRAMING)
   })
 })
+
+describe('the dev page token', () => {
+  test("reads the token from the server's live config folder, the same choice the server makes", async () => {
+    const { readFileSync } = await import('node:fs')
+    const text = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8')
+    expect(text).toMatch(/tokenMetaPlugin\(\(\) => liveConfigDir\(process\.env, process\.platform, homedir\(\)\)\)/)
+  })
+})

@@ -1,7 +1,7 @@
-// Public entry of @pod-board/model: the run model, the board types, the
+// Public entry of @open-aflow/model: the run model, the board types, the
 // transcript parser, the format readers, and the ported pod-flow parsers.
 // Nothing under src/ may do I/O (see test/no-io.test.ts).
-export const MODEL_PACKAGE = '@pod-board/model'
+export const MODEL_PACKAGE = '@open-aflow/model'
 
 export * from './run-model.ts'
 export type * from './board.ts'

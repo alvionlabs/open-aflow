@@ -11,12 +11,12 @@ Two entries share one wiring. `startServer` holds it. `main.ts` runs dev, and `m
 | | Dev | Production |
 |---|---|---|
 | Token | New per start, written to `<config dir>/session-token`; Vite puts it in the page | New per start, in memory only; the server puts it in the page |
-| Port | `POD_BOARD_API_PORT`, default 3000, no fallback | See below |
+| Port | `OPEN_AFLOW_API_PORT`, default 3000, no fallback | See below |
 | `Host` and `Origin` | API port and web port | The bound port only |
 | Page routes | Vite | The answer order below |
 | Framing headers | `frame-ancestors 'none'` and `X-Frame-Options: DENY` from Vite | On every web answer |
 
-**Port.** With `POD_BOARD_API_PORT` unset or empty, the server tries 47800. On `EADDRINUSE` or `EACCES`, the OS picks a free port for this launch, and the log names it. With the variable set, a busy port stops the start.
+**Port.** With `OPEN_AFLOW_API_PORT` unset or empty, the server tries 47800. On `EADDRINUSE` or `EACCES`, the OS picks a free port for this launch, and the log names it. With the variable set, a busy port stops the start.
 
 **Answers, first match wins.** Every answer sits behind the request guard, and a real API route always wins.
 
@@ -57,11 +57,11 @@ Every web answer, a 404 too, sends `Content-Security-Policy: frame-ancestors 'no
 - **Open queue item (before hosting):** any local process can read the token from `GET /`, and `tool-path` then chooses the file that runs as `claude`.
 - A framed page passes the guards, because it holds its own token and sends its own `Origin`. Only the headers stop it.
 - `/sw.js` differs by mode: production answers 404 JSON, and dev's web port answers HTML from Vite.
-- Tests never bind 47800. Set `POD_BOARD_API_PORT` or pass `preferredPort`.
+- Tests never bind 47800. Set `OPEN_AFLOW_API_PORT` or pass `preferredPort`.
 - `main-production.ts` run from source looks for `packages/server/src/web/` and exits 1. Never leave that folder behind.
 - `/api%2fnope` answers the page, because the router doesn't decode `%2f`. It leaks nothing.
 - Not proved: a real `EACCES` from Windows reserved ports, and the busy-47800 fallback through the bundle.
-- Run it with temp `POD_BOARD_CONFIG_DIR` and `POD_BOARD_PORTS_DIR` in checks.
+- Run it with temp `OPEN_AFLOW_CONFIG_DIR` and `OPEN_AFLOW_PORTS_DIR` in checks.
 
 ## History
 

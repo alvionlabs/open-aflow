@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import type { GhStatus, PrStatus } from '@pod-board/model'
+import type { GhStatus, PrStatus } from '@open-aflow/model'
 import { resolveBin, safeChildEnv } from './bin-path.ts'
 
 // The contract types live in the model; re-exported for callers of this module.

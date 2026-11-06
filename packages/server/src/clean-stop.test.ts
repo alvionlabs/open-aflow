@@ -9,7 +9,7 @@ import { createAutoContinueStore } from './auto-continue-store.ts'
 import { bundleApp } from './bundle-app.ts'
 import { projectDirName } from './transcript-files.ts'
 
-// The real bundle, with fake-claude.mjs behind POD_BOARD_CLAUDE_BIN and temp folders for everything.
+// The real bundle, with fake-claude.mjs behind OPEN_AFLOW_CLAUDE_BIN and temp folders for everything.
 // Never a real claude, a real repo, or the real config. Each fake is killed in teardown by its recorded process ID.
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -19,8 +19,8 @@ const CASELESS = WIN || process.platform === 'darwin'
 const RUN_MS = 90_000
 const BOOT_MS = 30_000
 const SESSION = 'sess-1'
-const STOP = { type: 'pod-board:stop' }
-const META = /<meta name="pod-board-token" content="([^"]+)"/
+const STOP = { type: 'open-aflow:stop' }
+const META = /<meta name="open-aflow-token" content="([^"]+)"/
 const SYS32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
 const OWNER = 'auto-continue-owner.json'
 
@@ -39,7 +39,7 @@ const removeWithRetry = async (path: string) => {
   }
 }
 
-const tempDir = (name: string) => realpathSync.native(mkdtempSync(join(tmpdir(), `pod-board-${name}-`)))
+const tempDir = (name: string) => realpathSync.native(mkdtempSync(join(tmpdir(), `open-aflow-${name}-`)))
 
 const holdPort = (): Promise<Server> =>
   new Promise((resolve, reject) => {
@@ -173,16 +173,16 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
   const bundleEnv = (port: number, over: Record<string, string> = {}): NodeJS.ProcessEnv => {
     const env: NodeJS.ProcessEnv = {}
     for (const [k, v] of Object.entries(process.env)) {
-      if (!k.startsWith('POD_BOARD_') && !k.toUpperCase().startsWith('CLAUDE') && !['PATH', 'NODE_PATH'].includes(k.toUpperCase())) env[k] = v
+      if (!k.startsWith('OPEN_AFLOW_') && !k.toUpperCase().startsWith('CLAUDE') && !['PATH', 'NODE_PATH'].includes(k.toUpperCase())) env[k] = v
     }
     return {
       ...env,
       Path: SYS32,
-      POD_BOARD_API_PORT: String(port),
-      POD_BOARD_CONFIG_DIR: cfg,
-      POD_BOARD_PORTS_DIR: join(tmp, 'ports'),
-      POD_BOARD_CLAUDE_DIR: join(tmp, 'claude'),
-      POD_BOARD_CLAUDE_BIN: join(tmp, 'bin', 'claude.cmd'),
+      OPEN_AFLOW_API_PORT: String(port),
+      OPEN_AFLOW_CONFIG_DIR: cfg,
+      OPEN_AFLOW_PORTS_DIR: join(tmp, 'ports'),
+      OPEN_AFLOW_CLAUDE_DIR: join(tmp, 'claude'),
+      OPEN_AFLOW_CLAUDE_BIN: join(tmp, 'bin', 'claude.cmd'),
       FAKE_CLAUDE_MODE: 'wait:600000',
       FAKE_CLAUDE_PIDS: pidsFile,
       ...over,
@@ -205,7 +205,7 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
     return { c, port, base: `http://127.0.0.1:${port}`, out: () => text, messages }
   }
 
-  const listening = (r: Run) => until(`the listening line on ${r.port}`, () => r.out().includes(`pod-board API listening on http://127.0.0.1:${r.port}`), BOOT_MS, r.out)
+  const listening = (r: Run) => until(`the listening line on ${r.port}`, () => r.out().includes(`open-aflow API listening on http://127.0.0.1:${r.port}`), BOOT_MS, r.out)
 
   const running = async (o: Parameters<typeof startBundle>[0] = {}) => {
     const r = await startBundle(o)
@@ -249,7 +249,7 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
         "import { spawn } from 'node:child_process'",
         "import { writeFileSync } from 'node:fs'",
         'const [server, mode, pidFile] = process.argv.slice(2)',
-        "const env = { ...process.env, ...(mode === 'watch' ? { POD_BOARD_PARENT_PID: String(process.pid) } : {}) }",
+        "const env = { ...process.env, ...(mode === 'watch' ? { OPEN_AFLOW_PARENT_PID: String(process.pid) } : {}) }",
         "const c = mode === 'watch' ? spawn(process.execPath, [server], { env, detached: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }) : spawn(process.execPath, [server], { env, detached: true, stdio: 'ignore', windowsHide: true })",
         'writeFileSync(pidFile, String(c.pid))',
         "if (mode === 'watch') setInterval(() => {}, 1000)",
@@ -301,12 +301,12 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
     async () => {
       const r = await running()
       await until('the ready message', () => r.messages.length > 0, BOOT_MS, r.out)
-      const line = /pod-board API listening on http:\/\/127\.0\.0\.1:(\d+)/.exec(r.out())
-      expect(r.messages).toEqual([{ type: 'pod-board:ready', port: Number(line![1]) }])
+      const line = /open-aflow API listening on http:\/\/127\.0\.0\.1:(\d+)/.exec(r.out())
+      expect(r.messages).toEqual([{ type: 'open-aflow:ready', port: Number(line![1]) }])
       expect(JSON.parse(readFileSync(ownerFile(), 'utf8'))).toMatchObject({ pid: r.c.pid })
 
       // Anything else is ignored.
-      for (const m of ['stop', { type: 'other' }, { type: 'pod-board:stop', extra: 1 }]) r.c.send(m)
+      for (const m of ['stop', { type: 'other' }, { type: 'open-aflow:stop', extra: 1 }]) r.c.send(m)
       await sleep(500)
       expect(await healthy(r.base)).toBe(true)
 
@@ -324,7 +324,7 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
       const r = await startBundle()
       r.c.send(STOP)
       expect(await exitOf(r.c)).toBe(0)
-      expect(r.out()).toContain('pod-board API listening')
+      expect(r.out()).toContain('open-aflow API listening')
       expect(r.messages).toHaveLength(1)
     },
     RUN_MS,
@@ -388,7 +388,7 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
       // and it writes its "waiting" line into the dead pipe.
       void fetch(`${base}/api/actions/resume`, {
         method: 'POST',
-        headers: { Origin: base, 'Content-Type': 'application/json', 'X-Pod-Board-Token': token },
+        headers: { Origin: base, 'Content-Type': 'application/json', 'X-Open-AFlow-Token': token },
         body: JSON.stringify({ repoId: board.repos[0]!.id, run: 'alpha', reply: 'continue' }),
       }).catch(() => {})
       await until('the fake to start', () => fakePids().length === 1, 30_000)
@@ -411,15 +411,15 @@ describe.runIf(WIN)('the bundle stops cleanly', () => {
     'a parent gone at start',
     async () => {
       const gone = spawnSync(process.execPath, ['-e', '0'], { windowsHide: true }).pid
-      const r = await startBundle({ ipc: false, env: { POD_BOARD_PARENT_PID: String(gone) } })
+      const r = await startBundle({ ipc: false, env: { OPEN_AFLOW_PARENT_PID: String(gone) } })
       expect(await exitOf(r.c)).toBe(0)
-      expect(r.out()).toContain('pod-board API listening')
+      expect(r.out()).toContain('open-aflow API listening')
       expect(existsSync(ownerFile())).toBe(false)
 
-      const bad = await startBundle({ ipc: false, env: { POD_BOARD_PARENT_PID: 'abc' } })
+      const bad = await startBundle({ ipc: false, env: { OPEN_AFLOW_PARENT_PID: 'abc' } })
       await new Promise((resolve) => bad.c.once('close', resolve))
       expect(bad.c.exitCode).toBe(1)
-      expect(bad.out()).toContain('POD_BOARD_PARENT_PID')
+      expect(bad.out()).toContain('OPEN_AFLOW_PARENT_PID')
       expect(bad.out()).not.toContain('listening')
     },
     RUN_MS,

@@ -3,7 +3,7 @@
 // Board; the request carries only the repo, the entry's line, and which button. Every reply carries the
 // number of the request it answers, so an older one is dropped, as in answer-flow.ts.
 
-import type { ResolveOutcome, ResolveResult } from '@pod-board/model'
+import type { ResolveOutcome, ResolveResult } from '@open-aflow/model'
 import { postAction, type ActionReply } from '../../actions-client.ts'
 import type { Post } from './answer-flow.ts'
 import type { WaitingRow } from './queue-view.ts'

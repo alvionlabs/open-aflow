@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { buildRepoModel, type AgentRun, type Board, type BoardRepo, type GhRead, type PrStatus } from '@pod-board/model'
-import { LIVE_TICK_MS } from '@pod-board/web/selection'
+import { buildRepoModel, type AgentRun, type Board, type BoardRepo, type GhRead, type PrStatus } from '@open-aflow/model'
+import { LIVE_TICK_MS } from '@open-aflow/web/selection'
 import { loadFixture } from '../../model/test/load-fixture.ts'
 import { bundleDesktop } from './bundle-desktop.ts'
 import { createNotifier, type Toast } from './notifier.ts'
@@ -452,7 +452,7 @@ describe('the bundle', () => {
   const REACT = /node_modules[\\/](?:\.pnpm[\\/])?react(?:-dom)?[@\\/]|react\.transitional\.element/
   let dir: string
   beforeEach(() => {
-    dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'pod-board-notifier-bundle-')))
+    dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'open-aflow-notifier-bundle-')))
   })
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true })
@@ -463,7 +463,7 @@ describe('the bundle', () => {
     await bundleDesktop({ entry: join(here, 'main.ts'), outfile })
     const text = readFileSync(outfile, 'utf8')
     // The notifier is inside.
-    expect(text).toContain('pod-board desktop: toast sent')
+    expect(text).toContain('open-aflow desktop: toast sent')
     expect(text).toContain('items need you')
     expect(text).not.toMatch(REACT)
 

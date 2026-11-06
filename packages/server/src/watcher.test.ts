@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Board } from '@pod-board/model'
+import type { Board } from '@open-aflow/model'
 import type { FSWatcher } from 'chokidar'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createBoardService, type BoardService } from './board-service.ts'
@@ -28,7 +28,7 @@ const gh: GhReader = {
 }
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'pod-board-a1-watch-'))
+  root = await mkdtemp(join(tmpdir(), 'open-aflow-a1-watch-'))
   configFile = join(root, 'config', 'config.json')
   portsDir = join(root, 'ports')
   claudeDir = join(root, 'claude')
@@ -104,7 +104,7 @@ async function until(check: () => boolean, ms = EVENT_MS) {
 /** One temp-folder cycle, in ms: about 6 on a free disk, and hundreds while other work competes for it. */
 async function diskCycleMs(): Promise<number> {
   const started = performance.now()
-  const dir = await mkdtemp(join(tmpdir(), 'pod-board-a1-probe-'))
+  const dir = await mkdtemp(join(tmpdir(), 'open-aflow-a1-probe-'))
   for (let i = 0; i < 5; i++) await writeFile(join(dir, `${i}.md`), 'x'.repeat(2000))
   for (let i = 0; i < 5; i++) await readFile(join(dir, `${i}.md`))
   await rm(dir, { recursive: true, force: true })

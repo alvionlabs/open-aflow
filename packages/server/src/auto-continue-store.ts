@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs'
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { withAnsweredKey, type AutoToggle } from '@pod-board/model'
+import { withAnsweredKey, type AutoToggle } from '@open-aflow/model'
 
 export type AutoContinueStore = {
   /** The toggles that are on, in the order they were turned on. */

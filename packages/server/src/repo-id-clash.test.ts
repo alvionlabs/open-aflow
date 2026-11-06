@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { Board, NewActionEntry } from '@pod-board/model'
+import type { Board, NewActionEntry } from '@open-aflow/model'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createActionRoutes } from './action-routes.ts'
@@ -25,7 +25,7 @@ import { projectDirName } from './transcript-files.ts'
 const API = 3060
 const WEB = 3061
 const TOKEN = createSessionToken()
-const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-pod-board-token': TOKEN }
+const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-open-aflow-token': TOKEN }
 const NOW = Date.parse('2026-11-02T12:00:00Z')
 const platform = process.platform
 const SHA = 'a'.repeat(40)
@@ -93,7 +93,7 @@ const clearAgents = () => rm(join(root, 'claude'), { recursive: true, force: tru
 const writeConfig = (...paths: string[]) => writeFile(cfgFile, JSON.stringify({ version: 1, repos: paths.map((path) => ({ path })) }))
 
 beforeEach(async () => {
-  root = await realpath(await mkdtemp(join(tmpdir(), 'pod-board-clash-')))
+  root = await realpath(await mkdtemp(join(tmpdir(), 'open-aflow-clash-')))
   hyphen = join(root, 'repos', 'chess-web')
   underscore = join(root, 'repos', 'chess_web')
   await makeRepo(hyphen)

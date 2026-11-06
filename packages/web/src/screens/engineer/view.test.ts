@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentRun, AgentTimeline, SliceModel, TestProgress } from '@pod-board/model'
+import type { AgentRun, AgentTimeline, SliceModel, TestProgress } from '@open-aflow/model'
 import { clock, engineerDetails, lastActive, testsLine, timelineRows } from './view.ts'
 
 const SEC = 1000

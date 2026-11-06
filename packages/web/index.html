@@ -19,11 +19,13 @@
     <!-- Applies the theme before the first paint, so Dark never flashes light. A stored Light or
          Dark pick sets data-theme; System sets nothing, so the media query decides; nothing usable
          stored (or storage that throws) sets the default, Dark. Same key and rule as
-         src/theme/theme.ts (THEME_KEY, readChoice); src/theme-boot.test.ts checks it. -->
+         src/theme/theme.ts (THEME_KEY, readChoice); src/theme-boot.test.ts checks it. With no new key,
+         it reads the key from before the rename, which main.tsx then moves (old-storage-keys.ts). -->
     <script>
       var choice = null
       try {
-        choice = window.localStorage.getItem('pod-board-theme')
+        choice = window.localStorage.getItem('open-aflow-theme')
+        if (choice === null) choice = window.localStorage.getItem('pod-board-theme')
       } catch (e) {}
       if (choice !== 'system') document.documentElement.setAttribute('data-theme', choice === 'light' ? 'light' : 'dark')
     </script>

@@ -21,18 +21,18 @@ const STAMP = '2026-11-04T12:00:00.000Z'
 
 describe('log lines', () => {
   test('words join to one line, and a chunk of server output splits into its lines', () => {
-    expect(logLines(['pod-board desktop: toast sent'])).toEqual(['pod-board desktop: toast sent'])
+    expect(logLines(['open-aflow desktop: toast sent'])).toEqual(['open-aflow desktop: toast sent'])
     expect(logLines(['a', 'b'])).toEqual(['a b'])
     expect(logLines(['one\r\ntwo\n\n'])).toEqual(['one', 'two'])
   })
 
   test('an error keeps only its name: its message can hold what the app read', () => {
-    expect(logLines(['pod-board desktop: notifier error:', new TypeError('BLOCKED: entry text')])).toEqual(['pod-board desktop: notifier error: TypeError'])
+    expect(logLines(['open-aflow desktop: notifier error:', new TypeError('BLOCKED: entry text')])).toEqual(['open-aflow desktop: notifier error: TypeError'])
     expect(logLines(['x', { title: 'entry text' }, 3])).toEqual(['x [object] [number]'])
   })
 
   test('a line that names a token is left out, in any case', () => {
-    expect(logLines(['X-Pod-Board-Token: abc'])).toEqual(['[left out: names a token]'])
+    expect(logLines(['X-Open-AFlow-Token: abc'])).toEqual(['[left out: names a token]'])
     expect(logLines(['ok\nsession TOKEN=abc\nok too'])).toEqual(['ok', '[left out: names a token]', 'ok too'])
   })
 
@@ -112,8 +112,8 @@ describe('the home folder', () => {
 
   test('the file gets it, in every line of a chunk', () => {
     const { files, fs } = fakeFs()
-    createLogFile({ file: 'd.log', fs, now: () => NOW, home: HOME }).write(['pod-board config: C:\\Users\\Name\\a\nnext C:/Users/Name/b'])
-    expect(files.get('d.log')).toBe(`${STAMP} pod-board config: ~\\a\n${STAMP} next ~/b\n`)
+    createLogFile({ file: 'd.log', fs, now: () => NOW, home: HOME }).write(['open-aflow config: C:\\Users\\Name\\a\nnext C:/Users/Name/b'])
+    expect(files.get('d.log')).toBe(`${STAMP} open-aflow config: ~\\a\n${STAMP} next ~/b\n`)
   })
 
   test('a long line is cut after the swap, so a cut never leaves part of the name', () => {

@@ -12,7 +12,7 @@ export type TabStorage = {
   removeItem(key: string): void
 }
 
-export const TAB_KEY = 'pod-board-tab'
+export const TAB_KEY = 'open-aflow-tab'
 
 // A `plan` stored before the flow replaced the Plan tab is unknown now, so it reads as closed.
 const TABS: readonly string[] = ['waiting', 'log'] satisfies Tab[]

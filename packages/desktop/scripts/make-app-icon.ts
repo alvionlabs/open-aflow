@@ -1,4 +1,4 @@
-// `pnpm --filter @pod-board/desktop exec tsx scripts/make-app-icon.ts`: the exe and installer icon, from the app icon.
+// `pnpm --filter @open-aflow/desktop exec tsx scripts/make-app-icon.ts`: the exe and installer icon, from the app icon.
 // The output is committed. app-icon.test.ts checks that this script gives those same bytes.
 
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -109,5 +109,5 @@ export function renderAppIcon(): Buffer {
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === THIS_FILE) {
   const target = join(pkg, 'assets', 'icon.ico')
   writeFileSync(target, renderAppIcon())
-  console.log(`pod-board: wrote ${target}`)
+  console.log(`open-aflow: wrote ${target}`)
 }

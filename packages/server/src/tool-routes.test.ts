@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { Board } from '@pod-board/model'
+import type { Board } from '@open-aflow/model'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createApp } from './app.ts'
 import { createToolFinder } from './tool-finder.ts'
@@ -41,7 +41,7 @@ const appOf = () =>
   })
 
 const save = (app: ReturnType<typeof appOf>, body: unknown, token = TOKEN) =>
-  app.request('/api/actions/tool-path', { method: 'POST', headers: { ...POST, 'x-pod-board-token': token }, body: JSON.stringify(body) })
+  app.request('/api/actions/tool-path', { method: 'POST', headers: { ...POST, 'x-open-aflow-token': token }, body: JSON.stringify(body) })
 
 beforeEach(() => {
   root = realpathSync(mkdtempSync(join(tmpdir(), 'tool-routes-')))
@@ -62,7 +62,7 @@ describe.runIf(WIN)('tool routes', () => {
     writeFileSync(settingsFile, JSON.stringify({ claude: join(root, 'gone', 'claude.exe') }))
     const app = appOf()
 
-    const ok = await app.request('/api/tools', { headers: { ...HOST, 'x-pod-board-token': TOKEN } })
+    const ok = await app.request('/api/tools', { headers: { ...HOST, 'x-open-aflow-token': TOKEN } })
     expect(ok.status).toBe(200)
     expect(await ok.json()).toEqual({
       tools: [
@@ -76,10 +76,10 @@ describe.runIf(WIN)('tool routes', () => {
     expect(noToken.status).toBe(403)
     expect(await noToken.json()).toEqual({ error: 'bad token' })
 
-    const wrongToken = await app.request('/api/tools', { headers: { ...HOST, 'x-pod-board-token': 'nope' } })
+    const wrongToken = await app.request('/api/tools', { headers: { ...HOST, 'x-open-aflow-token': 'nope' } })
     expect(wrongToken.status).toBe(403)
 
-    const foreign = await app.request('/api/tools', { headers: { host: 'evil.example', 'x-pod-board-token': TOKEN } })
+    const foreign = await app.request('/api/tools', { headers: { host: 'evil.example', 'x-open-aflow-token': TOKEN } })
     expect(foreign.status).toBe(403)
     expect(await foreign.json()).toEqual({ error: 'forbidden host' })
   })
@@ -87,7 +87,7 @@ describe.runIf(WIN)('tool routes', () => {
   test('each GET runs a new check', async () => {
     const app = appOf()
     const ghState = async () => {
-      const res = await app.request('/api/tools', { headers: { ...HOST, 'x-pod-board-token': TOKEN } })
+      const res = await app.request('/api/tools', { headers: { ...HOST, 'x-open-aflow-token': TOKEN } })
       expect(res.status).toBe(200)
       return ((await res.json()) as { tools: { tool: string; state: string }[] }).tools.find((t) => t.tool === 'gh')?.state
     }

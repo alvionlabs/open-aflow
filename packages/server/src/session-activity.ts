@@ -3,7 +3,7 @@
 
 import { readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
-import type { BoardRepo } from '@pod-board/model'
+import type { BoardRepo } from '@open-aflow/model'
 import { projectDirName } from './transcript-files.ts'
 
 /** How long a session's files must be quiet before it counts as idle. */

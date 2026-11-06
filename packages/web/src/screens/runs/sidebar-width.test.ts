@@ -45,13 +45,13 @@ describe('sidebar width', () => {
   })
 
   it('saves the clamped width under its own key; a storage that throws is ignored', () => {
-    const s = store({ 'pod-board-tab': 'log' })
+    const s = store({ 'open-aflow-tab': 'log' })
     saveWidth(s, 333)
     expect(s.data.get(SIDE_KEY)).toBe('333')
     saveWidth(s, 9000)
     expect(s.data.get(SIDE_KEY)).toBe('400')
     // The tab memory's key is left alone.
-    expect(s.data.get('pod-board-tab')).toBe('log')
+    expect(s.data.get('open-aflow-tab')).toBe('log')
     expect(() => saveWidth(store({}, true), 300)).not.toThrow()
     expect(() => saveWidth(undefined, 300)).not.toThrow()
   })

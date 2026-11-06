@@ -1,5 +1,5 @@
 import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import type { Stage } from '@pod-board/model'
+import type { Stage } from '@open-aflow/model'
 import { Icon } from '../../theme/icons.tsx'
 import { backPath, downPath, headPath, stepPath } from '../board/geometry.ts'
 import { flowColumns, flowEdges, foldLine } from './plan-view.ts'

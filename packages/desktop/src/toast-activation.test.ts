@@ -51,9 +51,9 @@ describe('the run from an activation', () => {
     ['empty: a toast from a version before this one', ''],
     ['no prefix', '#/repo/fix-a'],
     ['another prefix', 'http://evil.example/#/repo'],
-    ['the prefix alone', 'pod-board-toast:'],
-    ['not a board hash', 'pod-board-toast:javascript:alert(1)'],
-    ['a hash with no path', 'pod-board-toast:#repo'],
+    ['the prefix alone', 'open-aflow-toast:'],
+    ['not a board hash', 'open-aflow-toast:javascript:alert(1)'],
+    ['a hash with no path', 'open-aflow-toast:#repo'],
   ])('%s opens the window on no run', (_name, args) => {
     expect(hashFromActivation(args)).toBeUndefined()
   })
