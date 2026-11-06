@@ -31,7 +31,7 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 
 ## Watch out
 
-- The boot script in `index.html` reads only `open-aflow-theme`. On the first load after the rename, a stored Light or System theme shows Dark until `main.tsx` moves the old key, one time only.
+- The boot script in `index.html` paints before `main.tsx` runs, so it also reads the old theme key when `open-aflow-theme` is empty. Without that, the first load after the rename showed Dark for a stored Light or System pick. `brand.test.ts` allows that one old key there.
 - The dev and preview servers refuse framing with the same two headers as production (`server.headers` and `preview.headers` in `vite.config.ts`), because the dev page holds the token too. A framed page's own token and `Origin` pass the guards. Change both places or neither.
 - Build to `pod-docs/plans/calm-dashboard.md` `## Look` and its draft, not `docs/design/preview.html`.
 - `tokens.test.ts` fails on a CSS file under `packages/web/src` that sets `color` to `--faint` or a status token (rules targeting an `svg`, such as the flow's status marks, may), uses an old token name (`--panel`, `--line`, `--accent`, `--ok`, `--warn`, `--bad`, `--*-soft`, `--*-ink`, `--display`, `--body`), or drops text below 4.5:1.

@@ -44,6 +44,8 @@ const MOVES: Record<string, RegExp> = {
   'packages/server/src/config.ts': /'pod-board'/g,
   // The old browser keys the page moves once.
   'packages/web/src/old-storage-keys.ts': /'pod-board-(theme|tab|sidebar-width)'/g,
+  // The old theme key the boot script reads before main.tsx moves it, so the first load paints the right theme.
+  'packages/web/index.html': /'pod-board-theme'/g,
 }
 
 /** The text that counts: no History section, no old PR link, and no name of another repo that keeps its own. */

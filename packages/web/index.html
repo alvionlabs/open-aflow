@@ -24,6 +24,8 @@
       var choice = null
       try {
         choice = window.localStorage.getItem('open-aflow-theme')
+        // The key before the rename, until main.tsx moves it on this same load (old-storage-keys.ts).
+        if (choice === null) choice = window.localStorage.getItem('pod-board-theme')
       } catch (e) {}
       if (choice !== 'system') document.documentElement.setAttribute('data-theme', choice === 'light' ? 'light' : 'dark')
     </script>
