@@ -123,13 +123,29 @@ describe('moveOldConfig', () => {
     expect(await moveOldConfig({ from, to, ...io() })).toBe('copied')
   })
 
-  test('a part copy left by a crash is replaced, not merged', async () => {
+  test("a part copy left by a crash never merges in, and isn't removed: it may be another start's", async () => {
     await writeOld()
     const stale = `${to}.moving`
     await mkdir(stale)
     await writeFile(join(stale, 'stale.txt'), 'old crash')
     expect(await moveOldConfig({ from, to, ...io() })).toBe('copied')
     expect(await filesIn(to)).not.toContain('stale.txt')
-    expect(existsSync(stale)).toBe(false)
+    expect(existsSync(join(stale, 'stale.txt'))).toBe(true)
+  })
+
+  test('two copies at once: one copies every file, the other keeps it, and no part copy is left', async () => {
+    const names = Array.from({ length: 400 }, (_, i) => `resume-logs/r${i}.log`)
+    for (let round = 0; round < 5; round++) {
+      from = join(root, `old-${round}`)
+      to = join(root, `new-${round}`)
+      await mkdir(join(from, 'resume-logs'), { recursive: true })
+      await writeFile(join(from, 'config.json'), '{}')
+      await Promise.all(names.map((n) => writeFile(join(from, n), n)))
+      const both = await Promise.all([moveOldConfig({ from, to, ...io() }), moveOldConfig({ from, to, ...io() })])
+      expect(both.sort(), `round ${round}`).toEqual(['copied', 'kept'])
+      expect(await filesIn(to), `round ${round}`).toEqual(['config.json', ...names].sort())
+      expect((await readdir(root)).filter((n) => n.startsWith(`new-${round}.`)), `round ${round}`).toEqual([])
+    }
+    expect(errors).toEqual([])
   })
 })

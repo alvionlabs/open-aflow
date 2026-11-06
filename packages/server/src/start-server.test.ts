@@ -13,7 +13,16 @@ const spies = vi.hoisted(() => ({
   watcherCloses: 0,
   autoStarts: 0,
   watcherStartsAtFirstCheck: undefined as number | undefined,
+  /** Set: the config folder copy's `cp` throws this, as a locked old file would. */
+  cpFails: undefined as NodeJS.ErrnoException | undefined,
 }))
+
+// Pass-through `cp`, so a test can make the config folder copy fail.
+vi.mock('node:fs/promises', async (original) => {
+  const real = await original<typeof import('node:fs/promises')>()
+  const cp: typeof real.cp = (...args) => (spies.cpFails ? Promise.reject(spies.cpFails) : real.cp(...args))
+  return { ...real, default: { ...real, cp }, cp }
+})
 
 vi.mock('./watcher.ts', async (original) => {
   const real = await original<typeof import('./watcher.ts')>()
@@ -195,6 +204,7 @@ beforeEach(async () => {
   spies.watcherCloses = 0
   spies.autoStarts = 0
   spies.watcherStartsAtFirstCheck = undefined
+  spies.cpFails = undefined
 })
 
 afterEach(async () => {
@@ -558,6 +568,29 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     expect(await repoNames(started.port)).toEqual([])
     expect(existsSync(join(newDir(), 'config.json'))).toBe(false)
   })
+
+  for (const mode of ['production', 'dev'] as const) {
+    test(`${mode}: a failed copy creates no new folder, so the next start copies`, async () => {
+      await writeOld()
+      const startMode = async () =>
+        mode === 'production'
+          ? startOwn(ownEnv())
+          : start(ownEnv({ OPEN_AFLOW_API_PORT: String(await freePort()), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
+      spies.cpFails = Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' })
+      const first = await startMode()
+      expect(await repoNames(first.started.port)).toEqual([])
+      expect(logs.filter((l) => l.includes('could not copy') && l.includes('EBUSY'))).toHaveLength(1)
+      first.started.stop()
+      await first.exited
+      running.splice(0)
+      expect(existsSync(newDir())).toBe(false)
+
+      spies.cpFails = undefined
+      const second = await startMode()
+      expect(await repoNames(second.started.port)).toEqual(['repo:registered'])
+      expect(logs.filter((l) => l.includes('copied the old config folder'))).toHaveLength(1)
+    })
+  }
 
   test('a set OPEN_AFLOW_CONFIG_DIR never copies from the folder the server would pick', async () => {
     await writeOld()
