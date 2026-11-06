@@ -101,7 +101,7 @@ function rowOf(tool: ToolState): SetupRow {
       cls: 's-bad',
       word: 'bad path',
       path: tool.path,
-      fix: { lead: `${ENV_VARIABLE} names this file, and no file is there. Correct or remove the variable, then restart Pod Board.` },
+      fix: { lead: `${ENV_VARIABLE} names this file, and no file is there. Correct or remove the variable, then restart Open AFlow.` },
       field: false,
     }
   }

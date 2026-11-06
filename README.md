@@ -1,4 +1,4 @@
-# pod-board
+# Open AFlow
 
 A local, read-only desktop app that shows every pod run across your repos:
 each run's stage, the current wave's slices, what needs you, and each

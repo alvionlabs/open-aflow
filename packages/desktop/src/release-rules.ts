@@ -11,7 +11,7 @@ export const INSTALLER_CEILING_BYTES = 158_200_388
 
 const TEST_FEED_TEXT = 'POD_BOARD_UPDATE_TEST'
 const RELEASE_TAG = /^v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))$/
-const INSTALLER = /^pod-board-setup-.*\.exe$/
+const INSTALLER = /^open-aflow-setup-.*\.exe$/
 
 /** Answers the version. Throws unless the tag is exactly `v<major>.<minor>.<patch>` and equals the package version. */
 export function tagVersion(tag: string, packageVersion: string): string {

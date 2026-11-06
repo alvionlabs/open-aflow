@@ -224,7 +224,7 @@ export function stateDiff(before: MachineState, after: MachineState): string[] {
   return lines
 }
 
-/** Throws, naming what it found, when Pod Board is already installed for this user. */
+/** Throws, naming what it found, when the app is already installed for this user. */
 export function refuseRealInstall(state: MachineState): void {
   const found = [
     ...state.uninstallKeys.map((key) => `uninstall key ${key}`),

@@ -20,7 +20,7 @@ function SetupScreen({ setup, gate }: { setup: SetupState; gate: Gate }) {
     <main className="setup">
       <div className="setup-head">
         <h1>Setup check</h1>
-        <p className="setup-intro">Pod Board needs these tools before it can show your runs.</p>
+        <p className="setup-intro">Open AFlow needs these tools before it can show your runs.</p>
       </div>
       <ul className="setup-rows">
         {setupRows(setup).map((row) => (
