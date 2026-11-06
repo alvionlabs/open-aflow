@@ -2,7 +2,7 @@
 // serves the web app on one port and keeps the token in memory. The table is in
 // pod-docs/feature-details/server.md.
 
-import { mkdir } from 'node:fs/promises'
+import { mkdir, mkdtemp } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { serve } from '@hono/node-server'
@@ -48,21 +48,32 @@ function portPlan(env: Env, production: Production | undefined) {
   return { want, extraPorts: [portFromEnv(env, 'OPEN_AFLOW_WEB_PORT', 3001)] }
 }
 
+/**
+ * The config folder for this start. First the one-time copy of the old folder, before anything writes there. If the
+ * copy fails, this start runs on a new empty temp folder and leaves the real one uncreated, so the next start tries
+ * the copy again and nothing is written over the human's data.
+ */
+async function pickConfigDir(env: Env, platform: NodeJS.Platform): Promise<string> {
+  const dir = dirname(configPath(env, platform, homedir()))
+  if ((await moveOldConfig({ from: oldConfigDir(env, platform, homedir()), to: dir })) !== 'failed') return dir
+  const temp = await mkdtemp(join(tmpdir(), 'open-aflow-config-'))
+  console.error(`open-aflow: this start uses the empty temp config folder ${temp}; repos added now are gone at the next start`)
+  return temp
+}
+
 export async function startServer(env: Env, o: { production?: Production; exit?: (code: number) => void } = {}): Promise<Started> {
   const platform = process.platform
   const production = o.production
   const { want, extraPorts } = portPlan(env, production)
-  const settings = {
-    configFile: configPath(env, platform, homedir()),
+  const others = {
     portsDir: portsDir(env, tmpdir()),
     claudeDir: claudeDir(env, homedir()),
     transcriptDays: transcriptDays(env),
     claudeBin: claudeBin(env),
   }
-  const { configFile } = settings
-  const configDir = dirname(configFile)
-  // Before anything writes to the folder: a new folder that exists is never copied over.
-  await moveOldConfig({ from: oldConfigDir(env, platform, homedir()), to: configDir })
+  const configDir = await pickConfigDir(env, platform)
+  const configFile = join(configDir, 'config.json')
+  const settings = { configFile, ...others }
 
   // A fresh token each launch. Dev writes it before anything listens: no token file, no API.
   // Production keeps it in memory, so a dev page on the same config folder keeps working.

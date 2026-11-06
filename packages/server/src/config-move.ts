@@ -1,6 +1,7 @@
 // The one-time copy of the config folder from before the rename to Open AFlow. The rules are in
 // pod-docs/feature-details/server.md, under "Config folder".
 
+import { randomUUID } from 'node:crypto'
 import { cp, rename, rm, stat } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 
@@ -29,9 +30,11 @@ const isFolder = async (path: string) => (await stat(path).catch(() => undefined
 const exists = async (path: string) => (await stat(path).catch(() => undefined)) !== undefined
 
 /**
- * If `to` doesn't exist and `from` is a folder, copies `from` into `to` and leaves `from` as a backup. The copy goes
- * to `<to>.moving` first and is renamed into place, so a failed or cut copy never leaves a half folder that would
- * block the next try. Never throws: a failure is logged, and the server starts with an empty folder.
+ * If `to` doesn't exist and `from` is a folder, copies `from` into `to` and leaves `from` as a backup. Each call
+ * copies into its own temp folder beside `to` and renames it into place, so `to` appears whole or not at all, and two
+ * starts at once never touch each other's files. The one whose rename loses to the other returns `kept`. Never
+ * throws: a failure removes only this call's temp folder, is logged, and returns `failed`. The caller must then
+ * leave `to` uncreated, so the next start tries again.
  */
 export async function moveOldConfig(o: MoveOptions): Promise<MoveResult> {
   const { from, to } = o
@@ -40,16 +43,17 @@ export async function moveOldConfig(o: MoveOptions): Promise<MoveResult> {
   if (await exists(to)) return 'kept'
   if (from === undefined || !(await isFolder(from))) return 'none'
 
-  const part = `${to}.moving`
+  const part = `${to}.moving-${randomUUID()}`
   const topLevel = (source: string) => dirname(source) === from && NOT_COPIED.has(basename(source))
   try {
-    await rm(part, { recursive: true, force: true })
     await (o.copy ?? nodeCopy)(from, part, (source) => !topLevel(source))
     await rename(part, to)
   } catch (err) {
     await rm(part, { recursive: true, force: true }).catch(() => {})
+    // Another start's copy got there first: that folder is whole, so it counts.
+    if (await exists(to)) return 'kept'
     const reason = (err as NodeJS.ErrnoException).code ?? (err instanceof Error ? err.message : String(err))
-    error(`open-aflow: could not copy the old config folder ${from} to ${to} (${reason}); starting with an empty config`)
+    error(`open-aflow: could not copy the old config folder ${from} to ${to} (${reason}); the next start tries again`)
     return 'failed'
   }
   log(`open-aflow: copied the old config folder ${from} to ${to}; the old folder stays as a backup`)

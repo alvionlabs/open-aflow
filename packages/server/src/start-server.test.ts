@@ -584,6 +584,11 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
       await first.exited
       running.splice(0)
       expect(existsSync(newDir())).toBe(false)
+      // This start ran on its own temp folder, which it names. Remove it: it sits in the OS temp folder.
+      const temp = /empty temp config folder (.+?);/.exec(logs.join('\n'))?.[1]
+      expect(temp && existsSync(join(temp, 'config.json'))).toBe(false)
+      expect(temp && existsSync(temp)).toBe(true)
+      await removeWithRetry(temp!)
 
       spies.cpFails = undefined
       const second = await startMode()
