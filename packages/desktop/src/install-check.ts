@@ -4,7 +4,8 @@
 import { execFile, spawn } from 'node:child_process'
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { join, relative } from 'node:path'
+import { dirname, join, relative } from 'node:path'
+import { configPath } from '@open-aflow/server/config'
 import { processAlive } from '@open-aflow/server/parent-link'
 import { EXE_NAME, UPDATER_CACHE_DIR } from './build-config.ts'
 import { APP_ID, APP_NAME } from './shell-config.ts'
@@ -153,7 +154,8 @@ export function createRealConfigReader(dir: string): () => { files: string[] | n
   }
 }
 
-const realConfigDir = () => join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'pod-board')
+/** The folder an installed app with no temp env would use. */
+const realConfigDir = () => dirname(configPath({ APPDATA: process.env.APPDATA }, 'win32', homedir()))
 const updaterCacheDir = () => join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), UPDATER_CACHE_DIR)
 const startMenuDir = () => join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'Microsoft', 'Windows', 'Start Menu', 'Programs')
 let readRealConfig: ReturnType<typeof createRealConfigReader> | undefined

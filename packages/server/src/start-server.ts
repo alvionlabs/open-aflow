@@ -18,7 +18,8 @@ import { createBoardService } from './board-service.ts'
 import { listFolders, nodeFolderFs } from './folder-list.ts'
 import { portsDir } from './claims.ts'
 import { claudeBin, createClaudeRunner } from './claude-runner.ts'
-import { configPath, listenConfig, portFromEnv, type Env } from './config.ts'
+import { configPath, listenConfig, oldConfigDir, portFromEnv, type Env } from './config.ts'
+import { moveOldConfig } from './config-move.ts'
 import { createFoundGhExec, createGhReader, defaultGhExec } from './gh.ts'
 import { openWithFallback, wantedPort } from './listen.ts'
 import { createRemoveRepoRoutes } from './remove-repo-routes.ts'
@@ -60,6 +61,8 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
   }
   const { configFile } = settings
   const configDir = dirname(configFile)
+  // Before anything writes to the folder: a new folder that exists is never copied over.
+  await moveOldConfig({ from: oldConfigDir(env, platform, homedir()), to: configDir })
 
   // A fresh token each launch. Dev writes it before anything listens: no token file, no API.
   // Production keeps it in memory, so a dev page on the same config folder keeps working.

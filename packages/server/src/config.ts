@@ -33,29 +33,41 @@ export function envValue(env: Env, name: string): string | undefined {
 }
 
 /**
- * Where the board keeps its own config file, per OS. `OPEN_AFLOW_CONFIG_DIR`
- * wins everywhere. Paths use the separators of `platform`, so callers (and
- * tests) can ask for any OS from any host.
+ * The server's config folder name. It must differ from the packaged app's name (`open-aflow`) and its product name
+ * (`Open AFlow`): NSIS's `--delete-app-data` removes `%APPDATA%\<each of them>`. build-config.test.ts checks it.
  */
-export function configPath(env: Env, platform: NodeJS.Platform, home: string): string {
+export const CONFIG_DIR_NAME = 'open-aflow-server'
+
+/** The folder name before the rename to Open AFlow. A first start copies it once (config-move.ts). */
+const OLD_CONFIG_DIR_NAME = 'pod-board'
+
+/** The folder that holds the server's own folders on `platform`, with that OS's separators. */
+function configBase(env: Env, platform: NodeJS.Platform, home: string): { p: path.PlatformPath; base: string } {
   const p = platform === 'win32' ? path.win32 : path.posix
-  const override = envValue(env, 'OPEN_AFLOW_CONFIG_DIR')
-  if (override) return p.join(override, 'config.json')
-  if (platform === 'win32') {
-    const appData = envValue(env, 'APPDATA') ?? p.join(home, 'AppData', 'Roaming')
-    return p.join(appData, 'pod-board', 'config.json')
-  }
-  if (platform === 'darwin') return p.join(home, 'Library', 'Application Support', 'pod-board', 'config.json')
+  if (platform === 'win32') return { p, base: envValue(env, 'APPDATA') ?? p.join(home, 'AppData', 'Roaming') }
+  if (platform === 'darwin') return { p, base: p.join(home, 'Library', 'Application Support') }
   // The XDG spec says a relative XDG_CONFIG_HOME is invalid and must be ignored.
   const xdg = envValue(env, 'XDG_CONFIG_HOME')
-  const base = xdg && p.isAbsolute(xdg) ? xdg : p.join(home, '.config')
-  return p.join(base, 'pod-board', 'config.json')
+  return { p, base: xdg && p.isAbsolute(xdg) ? xdg : p.join(home, '.config') }
 }
 
-/** The server's config folder name. Not built yet. */
-export const CONFIG_DIR_NAME = 'pod-board'
+/**
+ * Where the board keeps its own config file, per OS. `OPEN_AFLOW_CONFIG_DIR` wins everywhere. Paths use the
+ * separators of `platform`, so callers (and tests) can ask for any OS from any host.
+ */
+export function configPath(env: Env, platform: NodeJS.Platform, home: string): string {
+  const override = envValue(env, 'OPEN_AFLOW_CONFIG_DIR')
+  const { p, base } = configBase(env, platform, home)
+  if (override) return p.join(override, 'config.json')
+  return p.join(base, CONFIG_DIR_NAME, 'config.json')
+}
 
-/** Not built yet. */
-export function oldConfigDir(_env: Env, _platform: NodeJS.Platform, _home: string): string | undefined {
-  return undefined
+/**
+ * The config folder before the rename, beside the one `configPath` picks. None when `OPEN_AFLOW_CONFIG_DIR` is
+ * set: a temp folder never copies from the real one.
+ */
+export function oldConfigDir(env: Env, platform: NodeJS.Platform, home: string): string | undefined {
+  if (envValue(env, 'OPEN_AFLOW_CONFIG_DIR')) return undefined
+  const { p, base } = configBase(env, platform, home)
+  return p.join(base, OLD_CONFIG_DIR_NAME)
 }
