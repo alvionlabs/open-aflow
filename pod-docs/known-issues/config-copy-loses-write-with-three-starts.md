@@ -3,7 +3,7 @@
 Severity: low
 Status: open · found 2026-11-05 · PR #92 final review
 
-**Who it affects:** someone moving from an old `pod-board` config folder whose copy fails once, while several copies of the app run. Only the human has an old folder, and the copy runs once per machine.
+**Who it affects:** someone moving from the old config folder from before the rename whose copy fails once, while several copies of the app run. Only the human has an old folder, and the copy runs once per machine.
 
 **What you see:** a repo added in one copy of the app is missing after the next start.
 
