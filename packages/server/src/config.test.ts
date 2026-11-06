@@ -85,19 +85,19 @@ describe('the config folder name', () => {
 
 describe('oldConfigDir: the folder before the rename, where a copy comes from', () => {
   test('is the old pod-board folder in the same place, per OS', () => {
-    expect(oldConfigDir({ APPDATA: 'C:\Users\me\AppData\Roaming' }, 'win32', 'C:\Users\me')).toBe(
-      'C:\Users\me\AppData\Roaming\pod-board',
+    expect(oldConfigDir({ APPDATA: 'C:\\Users\\me\\AppData\\Roaming' }, 'win32', 'C:\\Users\\me')).toBe(
+      'C:\\Users\\me\\AppData\\Roaming\\pod-board',
     )
-    expect(oldConfigDir({}, 'win32', 'C:\Users\me')).toBe('C:\Users\me\AppData\Roaming\pod-board')
+    expect(oldConfigDir({}, 'win32', 'C:\\Users\\me')).toBe('C:\\Users\\me\\AppData\\Roaming\\pod-board')
     expect(oldConfigDir({}, 'darwin', '/Users/me')).toBe('/Users/me/Library/Application Support/pod-board')
     expect(oldConfigDir({ XDG_CONFIG_HOME: '/x/cfg' }, 'linux', '/home/me')).toBe('/x/cfg/pod-board')
     expect(oldConfigDir({ XDG_CONFIG_HOME: 'cfg' }, 'linux', '/home/me')).toBe('/home/me/.config/pod-board')
   })
 
   test('is none when OPEN_AFLOW_CONFIG_DIR is set, so a temp folder never copies from the real one', () => {
-    expect(oldConfigDir({ OPEN_AFLOW_CONFIG_DIR: 'D:\cfg', APPDATA: 'C:\A' }, 'win32', 'C:\Users\me')).toBeUndefined()
+    expect(oldConfigDir({ OPEN_AFLOW_CONFIG_DIR: 'D:\\cfg', APPDATA: 'C:\\A' }, 'win32', 'C:\\Users\\me')).toBeUndefined()
     expect(oldConfigDir({ OPEN_AFLOW_CONFIG_DIR: '/tmp/cfg' }, 'linux', '/home/me')).toBeUndefined()
     // Empty counts as unset, as it does for configPath.
-    expect(oldConfigDir({ OPEN_AFLOW_CONFIG_DIR: '', APPDATA: 'C:\A' }, 'win32', 'C:\Users\me')).toBe('C:\A\pod-board')
+    expect(oldConfigDir({ OPEN_AFLOW_CONFIG_DIR: '', APPDATA: 'C:\\A' }, 'win32', 'C:\\Users\\me')).toBe('C:\\A\\pod-board')
   })
 })

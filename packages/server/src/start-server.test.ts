@@ -523,6 +523,9 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     return repo
   }
 
+  /** A production server on the given env as it is: startProduction would put OPEN_AFLOW_CONFIG_DIR back. */
+  const startOwn = async (env: Record<string, string>) => start({ ...env, OPEN_AFLOW_API_PORT: String(await freePort()) }, { webDir })
+
   const repoNames = async (port: number) => {
     const { text } = await send(port, '/api/board')
     return (JSON.parse(text) as { repos: { name: string; source: string }[] }).repos.map((r) => `${r.name}:${r.source}`)
@@ -530,7 +533,7 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
 
   test('a first start copies the old folder, so the registered repos come back', async () => {
     await writeOld()
-    const { started } = await startProduction(ownEnv())
+    const { started } = await startOwn(ownEnv())
     expect(await repoNames(started.port)).toEqual(['repo:registered'])
     expect(existsSync(join(newDir(), 'resume-logs', 'a.log'))).toBe(true)
     expect(existsSync(join(newDir(), 'auto-continue.json'))).toBe(true)
@@ -551,14 +554,14 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
   test('an existing new folder is never overwritten', async () => {
     await writeOld()
     await mkdir(newDir(), { recursive: true })
-    const { started } = await startProduction(ownEnv())
+    const { started } = await startOwn(ownEnv())
     expect(await repoNames(started.port)).toEqual([])
     expect(existsSync(join(newDir(), 'config.json'))).toBe(false)
   })
 
   test('a set OPEN_AFLOW_CONFIG_DIR never copies from the folder the server would pick', async () => {
     await writeOld()
-    const { started } = await startProduction({ ...ownEnv(), OPEN_AFLOW_CONFIG_DIR: cfg })
+    const { started } = await startOwn({ ...ownEnv(), OPEN_AFLOW_CONFIG_DIR: cfg })
     expect(await repoNames(started.port)).toEqual([])
     expect(existsSync(newDir())).toBe(false)
     expect(existsSync(join(cfg, 'config.json'))).toBe(false)
