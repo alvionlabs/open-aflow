@@ -3,7 +3,7 @@
 // the oldest entry in the blocked and pending ranks, else the earlier run in the sidebar.
 // Pure; the banner only renders it.
 
-import type { Board, RunSummary } from '@pod-board/model'
+import type { Board, RunSummary } from '@open-aflow/model'
 import { hashFor } from '../../selection.ts'
 import { nextSteps, type NextItem } from './next-step.ts'
 import { runName } from './plan-view.ts'

@@ -3,7 +3,7 @@
 // the repo's files, claims, or transcripts. The repo comes from the current Board by id and path. The rules
 // and why are in pod-docs/feature-details/server.md.
 
-import { repoPathKey, type Board, type NewActionEntry, type RemoveRepoResult } from '@pod-board/model'
+import { repoPathKey, type Board, type NewActionEntry, type RemoveRepoResult } from '@open-aflow/model'
 import { Hono } from 'hono'
 import type { RemoveRepoError } from './repos-config.ts'
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRepoModel, listRuns, type Board, type BoardRepo, type Claim, type PrStatus, type RunSummary } from '@pod-board/model'
+import { buildRepoModel, listRuns, type Board, type BoardRepo, type Claim, type PrStatus, type RunSummary } from '@open-aflow/model'
 import { loadFixture } from '../../../../model/test/load-fixture.ts'
 import { hashFor } from '../../selection.ts'
 import { elsewhere, type Elsewhere } from './elsewhere.ts'

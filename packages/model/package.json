@@ -1,5 +1,5 @@
 {
-  "name": "@pod-board/model",
+  "name": "@open-aflow/model",
   "version": "0.0.0",
   "private": true,
   "type": "module",

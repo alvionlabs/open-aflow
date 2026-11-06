@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRepoModel, type Board, type BoardRepo, type RunSummary } from '@pod-board/model'
+import { buildRepoModel, type Board, type BoardRepo, type RunSummary } from '@open-aflow/model'
 import { agentChip, agentLogRows, banners, confidenceTag, connectionStatus, emptyMessage, groupChip, logBlocks, logRunChip, nextStatus, otherRows, rowFigures, runCard, runChip, tabPress, titleParts } from './view.ts'
 
 const run = (over: Partial<RunSummary>): RunSummary => ({ repoId: 'r', repo: 'chess-web', where: 'x', state: 'idle', ...over })
@@ -185,7 +185,7 @@ describe('empty messages', () => {
   it('names the unsupported docs version, or its absence', () => {
     const unsupported = run({ state: 'unsupported', where: 'update pod' })
     expect(emptyMessage(unsupported, repoWith('# pod docs\n\npod docs: 3\n'))).toBe(
-      "This repo's pod docs are version 3; Pod Board reads version 2. Update pod in this repo.",
+      "This repo's pod docs are version 3; Open AFlow reads version 2. Update pod in this repo.",
     )
     // The model can't tell an older pod's docs from no pod at all, so the message serves both.
     for (const readme of ['# pod docs\n', undefined]) {

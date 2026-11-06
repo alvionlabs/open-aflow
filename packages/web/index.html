@@ -8,7 +8,7 @@
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="preload" href="/fonts/geist-400.woff2" as="font" type="font/woff2" crossorigin />
-    <title>Pod Board</title>
+    <title>Open AFlow</title>
     <!-- Until the app CSS loads (in dev it comes with the module script), the browser's own canvas
          shows: follow the system, or the stored pick once the script below sets data-theme. -->
     <meta name="color-scheme" content="light dark" />
@@ -19,11 +19,13 @@
     <!-- Applies the theme before the first paint, so Dark never flashes light. A stored Light or
          Dark pick sets data-theme; System sets nothing, so the media query decides; nothing usable
          stored (or storage that throws) sets the default, Dark. Same key and rule as
-         src/theme/theme.ts (THEME_KEY, readChoice); src/theme-boot.test.ts checks it. -->
+         src/theme/theme.ts (THEME_KEY, readChoice); src/theme-boot.test.ts checks it. With no new key,
+         it reads the key from before the rename, which main.tsx then moves (old-storage-keys.ts). -->
     <script>
       var choice = null
       try {
-        choice = window.localStorage.getItem('pod-board-theme')
+        choice = window.localStorage.getItem('open-aflow-theme')
+        if (choice === null) choice = window.localStorage.getItem('pod-board-theme')
       } catch (e) {}
       if (choice !== 'system') document.documentElement.setAttribute('data-theme', choice === 'light' ? 'light' : 'dark')
     </script>

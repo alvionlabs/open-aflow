@@ -3,9 +3,9 @@
 
 import { readFileSync } from 'node:fs'
 
-const FEED = 'POD_BOARD_UPDATE_TEST_FEED'
-const ANSWER = 'POD_BOARD_UPDATE_TEST_ANSWER'
-const DELAY = 'POD_BOARD_UPDATE_TEST_DELAY_MS'
+const FEED = 'OPEN_AFLOW_UPDATE_TEST_FEED'
+const ANSWER = 'OPEN_AFLOW_UPDATE_TEST_ANSWER'
+const DELAY = 'OPEN_AFLOW_UPDATE_TEST_DELAY_MS'
 
 /** Beside the install folder, so an update leaves it in place. */
 export const TEST_ENV_FILE = 'update-test-env.json'
@@ -51,5 +51,5 @@ function readEnvFile(file: string): Record<string, string> {
  */
 export function applyTestEnv(env: NodeJS.ProcessEnv, file: string): boolean {
   Object.assign(env, readEnvFile(file))
-  return Boolean(env.POD_BOARD_CONFIG_DIR) && Boolean(env.POD_BOARD_DESKTOP_DATA_DIR)
+  return Boolean(env.OPEN_AFLOW_CONFIG_DIR) && Boolean(env.OPEN_AFLOW_DESKTOP_DATA_DIR)
 }

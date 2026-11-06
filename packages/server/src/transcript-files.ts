@@ -1,6 +1,6 @@
 import { open, readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
-import type { AgentRun } from '@pod-board/model'
+import type { AgentRun } from '@open-aflow/model'
 import { envValue, type Env } from './config.ts'
 import { isInsideRepo, normalizeRepoPath } from './guard.ts'
 
@@ -13,18 +13,18 @@ export type AgentFileText = { id: string; session: string; meta: string; jsonl: 
 const DAY_MS = 24 * 60 * 60 * 1000
 export const DEFAULT_TRANSCRIPT_DAYS = 30
 
-/** Claude's config folder: `POD_BOARD_CLAUDE_DIR`, else `CLAUDE_CONFIG_DIR`, else `<home>/.claude`. */
+/** Claude's config folder: `OPEN_AFLOW_CLAUDE_DIR`, else `CLAUDE_CONFIG_DIR`, else `<home>/.claude`. */
 export function claudeDir(env: Env, home: string): string {
-  return envValue(env, 'POD_BOARD_CLAUDE_DIR') ?? envValue(env, 'CLAUDE_CONFIG_DIR') ?? path.join(home, '.claude')
+  return envValue(env, 'OPEN_AFLOW_CLAUDE_DIR') ?? envValue(env, 'CLAUDE_CONFIG_DIR') ?? path.join(home, '.claude')
 }
 
-/** How many days back to look for sessions: `POD_BOARD_TRANSCRIPT_DAYS`, default 30. A bad value throws. */
+/** How many days back to look for sessions: `OPEN_AFLOW_TRANSCRIPT_DAYS`, default 30. A bad value throws. */
 export function transcriptDays(env: Env): number {
-  const raw = envValue(env, 'POD_BOARD_TRANSCRIPT_DAYS')
+  const raw = envValue(env, 'OPEN_AFLOW_TRANSCRIPT_DAYS')
   if (raw === undefined) return DEFAULT_TRANSCRIPT_DAYS
   const days = /^[0-9]+$/.test(raw) ? Number(raw) : Number.NaN
   if (!Number.isSafeInteger(days) || days < 1) {
-    throw new Error(`POD_BOARD_TRANSCRIPT_DAYS must be a whole number of days, 1 or more, got ${JSON.stringify(raw)}`)
+    throw new Error(`OPEN_AFLOW_TRANSCRIPT_DAYS must be a whole number of days, 1 or more, got ${JSON.stringify(raw)}`)
   }
   return days
 }

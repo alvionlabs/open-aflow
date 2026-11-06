@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef } from 'react'
-import { otherActivity, type ActionEntry, type BoardRepo, type FixPipeline, type Pipeline, type RunSummary } from '@pod-board/model'
+import { otherActivity, type ActionEntry, type BoardRepo, type FixPipeline, type Pipeline, type RunSummary } from '@open-aflow/model'
 import { EngineerView } from '../engineer/EngineerView.tsx'
 import { ActionLog } from './ActionLog.tsx'
 import { Chip } from './Chip.tsx'

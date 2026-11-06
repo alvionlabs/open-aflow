@@ -5,8 +5,8 @@
 
 import { envValue, type Env } from './config.ts'
 
-export const STOP_MESSAGE = { type: 'pod-board:stop' } as const
-export type ReadyMessage = { type: 'pod-board:ready'; port: number }
+export const STOP_MESSAGE = { type: 'open-aflow:stop' } as const
+export type ReadyMessage = { type: 'open-aflow:ready'; port: number }
 export type ParentChannel = { onMessage(fn: (m: unknown) => void): void; send(m: unknown): void }
 
 /** The parts of a process that a channel needs. `parentPort` is Electron's, in a `utilityProcess`. */
@@ -16,7 +16,7 @@ export type ProcessLike = {
   on?: (event: 'message', fn: (m: unknown) => void) => unknown
 }
 
-const PARENT_PID = 'POD_BOARD_PARENT_PID'
+const PARENT_PID = 'OPEN_AFLOW_PARENT_PID'
 /** How often the parent is checked. */
 const PARENT_POLL_MS = 2000
 /** The largest process ID `process.kill` takes. */
@@ -51,7 +51,7 @@ export function parentChannel(proc: ProcessLike = process as unknown as ProcessL
   }
 }
 
-/** Only `{ type: 'pod-board:stop' }`, with nothing else in it. */
+/** Only `{ type: 'open-aflow:stop' }`, with nothing else in it. */
 export function isStopMessage(m: unknown): boolean {
   if (typeof m !== 'object' || m === null || Array.isArray(m)) return false
   const keys = Object.keys(m)
@@ -141,7 +141,7 @@ export function guardOutput(stream: { on(event: 'error', fn: (err: Error) => voi
 
 /**
  * Production's link to whatever started it, made before `startServer`. Throws on a bad
- * `POD_BOARD_PARENT_PID`, before it attaches anything. `ready` sends once.
+ * `OPEN_AFLOW_PARENT_PID`, before it attaches anything. `ready` sends once.
  */
 export function linkParent(o: { env: Env; stops: StopPath; proc?: ProcessLike }): { ready(port: number): void } {
   const pid = parentPid(o.env)
@@ -155,7 +155,7 @@ export function linkParent(o: { env: Env; stops: StopPath; proc?: ProcessLike })
     ready: (port) => {
       if (sent) return
       sent = true
-      const message: ReadyMessage = { type: 'pod-board:ready', port }
+      const message: ReadyMessage = { type: 'open-aflow:ready', port }
       channel?.send(message)
     },
   }

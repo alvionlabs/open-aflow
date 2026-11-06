@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildFixPipeline, buildPipeline, buildRepoModel, listRuns, type AgentRun, type BoardRepo, type PrStatus, type RunSummary } from '@pod-board/model'
+import { buildFixPipeline, buildPipeline, buildRepoModel, listRuns, type AgentRun, type BoardRepo, type PrStatus, type RunSummary } from '@open-aflow/model'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { loadFixture } from '../../../../model/test/load-fixture.ts'

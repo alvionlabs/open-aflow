@@ -27,11 +27,11 @@ describe('the test feed', () => {
 
   test('reads the answer and the first delay, and ignores a bad one', () => {
     expect(
-      readTestUpdate({ POD_BOARD_UPDATE_TEST_FEED: 'http://127.0.0.1:3111/', POD_BOARD_UPDATE_TEST_ANSWER: 'later', POD_BOARD_UPDATE_TEST_DELAY_MS: '1000' }),
+      readTestUpdate({ OPEN_AFLOW_UPDATE_TEST_FEED: 'http://127.0.0.1:3111/', OPEN_AFLOW_UPDATE_TEST_ANSWER: 'later', OPEN_AFLOW_UPDATE_TEST_DELAY_MS: '1000' }),
     ).toEqual({ feed: 'http://127.0.0.1:3111/', answer: 'later', firstCheckMs: 1000 })
-    expect(readTestUpdate({ POD_BOARD_UPDATE_TEST_ANSWER: 'restart' }).answer).toBe('restart')
-    expect(readTestUpdate({ POD_BOARD_UPDATE_TEST_FEED: 'https://example.com/', POD_BOARD_UPDATE_TEST_ANSWER: 'yes', POD_BOARD_UPDATE_TEST_DELAY_MS: 'soon' })).toEqual({ feed: null, answer: null, firstCheckMs: null })
-    expect(readTestUpdate({ POD_BOARD_UPDATE_TEST_DELAY_MS: '-5' }).firstCheckMs).toBeNull()
+    expect(readTestUpdate({ OPEN_AFLOW_UPDATE_TEST_ANSWER: 'restart' }).answer).toBe('restart')
+    expect(readTestUpdate({ OPEN_AFLOW_UPDATE_TEST_FEED: 'https://example.com/', OPEN_AFLOW_UPDATE_TEST_ANSWER: 'yes', OPEN_AFLOW_UPDATE_TEST_DELAY_MS: 'soon' })).toEqual({ feed: null, answer: null, firstCheckMs: null })
+    expect(readTestUpdate({ OPEN_AFLOW_UPDATE_TEST_DELAY_MS: '-5' }).firstCheckMs).toBeNull()
   })
 })
 
@@ -39,20 +39,20 @@ describe('the test feed', () => {
 describe('the test build env file', () => {
   let dir: string
   beforeEach(() => {
-    dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'pod-board-update-feed-')))
+    dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'open-aflow-update-feed-')))
   })
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  const FOLDERS = { POD_BOARD_CONFIG_DIR: 'C:\\t\\config', POD_BOARD_DESKTOP_DATA_DIR: 'C:\\t\\shell' }
+  const FOLDERS = { OPEN_AFLOW_CONFIG_DIR: 'C:\\t\\config', OPEN_AFLOW_DESKTOP_DATA_DIR: 'C:\\t\\shell' }
 
   test('its values reach the env, over what the env holds', () => {
     const file = join(dir, 'env.json')
-    writeFileSync(file, JSON.stringify({ ...FOLDERS, POD_BOARD_API_PORT: '3120' }))
-    const env: NodeJS.ProcessEnv = { POD_BOARD_API_PORT: '1', KEEP: 'yes' }
+    writeFileSync(file, JSON.stringify({ ...FOLDERS, OPEN_AFLOW_API_PORT: '3120' }))
+    const env: NodeJS.ProcessEnv = { OPEN_AFLOW_API_PORT: '1', KEEP: 'yes' }
     expect(applyTestEnv(env, file)).toBe(true)
-    expect(env).toEqual({ ...FOLDERS, POD_BOARD_API_PORT: '3120', KEEP: 'yes' })
+    expect(env).toEqual({ ...FOLDERS, OPEN_AFLOW_API_PORT: '3120', KEEP: 'yes' })
   })
 
   test('temp folders in the env are enough with no file', () => {
@@ -61,8 +61,8 @@ describe('the test build env file', () => {
 
   test('with no temp folders the test build may not start, so it never opens the real config', () => {
     expect(applyTestEnv({}, join(dir, 'none.json'))).toBe(false)
-    expect(applyTestEnv({ POD_BOARD_CONFIG_DIR: 'C:\\t\\config' }, join(dir, 'none.json'))).toBe(false)
-    expect(applyTestEnv({ POD_BOARD_CONFIG_DIR: '', POD_BOARD_DESKTOP_DATA_DIR: '' }, join(dir, 'none.json'))).toBe(false)
+    expect(applyTestEnv({ OPEN_AFLOW_CONFIG_DIR: 'C:\\t\\config' }, join(dir, 'none.json'))).toBe(false)
+    expect(applyTestEnv({ OPEN_AFLOW_CONFIG_DIR: '', OPEN_AFLOW_DESKTOP_DATA_DIR: '' }, join(dir, 'none.json'))).toBe(false)
 
     const bad = join(dir, 'bad.json')
     writeFileSync(bad, '{ not json')

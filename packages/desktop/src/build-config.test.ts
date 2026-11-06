@@ -3,7 +3,8 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
-import { buildConfig, builderOptions, checkVersion, parsePackageArgs, UPDATER_CACHE_DIR } from './build-config.ts'
+import { buildConfig, builderOptions, checkVersion, EXE_NAME, parsePackageArgs, UPDATER_CACHE_DIR } from './build-config.ts'
+import { CONFIG_DIR_NAME } from '@open-aflow/server/config'
 import { APP_ID, APP_NAME } from './shell-config.ts'
 
 const pkg = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -33,11 +34,20 @@ describe('electron-builder config', () => {
   })
 
   test("the app's file name is never the server's config folder", () => {
-    // NSIS's `--delete-app-data` removes %APPDATA%\<this name>. The server's config folder is `pod-board`.
+    // NSIS's `--delete-app-data` removes %APPDATA%\<this name> and %APPDATA%\<product name>. Windows folder names
+    // ignore case.
     const name = config().extraMetadata?.name as string
-    expect(name).not.toBe('pod-board')
+    expect(name.toLowerCase()).not.toBe(CONFIG_DIR_NAME.toLowerCase())
+    expect(APP_NAME.toLowerCase()).not.toBe(CONFIG_DIR_NAME.toLowerCase())
     expect(name).not.toMatch(/[@/\s]/)
     expect(UPDATER_CACHE_DIR).toBe(`${name}-updater`)
+  })
+
+  test('the install folder, the updater cache, and the exe carry the app name', () => {
+    // %LOCALAPPDATA%\Programs\open-aflow and %LOCALAPPDATA%\open-aflow-updater.
+    expect(config().extraMetadata?.name).toBe('open-aflow')
+    expect(UPDATER_CACHE_DIR).toBe('open-aflow-updater')
+    expect(EXE_NAME).toBe('Open AFlow.exe')
   })
 
   test('the desktop package has no production dependency for the packager to collect', () => {
@@ -61,14 +71,14 @@ describe('electron-builder config', () => {
     const name = config().nsis!.artifactName!
     for (const version of ['0.1.0', '1.2.3', '10.20.30']) {
       for (const ext of ['exe', 'exe.blockmap']) {
-        expect(name.replace('${version}', version).replace('${ext}', ext)).toBe(`pod-board-setup-${version}.${ext}`)
+        expect(name.replace('${version}', version).replace('${ext}', ext)).toBe(`open-aflow-setup-${version}.${ext}`)
       }
     }
   })
 
   test('publish config', () => {
     const c = config()
-    expect(c.publish).toEqual({ provider: 'github', owner: 'iamphduc', repo: 'pod-board', releaseType: 'release' })
+    expect(c.publish).toEqual({ provider: 'github', owner: 'alvionlabs', repo: 'open-aflow', releaseType: 'release' })
     expect(c.win?.verifyUpdateCodeSignature).toBe(false)
   })
 

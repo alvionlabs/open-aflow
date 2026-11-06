@@ -51,16 +51,16 @@ describe('the run from an activation', () => {
     ['empty: a toast from a version before this one', ''],
     ['no prefix', '#/repo/fix-a'],
     ['another prefix', 'http://evil.example/#/repo'],
-    ['the prefix alone', 'pod-board-toast:'],
-    ['not a board hash', 'pod-board-toast:javascript:alert(1)'],
-    ['a hash with no path', 'pod-board-toast:#repo'],
+    ['the prefix alone', 'open-aflow-toast:'],
+    ['not a board hash', 'open-aflow-toast:javascript:alert(1)'],
+    ['a hash with no path', 'open-aflow-toast:#repo'],
   ])('%s opens the window on no run', (_name, args) => {
     expect(hashFromActivation(args)).toBeUndefined()
   })
 })
 
 describe('the activator the app registers', () => {
-  const EXE = 'C:\\Users\\a\\AppData\\Local\\Programs\\pod-board-desktop\\Pod Board.exe'
+  const EXE = 'C:\\Users\\a\\AppData\\Local\\Programs\\open-aflow\\Open AFlow.exe'
   const CLSID = '{D6B1EDA6-9DC7-427D-B544-15863FECE7EB}'
 
   test("the shortcut's own CLSID, the one Windows calls for every toast", () => {

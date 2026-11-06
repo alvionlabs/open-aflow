@@ -15,7 +15,7 @@ let repo: { path: string }
 let project: string
 
 beforeEach(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), 'pod-board-s1-idle-')))
+  root = realpathSync(await mkdtemp(join(tmpdir(), 'open-aflow-s1-idle-')))
   claudeDir = join(root, 'claude')
   repo = { path: join(root, 'repos', 'r') }
   project = join(claudeDir, 'projects', projectDirName(repo.path))

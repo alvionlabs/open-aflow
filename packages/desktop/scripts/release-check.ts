@@ -26,7 +26,7 @@ async function step<T>(name: string, fn: () => T | Promise<T>): Promise<T> {
   }
 }
 
-/** `POD_BOARD_API_PORT` has no fallback, so a busy port would fail the start, or let another app answer the health check. */
+/** `OPEN_AFLOW_API_PORT` has no fallback, so a busy port would fail the start, or let another app answer the health check. */
 const freePort = (wanted: number) =>
   new Promise<number>((done, fail) => {
     const probe = createServer()
@@ -42,7 +42,7 @@ const freePort = (wanted: number) =>
 async function installAndStart(installer: string): Promise<void> {
   const before = await machineState()
   await step('machine state', () => refuseRealInstall(before))
-  const place = proofPlace(await step('port', () => freePort(Number(process.env.POD_BOARD_PROOF_PORT ?? 0))))
+  const place = proofPlace(await step('port', () => freePort(Number(process.env.OPEN_AFLOW_PROOF_PORT ?? 0))))
   let failure: unknown
   let diff: string[] | undefined
   try {
@@ -82,9 +82,9 @@ async function checkBuild(dir: string): Promise<void> {
     if (!existsSync(`${installer}.blockmap`)) throw new Error(`${name}.blockmap is missing`)
   })
   // A proof that holds the lock around this script says so. A second take in one chain would wait for itself.
-  if (process.env.POD_BOARD_INSTALL_LOCK_HELD === '1') await installAndStart(installer)
+  if (process.env.OPEN_AFLOW_INSTALL_LOCK_HELD === '1') await installAndStart(installer)
   else await withInstallLock(() => installAndStart(installer))
-  console.log(`pod-board: the release check passed for ${name}`)
+  console.log(`open-aflow: the release check passed for ${name}`)
 }
 
 async function main(argv: string[]): Promise<void> {
@@ -94,7 +94,7 @@ async function main(argv: string[]): Promise<void> {
   if (tag !== undefined) {
     const { version } = JSON.parse(readFileSync(join(pkg, 'package.json'), 'utf8')) as { version: string }
     await step('tag', () => tagVersion(tag.slice('--tag='.length), version))
-    console.log(`pod-board: the tag matches version ${version}`)
+    console.log(`open-aflow: the tag matches version ${version}`)
     return
   }
   // `pnpm --filter … exec` moves into the package folder. INIT_CWD is where the human typed the command.

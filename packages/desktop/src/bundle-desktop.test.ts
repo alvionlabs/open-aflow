@@ -11,7 +11,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 describe('bundleDesktop', () => {
   let dir: string
   beforeEach(() => {
-    dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'pod-board-desktop-bundle-')))
+    dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'open-aflow-desktop-bundle-')))
   })
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true })
@@ -29,7 +29,7 @@ describe('bundleDesktop', () => {
     expect(text).toMatch(/require\("electron"\)/)
     // CommonJS, with the shell's code inside and nothing of Electron's npm package.
     expect(text).not.toMatch(/^\s*import\s.+from\s/m)
-    expect(text).toContain('com.iamphduc.podboard')
+    expect(text).toContain('com.alvionlabs.openaflow')
     expect(text).not.toContain('Electron failed to install correctly')
 
     // pnpm package reads the bundle's packages from this file.
@@ -42,7 +42,7 @@ describe('bundleDesktop', () => {
     const outfile = join(dir, 'main.cjs')
     const { externalImports } = await bundleDesktop({ entry: join(here, 'main.ts'), outfile })
     const text = readFileSync(outfile, 'utf8')
-    expect(text).not.toContain('POD_BOARD_UPDATE_TEST')
+    expect(text).not.toContain('OPEN_AFLOW_UPDATE_TEST')
     // The file a test build reads. Nothing of the test feed stays.
     expect(text).not.toContain('update-test-env')
     // The updater is inside, set for no install on quit, and it adds no external import.
@@ -55,9 +55,9 @@ describe('bundleDesktop', () => {
     const outfile = join(dir, 'main.cjs')
     const { externalImports } = await bundleDesktop({ entry: join(here, 'main.ts'), outfile, testFeed: true })
     const text = readFileSync(outfile, 'utf8')
-    expect(text).toContain('POD_BOARD_UPDATE_TEST_FEED')
-    expect(text).toContain('POD_BOARD_UPDATE_TEST_ANSWER')
-    expect(text).toContain('POD_BOARD_UPDATE_TEST_DELAY_MS')
+    expect(text).toContain('OPEN_AFLOW_UPDATE_TEST_FEED')
+    expect(text).toContain('OPEN_AFLOW_UPDATE_TEST_ANSWER')
+    expect(text).toContain('OPEN_AFLOW_UPDATE_TEST_DELAY_MS')
     expect(text).toContain('update-test-env')
     expect(externalImports.filter((name) => name !== 'electron' && !isBuiltin(name))).toEqual([])
   }, 60_000)

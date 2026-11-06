@@ -1,5 +1,5 @@
 {
-  "name": "@pod-board/server",
+  "name": "@open-aflow/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
-    "@pod-board/model": "workspace:*",
+    "@open-aflow/model": "workspace:*",
     "chokidar": "^5.0.0",
     "hono": "^4.13.13"
   },

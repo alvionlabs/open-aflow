@@ -53,6 +53,12 @@ describe('theme boot', () => {
     // System sets nothing, so the media query decides.
     expect(boot(store({ [THEME_KEY]: 'system' }))).toEqual([])
 
+    // The first load after the rename paints the pick stored under the old key; the new key wins when both are set.
+    const OLD_KEY = 'pod-board-theme'
+    expect(boot(store({ [OLD_KEY]: 'light' }))).toEqual([['set', 'data-theme', 'light']])
+    expect(boot(store({ [OLD_KEY]: 'system' }))).toEqual([])
+    expect(boot(store({ [OLD_KEY]: 'light', [THEME_KEY]: 'dark' }))).toEqual([['set', 'data-theme', 'dark']])
+
     // Nothing usable stored: dark, the default.
     const dark = [['set', 'data-theme', 'dark']]
     expect(boot(store({}))).toEqual(dark)

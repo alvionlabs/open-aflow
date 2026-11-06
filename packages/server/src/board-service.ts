@@ -21,7 +21,7 @@ import {
   type PrStatus,
   type RepoModel,
   repoPathKey,
-} from '@pod-board/model'
+} from '@open-aflow/model'
 import { readClaims } from './claims.ts'
 import type { GhReader } from './gh.ts'
 import { ignoresCase as probeIgnoresCase, normalizeRepoPath, repoIds, sameRepoPath } from './guard.ts'

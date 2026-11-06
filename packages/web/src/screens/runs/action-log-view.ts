@@ -1,7 +1,7 @@
 // The action log list under Other activity: the newest actions across every repo,
 // each with its time, repo, target, and a result chip.
 
-import type { ActionEntry } from '@pod-board/model'
+import type { ActionEntry } from '@open-aflow/model'
 import type { Chip, ChipClass } from './view.ts'
 
 export const ACTION_LOG_CAP = 20

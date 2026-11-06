@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRepoModel, runReplies, type AgentRun, type BoardRepo, type Claim, type PrStatus, type ReplySignal, type RunSummary } from '@pod-board/model'
+import { buildRepoModel, runReplies, type AgentRun, type BoardRepo, type Claim, type PrStatus, type ReplySignal, type RunSummary } from '@open-aflow/model'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { NO_SESSION, replyPanel } from './reply-view.ts'

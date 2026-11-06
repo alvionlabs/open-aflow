@@ -6,7 +6,7 @@
 // listed but never takes a run's card (a repo row keeps a real stop as its card).
 // Pure; the card and the tab only render these.
 
-import { haltGate, holdsRun, isAnswerable, stopsRun, waitingPrs, type BoardRepo, type QueueItem, type RunSummary, type WaitingPr } from '@pod-board/model'
+import { haltGate, holdsRun, isAnswerable, stopsRun, waitingPrs, type BoardRepo, type QueueItem, type RunSummary, type WaitingPr } from '@open-aflow/model'
 import { KIND_ORDER } from './entry-kind.ts'
 import { waitingEntries, waitingRows, type WaitingRow } from './queue-view.ts'
 import { kindChip } from './waiting-tab.ts'

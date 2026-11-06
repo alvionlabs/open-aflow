@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRepoModel, type AgentRun, type BoardRepo, type RepoFiles } from '@pod-board/model'
+import { buildRepoModel, type AgentRun, type BoardRepo, type RepoFiles } from '@open-aflow/model'
 import { boardSlices, buildWaveBoard, cardChip, engineerFor, filterState, type Card, type CardState, type WaveBoard } from './board-view.ts'
 
 // Snapshots are built inline, the way the model's pipeline tests build them.

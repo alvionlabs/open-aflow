@@ -6,7 +6,7 @@
 
 ## How it works
 
-- **Package.** One-click NSIS, no admin rights, a Start-menu entry named `Pod Board`, no desktop shortcut. `resources/app.asar` holds `dist/main.cjs`, `assets/`, and `package.json`. `resources/server` holds the bundle. `THIRD-PARTY-NOTICES.txt` comes from each bundle's esbuild metafile. A package with no licence file and no override stops the step.
+- **Package.** One-click NSIS, no admin rights, a Start-menu entry and an Installed apps entry named `Open AFlow`, no desktop shortcut. The installer is `open-aflow-setup-<version>.exe`, the exe `Open AFlow.exe`, the app ID `com.alvionlabs.openaflow`, and the install folder `%LOCALAPPDATA%\Programs\open-aflow`. The update feed is the GitHub releases of `alvionlabs/open-aflow`. `resources/app.asar` holds `dist/main.cjs`, `assets/`, and `package.json`. `resources/server` holds the bundle. `THIRD-PARTY-NOTICES.txt` comes from each bundle's esbuild metafile. A package with no licence file and no override stops the step.
 - **After the install.** A normal install opens the app (`runAfterFinish`). A silent install stays closed, so a proof never starts the app with no temp env. The update path is silent with `--force-run`, which starts its one new copy, as it always did. The template rule is `${ifNot} ${Silent} ${orIf} ${isForceRun}` in `installSection.nsh`, and `build-config.test.ts` fails if a new electron-builder changes it.
 - **Release.** `release.yml` runs only on a tag `v<major>.<minor>.<patch>` that equals `version` in `packages/desktop/package.json`. Job `build` has a read token: it runs `pnpm verify`, `pnpm package`, and `pnpm release:check`. Job `publish` needs `build`, has the write token, and runs no repo code.
 - **Check.** `pnpm release:check` checks the size, `latest.yml`, and the blockmap, then installs, starts, and uninstalls the app. `pnpm test:install` runs the longer proofs. Each ends with `state diff: []`.
@@ -33,7 +33,7 @@ flowchart TD
 
 - **Unsigned, with `verifyUpdateCodeSignature: false`.** Friends won't rebuild, and an unsigned build needs the check off. Turned down for now: signing, which waits for the next plan. Trade-off: nothing proves who published an update, so the GitHub account is the trust boundary. Signing comes before a public launch.
 - **Only the human's tag publishes.** The sprint contract replaced the plan's two throwaway test releases with a local feed. Trade-off: the GitHub path stays unproved until the first two tags.
-- **`pod-board-desktop` as the packaged name.** NSIS's `--delete-app-data` removes `%APPDATA%\<name>`, and `pod-board` is the server's config folder.
+- **`open-aflow` as the packaged name.** It names the install folder and the updater's cache folder. NSIS's `--delete-app-data` removes `%APPDATA%\<name>`, and `%APPDATA%\<product name>` (`Open AFlow`), so neither may be the server's config folder, `open-aflow-server`. `build-config.test.ts` checks it against `CONFIG_DIR_NAME`.
 - **The server stops first on Restart now.** The installer's `Stop-Process` would end it with no drain.
 - **The test feed is compiled out.** A build-time flag removes it from every shipped build, and `release:check` refuses a build that holds its text.
 
@@ -46,7 +46,7 @@ flowchart TD
 - **Open queue item (before hosting):** no Electron fuses are set, so `ELECTRON_RUN_AS_NODE` still works on the shipped exe.
 - A real install makes `refuseRealInstall` stop every proof. Uninstall first.
 - `pnpm package --test-feed` is for proofs only. Never upload its files.
-- An uninstall leaves `%LOCALAPPDATA%\pod-board-desktop-updater`, about 122 MB. It keeps `%APPDATA%\pod-board`.
+- An uninstall leaves `%LOCALAPPDATA%\open-aflow-updater`, about 122 MB. It keeps `%APPDATA%\open-aflow-server`, and the old config folder that the first start copied from.
 - `quitAndInstall` often emits `error` and doesn't throw, so the flow treats that as a failed install: it logs and quits.
 - The templates match a process by `StartsWith($INSTDIR)`, so an exe in a sibling folder with that prefix also ends.
 - The local proof shows the full-download fallback, not a differential download.
@@ -56,10 +56,10 @@ flowchart TD
 
 1. Set `version` in `packages/desktop/package.json` on the merge target, and merge it.
 2. Run `git tag v<version>`, then `git push origin v<version>`. Watch the `release` workflow until it passes.
-3. On a machine with no Pod Board, download `pod-board-setup-<version>.exe` from Releases, click through SmartScreen (`More info`, `Run anyway`), and open the app from the Start menu.
+3. On a machine with no Open AFlow, download `open-aflow-setup-<version>.exe` from Releases, click through SmartScreen (`More info`, `Run anyway`), and open the app from the Start menu.
 4. Set a higher `version`, merge it, and repeat step 2.
 5. Leave the app open. Within 30 s of its next start, or 6 h while it runs, it opens the box. Choose `Later`, and open the app again: it asks again. Choose `Restart now`: it installs and opens on the new version.
-6. To uninstall: Settings, Apps, Installed apps, Pod Board, Uninstall.
+6. To uninstall: Settings, Apps, Installed apps, Open AFlow, Uninstall.
 
 To pull a bad release, delete it on the Releases page, then tag a higher version. Friends who already updated stay on the bad one until then, because the updater never moves down.
 
@@ -71,3 +71,5 @@ To pull a bad release, delete it on the Releases page, then tag a higher version
 - 2026-11-03 · windows-app · final PR #83, verdict fix at round 2 · [report](../reports/windows-app.html)
 - 2026-11-04 · fix-late-merge-continue · a normal install opens the app. A silent install still stays closed.
 - 2026-11-04 · fix-late-merge-continue · fixed: `proof-install` failed its window check since 2026-11-03 (`b32d1a2`), when `windowsHide: true` reached the proof's app start. A login start's no-window check also meant nothing while that flag was on.
+- 2026-11-05 · fix-rename-open-aflow · renamed: the app is Open AFlow. New installer and exe names, app ID, install folder, updater cache folder, and the update feed at `alvionlabs/open-aflow`.
+- 2026-11-05 · fix-rename-internals · renamed: every internal name is `open-aflow`; the server's config folder is `%APPDATA%\open-aflow-server`, copied once from the old folder.

@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { ActionEntry, Board, GhStatus, MergePreview, MergeResult, NewActionEntry } from '@pod-board/model'
+import type { ActionEntry, Board, GhStatus, MergePreview, MergeResult, NewActionEntry } from '@open-aflow/model'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createActionRoutes } from './action-routes.ts'
 import { createApp } from './app.ts'
@@ -13,7 +13,7 @@ import { createSessionToken } from './session-token.ts'
 const API = 3040
 const WEB = 3041
 const TOKEN = createSessionToken()
-const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-pod-board-token': TOKEN }
+const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-open-aflow-token': TOKEN }
 const NOW = Date.parse('2026-10-21T12:00:00Z')
 const SHA = 'a'.repeat(40)
 const NEW_SHA = 'c'.repeat(40)
@@ -54,7 +54,7 @@ let root: string
 let repoPath: string
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'pod-board-m1-routes-'))
+  root = await mkdtemp(join(tmpdir(), 'open-aflow-m1-routes-'))
   repoPath = join(root, 'repos', 'r')
   await mkdir(join(repoPath, 'pod-docs', 'plans'), { recursive: true })
   await mkdir(join(repoPath, 'pod-docs', 'sprints'), { recursive: true })

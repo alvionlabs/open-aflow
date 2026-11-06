@@ -1,14 +1,14 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
-import type { Claim } from '@pod-board/model'
+import type { Claim } from '@open-aflow/model'
 import { envValue, type Env } from './config.ts'
 
 /** A port claim pod writes while a run is live: `<ports dir>/<port base>` holding `<repo path> <plan>`. */
 export type { Claim }
 
-/** `POD_BOARD_PORTS_DIR`, else `<os temp>/pod-ports`. */
+/** `OPEN_AFLOW_PORTS_DIR`, else `<os temp>/pod-ports`. */
 export function portsDir(env: Env, tmp: string): string {
-  return envValue(env, 'POD_BOARD_PORTS_DIR') ?? path.join(tmp, 'pod-ports')
+  return envValue(env, 'OPEN_AFLOW_PORTS_DIR') ?? path.join(tmp, 'pod-ports')
 }
 
 /** Absolute in either OS's style, whatever OS reads it: a claim may name a Windows path. */

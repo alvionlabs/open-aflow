@@ -1,8 +1,8 @@
 // The toast rules and the tray dot's value, from the Boards the stream hands in. The seen set lasts the
 // app run and only grows, so nothing sends twice. The rules are in pod-docs/feature-details/toasts.md.
 
-import type { Board, BoardRepo, GhRead, PrStatus } from '@pod-board/model'
-import { LIVE_TICK_MS } from '@pod-board/web/selection'
+import type { Board, BoardRepo, GhRead, PrStatus } from '@open-aflow/model'
+import { LIVE_TICK_MS } from '@open-aflow/web/selection'
 import { attentionItems, type AttentionItem, type AttentionTier } from './attention.ts'
 
 /** Up to this many new items in one pass each get a toast. */

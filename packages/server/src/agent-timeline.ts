@@ -3,7 +3,7 @@
 // matched against the listing, never used to build a path. The timeline
 // holds tool names and short summaries only (see the model's timeline.ts).
 
-import { parseAgentTimeline, type AgentTimeline, type Board } from '@pod-board/model'
+import { parseAgentTimeline, type AgentTimeline, type Board } from '@open-aflow/model'
 import { listAgentFiles, readAgentFile } from './transcript-files.ts'
 
 export type TimelineSourceDeps = {

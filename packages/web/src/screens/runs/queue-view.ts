@@ -2,7 +2,7 @@
 // The selected plan's own entries first, then the repo's entries that join no plan. Other plans'
 // entries show under their own run. Pure; WaitingOnYou.tsx is the glue.
 
-import { isAnswerable, triage, type BoardRepo, type QueueItem, type RunSummary } from '@pod-board/model'
+import { isAnswerable, triage, type BoardRepo, type QueueItem, type RunSummary } from '@open-aflow/model'
 import type { AnswerState } from './answer-flow.ts'
 import { entryKind, type EntryKind } from './entry-kind.ts'
 import type { Chip, ChipClass } from './view.ts'

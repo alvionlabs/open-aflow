@@ -42,9 +42,9 @@ flowchart TD
 
 **The stream.** A `fetch` of `GET /api/events` on the shell's port. Bad JSON is skipped. A failed or closed stream retries after 5 s. 45 s with no bytes counts as lost. `host.onReady` moves it to a new port. The clock waits while the stream is lost.
 
-**A toast.** The title is the run's name, and the body is the item's title. Each send logs `pod-board desktop: toast sent`, with no entry text.
+**A toast.** The title is the run's name, and the body is the item's title. Each send logs `open-aflow desktop: toast sent`, with no entry text.
 
-**A click.** The toast's XML (`toastXml`) has `launch="pod-board-toast:<hash>"`. A click on a live banner reaches the toast's `click` event and `Notification.handleActivation`. Both call `bus.showWindow(hash)`, which is safe to repeat. A click in the notification center reaches only `handleActivation`: Windows calls the activator (COM, by the CLSID on the Start-menu shortcut) with the `launch` text. A `launch` that isn't ours, such as on a toast from 0.1.0, opens the window on no run. A packaged app registers the activator at its start, with its own shortcut's CLSID (`activatorClsid`). So a click also works before this run's first toast, and on an app that isn't running: Windows starts it with `-Embedding`, which is a normal start.
+**A click.** The toast's XML (`toastXml`) has `launch="open-aflow-toast:<hash>"`. A click on a live banner reaches the toast's `click` event and `Notification.handleActivation`. Both call `bus.showWindow(hash)`, which is safe to repeat. A click in the notification center reaches only `handleActivation`: Windows calls the activator (COM, by the CLSID on the Start-menu shortcut) with the `launch` text. A `launch` that isn't ours, such as on a toast from 0.1.0, opens the window on no run. A packaged app registers the activator at its start, with its own shortcut's CLSID (`activatorClsid`). So a click also works before this run's first toast, and on an app that isn't running: Windows starts it with `-Embedding`, which is a normal start.
 
 **Example.** The app starts offline, with a queue `BLOCKED` open and the staging branch's PR #901 open on GitHub. The first Board marks the `BLOCKED` seen, lights the dot, and notes the staging ask. No toast. `gh auth status` fails, so `gh` reads `logged-out`. At 8 s a slice's row becomes `#78 | pushed`: the docs name that merge, so one toast sends at once. An hour later `gh` comes back, and the first read finds #901: seen, no toast. Later a new `BLOCKED` line arrives: one toast, and one log line. A click opens that run. After the human answers it, the plan's `Send continue` reply appears and sends one more toast.
 
@@ -53,7 +53,7 @@ flowchart TD
 ## Why it's this way
 
 - **The run in the toast's `launch`, not a table in memory.** A toast outlives the app run, and a file of ids would need its own cleanup. Trade-off: the shell writes the toast's XML itself, so it must escape the text and drop what XML can't hold: control characters, U+FFFE, U+FFFF, and a surrogate with no partner. One of these makes Windows refuse the whole toast, and the log reads `toast sent`, then `toast failed`.
-- **One rule set.** `attention.ts` imports `nextSteps`, `hashFor`, and `runName` from `@pod-board/web`. Turned down: a copy of the rules. Trade-off: the web package exports three pure subpaths, and the shell must import only those.
+- **One rule set.** `attention.ts` imports `nextSteps`, `hashFor`, and `runName` from `@open-aflow/web`. Turned down: a copy of the rules. Trade-off: the web package exports three pure subpaths, and the shell must import only those.
 - **`fetch`, not `EventSource`.** The main process has no `EventSource`, and `/api/events` needs only a loopback `Host`. So the shell never holds the token.
 - **Only three tiers.** `pending` entries aren't urgent enough to interrupt. Trade-off: a pending decision never toasts.
 - **Each item gets one try.** It is marked seen before its send, so a send that throws can't repeat on every tick.
@@ -73,22 +73,22 @@ flowchart TD
 - A PR `gh` can never read (a folder with no remote) stays `read: false` for good. It can't name an item, so this costs one Board row.
 - A repo added after the start isn't in the baseline, so its open items send.
 - A repo id change, or a queue line someone edits, sends again, because the identity changes.
-- Never import `@pod-board/web`'s `.tsx` files or its package root. `notifier.test.ts` checks that the main bundle holds no React.
+- Never import `@open-aflow/web`'s `.tsx` files or its package root. `notifier.test.ts` checks that the main bundle holds no React.
 - An unpackaged toast can leave `Electron.lnk` in the Start menu, with the app's AppID, and `Get-StartApps` then lists `Electron`. Delete it after a run. A friend's machine has no unpackaged run.
 
 ### Human list
 
-`pnpm test:install` proves the Start-menu AppID and one `toast sent` on the installed app. No agent can see the items below. Do them after the last proof, because a real install stops the proofs. First delete `Electron.lnk` if it exists, then run `pnpm package`, run the installer, and open Pod Board from the Start menu.
+`pnpm test:install` proves the Start-menu AppID and one `toast sent` on the installed app. No agent can see the items below. Do them after the last proof, because a real install stops the proofs. First delete `Electron.lnk` if it exists, then run `pnpm package`, run the installer, and open Open AFlow from the Start menu.
 
-1. Register a temp copy of `E:\Projects\pod-trial-mock`, and add a `BLOCKED · orchestrator → human` line to its queue. A toast shows, with the name `Pod Board` and its icon.
+1. Register a temp copy of `E:\Projects\pod-trial-mock`, and add a `BLOCKED · orchestrator → human` line to its queue. A toast shows, with the name `Open AFlow` and its icon.
 2. Hide the window. Add a second such line, and click its banner while it shows. The window opens on that run.
 3. Hide the window. Add a third line, and wait for its banner to leave the screen. Click it in the notification center. The window opens on that run.
-4. Quit from the tray. Click the toast from step 3 in the notification center. The app starts and opens on that run. If nothing opens, read `%APPDATA%\Pod Board\desktop.log`.
+4. Quit from the tray. Click the toast from step 3 in the notification center. The app starts and opens on that run. If nothing opens, read `%APPDATA%\Open AFlow\desktop.log`.
 5. Right-click the tray icon. The menu holds Open and Quit, and their labels line up.
-6. The taskbar and `Pod Board.exe` show the app icon.
+6. The taskbar and `Open AFlow.exe` show the app icon.
 7. A normal install opened the app by itself. Run the same installer again with the app open: one copy of the app runs after it ends.
 
-To uninstall: Settings, Apps, Installed apps, Pod Board, Uninstall.
+To uninstall: Settings, Apps, Installed apps, Open AFlow, Uninstall.
 
 ## History
 
@@ -97,3 +97,4 @@ To uninstall: Settings, Apps, Installed apps, Pod Board, Uninstall.
 - 2026-11-03 · windows-app plan fix 2 · fixed: the 20 s hold is gone. The baseline now comes from gh's first read of each PR (`ghReads` on the Board). An old PR stays quiet when `gh` comes back, and a new doc-named merge sends at once.
 - 2026-11-04 · fix-late-merge-continue · fixed: a click on a toast in the notification center opened nothing. The toast now carries its run, and `Notification.handleActivation` opens it, also from a closed app.
 - 2026-11-04 · fix-late-merge-continue review · fixed: a queue line with U+FFFE, U+FFFF, or a surrogate with no partner sent no toast. Those characters now leave the toast, and an emoji stays.
+- 2026-11-05 · fix-rename-open-aflow · renamed: a toast shows the app name Open AFlow, from the `Open AFlow.lnk` Start-menu shortcut and the app ID `com.alvionlabs.openaflow`.

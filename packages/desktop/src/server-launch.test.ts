@@ -17,10 +17,10 @@ describe('server launch', () => {
   test('builds the server env', () => {
     const input: NodeJS.ProcessEnv = {
       Path: 'C:\\bin',
-      POD_BOARD_CONFIG_DIR: 'C:\\cfg',
-      POD_BOARD_API_PORT: '3110',
-      POD_BOARD_PARENT_PID: '1',
-      pod_board_parent_pid: '2',
+      OPEN_AFLOW_CONFIG_DIR: 'C:\\cfg',
+      OPEN_AFLOW_API_PORT: '3110',
+      OPEN_AFLOW_PARENT_PID: '1',
+      open_aflow_parent_pid: '2',
       ELECTRON_RUN_AS_NODE: '1',
       electron_run_as_node: '1',
       Electron_Run_As_Node: '',
@@ -29,12 +29,12 @@ describe('server launch', () => {
 
     const env = serverEnv(input, 4242)
 
-    expect(env).toEqual({ Path: 'C:\\bin', POD_BOARD_CONFIG_DIR: 'C:\\cfg', POD_BOARD_API_PORT: '3110', POD_BOARD_PARENT_PID: '4242' })
+    expect(env).toEqual({ Path: 'C:\\bin', OPEN_AFLOW_CONFIG_DIR: 'C:\\cfg', OPEN_AFLOW_API_PORT: '3110', OPEN_AFLOW_PARENT_PID: '4242' })
     expect(input).toEqual(before)
     expect(env).not.toBe(input)
   })
 
   test('sets the parent ID when none was set', () => {
-    expect(serverEnv({}, 7)).toEqual({ POD_BOARD_PARENT_PID: '7' })
+    expect(serverEnv({}, 7)).toEqual({ OPEN_AFLOW_PARENT_PID: '7' })
   })
 })

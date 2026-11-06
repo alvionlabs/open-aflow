@@ -8,8 +8,8 @@
 
 - **Layout.** Only `main.ts` and `*-main.ts` import `electron` or `electron-updater`. All logic sits in plain modules with fakes, and `no-electron.test.ts` holds this rule.
 - **Start.** Name, `APP_ID`, data folder, single-instance lock. A second launch exits here and shows the first window. On `ready`: window and tray, notifier, updater, server.
-- **Folders.** The shell data folder holds Chromium's data, the lock, and `window-state.json`. The server's config folder stays the server's own, so a shell and `pnpm dev` share it.
-- **Log file.** `desktop.log` in the shell data folder (installed: `%APPDATA%\Pod Board\desktop.log`; `POD_BOARD_DESKTOP_DATA_DIR` moves it). It holds each line the console shows, the server's too, with a time. At 256 KB it moves to `desktop.log.1`, so at most two files stay. In every line, the home folder becomes `~`, in any case, with either slash, with doubled backslashes, or URL-encoded as in a stack frame. A folder that goes on past the home with a sign and a letter or digit (`Name2`, `Name+old`, `Name(2)`) stays. A space swaps, because a folder with a space can't be told from prose: `Name Smith\x` reads `~ Smith\x`, which only mislabels it. A line that names a token is left out. An `Error` the shell itself logs keeps only its name. A server line is text by the time the shell reads it, so a server error keeps its message and stack as the server printed them. No code logs entry text on purpose, but a server error's message could quote what it read. The user's name can also stay where it isn't part of the home path, such as in a Claude project folder name (`C--Users-name-…`). A second launch writes nothing.
+- **Folders.** The shell data folder (installed: `%APPDATA%\Open AFlow`, from `app.setName`) holds Chromium's data, the lock, and `window-state.json`. The server's config folder stays the server's own, so a shell and `pnpm dev` share it.
+- **Log file.** `desktop.log` in the shell data folder (installed: `%APPDATA%\Open AFlow\desktop.log`; `OPEN_AFLOW_DESKTOP_DATA_DIR` moves it). It holds each line the console shows, the server's too, with a time. At 256 KB it moves to `desktop.log.1`, so at most two files stay. In every line, the home folder becomes `~`, in any case, with either slash, with doubled backslashes, or URL-encoded as in a stack frame. A folder that goes on past the home with a sign and a letter or digit (`Name2`, `Name+old`, `Name(2)`) stays. A space swaps, because a folder with a space can't be told from prose: `Name Smith\x` reads `~ Smith\x`, which only mislabels it. A line that names a token is left out. An `Error` the shell itself logs keeps only its name. A server line is text by the time the shell reads it, so a server error keeps its message and stack as the server printed them. No code logs entry text on purpose, but a server error's message could quote what it read. The user's name can also stay where it isn't part of the home path, such as in a Claude project folder name (`C--Users-name-…`). A second launch writes nothing.
 - **Port and token.** The shell sets no port and never holds the token. It reads the port from the server's ready message, and the page gets the token from the server.
 - **Server host.** One restart after a failure. A failure is an exit outside a stop, a `fork` that throws, or no ready in 60 s. A second failure shows a native error box and quits. 60 s of ready earns the restart back. A new port fires `onReady` again, and the window and notifier move.
 - **Window.** The normal Windows frame, no app menu, no preload, the page isolated. Close hides it. Off-origin `http` and `https` links open in the system browser, and anything else opens nothing. A `--hidden` start shows only the tray.
@@ -22,11 +22,11 @@ sequenceDiagram
   participant Main as Main process
   participant Server as Server (utilityProcess)
   participant Run as Detached claude run
-  Main->>Server: fork, with POD_BOARD_PARENT_PID
+  Main->>Server: fork, with OPEN_AFLOW_PARENT_PID
   Server-->>Main: ready, port
   Human->>Main: Quit in the tray
   Main->>Main: prevent the quit, hide windows
-  Main->>Server: pod-board:stop
+  Main->>Server: open-aflow:stop
   Server->>Server: drain, up to 70 s, release owner file
   Server-->>Main: exit
   Main->>Main: quit
@@ -76,3 +76,4 @@ sequenceDiagram
 - 2026-11-04 · fix-late-merge-continue · the shell saves its log lines and the server's to `desktop.log`. The tray shows Start at login's state in words.
 - 2026-11-04 · fix-late-merge-continue · the human's decision: Start at login leaves the tray menu, which is now Open and Quit.
 - 2026-11-05 · fix-late-merge-continue · `desktop.log` writes the home folder as `~`.
+- 2026-11-05 · fix-rename-open-aflow · renamed: the window title, tray tooltip, error dialog title, update box, and the server process in Task Manager (`Open AFlow server`) say Open AFlow. The shell data folder moves to `%APPDATA%\Open AFlow`.

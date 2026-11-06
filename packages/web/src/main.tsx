@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './theme/index.css'
+import { moveOldKeys } from './old-storage-keys.ts'
 import { applyTheme, readChoice } from './theme/theme.ts'
 import { App } from './App.tsx'
 import { SetupGate } from './screens/setup/SetupScreen.tsx'
@@ -12,6 +13,7 @@ const storage = (() => {
     return undefined
   }
 })()
+moveOldKeys(storage)
 applyTheme(readChoice(storage), document.documentElement)
 
 const root = document.getElementById('root')

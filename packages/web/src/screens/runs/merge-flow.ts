@@ -3,7 +3,7 @@
 // and a small driver that sends the requests. Every reply carries the number of the
 // request it answers, so a reply that arrives after a cancel or another open is dropped.
 
-import type { MergeOutcome, MergePreview, MergeResult, PrStatus } from '@pod-board/model'
+import type { MergeOutcome, MergePreview, MergeResult, PrStatus } from '@open-aflow/model'
 import { postAction, type ActionReply } from '../../actions-client.ts'
 import { outcomeChip } from './action-log-view.ts'
 import type { Chip, ChipClass } from './view.ts'

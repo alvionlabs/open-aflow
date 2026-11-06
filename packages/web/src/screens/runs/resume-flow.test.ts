@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Board, ResumeResult, RunSummary } from '@pod-board/model'
+import type { Board, ResumeResult, RunSummary } from '@open-aflow/model'
 import { NEED_RELOAD, UNREACHABLE, type ActionReply } from '../../actions-client.ts'
 import {
   NOT_LOGGED,

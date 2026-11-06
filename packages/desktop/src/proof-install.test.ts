@@ -27,11 +27,11 @@ const PROGRAMS = join(process.env.APPDATA ?? '', 'Microsoft', 'Windows', 'Start 
 /** An unpackaged Electron's first toast leaves this shortcut, with the same AppID. Get-StartApps then lists its name. */
 const DEV_SHORTCUT = join(PROGRAMS, 'Electron.lnk')
 const RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'
-const PORT = Number(process.env.POD_BOARD_PROOF_PORT ?? 3100)
+const PORT = Number(process.env.OPEN_AFLOW_PROOF_PORT ?? 3100)
 const RUN_MS = 300_000
 const LOCK_MS = 40 * 60_000
-const TOAST_LINE = 'pod-board desktop: toast sent'
-const META = /<meta name="pod-board-token" content="([^"]+)"/
+const TOAST_LINE = 'open-aflow desktop: toast sent'
+const META = /<meta name="open-aflow-token" content="([^"]+)"/
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const alive = (pid: number) => {
@@ -57,7 +57,7 @@ const version = () => (JSON.parse(readFileSync(join(DESKTOP, 'package.json'), 'u
 const planDoc = ['# Plan: alpha', '', '_Generated: 2026-11-01 · Status: active_', '', '## Sprint sequence', '', '| Sprint | Goal | Status | Depends on |', '|---|---|---|---|', '| one | goal | done | — |', '| two | goal | planned | — |', ''].join('\n')
 const sprintDoc = ['# Sprint: one', '', '_From plan: pod-docs/plans/alpha.md · Slug: one · Status: active · Generated: 2026-11-01_', '', '## Status board', '', '| Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |', '|---|---|---|---|---|---|---|---|', '| 1 | A1 | a | one-A1 | merged | done | high | — |', ''].join('\n')
 
-describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform === 'win32')('the install proof', () => {
+describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && process.platform === 'win32')('the install proof', () => {
   let freeLock: () => void = () => {}
   let lockDone: Promise<void> = Promise.resolve()
   let before: MachineState | undefined
@@ -72,8 +72,8 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
 
   const base = () => `http://127.0.0.1:${place.port}`
   const exe = () => join(place.installDir, EXE_NAME)
-  const installer = () => join(RELEASE, `pod-board-setup-${version()}.exe`)
-  const configDir = () => place.env.POD_BOARD_CONFIG_DIR!
+  const installer = () => join(RELEASE, `open-aflow-setup-${version()}.exe`)
+  const configDir = () => place.env.OPEN_AFLOW_CONFIG_DIR!
   const fakePids = () => (existsSync(pidsFile) ? readFileSync(pidsFile, 'utf8').split('\n').filter(Boolean).map(Number) : [])
   const runValue = async () => (await machineState()).runValue
 
@@ -101,7 +101,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
     writeFileSync(join(repo, 'pod-docs', 'plans', 'alpha.md'), planDoc)
     writeFileSync(join(repo, 'pod-docs', 'sprints', 'one.md'), sprintDoc)
 
-    const project = join(place.env.POD_BOARD_CLAUDE_DIR!, 'projects', projectDirName(repo))
+    const project = join(place.env.OPEN_AFLOW_CLAUDE_DIR!, 'projects', projectDirName(repo))
     const sub = join(project, 'sess-1', 'subagents')
     mkdirSync(sub, { recursive: true })
     const old = new Date(Date.now() - 7_200_000)
@@ -131,7 +131,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
     for (const name of ['git.exe', 'gh.exe']) writeFileSync(join(bin, name), '')
     writeFileSync(join(configDir(), 'tool-paths.json'), JSON.stringify({ git: join(bin, 'git.exe'), gh: join(bin, 'gh.exe') }))
     pidsFile = join(place.root, 'fake-pids.txt')
-    Object.assign(place.env, { POD_BOARD_CLAUDE_BIN: join(bin, 'claude.cmd'), FAKE_CLAUDE_MODE: 'wait:600000', FAKE_CLAUDE_PIDS: pidsFile })
+    Object.assign(place.env, { OPEN_AFLOW_CLAUDE_BIN: join(bin, 'claude.cmd'), FAKE_CLAUDE_MODE: 'wait:600000', FAKE_CLAUDE_PIDS: pidsFile })
   }
 
   beforeAll(async () => {
@@ -172,7 +172,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       expect(run.status, `${run.stdout}\n${run.stderr}`).toBe(0)
       expect(`${run.stdout}${run.stderr}`).not.toMatch(/\b(publishing|uploading|uploaded)\b/i)
 
-      const name = `pod-board-setup-${version()}.exe`
+      const name = `open-aflow-setup-${version()}.exe`
       expect(existsSync(join(RELEASE, name))).toBe(true)
       expect(existsSync(join(RELEASE, `${name}.blockmap`))).toBe(true)
       const update = parse(readFileSync(join(RELEASE, 'latest.yml'), 'utf8')) as { version: string; path: string; sha512: string }
@@ -268,13 +268,13 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       // Add repo, as the page does. The file lands in the temp folder.
       const added = await fetch(`${base()}/api/repos`, {
         method: 'POST',
-        headers: { Origin: base(), 'Content-Type': 'application/json', 'X-Pod-Board-Token': await tokenOf() },
+        headers: { Origin: base(), 'Content-Type': 'application/json', 'X-Open-AFlow-Token': await tokenOf() },
         body: JSON.stringify({ path: repo }),
       })
       expect(added.status, await added.clone().text()).toBe(201)
       const config = JSON.parse(readFileSync(join(configDir(), 'config.json'), 'utf8')) as { repos: { path: string }[] }
       expect(config.repos.map((r) => r.path)).toEqual([repo])
-      expect(readdirSync(place.env.POD_BOARD_DESKTOP_DATA_DIR!).length).toBeGreaterThan(0)
+      expect(readdirSync(place.env.OPEN_AFLOW_DESKTOP_DATA_DIR!).length).toBeGreaterThan(0)
 
       await stopApp()
     },
@@ -328,7 +328,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       const board = (await (await fetch(`${base()}/api/board`)).json()) as { repos: { id: string }[] }
       const res = await fetch(`${base()}/api/actions/resume`, {
         method: 'POST',
-        headers: { Origin: base(), 'Content-Type': 'application/json', 'X-Pod-Board-Token': await tokenOf() },
+        headers: { Origin: base(), 'Content-Type': 'application/json', 'X-Open-AFlow-Token': await tokenOf() },
         body: JSON.stringify({ repoId: board.repos[0]!.id, run: 'alpha', reply: 'continue' }),
       })
       expect(await res.json()).toMatchObject({ outcome: 'started' })
@@ -360,7 +360,7 @@ describe.runIf(process.env.POD_BOARD_REAL_INSTALL === '1' && process.platform ==
       expect(existsSync(join(configDir(), 'tool-paths.json'))).toBe(true)
       // The uninstaller ends the server by force, so its drain never ran. The next start's stale check takes this over.
       expect(existsSync(join(configDir(), 'auto-continue-owner.json'))).toBe(true)
-      expect(readdirSync(place.env.POD_BOARD_DESKTOP_DATA_DIR!).length).toBeGreaterThan(0)
+      expect(readdirSync(place.env.OPEN_AFLOW_DESKTOP_DATA_DIR!).length).toBeGreaterThan(0)
 
       process.kill(fake)
       await until('the fake to end', () => !alive(fake))

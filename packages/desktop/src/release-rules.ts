@@ -4,14 +4,14 @@
 import { createHash } from 'node:crypto'
 import { parse } from 'yaml'
 
-// Measured on 2026-11-03: pod-board-setup-0.1.0.exe is 121,692,606 bytes. The floor is 80% of that, and the ceiling is
+// Measured on 2026-11-03: open-aflow-setup-0.1.0.exe is 121,692,606 bytes. The floor is 80% of that, and the ceiling is
 // 130%. Measure again and change both when the app gains or loses something large.
 export const INSTALLER_FLOOR_BYTES = 97_354_085
 export const INSTALLER_CEILING_BYTES = 158_200_388
 
-const TEST_FEED_TEXT = 'POD_BOARD_UPDATE_TEST'
+const TEST_FEED_TEXT = 'OPEN_AFLOW_UPDATE_TEST'
 const RELEASE_TAG = /^v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))$/
-const INSTALLER = /^pod-board-setup-.*\.exe$/
+const INSTALLER = /^open-aflow-setup-.*\.exe$/
 
 /** Answers the version. Throws unless the tag is exactly `v<major>.<minor>.<patch>` and equals the package version. */
 export function tagVersion(tag: string, packageVersion: string): string {

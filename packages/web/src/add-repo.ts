@@ -22,7 +22,7 @@ export async function postRepo(path: string, deps: PostRepoDeps = {}): Promise<A
   if (!token) return { status: 0, error: NEED_RELOAD }
   const res = await (deps.fetch ?? fetch)('/api/repos', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Pod-Board-Token': token },
+    headers: { 'Content-Type': 'application/json', 'X-Open-AFlow-Token': token },
     body: JSON.stringify({ path }),
   })
   let error: unknown

@@ -2,7 +2,7 @@
 // server's own process. A resumed `claude` is detached, and nothing here reaches it. The rules are in
 // pod-docs/feature-details/desktop.md.
 
-import { STOP_MESSAGE } from '@pod-board/server/parent-link'
+import { STOP_MESSAGE } from '@open-aflow/server/parent-link'
 
 export const READY_LIMIT_MS = 60_000
 /** Above the server's DRAIN_CAP_MS (70 s). */
@@ -31,11 +31,11 @@ export type ServerHost = {
   onFailed(fn: (error: string) => void): () => void
 }
 
-/** The port of a `{ type: 'pod-board:ready', port }` message, or `undefined` for anything else. */
+/** The port of a `{ type: 'open-aflow:ready', port }` message, or `undefined` for anything else. */
 function readyPort(m: unknown): number | undefined {
   if (typeof m !== 'object' || m === null) return undefined
   const { type, port } = m as { type?: unknown; port?: unknown }
-  if (type !== 'pod-board:ready' || typeof port !== 'number') return undefined
+  if (type !== 'open-aflow:ready' || typeof port !== 'number') return undefined
   return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : undefined
 }
 

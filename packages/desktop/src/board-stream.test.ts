@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import type { Board } from '@pod-board/model'
+import type { Board } from '@open-aflow/model'
 import { createBoardStream, RETRY_MS, SILENCE_MS, type BoardStreamOptions } from './board-stream.ts'
 
 const enc = new TextEncoder()

@@ -182,7 +182,7 @@ describe('createClaudeRunner', () => {
       anthropic_auth_token: 'tok-2',
       Anthropic_Api_Key: 'sk-3',
       ANTHROPIC_BASE_URL: 'http://127.0.0.1:1',
-      POD_BOARD_SMOKE: 'kept',
+      OPEN_AFLOW_SMOKE: 'kept',
     })
     const runner = createClaudeRunner({ bin: 'claude', logDir, env, windowMs: 3000 })
     expect(await runner.start({ session: SESSION, word: 'continue', cwd: repo })).toEqual({ outcome: 'started' })
@@ -191,7 +191,7 @@ describe('createClaudeRunner', () => {
     expect(names).not.toContain('ANTHROPIC_AUTH_TOKEN')
     const seen = (await readRecord()).env
     expect(names).not.toContain('ANTHROPIC_BASE_URL')
-    expect(seen.POD_BOARD_SMOKE).toBe('kept')
+    expect(seen.OPEN_AFLOW_SMOKE).toBe('kept')
     expect(env.ANTHROPIC_API_KEY).toBe('sk-1') // the board's own env is left alone
   })
 
@@ -619,8 +619,8 @@ describe('pruneLogs', () => {
 describe('claudeBin', () => {
   test('picks the claude binary', () => {
     expect(claudeBin({})).toBe('claude')
-    expect(claudeBin({ POD_BOARD_CLAUDE_BIN: '' })).toBe('claude')
-    expect(claudeBin({ POD_BOARD_CLAUDE_BIN: 'C:\\tools\\claude.exe' })).toBe('C:\\tools\\claude.exe')
+    expect(claudeBin({ OPEN_AFLOW_CLAUDE_BIN: '' })).toBe('claude')
+    expect(claudeBin({ OPEN_AFLOW_CLAUDE_BIN: 'C:\\tools\\claude.exe' })).toBe('C:\\tools\\claude.exe')
     expect(RESUME_WINDOW_MS).toBe(10_000)
   })
 })
@@ -640,8 +640,8 @@ describe('childEnv', () => {
       CLAUDE_EFFORT: 'high',
       ClaudeSomething: 'x',
       CLAUDE_CONFIG_DIR: 'C:\\Users\\me\\.claude-work',
-      POD_BOARD_CLAUDE_BIN: 'C:\\tools\\claude.exe',
-      POD_BOARD_CLAUDE_DIR: 'C:\\x',
+      OPEN_AFLOW_CLAUDE_BIN: 'C:\\tools\\claude.exe',
+      OPEN_AFLOW_CLAUDE_DIR: 'C:\\x',
       PATH: 'C:\\bin',
       Path: 'C:\\bin2',
       HOME: '/home/me',
@@ -661,8 +661,8 @@ describe('childEnv', () => {
         'NoDefaultCurrentDirectoryInExePath',
         'PATH',
         'Path',
-        'POD_BOARD_CLAUDE_BIN',
-        'POD_BOARD_CLAUDE_DIR',
+        'OPEN_AFLOW_CLAUDE_BIN',
+        'OPEN_AFLOW_CLAUDE_DIR',
         'USERPROFILE',
       ].sort(),
     )

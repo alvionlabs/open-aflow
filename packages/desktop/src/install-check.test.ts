@@ -8,7 +8,7 @@ import { createRealConfigReader, proofPlace, refuseRealInstall, stateDiff, withI
 let dir: string
 
 beforeEach(() => {
-  dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'pod-board-install-check-')))
+  dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'open-aflow-install-check-')))
 })
 afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
@@ -27,7 +27,7 @@ describe('stateDiff', () => {
     const cases: [Partial<MachineState>, RegExp][] = [
       [{ uninstallKeys: ['HKEY_CURRENT_USER\\key-a'] }, /uninstall key.*key-a/],
       [{ runValue: '"x.exe" --hidden' }, /Run value.*x\.exe/],
-      [{ startMenu: ['C:\\sm\\Pod Board.lnk'] }, /Start-menu.*Pod Board\.lnk/],
+      [{ startMenu: ['C:\\sm\\Open AFlow.lnk'] }, /Start-menu.*Open AFlow\.lnk/],
       [{ apps: [4242] }, /app process.*4242/],
       [{ updaterCache: true }, /updater cache/],
       [{ realConfig: ['config.json 1', 'new.json 5'] }, /real config.*new\.json/],
@@ -105,8 +105,8 @@ describe('refuseRealInstall', () => {
     expect(() => refuseRealInstall(clean())).not.toThrow()
     expect(() => refuseRealInstall({ ...clean(), realConfig: null, updaterCache: true })).not.toThrow()
     expect(() => refuseRealInstall({ ...clean(), uninstallKeys: ['HKEY_CURRENT_USER\\the-key'] })).toThrow(/the-key/)
-    expect(() => refuseRealInstall({ ...clean(), startMenu: ['C:\\sm\\Pod Board.lnk'] })).toThrow(/Pod Board\.lnk/)
-    expect(() => refuseRealInstall({ ...clean(), runValue: '"C:\\real\\Pod Board.exe" --hidden' })).toThrow(/Run value/)
+    expect(() => refuseRealInstall({ ...clean(), startMenu: ['C:\\sm\\Open AFlow.lnk'] })).toThrow(/Open AFlow\.lnk/)
+    expect(() => refuseRealInstall({ ...clean(), runValue: '"C:\\real\\Open AFlow.exe" --hidden' })).toThrow(/Run value/)
     expect(() => refuseRealInstall({ ...clean(), apps: [99] })).toThrow(/99/)
   })
 })
@@ -115,18 +115,18 @@ describe('proofPlace', () => {
   test('its folders sit inside one temp root, and the env points at them', () => {
     const place = proofPlace(3110)
     try {
-      expect(basename(place.root)).toMatch(/^pod-board-install-proof-/)
+      expect(basename(place.root)).toMatch(/^open-aflow-install-proof-/)
       expect(realpathSync.native(place.root)).toBe(place.root)
       expect(place.port).toBe(3110)
       expect(place.installDir.startsWith(place.root)).toBe(true)
-      for (const name of ['POD_BOARD_CONFIG_DIR', 'POD_BOARD_DESKTOP_DATA_DIR', 'POD_BOARD_PORTS_DIR', 'POD_BOARD_CLAUDE_DIR']) {
+      for (const name of ['OPEN_AFLOW_CONFIG_DIR', 'OPEN_AFLOW_DESKTOP_DATA_DIR', 'OPEN_AFLOW_PORTS_DIR', 'OPEN_AFLOW_CLAUDE_DIR']) {
         expect(place.env[name]?.startsWith(place.root), name).toBe(true)
         expect(existsSync(place.env[name]!), name).toBe(true)
       }
-      expect(place.env.POD_BOARD_API_PORT).toBe('3110')
+      expect(place.env.OPEN_AFLOW_API_PORT).toBe('3110')
       // Never the real claude: this path has no file.
-      expect(place.env.POD_BOARD_CLAUDE_BIN?.startsWith(place.root)).toBe(true)
-      expect(existsSync(place.env.POD_BOARD_CLAUDE_BIN!)).toBe(false)
+      expect(place.env.OPEN_AFLOW_CLAUDE_BIN?.startsWith(place.root)).toBe(true)
+      expect(existsSync(place.env.OPEN_AFLOW_CLAUDE_BIN!)).toBe(false)
       expect(place.env.SystemRoot ?? place.env.SYSTEMROOT).toBeTruthy()
       expect(place.env.ELECTRON_RUN_AS_NODE).toBeUndefined()
       expect(Object.keys(place.env).filter((k) => k.toUpperCase().startsWith('VITEST'))).toEqual([])

@@ -23,7 +23,7 @@ import {
   type QueueItem,
   type SliceModel,
   type SprintModel,
-} from '@pod-board/model'
+} from '@open-aflow/model'
 import type { Chip } from '../runs/view.ts'
 
 export type CardState = 'needs-you' | 'running' | 'waiting' | 'blocked' | 'merged'

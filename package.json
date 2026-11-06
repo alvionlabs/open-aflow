@@ -1,5 +1,5 @@
 {
-  "name": "pod-board",
+  "name": "open-aflow",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -8,16 +8,16 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter @pod-board/server --filter @pod-board/web dev",
+    "dev": "pnpm --parallel --filter @open-aflow/server --filter @open-aflow/web dev",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
-    "build": "pnpm -r build && pnpm --filter @pod-board/server bundle",
+    "build": "pnpm -r build && pnpm --filter @open-aflow/server bundle",
     "start": "node packages/server/dist/app/server.mjs",
-    "desktop": "pnpm --filter @pod-board/desktop start",
+    "desktop": "pnpm --filter @open-aflow/desktop start",
     "test:electron": "node packages/desktop/scripts/real-tests.mjs",
-    "package": "pnpm --filter @pod-board/desktop package",
+    "package": "pnpm --filter @open-aflow/desktop package",
     "test:install": "node packages/desktop/scripts/install-tests.mjs",
-    "release:check": "pnpm --filter @pod-board/desktop exec tsx scripts/release-check.ts",
+    "release:check": "pnpm --filter @open-aflow/desktop exec tsx scripts/release-check.ts",
     "verify": "pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
