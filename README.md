@@ -90,17 +90,19 @@ the runs screen, or (under `pnpm dev`) send its absolute path with the session
 token the API writes at each start to `session-token` next to its config file:
 
 ```sh
-curl -s -X POST http://127.0.0.1:3000/api/repos   -H "Origin: http://127.0.0.1:3000" -H "Content-Type: application/json"   -H "X-Open-AFlow-Token: $(cat ~/.config/open-aflow/session-token)"   -d '{"path":"/home/you/code/my-repo"}'
+curl -s -X POST http://127.0.0.1:3000/api/repos   -H "Origin: http://127.0.0.1:3000" -H "Content-Type: application/json"   -H "X-Open-AFlow-Token: $(cat ~/.config/open-aflow-server/session-token)"   -d '{"path":"/home/you/code/my-repo"}'
 ```
 
 The path must be a local folder: on Windows a drive path such as
 `C:\code\my-repo`. A network share (`\\host\share`) is refused.
 
 The list lives in the board's own config file, the only file it writes:
-`%APPDATA%\open-aflow\config.json` on Windows,
-`~/Library/Application Support/open-aflow/config.json` on macOS, and
-`$XDG_CONFIG_HOME/open-aflow/config.json` (or `~/.config/open-aflow/config.json`)
-elsewhere. It never writes inside a repo.
+`%APPDATA%\open-aflow-server\config.json` on Windows,
+`~/Library/Application Support/open-aflow-server/config.json` on macOS, and
+`$XDG_CONFIG_HOME/open-aflow-server/config.json` (or `~/.config/open-aflow-server/config.json`)
+elsewhere. It never writes inside a repo. On its first start after the rename to
+Open AFlow, the board copies the config folder of its old name, in the same
+place, and keeps the old folder as a backup.
 
 See the board as JSON at `http://127.0.0.1:3000/api/board`, and live updates
 at `http://127.0.0.1:3000/api/events`.

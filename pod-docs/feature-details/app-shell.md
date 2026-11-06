@@ -8,6 +8,7 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 
 - **Serving.** In dev, Vite serves the React app on the web port and proxies `/api` to the API port; both bind `127.0.0.1`. In production, the API server also serves the web build on its one port, with the token in the page (rules in [server.md](server.md)). A page route gets the page in both modes. `/sw.js` differs: production answers 404 JSON, and dev still answers it with HTML from Vite.
 - **Theme.** `open-aflow-theme` in `localStorage`: `dark`, `light`, or `system`. Nothing stored, an unknown value, or storage that throws reads as `dark` (`readChoice`). `light` and `dark` set `data-theme` on `<html>`; `system` removes it so `prefers-color-scheme` decides. The ⋯ menu's `.seg` shows the choice with `aria-pressed`.
+- **Old browser keys.** Before it reads the theme, `main.tsx` runs `moveOldKeys` (`old-storage-keys.ts`): the theme, the open tab, and the sidebar width move once from the keys of the old name to `open-aflow-theme`, `open-aflow-tab`, and `open-aflow-sidebar-width`. A value under the new key wins; the old key goes either way. A refused write keeps the old key for the next load.
 - **Theme boot.** An inline script before the module script applies the same rule, and a `color-scheme` meta plus `:root[data-theme]` rules make the browser canvas follow. `theme-color` metas are `#000000` / `#ffffff`.
 - **Tokens.** Only theme files define colors and fonts. One token per Look palette entry: `--bg --surface --hover --border --border-strong --fg --muted --faint --primary-bg --primary-fg --focus`, status `--blocked --needs-you --running --ready --idle`, and `--shadow` (the menu only). `:root` holds light values; `[data-theme="dark"]` and the dark media query hold dark ones.
 - **Fonts.** Geist 400/500/600 for UI and headings, Geist Mono 400/500 for paths, commands, numbers and labels: latin woff2 copied from Fontsource into `public/fonts/` with their OFL texts; `geist-400.woff2` is preloaded. Nothing loads from another host.
@@ -30,6 +31,7 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 
 ## Watch out
 
+- The boot script in `index.html` reads only `open-aflow-theme`. On the first load after the rename, a stored Light or System theme shows Dark until `main.tsx` moves the old key, one time only.
 - The dev and preview servers refuse framing with the same two headers as production (`server.headers` and `preview.headers` in `vite.config.ts`), because the dev page holds the token too. A framed page's own token and `Origin` pass the guards. Change both places or neither.
 - Build to `pod-docs/plans/calm-dashboard.md` `## Look` and its draft, not `docs/design/preview.html`.
 - `tokens.test.ts` fails on a CSS file under `packages/web/src` that sets `color` to `--faint` or a status token (rules targeting an `svg`, such as the flow's status marks, may), uses an old token name (`--panel`, `--line`, `--accent`, `--ok`, `--warn`, `--bad`, `--*-soft`, `--*-ink`, `--display`, `--body`), or drops text below 4.5:1.
@@ -69,3 +71,4 @@ The frame around every screen: the web app at `http://127.0.0.1:<web>/`, the ful
 - 2026-11-03 · windows-app plan fix 2 · fixed: another page can no longer frame the `pnpm dev` page and take clicks. Vite sends `Content-Security-Policy: frame-ancestors 'none'` and `X-Frame-Options: DENY`.
 - 2026-11-05 · fix-desktop-only-web-bench · removed the PWA manifest, its link tags, its maskable icon, and its tests; the browser version is for development and agents
 - 2026-11-05 · fix-rename-open-aflow · renamed: the page `<title>` and the sidebar brand say Open AFlow.
+- 2026-11-05 · fix-rename-internals · the theme, tab, and sidebar width keys are `open-aflow-*`, moved once from the old keys.
