@@ -6,12 +6,12 @@ The API server (`packages/server`) finds the repos to show, reads their pod docs
 
 ## How it works
 
-- **Old sessions:** agents come only from sessions changed in the last 30 days (`POD_BOARD_TRANSCRIPT_DAYS`), with no exception for a claim. So a claimed run keeps Continue while its session is inside the 30-day transcript window. Past that window, a merged fix run with no agent on the Board stays listed, its Engineer and Round 1 read `done` with `no transcript`, and it offers Copy with no Continue.
+- **Old sessions:** agents come only from sessions changed in the last 30 days (`OPEN_AFLOW_TRANSCRIPT_DAYS`), with no exception for a claim. So a claimed run keeps Continue while its session is inside the 30-day transcript window. Past that window, a merged fix run with no agent on the Board stays listed, its Engineer and Round 1 read `done` with `no transcript`, and it offers Copy with no Continue.
 - **Repos:** paths in the config file plus every repo a claim file names, merged by normalized path (case-blind where the file system is). `source` is `registered`, `claim`, or `both`.
 - **Each repo:** pod docs → the model (a doc whose real path leaves the repo's real path is skipped); recent pod-agent transcripts → parsed runs through a cache keyed by size and mtime, never text; PRs from a `gh` cache refreshed every 30 s (a head branch with no open PR after 240 asks, which is 2 hours at that rate: every 5 minutes). One bad repo sets its `error`; the others still build.
 - **`gh`:** run by the absolute path of the first `gh.exe` / `gh.com` (`gh` on POSIX) in an absolute `PATH` entry; asked only about live PRs (current-sprint PRs, hand-back PRs, a fix claim's or a plan's PR by head branch).
 - **Tool finder** (`tool-finder.ts`, production only; dev keeps its `PATH` lookups): finds `git`, `gh`, and `claude` when the app doesn't start from a terminal. A check only looks for a file, so it starts no tool and shows no window. First match wins, per tool:
-  1. `claude` only: `POD_BOARD_CLAUDE_BIN`, with no search. No file → `bad-path`, `source: 'env'`.
+  1. `claude` only: `OPEN_AFLOW_CLAUDE_BIN`, with no search. No file → `bad-path`, `source: 'env'`.
   2. A path in `<config dir>/tool-paths.json`. It wins over every search. A path that fails the rules → `bad-path`, `source: 'settings'`, with no search.
   3. The inherited `Path`, absolute entries only.
   4. The registry `Path`, HKLM then HKCU, read by `reg.exe` from `SystemRoot` with no window and a 5 s limit per hive. `%VAR%` expands from the env. An entry with an unknown variable, a relative entry, or a UNC entry is dropped. A failed read counts as empty.
@@ -26,27 +26,27 @@ The API server (`packages/server`) finds the repos to show, reads their pod docs
   - every route: a loopback `Host` on the API or web port (`403 forbidden host`), and an exact `Origin` on writes. No CORS headers; both ports bind `127.0.0.1`.
   - `/api/actions/*` (remove-repo included) and `POST /api/repos` (`actionGuard`): Origin, a body over 64 KB (`413`), POST, `application/json`, the token, a JSON object.
   - `/api/fs/*` (`readGuard`): the token only, no `Origin`.
-  - The token is a fresh random value per API start. In dev it's in `<config dir>/session-token`, and Vite puts it in the page's `<meta name="pod-board-token">`. In production it stays in memory, and the server puts it in the page. The page sends it as `X-Pod-Board-Token`. Compared in constant time. Never in the Board, a URL, a cookie, a log, or `pnpm build` output.
-- **Two modes, one wiring** (`startServer` in `start-server.ts`; `runMain` prints a rejection as `pod-board: <message>`, exits 1, and connects the signals). `main.ts` runs dev. `main-production.ts` runs production and finds its `web` folder from `import.meta.url`, never from the working folder.
+  - The token is a fresh random value per API start. In dev it's in `<config dir>/session-token`, and Vite puts it in the page's `<meta name="open-aflow-token">`. In production it stays in memory, and the server puts it in the page. The page sends it as `X-Open-AFlow-Token`. Compared in constant time. Never in the Board, a URL, a cookie, a log, or `pnpm build` output.
+- **Two modes, one wiring** (`startServer` in `start-server.ts`; `runMain` prints a rejection as `open-aflow: <message>`, exits 1, and connects the signals). `main.ts` runs dev. `main-production.ts` runs production and finds its `web` folder from `import.meta.url`, never from the working folder.
 
   | | Dev | Production |
   |---|---|---|
   | Token | Written to `<config dir>/session-token` before anything listens | In memory only. An existing file stays as it is, so a dev page on the same config folder keeps working |
   | Config folder | Created by the token write | Created at start; a failure stops the start, naming the folder |
-  | Port | `POD_BOARD_API_PORT`, default 3000, no fallback | See **Production port** |
-  | `Host` and `Origin` | API port and `POD_BOARD_WEB_PORT` | The bound port only. `POD_BOARD_WEB_PORT` isn't read |
+  | Port | `OPEN_AFLOW_API_PORT`, default 3000, no fallback | See **Production port** |
+  | `Host` and `Origin` | API port and `OPEN_AFLOW_WEB_PORT` | The bound port only. `OPEN_AFLOW_WEB_PORT` isn't read |
   | Page routes | 404 on the API port | See **Production answers** |
 
 - **Start order:** settings; the web app and config folder (production) or the token file (dev); the first tool check (production); the watcher; the bind; then the guards, the log line, the owner file ([resume.md](resume.md)), and the automatic check. A failure at any step rejects, and a failed bind closes the watcher. Because the check starts after the bind, a server that can't start sends no `continue`.
 - **Clean stop** (`parent-link.ts`, production only; `runMain` connects it before `startServer`; dev attaches no channel and doesn't read the variable):
   - **Channel:** `process.parentPort` (Electron's `utilityProcess`; the message is in `e.data`), else Node IPC (`process.send`), else none. A closed channel never throws.
-  - **Messages:** only an exact `{ type: 'pod-board:stop' }` counts. `{ type: 'pod-board:ready', port }` goes out once, after the bind. A stop that arrives during the start runs once the start ends. A failed start exits 1 with no ready message.
-  - **Parent watch:** `POD_BOARD_PARENT_PID` holds the parent's process ID, polled at once and then every 2 s. Unset or empty: no watch, so a plain `pnpm start` outlives whatever started it. A bad value stops the start, naming the variable. Gone → the same stop as the message.
+  - **Messages:** only an exact `{ type: 'open-aflow:stop' }` counts. `{ type: 'open-aflow:ready', port }` goes out once, after the bind. A stop that arrives during the start runs once the start ends. A failed start exits 1 with no ready message.
+  - **Parent watch:** `OPEN_AFLOW_PARENT_PID` holds the parent's process ID, polled at once and then every 2 s. Unset or empty: no watch, so a plain `pnpm start` outlives whatever started it. A bad value stops the start, naming the variable. Gone → the same stop as the message.
   - **One stop path:** the message and the watch run `createShutdown` at most once, so a repeat never turns into its "second press" `exit(1)`. A second signal quits at once, also after a message started the stop. A signal followed by a message doesn't force a quit.
   - **The drain cap stays `DRAIN_CAP_MS` (70 s).** A parent's kill timeout must be longer.
   - **Closed output:** `EPIPE` on stdout or stderr is ignored, so a dead parent's pipe doesn't end the drain. Other stream errors act as before.
   - **A stop ends only its own process.** A resumed `claude` is detached and keeps running ([resume.md](resume.md)).
-- **Production port** (`listen.ts`): `POD_BOARD_API_PORT` unset or empty tries `APP_PORT` (47800). On `EADDRINUSE` or `EACCES` (Windows reserved ranges answer `EACCES`), the OS picks a free port for this launch, and the server logs `pod-board: port 47800 is busy; using <port> for this launch`. Set: that port only; busy stops the start, naming the variable and the port. Any other listen error stops the start. The guards are built with the port that was really bound.
+- **Production port** (`listen.ts`): `OPEN_AFLOW_API_PORT` unset or empty tries `APP_PORT` (47800). On `EADDRINUSE` or `EACCES` (Windows reserved ranges answer `EACCES`), the OS picks a free port for this launch, and the server logs `open-aflow: port 47800 is busy; using <port> for this launch`. Set: that port only; busy stops the start, naming the variable and the port. Any other listen error stops the start. The guards are built with the port that was really bound.
 - **Production answers** (`web-app.ts`, mounted last in `createApp`, so a real API route wins and every answer sits behind the request guard). First match wins, on the path without its query:
   1. `/api`, `/api/`, or `/api/…`, any method → 404.
   2. A method other than GET or HEAD → 404. The request guard checks `Origin` first.
@@ -74,7 +74,7 @@ flowchart TD
   D -->|yes| F[subfolders only, case-blind sort, first 1000, podDocs each]
 ```
 
-  Example: `?path=E:/Projects` → `{ path: "E:\\Projects", parent: "E:\\", locked: false, truncated: false, folders: [{ name: "pod-board", path: "E:\\Projects\\pod-board", podDocs: true }, …] }`. With no token → `403 {"error":"bad token"}`; `?path=%5C%5Chost%5Cshare` → `400 {"error":"not a local path"}`.
+  Example: `?path=E:/Projects` → `{ path: "E:\\Projects", parent: "E:\\", locked: false, truncated: false, folders: [{ name: "open-aflow", path: "E:\\Projects\\open-aflow", podDocs: true }, …] }`. With no token → `403 {"error":"bad token"}`; `?path=%5C%5Chost%5Cshare` → `400 {"error":"not a local path"}`.
   - A link counts as a folder only when it ends at a local folder. On Windows each target is read with `readlink` and a network or device target is dropped before anything follows it; a linked `pod-docs` reads `false`. Files and broken links are left out. It reads names, types and link targets, never a file, and stores nothing.
 
 ## Why it's this way
@@ -103,10 +103,10 @@ flowchart TD
 - Never spawn a child by a bare name with a repo as its working folder: use `resolveBin` and `safeChildEnv` (`bin-path.ts`).
 - Only an open PR keeps a head branch at 30 s. With none, it gets 240 asks (`NO_PR_ASK_LIMIT`, 2 hours at 30 s), then one per 5 minutes (`NO_PR_SLOW_MS`), never a stop: a PR can open later. This covers plan, fix-run, and staging heads alike, and a staging head whose newest PR is merged counts as having none. A merged PR on a plan or fix head stays final. So a PR on a slowed branch can take up to 5 minutes and one tick to show; once open, the branch is back at 30 s. The limit counts asks, not time: a laptop sleep or a `gh` logout asks nothing and uses none of it, while the 5 minutes are clock time. A failed ask counts, so a branch `gh` can never read also slows. A restart, `forget`, or the branch leaving the asked list starts the count again.
 - Keep Vite's dev `cors: false`. Through the proxy, a stopped API answers `502` with an empty body.
-- Point `POD_BOARD_CONFIG_DIR` and `POD_BOARD_PORTS_DIR` at temp folders in tests and smoke runs. From Git Bash, send a UNC test path URL-encoded.
+- Point `OPEN_AFLOW_CONFIG_DIR` and `OPEN_AFLOW_PORTS_DIR` at temp folders in tests and smoke runs. From Git Bash, send a UNC test path URL-encoded.
 - The rebuild chain must never stay rejected; keep the cap timer apart from the quiet timer.
 - Ctrl+C waits up to 70 s for running actions; don't wait for `server.close()` (open SSE streams keep it from finishing).
-- Tests never bind 47800: set `POD_BOARD_API_PORT` or pass `preferredPort`.
+- Tests never bind 47800: set `OPEN_AFLOW_API_PORT` or pass `preferredPort`.
 - `/sw.js` differs by mode: production answers 404 JSON, and dev's web port still answers it with HTML from Vite. Only production's rules live in `web-app.ts`.
 - On Windows, Node's `spawn` puts a child that isn't `detached` in a libuv job that ends it with its parent. A Node parent that dies then ends the server at once, with no drain and a stale owner file. The parent watch can't help there. To test the watch, start the server with `detached: true`.
 - The finder stats `Path` entries with sync calls, as `resolveBin` always has: a dead mapped drive on `Path` blocks the server for that check.

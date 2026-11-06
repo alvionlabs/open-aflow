@@ -23,7 +23,7 @@ export function portFromEnv(env: Env, name: string, fallback: number): number {
 
 /** Where the API server listens. Always loopback: the board reads local files. */
 export function listenConfig(env: Env): ListenConfig {
-  return { hostname: '127.0.0.1', port: portFromEnv(env, 'POD_BOARD_API_PORT', DEFAULT_API_PORT) }
+  return { hostname: '127.0.0.1', port: portFromEnv(env, 'OPEN_AFLOW_API_PORT', DEFAULT_API_PORT) }
 }
 
 /** `env[name]`, with an empty value counted as unset. */
@@ -33,13 +33,13 @@ export function envValue(env: Env, name: string): string | undefined {
 }
 
 /**
- * Where the board keeps its own config file, per OS. `POD_BOARD_CONFIG_DIR`
+ * Where the board keeps its own config file, per OS. `OPEN_AFLOW_CONFIG_DIR`
  * wins everywhere. Paths use the separators of `platform`, so callers (and
  * tests) can ask for any OS from any host.
  */
 export function configPath(env: Env, platform: NodeJS.Platform, home: string): string {
   const p = platform === 'win32' ? path.win32 : path.posix
-  const override = envValue(env, 'POD_BOARD_CONFIG_DIR')
+  const override = envValue(env, 'OPEN_AFLOW_CONFIG_DIR')
   if (override) return p.join(override, 'config.json')
   if (platform === 'win32') {
     const appData = envValue(env, 'APPDATA') ?? p.join(home, 'AppData', 'Roaming')

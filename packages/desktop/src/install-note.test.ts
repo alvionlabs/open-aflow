@@ -41,7 +41,7 @@ describe('docs/install.md', () => {
   test('the note names where to download and the config folder that stays', () => {
     const note = read('docs/install.md')
     expect(note).toContain('https://github.com/alvionlabs/open-aflow/releases/latest')
-    expect(note).toContain('%APPDATA%\\pod-board')
+    expect(note).toContain('%APPDATA%\\open-aflow')
     expect(note).toContain('`open-aflow-setup-<version>.exe`')
     expect(note).toContain('%APPDATA%\\Open AFlow\\desktop.log')
     expect(note).toContain('find **Open AFlow**')

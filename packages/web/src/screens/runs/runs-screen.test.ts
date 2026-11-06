@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRepoModel, listRuns, type Board, type BoardRepo, type Claim, type PrStatus, type RunSummary } from '@pod-board/model'
+import { buildRepoModel, listRuns, type Board, type BoardRepo, type Claim, type PrStatus, type RunSummary } from '@open-aflow/model'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { loadFixture } from '../../../../model/test/load-fixture.ts'
@@ -484,9 +484,9 @@ describe('sidebar resize handle', () => {
       return { value: /aria-valuenow="(\d+)"/.exec(handleOf(html))?.[1], style: /<div class="screen-body" style="([^"]*)"/.exec(html)?.[1] }
     }
     expect(at({})).toEqual({ value: '260', style: '--side-width:260px' })
-    expect(at({ 'pod-board-sidebar-width': '320' })).toEqual({ value: '320', style: '--side-width:320px' })
-    expect(at({ 'pod-board-sidebar-width': '9000' })).toEqual({ value: '400', style: '--side-width:400px' })
-    expect(at({ 'pod-board-sidebar-width': 'wide' })).toEqual({ value: '260', style: '--side-width:260px' })
+    expect(at({ 'open-aflow-sidebar-width': '320' })).toEqual({ value: '320', style: '--side-width:320px' })
+    expect(at({ 'open-aflow-sidebar-width': '9000' })).toEqual({ value: '400', style: '--side-width:400px' })
+    expect(at({ 'open-aflow-sidebar-width': 'wide' })).toEqual({ value: '260', style: '--side-width:260px' })
   })
 
   it('sits between the sidebar and the main column', () => {

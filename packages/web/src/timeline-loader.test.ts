@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentTimeline } from '@pod-board/model'
+import type { AgentTimeline } from '@open-aflow/model'
 import { createTimelineLoader, timelineUrl, type FetchJson, type JsonReply, type TimelineKey, type TimelineState } from './timeline-loader.ts'
 
 /** A fetch the test answers by hand, one request at a time. */

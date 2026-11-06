@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRepoModel, type Board, type BoardRepo, type RunSummary } from '@pod-board/model'
+import { buildRepoModel, type Board, type BoardRepo, type RunSummary } from '@open-aflow/model'
 import { agentChip, agentLogRows, banners, confidenceTag, connectionStatus, emptyMessage, groupChip, logBlocks, logRunChip, nextStatus, otherRows, rowFigures, runCard, runChip, tabPress, titleParts } from './view.ts'
 
 const run = (over: Partial<RunSummary>): RunSummary => ({ repoId: 'r', repo: 'chess-web', where: 'x', state: 'idle', ...over })

@@ -193,7 +193,7 @@ describe('sidebar cards stack by default', () => {
   })
 
   // Measured in the browser at 14 px / 500 in the app's own font, rounded up.
-  const WORDS = { authentication: 95, skyscraperviewpanel: 139, pod_board_long_repo: 145 }
+  const WORDS = { authentication: 95, skyscraperviewpanel: 139, open_aflow_long_repo: 145 }
 
   it('fits real long words whole on the stacked line at the default width, so none breaks', () => {
     for (const [word, width] of Object.entries(WORDS)) expect(contentOf(260), word).toBeGreaterThanOrEqual(width)
@@ -203,7 +203,7 @@ describe('sidebar cards stack by default', () => {
     expect(contentOf(200)).toBe(133)
     expect(WORDS.authentication).toBeLessThanOrEqual(contentOf(200))
     expect(WORDS.skyscraperviewpanel).toBeGreaterThan(contentOf(200))
-    expect(WORDS.pod_board_long_repo).toBeGreaterThan(contentOf(200))
+    expect(WORDS.open_aflow_long_repo).toBeGreaterThan(contentOf(200))
   })
 
   it('fits them whole in the name column just above the threshold too', () => {

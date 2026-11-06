@@ -23,13 +23,13 @@ importers:
       '@electron/asar':
         specifier: 4.3.1
         version: 4.3.1
-      '@pod-board/model':
+      '@open-aflow/model':
         specifier: workspace:*
         version: link:../model
-      '@pod-board/server':
+      '@open-aflow/server':
         specifier: workspace:*
         version: link:../server
-      '@pod-board/web':
+      '@open-aflow/web':
         specifier: workspace:*
         version: link:../web
       '@types/pngjs':
@@ -64,7 +64,7 @@ importers:
       '@hono/node-server':
         specifier: ^2.1.5
         version: 2.1.5(hono@4.13.13)
-      '@pod-board/model':
+      '@open-aflow/model':
         specifier: workspace:*
         version: link:../model
       chokidar:
@@ -83,7 +83,7 @@ importers:
 
   packages/web:
     dependencies:
-      '@pod-board/model':
+      '@open-aflow/model':
         specifier: workspace:*
         version: link:../model
       react:
@@ -93,7 +93,7 @@ importers:
         specifier: ^19.3.1
         version: 19.3.1(react@19.3.1)
     devDependencies:
-      '@pod-board/server':
+      '@open-aflow/server':
         specifier: workspace:*
         version: link:../server
       '@types/react':

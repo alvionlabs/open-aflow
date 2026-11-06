@@ -110,7 +110,7 @@ describe('request guard', () => {
 })
 
 const TOKEN = 'k'.repeat(43)
-const GOOD = { host: '127.0.0.1:3040', origin: 'http://127.0.0.1:3041', 'content-type': 'application/json', 'x-pod-board-token': TOKEN }
+const GOOD = { host: '127.0.0.1:3040', origin: 'http://127.0.0.1:3041', 'content-type': 'application/json', 'x-open-aflow-token': TOKEN }
 
 /** The action guard alone, in front of a handler that counts its calls. */
 function actionGuarded() {
@@ -138,7 +138,7 @@ describe('action guard', () => {
 
   test('checks Host, Origin, method, content type, token, then body, in that order', async () => {
     const { app, reached } = actionGuarded()
-    const { 'x-pod-board-token': _, ...noToken } = GOOD
+    const { 'x-open-aflow-token': _, ...noToken } = GOOD
     const cases: [string, Record<string, string>, string, string | undefined, number, string][] = [
       ['foreign host, everything else bad', { host: 'evil.example:3040', origin: 'http://evil.example', 'content-type': 'text/plain' }, 'GET', undefined, 403, 'forbidden host'],
       ['bad origin, bad type, no token, bad body', { ...noToken, origin: 'http://evil.example', 'content-type': 'text/plain' }, 'POST', '[]', 403, 'forbidden origin'],
@@ -179,7 +179,7 @@ describe('action guard', () => {
     const { app } = actionGuarded()
     // HTTP trims spaces around a header value, so ` <token>` is the token itself.
     for (const token of ['', 'k'.repeat(42), 'k'.repeat(44), 'j' + 'k'.repeat(42), 'K'.repeat(43), `${TOKEN.slice(0, 20)} ${TOKEN.slice(21)}`]) {
-      const res = await act(app, { ...GOOD, 'x-pod-board-token': token })
+      const res = await act(app, { ...GOOD, 'x-open-aflow-token': token })
       expect(res.status, JSON.stringify(token)).toBe(403)
       expect(await res.json()).toEqual({ error: 'bad token' })
     }
@@ -222,7 +222,7 @@ describe('read guard', () => {
     const { app, reached } = readGuarded()
     // No Origin: browsers leave it off same-origin GETs.
     for (const host of ['127.0.0.1:3040', 'localhost:3041']) {
-      const ok = await read(app, { host, 'x-pod-board-token': TOKEN })
+      const ok = await read(app, { host, 'x-open-aflow-token': TOKEN })
       expect(ok.status, host).toBe(200)
       expect(await ok.json()).toEqual({ ok: true })
       noCors(ok)
@@ -231,13 +231,13 @@ describe('read guard', () => {
 
     const refused: [string, Record<string, string>, string, string][] = [
       ['no token', { host: '127.0.0.1:3040' }, 'http://127.0.0.1:3040/api/fs/x', 'bad token'],
-      ['empty token', { host: '127.0.0.1:3040', 'x-pod-board-token': '' }, 'http://127.0.0.1:3040/api/fs/x', 'bad token'],
-      ['token in the URL only', { host: '127.0.0.1:3040' }, `http://127.0.0.1:3040/api/fs/x?token=${TOKEN}&x-pod-board-token=${TOKEN}`, 'bad token'],
-      ['foreign host, good token', { host: 'evil.example:3040', 'x-pod-board-token': TOKEN }, 'http://127.0.0.1:3040/api/fs/x', 'forbidden host'],
+      ['empty token', { host: '127.0.0.1:3040', 'x-open-aflow-token': '' }, 'http://127.0.0.1:3040/api/fs/x', 'bad token'],
+      ['token in the URL only', { host: '127.0.0.1:3040' }, `http://127.0.0.1:3040/api/fs/x?token=${TOKEN}&x-open-aflow-token=${TOKEN}`, 'bad token'],
+      ['foreign host, good token', { host: 'evil.example:3040', 'x-open-aflow-token': TOKEN }, 'http://127.0.0.1:3040/api/fs/x', 'forbidden host'],
       ['foreign host, no token', { host: 'evil.example:3040' }, 'http://127.0.0.1:3040/api/fs/x', 'forbidden host'],
     ]
     for (const token of ['k'.repeat(42), 'k'.repeat(44), 'j' + 'k'.repeat(42), 'K'.repeat(43)]) {
-      refused.push([`wrong token ${token.length}`, { host: '127.0.0.1:3040', 'x-pod-board-token': token }, 'http://127.0.0.1:3040/api/fs/x', 'bad token'])
+      refused.push([`wrong token ${token.length}`, { host: '127.0.0.1:3040', 'x-open-aflow-token': token }, 'http://127.0.0.1:3040/api/fs/x', 'bad token'])
     }
     for (const [name, headers, url, error] of refused) {
       const res = await read(app, headers, url)
@@ -250,7 +250,7 @@ describe('read guard', () => {
 
   test('a write through it still needs the Origin', async () => {
     const { app, reached } = readGuarded()
-    const res = await app.request('http://127.0.0.1:3040/api/fs/x', { method: 'POST', headers: { host: '127.0.0.1:3040', 'x-pod-board-token': TOKEN } })
+    const res = await app.request('http://127.0.0.1:3040/api/fs/x', { method: 'POST', headers: { host: '127.0.0.1:3040', 'x-open-aflow-token': TOKEN } })
     expect(res.status).toBe(403)
     expect(await res.json()).toEqual({ error: 'forbidden origin' })
     expect(reached()).toBe(0)
@@ -259,9 +259,9 @@ describe('read guard', () => {
 
 describe('repo identity', () => {
   test('drops trailing separators and uses \\ on win32', () => {
-    expect(normalizeRepoPath('E:/Projects/pod-board/', 'win32')).toBe('E:\\Projects\\pod-board')
-    expect(normalizeRepoPath('E:\\Projects/pod-board\\\\', 'win32')).toBe('E:\\Projects\\pod-board')
-    expect(normalizeRepoPath('E:/Projects/./x/../pod-board', 'win32')).toBe('E:\\Projects\\pod-board')
+    expect(normalizeRepoPath('E:/Projects/open-aflow/', 'win32')).toBe('E:\\Projects\\open-aflow')
+    expect(normalizeRepoPath('E:\\Projects/open-aflow\\\\', 'win32')).toBe('E:\\Projects\\open-aflow')
+    expect(normalizeRepoPath('E:/Projects/./x/../open-aflow', 'win32')).toBe('E:\\Projects\\open-aflow')
     expect(normalizeRepoPath('E:/', 'win32')).toBe('E:\\')
   })
 
@@ -272,8 +272,8 @@ describe('repo identity', () => {
   })
 
   test('repoId maps every non-alphanumeric character to - and lowercases where case is ignored', () => {
-    expect(repoId('E:\\Projects\\Pod-Board', 'win32', true)).toBe('e--projects-pod-board')
-    expect(repoId('e:/projects/pod-board/', 'win32', true)).toBe('e--projects-pod-board')
+    expect(repoId('E:\\Projects\\Open-AFlow', 'win32', true)).toBe('e--projects-open-aflow')
+    expect(repoId('e:/projects/open-aflow/', 'win32', true)).toBe('e--projects-open-aflow')
     expect(repoId('/home/Me/my repo', 'linux', false)).toBe('-home-Me-my-repo')
     expect(repoId('/home/Me/my repo/', 'linux', false)).toBe('-home-Me-my-repo')
   })
@@ -295,7 +295,7 @@ describe('repo identity', () => {
 
 describe('ignoresCase probe', () => {
   test('matches what the real file system does with another case', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'pod-board-case-'))
+    const root = await mkdtemp(join(tmpdir(), 'open-aflow-case-'))
     try {
       const dir = join(root, 'Probe-Dir')
       await mkdir(dir)
@@ -312,7 +312,7 @@ describe('ignoresCase probe', () => {
   })
 
   test('two folders that differ only in case are a case-sensitive file system', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'pod-board-case-'))
+    const root = await mkdtemp(join(tmpdir(), 'open-aflow-case-'))
     try {
       await mkdir(join(root, 'twin'))
       if (existsSync(join(root, 'TWIN'))) return // this file system ignores case: no twins possible
@@ -325,7 +325,7 @@ describe('ignoresCase probe', () => {
   })
 
   test('a missing folder falls back to the OS default and never throws', async () => {
-    const gone = join(tmpdir(), 'pod-board-case-gone-' + Date.now(), 'Nope')
+    const gone = join(tmpdir(), 'open-aflow-case-gone-' + Date.now(), 'Nope')
     expect(await ignoresCase(gone)).toBe(process.platform === 'win32' || process.platform === 'darwin')
   })
 })
@@ -362,9 +362,9 @@ describe('repoIds', () => {
   })
 
   test('a repo with no clash keeps today’s id, byte for byte, beside a clash', () => {
-    const { ids } = repoIds([W('E:/Projects/Pod-Board'), W('E:/x/a-b'), W('E:/x/a_b'), L('/home/Me/my repo')], 'win32')
-    expect(ids[0]).toBe('e--projects-pod-board')
-    expect(ids[0]).toBe(repoId('E:/Projects/Pod-Board', 'win32', true))
+    const { ids } = repoIds([W('E:/Projects/Open-AFlow'), W('E:/x/a-b'), W('E:/x/a_b'), L('/home/Me/my repo')], 'win32')
+    expect(ids[0]).toBe('e--projects-open-aflow')
+    expect(ids[0]).toBe(repoId('E:/Projects/Open-AFlow', 'win32', true))
     expect(ids[3]).toBe(repoId('/home/Me/my repo', 'win32', false))
     expect(repoIds([L('/home/Me/my repo')], 'linux').ids).toEqual(['-home-Me-my-repo'])
   })

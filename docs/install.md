@@ -54,4 +54,4 @@ The app keeps a small log at `%APPDATA%\Open AFlow\desktop.log`. It holds the ap
 
 Open **Settings** > **Apps** > **Installed apps**, find **Open AFlow**, and select **Uninstall**. Your running `claude` sessions keep running.
 
-The uninstall keeps your settings in `%APPDATA%\pod-board`. To remove them too, delete that folder.
+The uninstall keeps your settings in `%APPDATA%\open-aflow`. To remove them too, delete that folder.

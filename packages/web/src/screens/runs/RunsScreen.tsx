@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { buildFixPipeline, buildFlow, buildPipeline, type Board, type RunSummary } from '@pod-board/model'
+import { buildFixPipeline, buildFlow, buildPipeline, type Board, type RunSummary } from '@open-aflow/model'
 import type { StreamState } from '../../board-stream.ts'
 import { hashFor, type View } from '../../selection.ts'
 import { Icon } from '../../theme/icons.tsx'

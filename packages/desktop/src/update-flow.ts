@@ -4,7 +4,7 @@
 export const FIRST_CHECK_MS = 30_000
 export const RECHECK_MS = 6 * 60 * 60_000
 
-const LOG = 'pod-board desktop: update'
+const LOG = 'open-aflow desktop: update'
 
 export type UpdaterPort = {
   /** May resolve with the download that it started. */

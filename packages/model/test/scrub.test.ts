@@ -69,7 +69,7 @@ describe('scrub', () => {
       '| 1 | L1 | Look | ladder-L1 | [#76](https://github.com/iamphduc/chess-web/pull/76) merged | merged | medium | — |',
       'Final PR https://github.com/iamphduc/chess-web/pull/76, see http://127.0.0.1:3000/api/health.',
       'A page at https://example.com/home/docs and https://example.com/Users/list is not a home path.',
-      'Install `react@18.3.1` and `@pod-board/model`; run `npm run calibrate -- --measure`.',
+      'Install `react@18.3.1` and `@open-aflow/model`; run `npm run calibrate -- --measure`.',
       'Paths stay repo-relative: `src/game/review/grade.ts`, `pod-docs/sprints/archive/ladder.md`.',
       'Times like 10:31:18Z and ratios like 3:2 are fine; so is `task-skipped-because-of-a-long-reason`.',
       '- `[2026-06-04 · PENDING · reviewer → orchestrator · sprint: x]` body **Resolution:** pending',

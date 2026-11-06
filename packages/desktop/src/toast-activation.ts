@@ -2,7 +2,7 @@
 // notification center, with the toast's `launch` text and nothing else, so the toast carries its run. The rules are in
 // pod-docs/feature-details/toasts.md.
 
-const LAUNCH_PREFIX = 'pod-board-toast:'
+const LAUNCH_PREFIX = 'open-aflow-toast:'
 /** A board hash: `#/<repo>`, and more path after it. */
 const BOARD_HASH = /^#\/\S+$/
 

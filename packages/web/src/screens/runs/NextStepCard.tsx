@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import type { BoardRepo, RunSummary } from '@pod-board/model'
+import type { BoardRepo, RunSummary } from '@open-aflow/model'
 import { AnswerForm } from './AnswerForm.tsx'
 import { INITIAL, createAnswerFlow, formView, type AnswerState } from './answer-flow.ts'
 import { MergeConfirm, mergeButtonId, useMergeFlow } from './MergeConfirm.tsx'

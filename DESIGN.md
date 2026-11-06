@@ -1,4 +1,4 @@
-# Pod Board design rules
+# Open AFlow design rules
 
 Read this before any UI change. It holds all design rules.
 

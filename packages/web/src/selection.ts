@@ -9,7 +9,7 @@
 // none, with an empty hash. `resolveSelection` also returns the hash that names what it picked, so the
 // page can put it in the URL and a vanished run's hash doesn't come back to life.
 
-import type { RunSummary } from '@pod-board/model'
+import type { RunSummary } from '@open-aflow/model'
 
 /** How often live minutes recompute without a new Board. */
 export const LIVE_TICK_MS = 30_000

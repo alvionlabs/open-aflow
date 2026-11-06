@@ -190,7 +190,7 @@ export function createToolFinder(o: {
     resolveBin(tool, { PATH: dirs.join(sep) }, platform, { exts: EXTENSIONS[tool] })
 
   const find = (tool: ToolName, settings: Partial<Record<ToolName, string>>, registry: string[], known: string[]): ToolState => {
-    const fromEnv = tool === 'claude' ? envValue(o.env, 'POD_BOARD_CLAUDE_BIN') : undefined
+    const fromEnv = tool === 'claude' ? envValue(o.env, 'OPEN_AFLOW_CLAUDE_BIN') : undefined
     if (fromEnv !== undefined) {
       // That value only: a bare name or a relative path has nothing to search, and a name with no extension finds its shim.
       const local = !NETWORK_PATH.test(fromEnv) && (win ? DRIVE_PATH.test(fromEnv) : path.posix.isAbsolute(fromEnv))

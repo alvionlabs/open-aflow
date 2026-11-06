@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { BoardRepo, RunSummary } from '@pod-board/model'
+import type { BoardRepo, RunSummary } from '@open-aflow/model'
 import { RunMoreMenuView } from './RunMoreMenu.tsx'
 import { RunsList } from './RunsList.tsx'
 import { moreButtonId } from './remove-flow.ts'
@@ -117,7 +117,7 @@ describe('underscores in the sidebar card', () => {
   })
 
   it('does the same on the repo line, whose text stays the same', () => {
-    expect(listed({ repo: 'pod_board' })).toContain('<span class="run-repo muted">pod_<wbr/>board</span>')
+    expect(listed({ repo: 'open_aflow' })).toContain('<span class="run-repo muted">open_<wbr/>aflow</span>')
     expect(listed({ repo: 'chess-web' })).toContain('<span class="run-repo muted">chess-web</span>')
   })
 })

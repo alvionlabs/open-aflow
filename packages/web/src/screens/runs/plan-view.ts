@@ -1,7 +1,7 @@
 // The run's flow (columns of step cards), its fold line for phones, and the run header (title, meta
 // line, progress strip, `Wave N of M`), from the model's flow. Pure; the Flow and the header only render these.
 
-import { buildFlow, fixPr, fixRunAgents, isPlanAgent, type BoardRepo, type RunSummary, type Stage, type Step, type StepState } from '@pod-board/model'
+import { buildFlow, fixPr, fixRunAgents, isPlanAgent, type BoardRepo, type RunSummary, type Stage, type Step, type StepState } from '@open-aflow/model'
 
 export type Segment = 'done' | 'current' | 'rest'
 /** `meta`: `<repo> · <Plan|Fix> · started <when>`, unknown parts left out; empty for a repo row, whose title is the repo. */
@@ -97,7 +97,7 @@ function waveText(run: RunSummary, repo: BoardRepo): string | undefined {
   return `Wave ${sprint.currentWave ?? last.wave} of ${last.wave}`
 }
 
-/** POD_BOARD_TRANSCRIPT_DAYS when the Board doesn't say. */
+/** OPEN_AFLOW_TRANSCRIPT_DAYS when the Board doesn't say. */
 export const TRANSCRIPT_DAYS = 30
 
 /**

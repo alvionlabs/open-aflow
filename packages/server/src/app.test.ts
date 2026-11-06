@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join } from 'node:path'
-import type { AgentTimeline, Board } from '@pod-board/model'
+import type { AgentTimeline, Board } from '@open-aflow/model'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createApp, type AppDeps, type BoardSource } from './app.ts'
@@ -21,7 +21,7 @@ const POST_HEADERS = { ...HOST, origin: `http://127.0.0.1:${WEB}`, 'content-type
 const platform = process.platform
 
 const TOKEN = createSessionToken()
-const ACTION_HEADERS = { ...POST_HEADERS, 'x-pod-board-token': TOKEN }
+const ACTION_HEADERS = { ...POST_HEADERS, 'x-open-aflow-token': TOKEN }
 /** The largest request body the guarded routes take. */
 const BODY_LIMIT = 64 * 1024
 
@@ -142,7 +142,7 @@ describe('add repo route', () => {
   const gh: GhReader = { status: () => 'unknown', checkedAt: () => undefined, get: () => undefined, getBranch: () => undefined, refresh: async () => false }
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), 'pod-board-a1-app-'))
+    root = await mkdtemp(join(tmpdir(), 'open-aflow-a1-app-'))
     configFile = join(root, 'config', 'config.json')
     const portsDir = join(root, 'ports')
     const claudeDir = join(root, 'claude')
@@ -220,9 +220,9 @@ describe('add repo route', () => {
     const wrong = createSessionToken()
     for (const [why, headers] of [
       ['no token', POST_HEADERS],
-      ['empty token', { ...POST_HEADERS, 'x-pod-board-token': '' }],
-      ['wrong token', { ...POST_HEADERS, 'x-pod-board-token': wrong }],
-      ['shorter token', { ...POST_HEADERS, 'x-pod-board-token': TOKEN.slice(1) }],
+      ['empty token', { ...POST_HEADERS, 'x-open-aflow-token': '' }],
+      ['wrong token', { ...POST_HEADERS, 'x-open-aflow-token': wrong }],
+      ['shorter token', { ...POST_HEADERS, 'x-open-aflow-token': TOKEN.slice(1) }],
     ] as const) {
       const res = await post(body, headers)
       expect(res.status, why).toBe(403)
@@ -233,7 +233,7 @@ describe('add repo route', () => {
     const origin = await post(body, { ...ACTION_HEADERS, origin: 'http://evil.example' })
     expect(origin.status).toBe(403)
     expect(await origin.json()).toEqual({ error: 'forbidden origin' })
-    expect((await app.request('/api/repos', { headers: { ...HOST, 'x-pod-board-token': TOKEN } })).status).toBe(405)
+    expect((await app.request('/api/repos', { headers: { ...HOST, 'x-open-aflow-token': TOKEN } })).status).toBe(405)
     expect((await post(body)).status).toBe(201)
     expect((await post(body)).status).toBe(409)
   })
@@ -396,7 +396,7 @@ describe('action routes', () => {
     }
     return { app, calls, send }
   }
-  const { 'x-pod-board-token': _token, ...noToken } = ACTION_HEADERS
+  const { 'x-open-aflow-token': _token, ...noToken } = ACTION_HEADERS
 
   const refused = async (res: Response, status: number, error: string, label: string) => {
     expect(res.status, label).toBe(status)
@@ -407,7 +407,7 @@ describe('action routes', () => {
   test('action without token is refused', async () => {
     const { send, calls } = setup()
     await refused(await send(noToken), 403, 'bad token', 'no token')
-    await refused(await send({ ...noToken, 'x-pod-board-token': '' }), 403, 'bad token', 'empty token')
+    await refused(await send({ ...noToken, 'x-open-aflow-token': '' }), 403, 'bad token', 'empty token')
     expect(calls).toEqual([])
   })
 
@@ -415,9 +415,9 @@ describe('action routes', () => {
     const { send, calls } = setup()
     const wrong = createSessionToken()
     expect(wrong).toHaveLength(TOKEN.length)
-    await refused(await send({ ...ACTION_HEADERS, 'x-pod-board-token': wrong }), 403, 'bad token', 'same length')
-    await refused(await send({ ...ACTION_HEADERS, 'x-pod-board-token': TOKEN.slice(1) }), 403, 'bad token', 'shorter')
-    await refused(await send({ ...ACTION_HEADERS, 'x-pod-board-token': TOKEN + 'x' }), 403, 'bad token', 'longer')
+    await refused(await send({ ...ACTION_HEADERS, 'x-open-aflow-token': wrong }), 403, 'bad token', 'same length')
+    await refused(await send({ ...ACTION_HEADERS, 'x-open-aflow-token': TOKEN.slice(1) }), 403, 'bad token', 'shorter')
+    await refused(await send({ ...ACTION_HEADERS, 'x-open-aflow-token': TOKEN + 'x' }), 403, 'bad token', 'longer')
     expect(calls).toEqual([])
   })
 
@@ -449,7 +449,7 @@ describe('action routes', () => {
 
   test('action method and body are checked', async () => {
     const { send, calls } = setup()
-    await refused(await send({ host: HOST.host, 'x-pod-board-token': TOKEN }, { method: 'GET' }), 405, 'method not allowed', 'GET')
+    await refused(await send({ host: HOST.host, 'x-open-aflow-token': TOKEN }, { method: 'GET' }), 405, 'method not allowed', 'GET')
     await refused(await send(ACTION_HEADERS, { method: 'PUT' }), 405, 'method not allowed', 'PUT')
     for (const body of ['{ nope', '[]', 'null', '']) {
       await refused(await send(ACTION_HEADERS, { body }), 400, 'bad request', JSON.stringify(body))
@@ -514,14 +514,14 @@ describe('action routes', () => {
 })
 
 describe('folder listing route', () => {
-  const READ = { ...HOST, 'x-pod-board-token': TOKEN }
+  const READ = { ...HOST, 'x-open-aflow-token': TOKEN }
   let root: string
   let seen: (string | undefined)[]
   let app: Hono
   const url = (dir?: string) => (dir === undefined ? '/api/fs/folders' : `/api/fs/folders?${new URLSearchParams({ path: dir })}`)
 
   beforeEach(async () => {
-    root = await realpath(await mkdtemp(join(tmpdir(), 'pod-board-folders-')))
+    root = await realpath(await mkdtemp(join(tmpdir(), 'open-aflow-folders-')))
     await mkdir(join(root, 'b-repo', 'pod-docs'), { recursive: true })
     await mkdir(join(root, 'A plus+space'))
     await writeFile(join(root, 'f.txt'), 'secret')
@@ -566,7 +566,7 @@ describe('folder listing route', () => {
   test('every error code and body', async () => {
     const cases: [string, Record<string, string>, string, number, string][] = [
       ['no token', HOST, url(root), 403, 'bad token'],
-      ['wrong token', { ...HOST, 'x-pod-board-token': 'k'.repeat(43) }, url(root), 403, 'bad token'],
+      ['wrong token', { ...HOST, 'x-open-aflow-token': 'k'.repeat(43) }, url(root), 403, 'bad token'],
       ['token in the URL', HOST, `${url(root)}&token=${TOKEN}`, 403, 'bad token'],
       ['foreign host', { ...READ, host: `evil.example:${API}` }, url(root), 403, 'forbidden host'],
       ['relative', READ, url('some/folder'), 400, 'not absolute'],
@@ -627,7 +627,7 @@ describe('tool routes seam', () => {
       timeline: noTimeline,
       ...extra,
     })
-  const read = (app: Hono) => app.request('/api/tools', { headers: { ...HOST, 'x-pod-board-token': TOKEN } })
+  const read = (app: Hono) => app.request('/api/tools', { headers: { ...HOST, 'x-open-aflow-token': TOKEN } })
   const write = (app: Hono) =>
     app.request('/api/actions/tool-path', { method: 'POST', headers: ACTION_HEADERS, body: JSON.stringify({ tool: 'gh', path: null }) })
 
@@ -667,7 +667,7 @@ describe('web seam', () => {
     expect(await (await get('/api/health')).json()).toEqual({ ok: true })
     expect(await (await get('/api/board')).json()).toEqual(BOARD)
     expect(await (await get('/api/agents/r/a1/timeline')).json()).toEqual(TIMELINE)
-    expect((await get('/api/fs/folders', { ...HOST, 'x-pod-board-token': TOKEN })).status).toBe(200)
+    expect((await get('/api/fs/folders', { ...HOST, 'x-open-aflow-token': TOKEN })).status).toBe(200)
     expect((await get('/api/fs/folders')).status).toBe(403)
     const merged = await app.request('/api/actions/merge', { method: 'POST', headers: ACTION_HEADERS, body: '{}' })
     expect(await merged.json()).toEqual({ merged: true })
@@ -686,7 +686,7 @@ describe('web seam', () => {
   })
 
   test('the web app sits behind the request guard', async () => {
-    const root = await realpath(await mkdtemp(join(tmpdir(), 'pod-board-app-web-')))
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'open-aflow-app-web-')))
     try {
       await writeFile(join(root, 'index.html'), '<html><head></head><body>page</body></html>')
       const web = await createWebApp({ dir: root, token: TOKEN })

@@ -1,7 +1,7 @@
 import { appendFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { Board } from '@pod-board/model'
+import type { Board } from '@open-aflow/model'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createTimelineSource } from './agent-timeline.ts'
 import { createBoardService } from './board-service.ts'
@@ -21,7 +21,7 @@ let claudeDir: string
 let configFile: string
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'pod-board-t1-tl-'))
+  root = await mkdtemp(join(tmpdir(), 'open-aflow-t1-tl-'))
   repo = join(root, 'repos', 'my-repo')
   claudeDir = join(root, 'claude')
   configFile = join(root, 'config', 'config.json')

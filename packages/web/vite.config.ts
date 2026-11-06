@@ -2,11 +2,11 @@ import { homedir } from 'node:os'
 import { dirname } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { configPath, DEFAULT_API_PORT, portFromEnv } from '@pod-board/server/config'
-import { tokenMetaPlugin } from '@pod-board/server/session-token'
+import { configPath, DEFAULT_API_PORT, portFromEnv } from '@open-aflow/server/config'
+import { tokenMetaPlugin } from '@open-aflow/server/session-token'
 
-const apiPort = portFromEnv(process.env, 'POD_BOARD_API_PORT', DEFAULT_API_PORT)
-const webPort = portFromEnv(process.env, 'POD_BOARD_WEB_PORT', 3001)
+const apiPort = portFromEnv(process.env, 'OPEN_AFLOW_API_PORT', DEFAULT_API_PORT)
+const webPort = portFromEnv(process.env, 'OPEN_AFLOW_WEB_PORT', 3001)
 // The API writes its session token next to its config file; the dev server reads it on each page load.
 const configDir = dirname(configPath(process.env, process.platform, homedir()))
 // No other page may frame the board: a framed page's own token and Origin pass the guards, so a click

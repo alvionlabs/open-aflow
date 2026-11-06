@@ -37,10 +37,10 @@ export function startNotifier(ctx: ShellContext): void {
     note.on('close', () => open.delete(note))
     note.on('failed', () => {
       open.delete(note)
-      console.error('pod-board desktop: toast failed')
+      console.error('open-aflow desktop: toast failed')
     })
     note.show()
-    console.log('pod-board desktop: toast sent')
+    console.log('open-aflow desktop: toast sent')
   }
 
   const notifier = createNotifier({
@@ -48,7 +48,7 @@ export function startNotifier(ctx: ShellContext): void {
     supported: () => Notification.isSupported(),
     send,
     setAttention: (on) => ctx.bus.setAttention(on),
-    onError: (error) => console.error('pod-board desktop: notifier error:', error),
+    onError: (error) => console.error('open-aflow desktop: notifier error:', error),
   })
   const stream = createBoardStream({
     fetch: (url, init) => fetch(url, init),

@@ -16,19 +16,19 @@ import {
 const DAY = 24 * 60 * 60 * 1000
 
 describe('transcript settings', () => {
-  test('claudeDir: POD_BOARD_CLAUDE_DIR, else CLAUDE_CONFIG_DIR, else ~/.claude', () => {
-    expect(claudeDir({ POD_BOARD_CLAUDE_DIR: '/a', CLAUDE_CONFIG_DIR: '/b' }, '/home/me')).toBe('/a')
+  test('claudeDir: OPEN_AFLOW_CLAUDE_DIR, else CLAUDE_CONFIG_DIR, else ~/.claude', () => {
+    expect(claudeDir({ OPEN_AFLOW_CLAUDE_DIR: '/a', CLAUDE_CONFIG_DIR: '/b' }, '/home/me')).toBe('/a')
     expect(claudeDir({ CLAUDE_CONFIG_DIR: '/b' }, '/home/me')).toBe('/b')
-    expect(claudeDir({ POD_BOARD_CLAUDE_DIR: '', CLAUDE_CONFIG_DIR: '' }, 'home')).toBe(join('home', '.claude'))
+    expect(claudeDir({ OPEN_AFLOW_CLAUDE_DIR: '', CLAUDE_CONFIG_DIR: '' }, 'home')).toBe(join('home', '.claude'))
     expect(claudeDir({}, 'home')).toBe(join('home', '.claude'))
   })
 
-  test('transcriptDays: POD_BOARD_TRANSCRIPT_DAYS, default 30, bad values throw', () => {
+  test('transcriptDays: OPEN_AFLOW_TRANSCRIPT_DAYS, default 30, bad values throw', () => {
     expect(transcriptDays({})).toBe(30)
-    expect(transcriptDays({ POD_BOARD_TRANSCRIPT_DAYS: '' })).toBe(30)
-    expect(transcriptDays({ POD_BOARD_TRANSCRIPT_DAYS: '7' })).toBe(7)
+    expect(transcriptDays({ OPEN_AFLOW_TRANSCRIPT_DAYS: '' })).toBe(30)
+    expect(transcriptDays({ OPEN_AFLOW_TRANSCRIPT_DAYS: '7' })).toBe(7)
     for (const bad of ['0', '-1', 'abc', '1.5', ' 7', '1e3']) {
-      expect(() => transcriptDays({ POD_BOARD_TRANSCRIPT_DAYS: bad }), bad).toThrowError(/POD_BOARD_TRANSCRIPT_DAYS/)
+      expect(() => transcriptDays({ OPEN_AFLOW_TRANSCRIPT_DAYS: bad }), bad).toThrowError(/OPEN_AFLOW_TRANSCRIPT_DAYS/)
     }
   })
 })
@@ -39,7 +39,7 @@ describe('finds agent transcripts', () => {
   const now = Date.UTC(2026, 9, 18, 12)
 
   beforeEach(async () => {
-    claude = await mkdtemp(join(tmpdir(), 'pod-board-d1-claude-'))
+    claude = await mkdtemp(join(tmpdir(), 'open-aflow-d1-claude-'))
   })
   afterEach(async () => {
     await rm(claude, { recursive: true, force: true })
@@ -189,7 +189,7 @@ describe('finds agent transcripts', () => {
 describe('the cwd of a session file', () => {
   let dir: string
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'pod-board-session-cwd-'))
+    dir = await mkdtemp(join(tmpdir(), 'open-aflow-session-cwd-'))
   })
   afterEach(async () => {
     await rm(dir, { recursive: true, force: true })

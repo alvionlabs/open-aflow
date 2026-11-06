@@ -255,30 +255,30 @@ describe.runIf(WIN)('createToolFinder', () => {
     writeSettings({ claude: join(fromSettings, 'claude.exe') })
 
     const file = join(fromEnv, 'my-claude.exe')
-    const wins = finderOf(envOf({ Path: pathDir, POD_BOARD_CLAUDE_BIN: file }))
+    const wins = finderOf(envOf({ Path: pathDir, OPEN_AFLOW_CLAUDE_BIN: file }))
     expect(stateOf(await wins.check(), 'claude')).toEqual({ tool: 'claude', state: 'found', path: file, source: 'env' })
 
     const gone = join(fromEnv, 'no-such', 'claude.exe')
-    const missing = finderOf(envOf({ Path: pathDir, POD_BOARD_CLAUDE_BIN: gone }))
+    const missing = finderOf(envOf({ Path: pathDir, OPEN_AFLOW_CLAUDE_BIN: gone }))
     expect(stateOf(await missing.check(), 'claude')).toEqual({ tool: 'claude', state: 'bad-path', path: gone, source: 'env' })
     expect(missing.path('claude')).toBeUndefined()
 
     // A bare name or a relative path starts no search either.
     process.chdir(pathDir)
     for (const value of ['claude', 'claude.exe', '.\\claude.exe']) {
-      const bare = finderOf(envOf({ Path: pathDir, POD_BOARD_CLAUDE_BIN: value }))
+      const bare = finderOf(envOf({ Path: pathDir, OPEN_AFLOW_CLAUDE_BIN: value }))
       expect(stateOf(await bare.check(), 'claude')).toEqual({ tool: 'claude', state: 'bad-path', path: value, source: 'env' })
     }
 
     // An empty value counts as unset, as it does everywhere else.
-    const empty = finderOf(envOf({ Path: pathDir, POD_BOARD_CLAUDE_BIN: '' }))
+    const empty = finderOf(envOf({ Path: pathDir, OPEN_AFLOW_CLAUDE_BIN: '' }))
     expect(stateOf(await empty.check(), 'claude')).toMatchObject({ state: 'found', source: 'settings' })
   })
 
   test('the env value finds the shim beside an extensionless name, as the runner does', async () => {
     const shimDir = folder('shim')
     plant(shimDir, 'claude', 'claude.cmd')
-    const finder = finderOf(envOf({ POD_BOARD_CLAUDE_BIN: join(shimDir, 'claude') }))
+    const finder = finderOf(envOf({ OPEN_AFLOW_CLAUDE_BIN: join(shimDir, 'claude') }))
     expect(stateOf(await finder.check(), 'claude')).toEqual({ tool: 'claude', state: 'found', path: join(shimDir, 'claude.cmd'), source: 'env' })
   })
 

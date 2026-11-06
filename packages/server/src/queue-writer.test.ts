@@ -16,7 +16,7 @@ let queue: string
 beforeEach(async () => {
   // Resolved once, like the real realpath does: macOS temp is /var -> /private/var, Windows temp can be an 8.3 short name.
   // Fakes below build their targets from this, so the writer compares like with like.
-  root = await realpath(await mkdtemp(join(tmpdir(), 'pod-board-a1-writer-')))
+  root = await realpath(await mkdtemp(join(tmpdir(), 'open-aflow-a1-writer-')))
   repo = join(root, 'repo')
   await mkdir(join(repo, 'pod-docs'), { recursive: true })
   queue = join(repo, 'pod-docs', 'handoff-queue.md')

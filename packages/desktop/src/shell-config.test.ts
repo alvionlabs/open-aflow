@@ -4,8 +4,8 @@ import { APP_ID, APP_NAME, dataDirOverride, SERVER_SERVICE_NAME } from './shell-
 describe('shell config', () => {
   test('reads the data folder', () => {
     expect(dataDirOverride({})).toBeUndefined()
-    expect(dataDirOverride({ POD_BOARD_DESKTOP_DATA_DIR: '' })).toBeUndefined()
-    expect(dataDirOverride({ POD_BOARD_DESKTOP_DATA_DIR: 'C:\\tmp\\shell' })).toBe('C:\\tmp\\shell')
+    expect(dataDirOverride({ OPEN_AFLOW_DESKTOP_DATA_DIR: '' })).toBeUndefined()
+    expect(dataDirOverride({ OPEN_AFLOW_DESKTOP_DATA_DIR: 'C:\\tmp\\shell' })).toBe('C:\\tmp\\shell')
   })
 
   test('the identity is fixed', () => {

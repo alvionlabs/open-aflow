@@ -30,7 +30,7 @@ describe('the gate', () => {
     const gate = await opened(fetchFn)
     const [url, init] = fetchFn.mock.calls[0]!
     expect(url).toBe('/api/tools')
-    expect((init?.headers as Record<string, string>)['X-Pod-Board-Token']).toBe('tok-1')
+    expect((init?.headers as Record<string, string>)['X-Open-AFlow-Token']).toBe('tok-1')
     const state = gate.state()
     expect(state.view).toBe('setup')
     expect(state.view === 'setup' && state.setup.tools).toEqual([git, gh, noClaude])
@@ -204,7 +204,7 @@ describe('saving', () => {
     const [url, init] = fetchFn.mock.calls[1]!
     expect(url).toBe('/api/actions/tool-path')
     expect(init?.method).toBe('POST')
-    expect((init?.headers as Record<string, string>)['X-Pod-Board-Token']).toBe('tok-1')
+    expect((init?.headers as Record<string, string>)['X-Open-AFlow-Token']).toBe('tok-1')
     expect(JSON.parse(init?.body as string)).toEqual({ tool: 'claude', path: 'C:\\c\\claude.exe' })
     expect(gate.state()).toEqual({ view: 'board' })
   })

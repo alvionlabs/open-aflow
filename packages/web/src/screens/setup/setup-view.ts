@@ -42,7 +42,7 @@ const INSTALL: Record<ToolName, string> = {
   claude: 'https://code.claude.com/docs/en/setup',
 }
 
-const ENV_VARIABLE = 'POD_BOARD_CLAUDE_BIN'
+const ENV_VARIABLE = 'OPEN_AFLOW_CLAUDE_BIN'
 export const UNREADABLE ='The server sent an answer the page cannot read.'
 
 export const SETUP_NOTE =

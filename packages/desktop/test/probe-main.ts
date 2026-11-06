@@ -8,8 +8,8 @@ import { serverEnv } from '../src/server-launch.ts'
 import { startShell } from '../src/shell-main.ts'
 
 const env = process.env
-const statusFile = env.POD_BOARD_PROBE_STATUS!
-const quitFile = env.POD_BOARD_PROBE_QUIT!
+const statusFile = env.OPEN_AFLOW_PROBE_STATUS!
+const quitFile = env.OPEN_AFLOW_PROBE_QUIT!
 
 const status = {
   mainPid: process.pid,
@@ -27,8 +27,8 @@ save()
 
 const shell = startShell({
   env,
-  appPath: env.POD_BOARD_PROBE_APP_PATH,
-  activatorAtStart: env.POD_BOARD_PROBE_ACTIVATOR === '1',
+  appPath: env.OPEN_AFLOW_PROBE_APP_PATH,
+  activatorAtStart: env.OPEN_AFLOW_PROBE_ACTIVATOR === '1',
   onServer: (pid) => {
     status.servers.push(pid)
     save()
@@ -57,7 +57,7 @@ if (!shell) {
     status.hashes.push(hash ?? null)
     save()
   })
-  const reporter = env.POD_BOARD_PROBE_REPORTER
+  const reporter = env.OPEN_AFLOW_PROBE_REPORTER
   if (reporter) {
     void app.whenReady().then(() => {
       forkServer({ entry: reporter, env: serverEnv(env, process.pid) }).onMessage((m) => {

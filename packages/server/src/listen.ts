@@ -5,7 +5,7 @@ import { envValue, portFromEnv, type Env } from './config.ts'
 
 export const APP_PORT = 47800
 
-const API_PORT = 'POD_BOARD_API_PORT'
+const API_PORT = 'OPEN_AFLOW_API_PORT'
 
 /** Unset or empty env: `preferred` (default `APP_PORT`), with fallback. A set value is strict; a bad one throws naming the variable. */
 export function wantedPort(env: Env, preferred?: number): { port: number; fallback: boolean } {

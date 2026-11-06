@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { NewActionEntry } from '@pod-board/model'
+import type { NewActionEntry } from '@open-aflow/model'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { ACTION_LOG_MAX, createActionLog } from './action-log.ts'
 
@@ -9,7 +9,7 @@ let root: string
 let file: string
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'pod-board-m1-log-'))
+  root = await mkdtemp(join(tmpdir(), 'open-aflow-m1-log-'))
   file = join(root, 'actions.jsonl')
 })
 

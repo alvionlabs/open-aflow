@@ -26,7 +26,7 @@ let logs: string[]
 const log = (m: string) => void logs.push(m)
 
 beforeEach(() => {
-  dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'pod-board-owner-')))
+  dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'open-aflow-owner-')))
   file = join(dir, OWNER_FILE)
   logs = []
 })
