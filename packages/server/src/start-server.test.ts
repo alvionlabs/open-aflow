@@ -5,6 +5,8 @@ import { createServer, type Server } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { liveConfigDir } from './config.ts'
+import { readSessionToken } from './session-token.ts'
 import { startServer, type Production, type Started } from './start-server.ts'
 
 // Pass-through spies: the real watcher and check run, and the tests see whether they started.
@@ -13,15 +15,18 @@ const spies = vi.hoisted(() => ({
   watcherCloses: 0,
   autoStarts: 0,
   watcherStartsAtFirstCheck: undefined as number | undefined,
-  /** Set: the config folder copy's `cp` throws this, as a locked old file would. */
-  cpFails: undefined as NodeJS.ErrnoException | undefined,
+  /** Set: the config folder copy's `copyFile` throws what this returns for a source, as an unreadable file would. */
+  copyFails: undefined as ((source: string) => NodeJS.ErrnoException | undefined) | undefined,
 }))
 
-// Pass-through `cp`, so a test can make the config folder copy fail.
+// Pass-through `copyFile`, so a test can make one file of the config folder copy fail.
 vi.mock('node:fs/promises', async (original) => {
   const real = await original<typeof import('node:fs/promises')>()
-  const cp: typeof real.cp = (...args) => (spies.cpFails ? Promise.reject(spies.cpFails) : real.cp(...args))
-  return { ...real, default: { ...real, cp }, cp }
+  const copyFile: typeof real.copyFile = (src, ...rest) => {
+    const err = spies.copyFails?.(String(src))
+    return err ? Promise.reject(err) : real.copyFile(src, ...rest)
+  }
+  return { ...real, default: { ...real, copyFile }, copyFile }
 })
 
 vi.mock('./watcher.ts', async (original) => {
@@ -204,7 +209,7 @@ beforeEach(async () => {
   spies.watcherCloses = 0
   spies.autoStarts = 0
   spies.watcherStartsAtFirstCheck = undefined
-  spies.cpFails = undefined
+  spies.copyFails = undefined
 })
 
 afterEach(async () => {
@@ -569,33 +574,72 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     expect(existsSync(join(newDir(), 'config.json'))).toBe(false)
   })
 
-  for (const mode of ['production', 'dev'] as const) {
-    test(`${mode}: a failed copy creates no new folder, so the next start copies`, async () => {
-      await writeOld()
-      const startMode = async () =>
-        mode === 'production'
-          ? startOwn(ownEnv())
-          : start(ownEnv({ OPEN_AFLOW_API_PORT: String(await freePort()), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
-      spies.cpFails = Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' })
-      const first = await startMode()
-      expect(await repoNames(first.started.port)).toEqual([])
-      expect(logs.filter((l) => l.includes('could not copy') && l.includes('EBUSY'))).toHaveLength(1)
-      first.started.stop()
-      await first.exited
-      running.splice(0)
-      expect(existsSync(newDir())).toBe(false)
-      // This start ran on its own temp folder, which it names. Remove it: it sits in the OS temp folder.
-      const temp = /empty temp config folder (.+?);/.exec(logs.join('\n'))?.[1]
-      expect(temp && existsSync(join(temp, 'config.json'))).toBe(false)
-      expect(temp && existsSync(temp)).toBe(true)
-      await removeWithRetry(temp!)
+  /** The old config.json can't be read: what a file another program denies gives. */
+  const configUnreadable = (source: string) =>
+    source === join(oldDir(), 'config.json') ? Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' }) : undefined
 
-      spies.cpFails = undefined
-      const second = await startMode()
-      expect(await repoNames(second.started.port)).toEqual(['repo:registered'])
-      expect(logs.filter((l) => l.includes('copied the old config folder'))).toHaveLength(1)
-    })
+  const stopAll = async () => {
+    for (const { started, exited } of running.splice(0)) {
+      started.stop()
+      await exited
+    }
   }
+
+  test('an unreadable config.json: the start uses the old folder, an Add repo stays, and a later start copies it', async () => {
+    await writeOld()
+    const second = join(tmp, 'second')
+    await mkdir(join(second, 'pod-docs'), { recursive: true })
+    await writeFile(join(second, 'pod-docs', 'README.md'), '# pod docs\n\npod docs: 2\n')
+
+    spies.copyFails = configUnreadable
+    const first = await startOwn(ownEnv())
+    expect(await repoNames(first.started.port)).toEqual(['repo:registered'])
+    const failed = logs.filter((l) => l.includes('could not copy'))
+    expect(failed).toHaveLength(1)
+    expect(failed[0]).toContain(oldDir())
+    expect(failed[0]).toContain(newDir())
+    expect(failed[0]).toContain('config.json')
+    expect(failed[0]).toContain('EPERM')
+    const token = await pageToken(first.started.port)
+    const added = await send(first.started.port, '/api/repos', {
+      method: 'POST',
+      headers: { Origin: `http://127.0.0.1:${first.started.port}`, 'Content-Type': 'application/json', 'X-Open-AFlow-Token': token },
+      body: JSON.stringify({ path: second }),
+    })
+    expect(added.status).toBe(201)
+    await stopAll()
+    expect(existsSync(newDir())).toBe(false)
+    expect(logs.join('\n')).not.toMatch(/temp config/)
+
+    // Still failing: the repo added last time is still there.
+    const again = await startOwn(ownEnv())
+    expect((await repoNames(again.started.port)).sort()).toEqual(['repo:registered', 'second:registered'])
+    await stopAll()
+
+    // The file can be read again: the copy takes the old folder as it is now.
+    spies.copyFails = undefined
+    const third = await startOwn(ownEnv())
+    expect((await repoNames(third.started.port)).sort()).toEqual(['repo:registered', 'second:registered'])
+    expect(existsSync(join(newDir(), 'config.json'))).toBe(true)
+    expect(logs.filter((l) => l.includes('copied the old config folder'))).toHaveLength(1)
+  })
+
+  test('dev: after a failed copy the token file is in the old folder, where the dev page looks for it', async () => {
+    await writeOld()
+    spies.copyFails = configUnreadable
+    const { started } = await start(ownEnv({ OPEN_AFLOW_API_PORT: String(await freePort()), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
+    expect(await repoNames(started.port)).toEqual(['repo:registered'])
+    expect(liveConfigDir(ownEnv(), process.platform, tmp)).toBe(oldDir())
+    expect(readSessionToken(liveConfigDir(ownEnv(), process.platform, tmp))).toHaveLength(43)
+    expect(existsSync(newDir())).toBe(false)
+  })
+
+  test('dev: after a copy the token file is in the new folder, where the dev page looks for it', async () => {
+    await writeOld()
+    await start(ownEnv({ OPEN_AFLOW_API_PORT: String(await freePort()), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
+    expect(liveConfigDir(ownEnv(), process.platform, tmp)).toBe(newDir())
+    expect(readSessionToken(newDir())).toHaveLength(43)
+  })
 
   test('a set OPEN_AFLOW_CONFIG_DIR never copies from the folder the server would pick', async () => {
     await writeOld()

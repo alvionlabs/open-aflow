@@ -1,5 +1,47 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { CONFIG_DIR_NAME, configPath, listenConfig, oldConfigDir, portFromEnv } from './config.ts'
+import { CONFIG_DIR_NAME, configPath, listenConfig, liveConfigDir, oldConfigDir, portFromEnv } from './config.ts'
+
+// Temp folders only: APPDATA and XDG_CONFIG_HOME point into a fresh mkdtemp root.
+describe.runIf(process.platform === 'win32' || process.platform === 'linux')('liveConfigDir: the folder the server uses now', () => {
+  const withBase = (fn: (base: string, env: Record<string, string>) => void) => {
+    const base = mkdtempSync(join(tmpdir(), 'open-aflow-live-'))
+    try {
+      fn(base, { APPDATA: base, XDG_CONFIG_HOME: base })
+    } finally {
+      rmSync(base, { recursive: true, force: true })
+    }
+  }
+  const at = (env: Record<string, string>, base: string) => liveConfigDir(env, process.platform, base)
+
+  test('the new folder when it exists, and when neither exists', () =>
+    withBase((base, env) => {
+      expect(at(env, base)).toBe(join(base, 'open-aflow-server'))
+      mkdirSync(join(base, 'pod-board'))
+      mkdirSync(join(base, 'open-aflow-server'))
+      expect(at(env, base)).toBe(join(base, 'open-aflow-server'))
+    }))
+
+  test('the old folder while only it exists: a start whose copy failed runs there', () =>
+    withBase((base, env) => {
+      mkdirSync(join(base, 'pod-board'))
+      expect(at(env, base)).toBe(join(base, 'pod-board'))
+    }))
+
+  test('an old path that is a file is no folder', () =>
+    withBase((base, env) => {
+      writeFileSync(join(base, 'pod-board'), 'x')
+      expect(at(env, base)).toBe(join(base, 'open-aflow-server'))
+    }))
+
+  test('OPEN_AFLOW_CONFIG_DIR wins, even with an old folder', () =>
+    withBase((base, env) => {
+      mkdirSync(join(base, 'pod-board'))
+      expect(at({ ...env, OPEN_AFLOW_CONFIG_DIR: join(base, 'cfg') }, base)).toBe(join(base, 'cfg'))
+    }))
+})
 
 describe('listenConfig', () => {
   test('binds 127.0.0.1 with the env port', () => {

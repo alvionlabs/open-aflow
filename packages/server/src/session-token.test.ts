@@ -82,6 +82,18 @@ describe('session token', () => {
 })
 
 describe('token meta', () => {
+  test('asks for the folder at each page load, so it follows the folder the server picked', async () => {
+    let dir = join(root, 'old')
+    const plugin = tokenMetaPlugin(() => dir)
+    const a = createSessionToken()
+    await writeSessionToken(dir, a)
+    expect(metas(plugin.transformIndexHtml(HTML))).toEqual([a])
+    dir = join(root, 'new')
+    const b = createSessionToken()
+    await writeSessionToken(dir, b)
+    expect(metas(plugin.transformIndexHtml(HTML))).toEqual([b])
+  })
+
   test('injects the token meta on each page load', async () => {
     const dir = join(root, 'cfg')
     const plugin = tokenMetaPlugin(dir)

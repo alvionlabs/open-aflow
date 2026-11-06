@@ -71,3 +71,8 @@ export function oldConfigDir(env: Env, platform: NodeJS.Platform, home: string):
   const { p, base } = configBase(env, platform, home)
   return p.join(base, OLD_CONFIG_DIR_NAME)
 }
+
+/** Not built yet. */
+export function liveConfigDir(env: Env, platform: NodeJS.Platform, home: string): string {
+  return path.dirname(configPath(env, platform, home))
+}
