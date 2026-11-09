@@ -8,7 +8,7 @@ The **`## Smoke recipe`** below tells each engineer how to bring the app up for 
 
 ## What it is
 
-Open AFlow (repo `alvionlabs/open-aflow`) is a local web app that shows every pod run across a developer's repos: each run's stage, the current wave's slices, what needs the human, and each engineer's live activity. Its actions merge a PR waiting on you, through `gh`, append your answer to a queue entry waiting on you, and resume a run's own Claude session with `continue` or `go`. One person runs it on their own machine.
+Open AFlow (repo `alvionlabs/openaflow`) is a local web app that shows every pod run across a developer's repos: each run's stage, the current wave's slices, what needs the human, and each engineer's live activity. Its actions merge a PR waiting on you, through `gh`, append your answer to a queue entry waiting on you, and resume a run's own Claude session with `continue` or `go`. One person runs it on their own machine.
 
 ## Parts
 

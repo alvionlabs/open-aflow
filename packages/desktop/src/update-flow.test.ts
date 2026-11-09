@@ -193,7 +193,7 @@ describe('createUpdateFlow', () => {
   })
 
   test('a failure stays quiet and retries', async () => {
-    const URL_TEXT = 'https://github.com/alvionlabs/open-aflow/releases/latest?token=abc123'
+    const URL_TEXT = 'https://github.com/alvionlabs/openaflow/releases/latest?token=abc123'
     const t = setup()
     const failure = Object.assign(new Error(`HttpError: 500 ${URL_TEXT}`), { code: 'HTTP_ERROR_500' })
     t.port.nextCheck = () => {

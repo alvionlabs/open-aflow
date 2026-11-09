@@ -412,7 +412,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && MOCK !== '' && pro
       pack(`--output=${shipped}`)
       const resources = join(shipped, 'win-unpacked', 'resources')
       const update = parse(readFileSync(join(resources, 'app-update.yml'), 'utf8')) as Record<string, unknown>
-      expect(update).toMatchObject({ provider: 'github', owner: 'alvionlabs', repo: 'open-aflow' })
+      expect(update).toMatchObject({ provider: 'github', owner: 'alvionlabs', repo: 'openaflow' })
       // The signature check is off: the field that turns it on is absent.
       expect(update.publisherName).toBeUndefined()
       expect(update.updaterCacheDirName).toBe('open-aflow-updater')

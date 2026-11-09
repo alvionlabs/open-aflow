@@ -93,7 +93,7 @@ export function buildConfig(o: BuildOptions): Configuration {
       artifactName: 'open-aflow-setup-${version}.${ext}',
       include: 'build/installer.nsh',
     },
-    publish: { provider: 'github', owner: 'alvionlabs', repo: 'open-aflow', releaseType: 'release' },
+    publish: { provider: 'github', owner: 'alvionlabs', repo: 'openaflow', releaseType: 'release' },
   }
 }
 
