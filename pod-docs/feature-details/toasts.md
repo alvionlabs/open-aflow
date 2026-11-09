@@ -80,7 +80,7 @@ flowchart TD
 
 `pnpm test:install` proves the Start-menu AppID and one `toast sent` on the installed app. No agent can see the items below. Do them after the last proof, because a real install stops the proofs. First delete `Electron.lnk` if it exists, then run `pnpm package`, run the installer, and open Open AFlow from the Start menu.
 
-1. Register a temp copy of `E:\Projects\pod-trial-mock`, and add a `BLOCKED · orchestrator → human` line to its queue. A toast shows, with the name `Open AFlow` and its icon.
+1. Register a temp copy of the mock repo, and add a `BLOCKED · orchestrator → human` line to its queue. A toast shows, with the name `Open AFlow` and its icon.
 2. Hide the window. Add a second such line, and click its banner while it shows. The window opens on that run.
 3. Hide the window. Add a third line, and wait for its banner to leave the screen. Click it in the notification center. The window opens on that run.
 4. Quit from the tray. Click the toast from step 3 in the notification center. The app starts and opens on that run. If nothing opens, read `%APPDATA%\Open AFlow\desktop.log`.
