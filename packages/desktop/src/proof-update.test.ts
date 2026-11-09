@@ -19,7 +19,8 @@ import { TEST_ENV_FILE } from './update-feed.ts'
 const here = dirname(fileURLToPath(import.meta.url))
 const DESKTOP = join(here, '..')
 const ROOT = join(DESKTOP, '..', '..')
-const MOCK = 'E:\\Projects\\pod-trial-mock'
+/** The mock repo to copy. Its path is local to the maintainer's machine, so it comes from the env. */
+const MOCK = process.env.OPEN_AFLOW_MOCK_REPO ?? ''
 const FAKE = join(DESKTOP, '..', 'server', 'test', 'fake-claude.mjs')
 const SYS32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
 const POWERSHELL = join(SYS32, 'WindowsPowerShell', 'v1.0', 'powershell.exe')
@@ -105,7 +106,7 @@ function startFeed(folder: string) {
 const planDoc = ['# Plan: alpha', '', '_Generated: 2026-11-01 · Status: active_', '', '## Sprint sequence', '', '| Sprint | Goal | Status | Depends on |', '|---|---|---|---|', '| one | goal | done | — |', '| two | goal | planned | — |', ''].join('\n')
 const sprintDoc = ['# Sprint: one', '', '_From plan: pod-docs/plans/alpha.md · Slug: one · Status: active · Generated: 2026-11-01_', '', '## Status board', '', '| Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |', '|---|---|---|---|---|---|---|---|', '| 1 | A1 | a | one-A1 | merged | done | high | — |', ''].join('\n')
 
-describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && process.platform === 'win32')('the update proof', () => {
+describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && MOCK !== '' && process.platform === 'win32')('the update proof', () => {
   let freeLock: () => void = () => {}
   let lockDone: Promise<void> = Promise.resolve()
   let before: MachineState | undefined
@@ -411,7 +412,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && process.platform =
       pack(`--output=${shipped}`)
       const resources = join(shipped, 'win-unpacked', 'resources')
       const update = parse(readFileSync(join(resources, 'app-update.yml'), 'utf8')) as Record<string, unknown>
-      expect(update).toMatchObject({ provider: 'github', owner: 'alvionlabs', repo: 'open-aflow' })
+      expect(update).toMatchObject({ provider: 'github', owner: 'alvionlabs', repo: 'openaflow' })
       // The signature check is off: the field that turns it on is absent.
       expect(update.publisherName).toBeUndefined()
       expect(update.updaterCacheDirName).toBe('open-aflow-updater')

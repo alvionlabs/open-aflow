@@ -4,7 +4,7 @@ Open AFlow runs on your Windows PC. It shows your pod runs across your repos.
 
 ## Download
 
-1. Open the [latest release](https://github.com/alvionlabs/open-aflow/releases/latest).
+1. Open the [latest release](https://github.com/alvionlabs/openaflow/releases/latest).
 2. Download `open-aflow-setup-<version>.exe`.
 3. Double-click the file. Open AFlow installs for your user only. You don't need admin rights.
 4. The app opens when the install ends. Later, open **Open AFlow** from the Start menu.

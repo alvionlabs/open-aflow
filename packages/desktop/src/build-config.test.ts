@@ -78,7 +78,7 @@ describe('electron-builder config', () => {
 
   test('publish config', () => {
     const c = config()
-    expect(c.publish).toEqual({ provider: 'github', owner: 'alvionlabs', repo: 'open-aflow', releaseType: 'release' })
+    expect(c.publish).toEqual({ provider: 'github', owner: 'alvionlabs', repo: 'openaflow', releaseType: 'release' })
     expect(c.win?.verifyUpdateCodeSignature).toBe(false)
   })
 
