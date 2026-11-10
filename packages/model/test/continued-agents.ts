@@ -1,4 +1,4 @@
-// Two real continued pod agents from open-aflow's /pod:fix run fix-show-fix-runs (PR #23), as
+// Two real continued pod agents from openaflow's /pod:fix run fix-show-fix-runs (PR #23), as
 // shapes only: record types, timestamps, the isMeta and origin flags, block types, and the
 // SubagentHandback name, in file order. Every text is a placeholder; the first prompt is a made-up
 // dispatch in the real field shape, so the agents join their fix run. Cut from the transcripts of

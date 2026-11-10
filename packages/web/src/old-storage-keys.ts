@@ -1,4 +1,4 @@
-// The browser keys from before the rename to Open AFlow, moved once at page start, so the theme, the open tab, and
+// The browser keys from before the rename to OpenAFlow, moved once at page start, so the theme, the open tab, and
 // the sidebar width stay. Pure; main.tsx passes `localStorage`.
 
 import { SIDE_KEY } from './screens/runs/sidebar-width.ts'

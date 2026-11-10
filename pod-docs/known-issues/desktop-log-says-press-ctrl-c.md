@@ -3,9 +3,9 @@
 Severity: low
 Status: open · found 2026-11-05 · real run test on the installed app
 
-**Who it affects:** anyone who reads `%APPDATA%\Open AFlow\desktop.log`.
+**Who it affects:** anyone who reads `%APPDATA%\OpenAFlow\desktop.log`.
 
-**What you see:** on Quit while a send runs, the log reads `open-aflow: waiting for 1 action to finish; press Ctrl+C again to quit now`. The desktop app has no console, so Ctrl+C means nothing there.
+**What you see:** on Quit while a send runs, the log reads `openaflow: waiting for 1 action to finish; press Ctrl+C again to quit now`. The desktop app has no console, so Ctrl+C means nothing there.
 
 **How to reproduce:**
 1. Press Continue on a run in the installed app.

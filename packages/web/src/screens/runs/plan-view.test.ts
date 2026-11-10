@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildFlow, buildPipeline, buildRepoModel, listRuns, type AgentRun, type BoardRepo, type Claim, type PrStatus, type RunSummary, type Stage, type Step } from '@open-aflow/model'
+import { buildFlow, buildPipeline, buildRepoModel, listRuns, type AgentRun, type BoardRepo, type Claim, type PrStatus, type RunSummary, type Stage, type Step } from '@openaflow/model'
 import { loadFixture } from '../../../../model/test/load-fixture.ts'
 import { flowColumns, flowEdges, foldLine, runHeader, startedAgo } from './plan-view.ts'
 

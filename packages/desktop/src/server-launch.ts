@@ -2,7 +2,7 @@
 
 import { join } from 'node:path'
 
-const PARENT_PID = 'OPEN_AFLOW_PARENT_PID'
+const PARENT_PID = 'OPENAFLOW_PARENT_PID'
 /** With this set, Electron's exe runs as plain Node, which a utilityProcess must not. */
 const RUN_AS_NODE = 'ELECTRON_RUN_AS_NODE'
 
@@ -12,7 +12,7 @@ export function serverEntry(o: { packaged: boolean; appPath: string; resourcesPa
   return join(o.appPath, '..', 'server', 'dist', 'app', 'server.mjs')
 }
 
-/** A copy of env with OPEN_AFLOW_PARENT_PID = mainPid, an old value replaced, and ELECTRON_RUN_AS_NODE removed in any case. */
+/** A copy of env with OPENAFLOW_PARENT_PID = mainPid, an old value replaced, and ELECTRON_RUN_AS_NODE removed in any case. */
 export function serverEnv(env: NodeJS.ProcessEnv, mainPid: number): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = {}
   for (const [key, value] of Object.entries(env)) {

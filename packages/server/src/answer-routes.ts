@@ -16,7 +16,7 @@ import {
   type QueueItem,
   type ResolveOutcome,
   type ResolveResult,
-} from '@open-aflow/model'
+} from '@openaflow/model'
 import { Hono } from 'hono'
 import { nodeQueueFs, writeAnswer, writeResolution, type QueueFs } from './queue-writer.ts'
 

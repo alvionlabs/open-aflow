@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { autoSends, buildFlow, buildPipeline, buildRepoModel, listRuns, runReplies, ENGINEER_QUIET_MS, STALE_MS, type AgentRun, type BoardRepo, type PrStatus, type RunSummary } from '@open-aflow/model'
+import { autoSends, buildFlow, buildPipeline, buildRepoModel, listRuns, runReplies, ENGINEER_QUIET_MS, STALE_MS, type AgentRun, type BoardRepo, type PrStatus, type RunSummary } from '@openaflow/model'
 import { buildWaveBoard } from '../board/board-view.ts'
 import { elsewhere } from './elsewhere.ts'
 import { nextSteps } from './next-step.ts'

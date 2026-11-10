@@ -23,7 +23,7 @@ function store(initial: Record<string, string> = {}, fail = false): TabStorage &
 
 describe('tab memory', () => {
   it('remembers one open tab', () => {
-    expect(TAB_KEY).toBe('open-aflow-tab')
+    expect(TAB_KEY).toBe('openaflow-tab')
 
     // Read: each known value; nothing stored, an unknown value, or a throwing storage → closed.
     for (const tab of ['waiting', 'log'] as const) expect(readTab(store({ [TAB_KEY]: tab }))).toBe(tab)
@@ -38,13 +38,13 @@ describe('tab memory', () => {
     expect(readTab(null)).toBeUndefined()
 
     // Save: a tab is stored under the key; undefined removes the key; other keys stay.
-    const s = store({ 'open-aflow-theme': 'dark' })
+    const s = store({ 'openaflow-theme': 'dark' })
     saveTab(s, 'waiting')
-    expect(s.data).toEqual({ 'open-aflow-theme': 'dark', [TAB_KEY]: 'waiting' })
+    expect(s.data).toEqual({ 'openaflow-theme': 'dark', [TAB_KEY]: 'waiting' })
     saveTab(s, 'log')
     expect(readTab(s)).toBe('log')
     saveTab(s, undefined)
-    expect(s.data).toEqual({ 'open-aflow-theme': 'dark' })
+    expect(s.data).toEqual({ 'openaflow-theme': 'dark' })
     // A throwing storage (set or remove), or none, is ignored.
     expect(() => saveTab(store({}, true), 'log')).not.toThrow()
     expect(() => saveTab(store({ [TAB_KEY]: 'log' }, true), undefined)).not.toThrow()

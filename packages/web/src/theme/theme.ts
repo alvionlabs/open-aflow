@@ -7,7 +7,7 @@ export type ChoiceStorage = { getItem(key: string): string | null; setItem(key: 
 /** The part of an element the theme needs (in the app, `document.documentElement`). */
 export type ThemeRoot = { setAttribute(name: string, value: string): void; removeAttribute(name: string): void }
 
-export const THEME_KEY = 'open-aflow-theme'
+export const THEME_KEY = 'openaflow-theme'
 
 const CHOICES: readonly ThemeChoice[] = ['system', 'light', 'dark']
 

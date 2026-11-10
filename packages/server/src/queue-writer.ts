@@ -5,7 +5,7 @@
 import { randomBytes } from 'node:crypto'
 import { readFile, realpath, rename, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
-import { cleanAnswer, withAnswer, withResolution, type AnswerOutcome } from '@open-aflow/model'
+import { cleanAnswer, withAnswer, withResolution, type AnswerOutcome } from '@openaflow/model'
 
 /** The file calls the writer makes. Injectable so tests can fake a symlink or a held file on any OS. */
 export type QueueFs = {

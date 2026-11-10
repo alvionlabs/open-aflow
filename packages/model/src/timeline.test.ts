@@ -8,7 +8,7 @@ type Block = Record<string, unknown>
 const T0 = Date.parse('2026-10-19T10:00:00.000Z')
 const at = (s: number) => new Date(T0 + s * 1000).toISOString()
 
-const ROOT = 'E:\\Projects\\open-aflow'
+const ROOT = 'E:\\Projects\\openaflow'
 
 const assistant = (s: number | undefined, content: Block[], id = `m${s}`) => ({
   type: 'assistant',
@@ -89,21 +89,21 @@ describe('relative paths', () => {
   const read = (p: string, roots?: string[]) => summary('Read', { file_path: p }, roots)
 
   it('cuts the worktree prefix', () => {
-    expect(read('E:\\Projects\\open-aflow\\.claude\\worktrees\\board-engineer-T1\\packages\\model\\src\\x.ts')).toBe(
+    expect(read('E:\\Projects\\openaflow\\.claude\\worktrees\\board-engineer-T1\\packages\\model\\src\\x.ts')).toBe(
       'Read packages/model/src/x.ts',
     )
     expect(read('/home/me/other/.claude/worktrees/fix-a/src/y.ts', [])).toBe('Read src/y.ts')
   })
 
   it('cuts a root in any case, with Windows slashes', () => {
-    expect(read('e:/projects/OPEN-AFLOW/pod-docs/plans/x.md')).toBe('Read pod-docs/plans/x.md')
-    expect(read('E:\\Projects\\open-aflow\\README.md')).toBe('Read README.md')
+    expect(read('e:/projects/OPENAFLOW/pod-docs/plans/x.md')).toBe('Read pod-docs/plans/x.md')
+    expect(read('E:\\Projects\\openaflow\\README.md')).toBe('Read README.md')
     expect(read('/srv/repo/src/a.ts', ['/srv/repo/'])).toBe('Read src/a.ts')
   })
 
   it('gives the base name outside every root', () => {
     expect(read('C:\\Users\\me\\.ssh\\config')).toBe('Read config')
-    expect(read('E:/Projects/open-aflow-other/src/a.ts')).toBe('Read a.ts')
+    expect(read('E:/Projects/openaflow-other/src/a.ts')).toBe('Read a.ts')
     expect(read('/etc/hosts')).toBe('Read hosts')
     expect(read('relative/dir/file.ts')).toBe('Read file.ts')
   })
@@ -173,12 +173,12 @@ describe('tool summaries', () => {
 describe('shell summaries', () => {
   it('shows the program and a known subcommand', () => {
     expect(bash('pnpm test')).toBe('Bash: pnpm test')
-    expect(bash('pnpm --filter @open-aflow/server test')).toBe('Bash: pnpm test')
+    expect(bash('pnpm --filter @openaflow/server test')).toBe('Bash: pnpm test')
     expect(bash('git status')).toBe('Bash: git status')
     expect(bash('ls -la')).toBe('Bash: ls')
     expect(bash('C:\\tools\\Git.EXE log --oneline')).toBe('Bash: git log')
     expect(bash('./node_modules/.bin/vitest run')).toBe('Bash: vitest run')
-    expect(summary('PowerShell', { command: "$env:OPEN_AFLOW_API_PORT='3010'; pnpm dev" })).toBe('PowerShell: pnpm dev')
+    expect(summary('PowerShell', { command: "$env:OPENAFLOW_API_PORT='3010'; pnpm dev" })).toBe('PowerShell: pnpm dev')
   })
 
   it('looks for the subcommand in the next four tokens only', () => {

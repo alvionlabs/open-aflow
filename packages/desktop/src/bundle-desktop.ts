@@ -14,7 +14,7 @@ export async function bundleDesktop(o: { entry: string; outfile: string; testFee
     format: 'cjs',
     target: 'node22',
     external: ['electron'],
-    define: { __OPEN_AFLOW_TEST_FEED__: String(o.testFeed === true) },
+    define: { __OPENAFLOW_TEST_FEED__: String(o.testFeed === true) },
     logLevel: 'warning',
     entryPoints: [o.entry],
     outfile: o.outfile,

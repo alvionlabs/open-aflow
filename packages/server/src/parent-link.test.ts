@@ -54,7 +54,7 @@ describe('parentChannel', () => {
     expect(stop).toHaveBeenCalledTimes(1)
 
     link.ready(4100)
-    expect(f.posted).toEqual([{ type: 'open-aflow:ready', port: 4100 }])
+    expect(f.posted).toEqual([{ type: 'openaflow:ready', port: 4100 }])
     expect(ipc.sent).toEqual([])
 
     const seen: unknown[] = []
@@ -74,8 +74,8 @@ describe('parentChannel', () => {
     channel!.onMessage((m) => seen.push(m))
     ipc.deliver(STOP_MESSAGE)
     expect(seen).toEqual([STOP_MESSAGE])
-    channel!.send({ type: 'open-aflow:ready', port: 1 })
-    expect(ipc.sent).toEqual([{ type: 'open-aflow:ready', port: 1 }])
+    channel!.send({ type: 'openaflow:ready', port: 1 })
+    expect(ipc.sent).toEqual([{ type: 'openaflow:ready', port: 1 }])
 
     expect(parentChannel({})).toBeUndefined()
     // `on` alone isn't a channel: a plain process has `on` and no `send`.
@@ -84,8 +84,8 @@ describe('parentChannel', () => {
 
   test('only the exact stop message counts', () => {
     expect(isStopMessage(STOP_MESSAGE)).toBe(true)
-    expect(isStopMessage({ type: 'open-aflow:stop' })).toBe(true)
-    for (const m of [null, undefined, '', 'open-aflow:stop', 1, true, [], ['open-aflow:stop'], {}, { type: 'open-aflow:ready', port: 1 }, { type: 'OPEN-AFLOW:STOP' }, { type: 'open-aflow:stop', extra: 1 }, { data: STOP_MESSAGE }]) {
+    expect(isStopMessage({ type: 'openaflow:stop' })).toBe(true)
+    for (const m of [null, undefined, '', 'openaflow:stop', 1, true, [], ['openaflow:stop'], {}, { type: 'openaflow:ready', port: 1 }, { type: 'OPENAFLOW:STOP' }, { type: 'openaflow:stop', extra: 1 }, { data: STOP_MESSAGE }]) {
       expect(isStopMessage(m), JSON.stringify(m)).toBe(false)
     }
 
@@ -94,7 +94,7 @@ describe('parentChannel', () => {
     const stop = vi.fn()
     stops.attach(stop)
     linkParent({ env: {}, stops, proc: ipc.proc })
-    for (const m of [null, 'open-aflow:stop', 7, { type: 'other' }]) expect(() => ipc.deliver(m)).not.toThrow()
+    for (const m of [null, 'openaflow:stop', 7, { type: 'other' }]) expect(() => ipc.deliver(m)).not.toThrow()
     expect(stop).not.toHaveBeenCalled()
     ipc.deliver(STOP_MESSAGE)
     expect(stop).toHaveBeenCalledTimes(1)
@@ -131,7 +131,7 @@ describe('parentChannel', () => {
     const link = linkParent({ env: {}, stops: createStopPath(), proc: ipc.proc })
     link.ready(4100)
     link.ready(4100)
-    expect(ipc.sent).toEqual([{ type: 'open-aflow:ready', port: 4100 }])
+    expect(ipc.sent).toEqual([{ type: 'openaflow:ready', port: 4100 }])
     // With no channel, ready does nothing and doesn't throw.
     expect(() => linkParent({ env: {}, stops: createStopPath(), proc: {} }).ready(1)).not.toThrow()
   })
@@ -139,7 +139,7 @@ describe('parentChannel', () => {
   test('a bad parent value stops the link before it attaches anything', () => {
     const ipc = fakeIpc()
     const on = vi.spyOn(ipc.proc, 'on')
-    expect(() => linkParent({ env: { OPEN_AFLOW_PARENT_PID: 'abc' }, stops: createStopPath(), proc: ipc.proc })).toThrow(/OPEN_AFLOW_PARENT_PID/)
+    expect(() => linkParent({ env: { OPENAFLOW_PARENT_PID: 'abc' }, stops: createStopPath(), proc: ipc.proc })).toThrow(/OPENAFLOW_PARENT_PID/)
     expect(on).not.toHaveBeenCalled()
   })
 })
@@ -197,12 +197,12 @@ describe('createStopPath', () => {
 describe('parentPid', () => {
   test("reads the parent's process ID", () => {
     expect(parentPid({})).toBeUndefined()
-    expect(parentPid({ OPEN_AFLOW_PARENT_PID: '' })).toBeUndefined()
-    expect(parentPid({ OPEN_AFLOW_PARENT_PID: '4242' })).toBe(4242)
-    expect(parentPid({ OPEN_AFLOW_PARENT_PID: '2147483647' })).toBe(2147483647)
+    expect(parentPid({ OPENAFLOW_PARENT_PID: '' })).toBeUndefined()
+    expect(parentPid({ OPENAFLOW_PARENT_PID: '4242' })).toBe(4242)
+    expect(parentPid({ OPENAFLOW_PARENT_PID: '2147483647' })).toBe(2147483647)
     // 2147483648 is past what process.kill takes, so it would throw at each poll.
     for (const bad of ['0', '-1', 'abc', '1.5', '12abc', ' 12', '1e3', '0x10', '2147483648', '99999999999']) {
-      expect(() => parentPid({ OPEN_AFLOW_PARENT_PID: bad }), bad).toThrow(/OPEN_AFLOW_PARENT_PID/)
+      expect(() => parentPid({ OPENAFLOW_PARENT_PID: bad }), bad).toThrow(/OPENAFLOW_PARENT_PID/)
     }
   })
 })
@@ -281,7 +281,7 @@ describe('watchParent', () => {
     const stops = createStopPath()
     const stop = vi.fn()
     // A process ID that can't be running: the check is real here, through linkParent's default.
-    linkParent({ env: { OPEN_AFLOW_PARENT_PID: '2147483647' }, stops, proc: {} })
+    linkParent({ env: { OPENAFLOW_PARENT_PID: '2147483647' }, stops, proc: {} })
     expect(stop).not.toHaveBeenCalled()
     stops.attach(stop)
     expect(stop).toHaveBeenCalledTimes(1)

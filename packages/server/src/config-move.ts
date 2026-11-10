@@ -1,4 +1,4 @@
-// The one-time copy of the config folder from before the rename to Open AFlow. The rules are in
+// The one-time copy of the config folder from before the rename to OpenAFlow. The rules are in
 // pod-docs/feature-details/server.md, under "Config folder".
 
 import { randomUUID } from 'node:crypto'
@@ -12,7 +12,7 @@ export type MoveResult = 'copied' | 'none' | 'kept' | 'failed' | 'in-use'
 export type CopyFile = (from: string, to: string) => Promise<void>
 
 export type MoveOptions = {
-  /** The old folder, or undefined when there is none to copy from (a set `OPEN_AFLOW_CONFIG_DIR`). */
+  /** The old folder, or undefined when there is none to copy from (a set `OPENAFLOW_CONFIG_DIR`). */
   from: string | undefined
   to: string
   log?: (line: string) => void
@@ -91,7 +91,7 @@ export async function moveOldConfig(o: MoveOptions): Promise<MoveResult> {
   // A server still runs on the old folder (a start whose copy failed): a copy now would split its writes from ours.
   const holder = await liveHolder(from)
   if (holder !== undefined) {
-    log(`open-aflow: the old config folder ${from} is in use by process ${holder}; this start uses it too, and a later start copies it`)
+    log(`openaflow: the old config folder ${from} is in use by process ${holder}; this start uses it too, and a later start copies it`)
     return 'in-use'
   }
 
@@ -111,7 +111,7 @@ export async function moveOldConfig(o: MoveOptions): Promise<MoveResult> {
           break
         } catch (err) {
           if (!needed) {
-            error(`open-aflow: skipped ${src} in the old config folder copy (${code(err)})`)
+            error(`openaflow: skipped ${src} in the old config folder copy (${code(err)})`)
             break
           }
           if (!BUSY.has(code(err)) || tryNo >= retry.tries) {
@@ -128,9 +128,9 @@ export async function moveOldConfig(o: MoveOptions): Promise<MoveResult> {
     // Another start's copy got there first: that folder is whole, so it counts.
     if (await exists(to)) return 'kept'
     const what = failedFile ? `${failedFile} of the old config folder ${from}` : `the old config folder ${from}`
-    error(`open-aflow: could not copy ${what} to ${to} (${code(err)}); this start uses the old folder, and the next start tries again`)
+    error(`openaflow: could not copy ${what} to ${to} (${code(err)}); this start uses the old folder, and the next start tries again`)
     return 'failed'
   }
-  log(`open-aflow: copied the old config folder ${from} to ${to}; the old folder stays as a backup`)
+  log(`openaflow: copied the old config folder ${from} to ${to}; the old folder stays as a backup`)
   return 'copied'
 }

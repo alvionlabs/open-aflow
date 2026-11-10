@@ -16,7 +16,7 @@ import { startUpdater } from './updater-main.ts'
 import { startWindow } from './window-main.ts'
 
 /** `pnpm package --test-feed` sets this. In every other build the test feed's code is removed. */
-declare const __OPEN_AFLOW_TEST_FEED__: boolean
+declare const __OPENAFLOW_TEST_FEED__: boolean
 
 export type ShellContext = {
   host: ServerHost
@@ -41,8 +41,8 @@ const showFailure = (error: string) => dialog.showErrorBox(APP_NAME, `The server
 
 /** Returns `undefined` on a second launch, which starts no server and exits. */
 export function startShell(o: ShellOptions): ShellContext | undefined {
-  if (__OPEN_AFLOW_TEST_FEED__ && app.isPackaged && !applyTestEnv(o.env, join(dirname(process.execPath), '..', TEST_ENV_FILE))) {
-    console.error('open-aflow desktop: a test build needs temp folders, so it will not start')
+  if (__OPENAFLOW_TEST_FEED__ && app.isPackaged && !applyTestEnv(o.env, join(dirname(process.execPath), '..', TEST_ENV_FILE))) {
+    console.error('openaflow desktop: a test build needs temp folders, so it will not start')
     app.exit(1)
     return undefined
   }

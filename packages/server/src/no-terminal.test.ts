@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { bundleApp } from './bundle-app.ts'
 
 const WIN = process.platform === 'win32'
-const META = /<meta name="open-aflow-token" content="([^"]+)"/
+const META = /<meta name="openaflow-token" content="([^"]+)"/
 const SYS32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
 
 const freePort = (): Promise<number> =>
@@ -68,15 +68,15 @@ describe.runIf(WIN)('the bundle with no terminal', () => {
 
       const env: NodeJS.ProcessEnv = {}
       for (const [k, v] of Object.entries(process.env)) {
-        if (!k.startsWith('OPEN_AFLOW_') && !['PATH', 'NODE_PATH'].includes(k.toUpperCase())) env[k] = v
+        if (!k.startsWith('OPENAFLOW_') && !['PATH', 'NODE_PATH'].includes(k.toUpperCase())) env[k] = v
       }
       const port = await freePort()
       Object.assign(env, {
         Path: SYS32,
-        OPEN_AFLOW_API_PORT: String(port),
-        OPEN_AFLOW_CONFIG_DIR: cfg,
-        OPEN_AFLOW_PORTS_DIR: join(root, 'ports'),
-        OPEN_AFLOW_CLAUDE_DIR: join(root, 'claude'),
+        OPENAFLOW_API_PORT: String(port),
+        OPENAFLOW_CONFIG_DIR: cfg,
+        OPENAFLOW_PORTS_DIR: join(root, 'ports'),
+        OPENAFLOW_CLAUDE_DIR: join(root, 'claude'),
       })
       const c = spawn(process.execPath, [join(root, 'out', 'server.mjs')], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
       child = c
@@ -93,7 +93,7 @@ describe.runIf(WIN)('the bundle with no terminal', () => {
       const token = META.exec(await (await fetch(`${base}/`)).text())?.[1] ?? ''
       expect(token).not.toBe('')
       const read = async () => {
-        const res = await fetch(`${base}/api/tools`, { headers: { 'X-Open-AFlow-Token': token } })
+        const res = await fetch(`${base}/api/tools`, { headers: { 'X-OpenAFlow-Token': token } })
         return { status: res.status, text: await res.text() }
       }
 

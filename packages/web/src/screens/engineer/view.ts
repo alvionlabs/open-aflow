@@ -3,7 +3,7 @@
 // why are in pod-docs/feature-details/engineer-view.md. Never shows
 // AgentRun.description: the view shows tool names and short summaries only.
 
-import { formatTokens, type AgentRun, type AgentTimeline, type SliceModel, type TestProgress } from '@open-aflow/model'
+import { formatTokens, type AgentRun, type AgentTimeline, type SliceModel, type TestProgress } from '@openaflow/model'
 import type { ChipClass } from '../runs/view.ts'
 
 export type Detail = { label: string; value: string; mono: boolean }

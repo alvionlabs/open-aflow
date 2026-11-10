@@ -67,7 +67,7 @@ try {
     ...builderOptions({ noticesFile: writeNotices(), ...args }),
     targets: Platform.WINDOWS.createTarget('nsis', Arch.x64),
   })
-  console.log(`open-aflow: packaged, and published nothing:\n${files.join('\n')}`)
+  console.log(`openaflow: packaged, and published nothing:\n${files.join('\n')}`)
 } finally {
   // dist/main.cjs never stays a test build.
   if (testFeed) await bundleDesktop(mainBundle)

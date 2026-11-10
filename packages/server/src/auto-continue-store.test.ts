@@ -9,7 +9,7 @@ let root: string
 let file: string
 
 beforeEach(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), 'open-aflow-s1-store-')))
+  root = realpathSync(await mkdtemp(join(tmpdir(), 'openaflow-s1-store-')))
   file = join(root, 'cfg', 'auto-continue.json')
 })
 

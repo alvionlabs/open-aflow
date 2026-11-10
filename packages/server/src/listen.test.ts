@@ -18,12 +18,12 @@ function opener(...failures: Error[]) {
 test('wantedPort', () => {
   expect(APP_PORT).toBe(47800)
   expect(wantedPort({})).toEqual({ port: 47800, fallback: true })
-  expect(wantedPort({ OPEN_AFLOW_API_PORT: '' })).toEqual({ port: 47800, fallback: true })
+  expect(wantedPort({ OPENAFLOW_API_PORT: '' })).toEqual({ port: 47800, fallback: true })
   expect(wantedPort({}, 5123)).toEqual({ port: 5123, fallback: true })
-  expect(wantedPort({ OPEN_AFLOW_API_PORT: '3110' })).toEqual({ port: 3110, fallback: false })
-  expect(wantedPort({ OPEN_AFLOW_API_PORT: '3110' }, 5123)).toEqual({ port: 3110, fallback: false })
+  expect(wantedPort({ OPENAFLOW_API_PORT: '3110' })).toEqual({ port: 3110, fallback: false })
+  expect(wantedPort({ OPENAFLOW_API_PORT: '3110' }, 5123)).toEqual({ port: 3110, fallback: false })
   for (const bad of ['abc', '0', '70000', ' 3110', '-1']) {
-    expect(() => wantedPort({ OPEN_AFLOW_API_PORT: bad })).toThrow(/OPEN_AFLOW_API_PORT/)
+    expect(() => wantedPort({ OPENAFLOW_API_PORT: bad })).toThrow(/OPENAFLOW_API_PORT/)
   }
 })
 
@@ -58,7 +58,7 @@ describe('openWithFallback', () => {
     // A strict port that is busy or refused rejects naming the variable and the port.
     for (const code of ['EADDRINUSE', 'EACCES']) {
       const { calls, open } = opener(failure(code))
-      await expect(openWithFallback({ port: 3110, fallback: false }, open)).rejects.toThrow(/OPEN_AFLOW_API_PORT.*3110/)
+      await expect(openWithFallback({ port: 3110, fallback: false }, open)).rejects.toThrow(/OPENAFLOW_API_PORT.*3110/)
       expect(calls).toEqual([3110])
     }
   })

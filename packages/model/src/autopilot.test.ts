@@ -163,7 +163,7 @@ describe('autopilot run, stopped at a PENDING gate', () => {
   })
 
   // Real PENDING · orchestrator → human bodies from pod queues and Queue logs (chess-web, sparring-liem,
-  // watchless, open-aflow, pod-trial), cut short; PR links point at #9. A halt starts with its gate
+  // watchless, openaflow, pod-trial), cut short; PR links point at #9. A halt starts with its gate
   // (skills/autopilot/policy.md: gates 1–7, by number or by name); a note that only mentions one is no stop.
   const STOPS: [string, string][] = [
     ['gate 5 by number and name', 'Gate 5 (safety-bound): `--max-runtime` (default 4h) hit — run started 2026-10-04T06:58:18Z, halted 22:56Z before dispatching wave 2 (`D1`).'],

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { buildFixPipeline, buildFlow, buildPipeline, type Board, type RunSummary } from '@open-aflow/model'
+import { buildFixPipeline, buildFlow, buildPipeline, type Board, type RunSummary } from '@openaflow/model'
 import type { StreamState } from '../../board-stream.ts'
 import { hashFor, type View } from '../../selection.ts'
 import { Icon } from '../../theme/icons.tsx'
@@ -178,7 +178,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
           <div className="side-head">
             <span className="logo">
               <i aria-hidden="true" />
-              Open AFlow
+              OpenAFlow
             </span>
             {lost && (
               <span className={`status ${lost.cls}`} role="status">

@@ -5,7 +5,7 @@ import { CONTINUED_ENGINEER, CONTINUED_REVIEWER, jsonlAt } from './continued-age
 import { loadFixture } from './load-fixture.ts'
 import { buildRepoModel } from '../src/run-model.ts'
 
-// open-aflow's real /pod:fix run fix-show-fix-runs: the engineer built (17:25–18:08), the reviewer ran
+// openaflow's real /pod:fix run fix-show-fix-runs: the engineer built (17:25–18:08), the reviewer ran
 // round 1 (18:10–18:19), the same engineer was continued for the fix pass (18:19–18:54), and the same
 // reviewer was continued for round 2 (18:55–19:02). Each step reads the transcripts as they stood then.
 
@@ -18,13 +18,13 @@ function fixRepoAt(at: string): BoardRepo {
   )
   return {
     id: 'pb',
-    name: 'open-aflow',
-    path: '/r/open-aflow',
+    name: 'openaflow',
+    path: '/r/openaflow',
     source: 'claim',
     model: buildRepoModel({ 'pod-docs/README.md': '# pod docs\n\npod docs: 2\n' }),
     agents,
     prs: [{ number: 23, state: 'open', checks: 'pass', checkedAt: 0, branch: 'fix-show-fix-runs' }],
-    claims: [{ portBase: 3500, repoPath: '/r/open-aflow', plan: 'fix-show-fix-runs' }],
+    claims: [{ portBase: 3500, repoPath: '/r/openaflow', plan: 'fix-show-fix-runs' }],
   }
 }
 

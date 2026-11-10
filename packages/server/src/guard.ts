@@ -67,7 +67,7 @@ export function actionGuard({ ports, token }: { ports: readonly number[]; token:
 /**
  * Guards reads that need the session token, such as the folder listing under
  * /api/fs/. After the request guard's checks (Host; Origin too on anything but
- * GET and HEAD), the `X-Open-AFlow-Token` header must match. A token in the URL
+ * GET and HEAD), the `X-OpenAFlow-Token` header must match. A token in the URL
  * doesn't count. Host 403, Origin 403, then token 403.
  */
 export function readGuard({ ports, token }: { ports: readonly number[]; token: string }): MiddlewareHandler {
@@ -81,11 +81,11 @@ export function readGuard({ ports, token }: { ports: readonly number[]; token: s
   }
 }
 
-/** Whether a request's `X-Open-AFlow-Token` header is the session token, compared in constant time. */
+/** Whether a request's `X-OpenAFlow-Token` header is the session token, compared in constant time. */
 function tokenCheck(token: string): (c: Context) => boolean {
   const expected = Buffer.from(token, 'utf8')
   return (c) => {
-    const given = Buffer.from(c.req.header('x-open-aflow-token') ?? '', 'utf8')
+    const given = Buffer.from(c.req.header('x-openaflow-token') ?? '', 'utf8')
     return given.length === expected.length && timingSafeEqual(given, expected)
   }
 }

@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
-import type { ReplyWord } from '@open-aflow/model'
+import type { ReplyWord } from '@openaflow/model'
 import { envKey, isAbsoluteFor, isFile, resolveBin, safeChildEnv } from './bin-path.ts'
 import { envValue, type Env } from './config.ts'
 
@@ -70,9 +70,9 @@ export function pruneLogs(dir: string, keep: number): void {
   }
 }
 
-/** The claude binary: `OPEN_AFLOW_CLAUDE_BIN`, else `claude` (found on PATH). */
+/** The claude binary: `OPENAFLOW_CLAUDE_BIN`, else `claude` (found on PATH). */
 export function claudeBin(env: Env): string {
-  return envValue(env, 'OPEN_AFLOW_CLAUDE_BIN') ?? 'claude'
+  return envValue(env, 'OPENAFLOW_CLAUDE_BIN') ?? 'claude'
 }
 
 /**

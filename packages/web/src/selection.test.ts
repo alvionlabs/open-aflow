@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { RunSummary } from '@open-aflow/model'
+import type { RunSummary } from '@openaflow/model'
 import { followRepoId, hashFor, parseHash, rememberRepoPaths, resolveSelection, startClock, LIVE_TICK_MS } from './selection.ts'
 
 const run = (repoId: string, plan?: string): RunSummary => ({

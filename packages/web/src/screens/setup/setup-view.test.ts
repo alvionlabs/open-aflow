@@ -62,8 +62,8 @@ describe('setup rows', () => {
     expect(row.word).toBe('bad path')
     expect(row.field).toBe(false)
     expect(row.path).toBe('C:\\gone\\claude.exe')
-    expect(fixText(row.fix)).toContain('OPEN_AFLOW_CLAUDE_BIN')
-    expect(fixText(row.fix)).toContain('then restart Open AFlow.')
+    expect(fixText(row.fix)).toContain('OPENAFLOW_CLAUDE_BIN')
+    expect(fixText(row.fix)).toContain('then restart OpenAFlow.')
   })
 
   it('the note on CLAUDE variables', () => {

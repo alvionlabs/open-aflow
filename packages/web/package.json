@@ -1,5 +1,5 @@
 {
-  "name": "@open-aflow/web",
+  "name": "@openaflow/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,12 +15,12 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@open-aflow/model": "workspace:*",
+    "@openaflow/model": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@open-aflow/server": "workspace:*",
+    "@openaflow/server": "workspace:*",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",

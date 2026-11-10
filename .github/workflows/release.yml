@@ -42,8 +42,8 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           path: |
-            packages/desktop/release/open-aflow-setup-*.exe
-            packages/desktop/release/open-aflow-setup-*.exe.blockmap
+            packages/desktop/release/openaflow-setup-*.exe
+            packages/desktop/release/openaflow-setup-*.exe.blockmap
             packages/desktop/release/latest.yml
 
   publish:

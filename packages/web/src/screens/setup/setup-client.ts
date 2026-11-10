@@ -33,7 +33,7 @@ async function askTools(fetchFn: typeof fetch, token: string, signal: AbortSigna
   let res: Response
   let text: string
   try {
-    res = await fetchFn('/api/tools', { headers: { 'X-Open-AFlow-Token': token }, signal })
+    res = await fetchFn('/api/tools', { headers: { 'X-OpenAFlow-Token': token }, signal })
     text = await res.text()
   } catch {
     return { ok: false, message: UNREACHABLE }

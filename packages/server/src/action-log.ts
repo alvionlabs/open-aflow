@@ -4,7 +4,7 @@
 
 import { readFileSync } from 'node:fs'
 import { appendFile } from 'node:fs/promises'
-import type { ActionEntry, AnswerOutcome, MergeOutcome, NewActionEntry, RemoveRepoOutcome, ResolveOutcome, ResumeOutcome } from '@open-aflow/model'
+import type { ActionEntry, AnswerOutcome, MergeOutcome, NewActionEntry, RemoveRepoOutcome, ResolveOutcome, ResumeOutcome } from '@openaflow/model'
 
 export const ACTION_LOG_MAX = 50
 const MERGE_RESULTS = new Set<string>(['merged', 'queued', 'auto-merge', 'stale', 'failed', 'unconfirmed'] satisfies MergeOutcome[])

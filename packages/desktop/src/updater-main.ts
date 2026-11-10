@@ -9,7 +9,7 @@ import { readTestUpdate } from './update-feed.ts'
 import { createUpdateFlow, type UpdaterPort } from './update-flow.ts'
 
 /** `pnpm package --test-feed` sets this. In every other build the test feed's code is removed. */
-declare const __OPEN_AFLOW_TEST_FEED__: boolean
+declare const __OPENAFLOW_TEST_FEED__: boolean
 
 function realUpdater(feed: string | null): UpdaterPort {
   // Its own log prints URLs.
@@ -50,10 +50,10 @@ export function startUpdater(ctx: ShellContext): void {
   let feed: string | null = null
   let firstCheckMs: number | undefined
   let ask = askBox
-  if (__OPEN_AFLOW_TEST_FEED__) {
+  if (__OPENAFLOW_TEST_FEED__) {
     const test = readTestUpdate(ctx.env)
     if (app.isPackaged && test.feed === null) {
-      console.error('open-aflow desktop: update test feed ignored: it is not a loopback URL, so this build has no feed')
+      console.error('openaflow desktop: update test feed ignored: it is not a loopback URL, so this build has no feed')
       return
     }
     feed = test.feed

@@ -3,7 +3,7 @@
 // driver that sends the answer. The text is checked with cleanAnswer before anything is sent.
 // Every reply carries the number of the request it answers, so an older one is dropped.
 
-import { cleanAnswer, type AnswerOutcome, type AnswerResult } from '@open-aflow/model'
+import { cleanAnswer, type AnswerOutcome, type AnswerResult } from '@openaflow/model'
 import { postAction, type ActionReply } from '../../actions-client.ts'
 import { outcomeChip } from './action-log-view.ts'
 import { ANSWER_NOTE } from './queue-view.ts'

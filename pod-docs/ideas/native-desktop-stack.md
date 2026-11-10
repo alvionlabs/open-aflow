@@ -10,7 +10,7 @@ Discord is a reference. On 2026-11-04, its CTO confirmed a Rust rebuild on GPUI 
 A UI rewrite alone leaves the Node server running, so its memory stays. To remove Node, also rewrite the server, the file watching, and the `git`, `gh`, and `claude` process handling.
 
 ## Why it's on hold
-We ship Electron now because shipping fast matters more. We have no RAM measurement of open-aflow that shows a problem. Discord's 290 MB figure is one screenshot of an early build, not a benchmark. GPUI's API still changes, and it has no built-in text input.
+We ship Electron now because shipping fast matters more. We have no RAM measurement of openaflow that shows a problem. Discord's 290 MB figure is one screenshot of an early build, not a benchmark. GPUI's API still changes, and it has no built-in text input.
 
 ## What would make it worth building
 All of these must be true, in this order:

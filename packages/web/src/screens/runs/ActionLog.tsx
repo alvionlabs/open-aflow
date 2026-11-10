@@ -1,4 +1,4 @@
-import type { ActionEntry } from '@open-aflow/model'
+import type { ActionEntry } from '@openaflow/model'
 import { Chip } from './Chip.tsx'
 import { ACTION_LOG_CAP, NO_ACTIONS, actionLogRows } from './action-log-view.ts'
 

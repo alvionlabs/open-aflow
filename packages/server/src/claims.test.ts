@@ -12,9 +12,9 @@ describe('parseClaim', () => {
       plan: 'plan-a',
     })
     // The live format ends in a newline; extra spaces around parts are trimmed.
-    expect(parseClaim('3000', 'E:/Projects/open-aflow board-read\n')).toEqual({
+    expect(parseClaim('3000', 'E:/Projects/openaflow board-read\n')).toEqual({
       portBase: 3000,
-      repoPath: 'E:/Projects/open-aflow',
+      repoPath: 'E:/Projects/openaflow',
       plan: 'board-read',
     })
     expect(parseClaim('3200', '  /home/me/my  repo \t plan-b  \r\n')).toEqual({
@@ -40,17 +40,17 @@ describe('parseClaim', () => {
 })
 
 describe('portsDir', () => {
-  test('OPEN_AFLOW_PORTS_DIR, else <temp>/pod-ports', () => {
-    expect(portsDir({ OPEN_AFLOW_PORTS_DIR: '/p' }, '/tmp')).toBe('/p')
+  test('OPENAFLOW_PORTS_DIR, else <temp>/pod-ports', () => {
+    expect(portsDir({ OPENAFLOW_PORTS_DIR: '/p' }, '/tmp')).toBe('/p')
     expect(portsDir({}, join('T', 'emp'))).toBe(join('T', 'emp', 'pod-ports'))
-    expect(portsDir({ OPEN_AFLOW_PORTS_DIR: '' }, 'T')).toBe(join('T', 'pod-ports'))
+    expect(portsDir({ OPENAFLOW_PORTS_DIR: '' }, 'T')).toBe(join('T', 'pod-ports'))
   })
 })
 
 describe('readClaims', () => {
   let root: string
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), 'open-aflow-d1-claims-'))
+    root = await mkdtemp(join(tmpdir(), 'openaflow-d1-claims-'))
   })
   afterEach(async () => {
     await rm(root, { recursive: true, force: true })

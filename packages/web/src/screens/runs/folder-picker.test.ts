@@ -102,7 +102,7 @@ describe('folder picker', () => {
     expect(roots).toEqual({ ok: true, data: ROOTS })
     const [url0, init0] = fetch.mock.calls[0]!
     expect(url0).toBe('/api/fs/folders')
-    expect(new Headers(init0?.headers).get('X-Open-AFlow-Token')).toBe('tok-123')
+    expect(new Headers(init0?.headers).get('X-OpenAFlow-Token')).toBe('tok-123')
     expect(init0?.method ?? 'GET').toBe('GET')
 
     // A path is query-encoded (a folder named `a+b c` round-trips).

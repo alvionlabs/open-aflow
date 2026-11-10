@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ActionEntry, AnswerOutcome, MergeOutcome, ResumeOutcome } from '@open-aflow/model'
+import type { ActionEntry, AnswerOutcome, MergeOutcome, ResumeOutcome } from '@openaflow/model'
 import { ACTION_LOG_CAP, NO_ACTIONS, actionLogRows, outcomeChip } from './action-log-view.ts'
 
 const at = (y: number, m: number, d: number, h: number, min: number) => new Date(y, m - 1, d, h, min).getTime()

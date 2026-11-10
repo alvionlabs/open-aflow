@@ -42,9 +42,9 @@ const writeOld = async () => {
 }
 
 beforeEach(() => {
-  root = realpathSync(mkdtempSync(join(tmpdir(), 'open-aflow-move-')))
+  root = realpathSync(mkdtempSync(join(tmpdir(), 'openaflow-move-')))
   from = join(root, 'pod-board')
-  to = join(root, 'open-aflow-server')
+  to = join(root, 'openaflow-server')
   logs = []
   errors = []
 })
@@ -67,7 +67,7 @@ describe('moveOldConfig', () => {
     await writeOld()
     await moveOldConfig({ from, to, ...io() })
     expect(logs).toHaveLength(1)
-    expect(logs[0]).toMatch(/^open-aflow: /)
+    expect(logs[0]).toMatch(/^openaflow: /)
     expect(logs[0]).toContain(from)
     expect(logs[0]).toContain(to)
     expect(errors).toEqual([])
@@ -144,7 +144,7 @@ describe('moveOldConfig', () => {
     expect(existsSync(to)).toBe(false)
     expect(await readdir(root)).toEqual(['pod-board'])
     expect(errors).toHaveLength(1)
-    expect(errors[0]).toMatch(/^open-aflow: /)
+    expect(errors[0]).toMatch(/^openaflow: /)
     for (const part of [from, to, 'config.json', 'EPERM']) expect(errors[0]).toContain(part)
     expect(logs).toEqual([])
     // The next start tries again, because nothing was kept.

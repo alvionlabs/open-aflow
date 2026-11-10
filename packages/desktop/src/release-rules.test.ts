@@ -27,7 +27,7 @@ describe('checkSize', () => {
 })
 
 describe('checkUpdateFile', () => {
-  const name = 'open-aflow-setup-1.2.3.exe'
+  const name = 'openaflow-setup-1.2.3.exe'
   const bytes = Buffer.from('the installer')
   const sha512 = createHash('sha512').update(bytes).digest('base64')
   const file = { url: name, sha512, size: bytes.length }
@@ -54,17 +54,17 @@ describe('checkUpdateFile', () => {
 describe('checkNoTestFeed', () => {
   test('the test feed text in main.cjs fails', () => {
     expect(() => checkNoTestFeed('const a = 1')).not.toThrow()
-    expect(() => checkNoTestFeed('const a = process.env.OPEN_AFLOW_UPDATE_TEST_FEED')).toThrow(/OPEN_AFLOW_UPDATE_TEST/)
+    expect(() => checkNoTestFeed('const a = process.env.OPENAFLOW_UPDATE_TEST_FEED')).toThrow(/OPENAFLOW_UPDATE_TEST/)
   })
 })
 
 describe('pickInstaller', () => {
   test('exactly one installer counts', () => {
-    const name = 'open-aflow-setup-1.2.3.exe'
-    expect(pickInstaller([name, `${name}.blockmap`, 'latest.yml', 'builder-debug.yml', 'win-unpacked', '__uninstaller-nsis-open-aflow.exe'])).toBe(name)
+    const name = 'openaflow-setup-1.2.3.exe'
+    expect(pickInstaller([name, `${name}.blockmap`, 'latest.yml', 'builder-debug.yml', 'win-unpacked', '__uninstaller-nsis-openaflow.exe'])).toBe(name)
     expect(() => pickInstaller(['latest.yml'])).toThrow(/no installer/)
     // The name before the rename is not this app's installer.
     expect(() => pickInstaller(['pod-board-setup-1.2.3.exe', 'latest.yml'])).toThrow(/no installer/)
-    expect(() => pickInstaller([name, 'open-aflow-setup-1.2.4.exe'])).toThrow(/open-aflow-setup-1\.2\.3\.exe.*open-aflow-setup-1\.2\.4\.exe/)
+    expect(() => pickInstaller([name, 'openaflow-setup-1.2.4.exe'])).toThrow(/openaflow-setup-1\.2\.3\.exe.*openaflow-setup-1\.2\.4\.exe/)
   })
 })

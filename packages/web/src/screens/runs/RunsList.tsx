@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from 'react'
-import type { BoardRepo, RunSummary } from '@open-aflow/model'
+import type { BoardRepo, RunSummary } from '@openaflow/model'
 import { hashFor } from '../../selection.ts'
 import { moreButtonId, moreName, repoOfRun } from './remove-flow.ts'
 import { RunMoreMenu } from './RunMoreMenu.tsx'

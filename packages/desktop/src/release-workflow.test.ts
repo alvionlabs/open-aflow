@@ -119,7 +119,7 @@ describe('release.yml', () => {
       .map((l) => l.trim())
       .filter(Boolean)
       .sort()
-    expect(paths).toEqual(['packages/desktop/release/latest.yml', 'packages/desktop/release/open-aflow-setup-*.exe', 'packages/desktop/release/open-aflow-setup-*.exe.blockmap'])
+    expect(paths).toEqual(['packages/desktop/release/latest.yml', 'packages/desktop/release/openaflow-setup-*.exe', 'packages/desktop/release/openaflow-setup-*.exe.blockmap'])
   })
 
   test('a normal release', () => {

@@ -14,7 +14,7 @@ let repoA: string
 let repoB: string
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'open-aflow-d1-repos-'))
+  root = await mkdtemp(join(tmpdir(), 'openaflow-d1-repos-'))
   cfgDir = join(root, 'cfg', 'nested')
   file = join(cfgDir, 'config.json')
   repoA = join(root, 'Repo A')

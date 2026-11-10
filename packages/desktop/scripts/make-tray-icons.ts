@@ -1,4 +1,4 @@
-// `pnpm --filter @open-aflow/desktop exec tsx scripts/make-tray-icons.ts`: the tray's icons, from the app icon.
+// `pnpm --filter @openaflow/desktop exec tsx scripts/make-tray-icons.ts`: the tray's icons, from the app icon.
 // The output is committed. tray-assets.test.ts checks that this script gives those same bytes.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -97,5 +97,5 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === THIS_FILE) {
   const assets = join(pkg, 'assets')
   mkdirSync(assets, { recursive: true })
   for (const [name, bytes] of Object.entries(renderTrayIcons())) writeFileSync(join(assets, name), bytes)
-  console.log(`open-aflow: wrote the tray icons in ${assets}`)
+  console.log(`openaflow: wrote the tray icons in ${assets}`)
 }

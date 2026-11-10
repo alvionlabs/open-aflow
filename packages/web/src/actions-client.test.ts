@@ -31,7 +31,7 @@ describe('action client', () => {
     expect(url).toBe('/api/actions/merge-preview')
     expect(init.method).toBe('POST')
     const headers = new Headers(init.headers)
-    expect(headers.get('x-open-aflow-token')).toBe(TOKEN)
+    expect(headers.get('x-openaflow-token')).toBe(TOKEN)
     expect(headers.get('content-type')).toBe('application/json')
     expect(JSON.parse(String(init.body))).toEqual({ repoId: 'r1', number: 7 })
   })
@@ -42,7 +42,7 @@ describe('action client', () => {
     await postAction('merge', {}, { fetch: f.fn, token: () => token })
     token = 'second'
     await postAction('merge', {}, { fetch: f.fn, token: () => token })
-    expect(f.calls.map((c) => new Headers(c.init.headers).get('x-open-aflow-token'))).toEqual(['first', 'second'])
+    expect(f.calls.map((c) => new Headers(c.init.headers).get('x-openaflow-token'))).toEqual(['first', 'second'])
   })
 
   it('reports each failure in words', async () => {

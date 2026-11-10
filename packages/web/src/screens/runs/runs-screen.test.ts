@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRepoModel, listRuns, type Board, type BoardRepo, type Claim, type PrStatus, type RunSummary } from '@open-aflow/model'
+import { buildRepoModel, listRuns, type Board, type BoardRepo, type Claim, type PrStatus, type RunSummary } from '@openaflow/model'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { loadFixture } from '../../../../model/test/load-fixture.ts'
@@ -342,11 +342,11 @@ describe('sidebar', () => {
     const { html } = render({ repo: chess([onlyQueue()]) })
     const side = sideOf(html)
     const at = (needle: string) => side.indexOf(needle)
-    expect(at('Open AFlow')).toBeGreaterThan(-1)
+    expect(at('OpenAFlow')).toBeGreaterThan(-1)
     // Just "Runs": the cards already show each run's state, so no `· N active` count.
     expect(side).toMatch(/<span class="eyebrow runs-head">Runs<\/span>/)
     expect(text(side)).not.toMatch(/active/)
-    expect(at('runs-head')).toBeGreaterThan(at('Open AFlow'))
+    expect(at('runs-head')).toBeGreaterThan(at('OpenAFlow'))
     expect(at('class="run-list"')).toBeGreaterThan(at('runs-head'))
     expect(side).toMatch(ADD)
     expect(side.search(ADD)).toBeGreaterThan(at('class="run-list"'))
@@ -380,7 +380,7 @@ describe('sidebar', () => {
   it('shows lost · retrying beside the title only while lost', () => {
     const repo = chess([onlyQueue()])
     const lost = sideOf(render({ repo, stream: 'lost' }).html)
-    expect(lost).toMatch(/class="side-head"[\s\S]*Open AFlow[\s\S]*lost · retrying/)
+    expect(lost).toMatch(/class="side-head"[\s\S]*OpenAFlow[\s\S]*lost · retrying/)
     expect(sideOf(render({ repo, stream: 'live' }).html)).not.toMatch(/retrying/)
   })
 
@@ -484,9 +484,9 @@ describe('sidebar resize handle', () => {
       return { value: /aria-valuenow="(\d+)"/.exec(handleOf(html))?.[1], style: /<div class="screen-body" style="([^"]*)"/.exec(html)?.[1] }
     }
     expect(at({})).toEqual({ value: '260', style: '--side-width:260px' })
-    expect(at({ 'open-aflow-sidebar-width': '320' })).toEqual({ value: '320', style: '--side-width:320px' })
-    expect(at({ 'open-aflow-sidebar-width': '9000' })).toEqual({ value: '400', style: '--side-width:400px' })
-    expect(at({ 'open-aflow-sidebar-width': 'wide' })).toEqual({ value: '260', style: '--side-width:260px' })
+    expect(at({ 'openaflow-sidebar-width': '320' })).toEqual({ value: '320', style: '--side-width:320px' })
+    expect(at({ 'openaflow-sidebar-width': '9000' })).toEqual({ value: '400', style: '--side-width:400px' })
+    expect(at({ 'openaflow-sidebar-width': 'wide' })).toEqual({ value: '260', style: '--side-width:260px' })
   })
 
   it('sits between the sidebar and the main column', () => {

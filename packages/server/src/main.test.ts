@@ -57,14 +57,14 @@ const boot = async (o: { env?: Record<string, string>; ipc?: boolean } = {}): Pr
   const api = await freePort()
   const web = await freePort()
   const env: NodeJS.ProcessEnv = { ...process.env }
-  for (const k of Object.keys(env)) if (k.startsWith('OPEN_AFLOW_')) delete env[k]
+  for (const k of Object.keys(env)) if (k.startsWith('OPENAFLOW_')) delete env[k]
   Object.assign(env, {
-    OPEN_AFLOW_API_PORT: String(api),
-    OPEN_AFLOW_WEB_PORT: String(web),
-    OPEN_AFLOW_CONFIG_DIR: join(tmp, 'cfg'),
-    OPEN_AFLOW_PORTS_DIR: join(tmp, 'ports'),
-    OPEN_AFLOW_CLAUDE_DIR: join(tmp, 'claude'),
-    OPEN_AFLOW_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
+    OPENAFLOW_API_PORT: String(api),
+    OPENAFLOW_WEB_PORT: String(web),
+    OPENAFLOW_CONFIG_DIR: join(tmp, 'cfg'),
+    OPENAFLOW_PORTS_DIR: join(tmp, 'ports'),
+    OPENAFLOW_CLAUDE_DIR: join(tmp, 'claude'),
+    OPENAFLOW_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
     ...o.env,
   })
   const c = spawn(process.execPath, ['--import', TSX, MAIN], {
@@ -82,7 +82,7 @@ const boot = async (o: { env?: Record<string, string>; ipc?: boolean } = {}): Pr
     )
     const onData = (d: unknown) => {
       text += String(d)
-      if (text.includes(`open-aflow API listening on http://127.0.0.1:${api}`)) {
+      if (text.includes(`openaflow API listening on http://127.0.0.1:${api}`)) {
         clearTimeout(timer)
         resolve()
       }
@@ -98,7 +98,7 @@ const boot = async (o: { env?: Record<string, string>; ipc?: boolean } = {}): Pr
 }
 
 beforeEach(() => {
-  tmp = mkdtempSync(join(tmpdir(), 'open-aflow-main-'))
+  tmp = mkdtempSync(join(tmpdir(), 'openaflow-main-'))
 })
 
 afterEach(async () => {
@@ -145,7 +145,7 @@ describe('main.ts', () => {
     const token = readFileSync(join(tmp, 'cfg', 'session-token')).toString().trim()
     const ok = await fetch(url, {
       method: 'POST',
-      headers: { ...headers, 'X-Open-AFlow-Token': token },
+      headers: { ...headers, 'X-OpenAFlow-Token': token },
       body,
     })
     expect(ok.status).toBe(404)
@@ -163,12 +163,12 @@ describe('main.ts', () => {
 /** Runs an entry on temp folders with `over` on top, until it exits. */
 const runToExit = async (entry: string, over: Record<string, string>): Promise<{ code: number | null; text: string }> => {
   const env: NodeJS.ProcessEnv = { ...process.env }
-  for (const k of Object.keys(env)) if (k.startsWith('OPEN_AFLOW_')) delete env[k]
+  for (const k of Object.keys(env)) if (k.startsWith('OPENAFLOW_')) delete env[k]
   Object.assign(env, {
-    OPEN_AFLOW_CONFIG_DIR: join(tmp, 'cfg'),
-    OPEN_AFLOW_PORTS_DIR: join(tmp, 'ports'),
-    OPEN_AFLOW_CLAUDE_DIR: join(tmp, 'claude'),
-    OPEN_AFLOW_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
+    OPENAFLOW_CONFIG_DIR: join(tmp, 'cfg'),
+    OPENAFLOW_PORTS_DIR: join(tmp, 'ports'),
+    OPENAFLOW_CLAUDE_DIR: join(tmp, 'claude'),
+    OPENAFLOW_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
     ...over,
   })
   const c = spawn(process.execPath, ['--import', TSX, entry], { env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
@@ -191,11 +191,11 @@ describe('the dev entry', () => {
 
   test('dev has no parent link', async () => {
     // A value production would refuse, and a stop message production would obey.
-    const b = await boot({ env: { OPEN_AFLOW_PARENT_PID: 'abc' }, ipc: true })
+    const b = await boot({ env: { OPENAFLOW_PARENT_PID: 'abc' }, ipc: true })
     child = b.child
     const messages: unknown[] = []
     b.child.on('message', (m) => messages.push(m))
-    b.child.send({ type: 'open-aflow:stop' })
+    b.child.send({ type: 'openaflow:stop' })
     await new Promise((r) => setTimeout(r, 3000))
     expect(b.child.exitCode).toBeNull()
     expect((await fetch(`http://127.0.0.1:${b.api}/api/health`)).status).toBe(200)
@@ -204,7 +204,7 @@ describe('the dev entry', () => {
 
   test('dev ignores a parent that is gone', async () => {
     const gone = spawnSync(process.execPath, ['-e', '0'], { windowsHide: true }).pid
-    const b = await boot({ env: { OPEN_AFLOW_PARENT_PID: String(gone) } })
+    const b = await boot({ env: { OPENAFLOW_PARENT_PID: String(gone) } })
     child = b.child
     await new Promise((r) => setTimeout(r, 3000))
     expect(b.child.exitCode).toBeNull()
@@ -212,9 +212,9 @@ describe('the dev entry', () => {
   }, 60_000)
 
   test('a bad port stops the dev server', async () => {
-    const { code, text } = await runToExit(MAIN, { OPEN_AFLOW_API_PORT: 'abc' })
+    const { code, text } = await runToExit(MAIN, { OPENAFLOW_API_PORT: 'abc' })
     expect(code).toBe(1)
-    expect(text).toContain('open-aflow: OPEN_AFLOW_API_PORT')
+    expect(text).toContain('openaflow: OPENAFLOW_API_PORT')
     expect(text).not.toContain('listening')
   }, 60_000)
 })
@@ -222,9 +222,9 @@ describe('the dev entry', () => {
 describe('the production entry', () => {
   // No web build sits beside the source file, so the entry stops and names its own folder.
   test('with no web folder beside it, it stops naming the folder', async () => {
-    const { code, text } = await runToExit(join(here, 'main-production.ts'), { OPEN_AFLOW_API_PORT: String(await freePort()) })
+    const { code, text } = await runToExit(join(here, 'main-production.ts'), { OPENAFLOW_API_PORT: String(await freePort()) })
     expect(code).toBe(1)
-    expect(text).toContain('open-aflow: ')
+    expect(text).toContain('openaflow: ')
     expect(text).toContain(join(here, 'web'))
     expect(text).not.toContain('listening')
   }, 60_000)

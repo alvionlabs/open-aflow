@@ -3,7 +3,7 @@
 // sent only on a press, and each reply carries the number of the request it answers, so an
 // older one is dropped. The switch only ever posts auto-continue; only a press of Go sends go.
 
-import type { Board, ResumeResult, RunSummary } from '@open-aflow/model'
+import type { Board, ResumeResult, RunSummary } from '@openaflow/model'
 import { postAction, type ActionReply } from '../../actions-client.ts'
 import { outcomeChip } from './action-log-view.ts'
 import type { Chip } from './view.ts'

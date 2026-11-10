@@ -2,10 +2,10 @@
 // web page's: the Next step card and its rest, cut to three tiers. Pure. The rules are in
 // pod-docs/feature-details/toasts.md.
 
-import { autoMaySend, listRuns, runReplies, type Board, type BoardRepo, type RunReply, type RunSummary } from '@open-aflow/model'
-import { nextSteps, type NextItem } from '@open-aflow/web/next-step'
-import { runName } from '@open-aflow/web/plan-view'
-import { hashFor } from '@open-aflow/web/selection'
+import { autoMaySend, listRuns, runReplies, type Board, type BoardRepo, type RunReply, type RunSummary } from '@openaflow/model'
+import { nextSteps, type NextItem } from '@openaflow/web/next-step'
+import { runName } from '@openaflow/web/plan-view'
+import { hashFor } from '@openaflow/web/selection'
 
 export type AttentionTier = 'blocked' | 'merge' | 'reply'
 export type AttentionItem = {

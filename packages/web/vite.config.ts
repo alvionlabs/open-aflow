@@ -1,11 +1,11 @@
 import { homedir } from 'node:os'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { DEFAULT_API_PORT, liveConfigDir, portFromEnv } from '@open-aflow/server/config'
-import { tokenMetaPlugin } from '@open-aflow/server/session-token'
+import { DEFAULT_API_PORT, liveConfigDir, portFromEnv } from '@openaflow/server/config'
+import { tokenMetaPlugin } from '@openaflow/server/session-token'
 
-const apiPort = portFromEnv(process.env, 'OPEN_AFLOW_API_PORT', DEFAULT_API_PORT)
-const webPort = portFromEnv(process.env, 'OPEN_AFLOW_WEB_PORT', 3001)
+const apiPort = portFromEnv(process.env, 'OPENAFLOW_API_PORT', DEFAULT_API_PORT)
+const webPort = portFromEnv(process.env, 'OPENAFLOW_WEB_PORT', 3001)
 // No other page may frame the board: a framed page's own token and Origin pass the guards, so a click
 // there would count. Production sends the same pair from web-app.ts.
 const NO_FRAMING = { 'Content-Security-Policy': "frame-ancestors 'none'", 'X-Frame-Options': 'DENY' }

@@ -4,14 +4,14 @@ import { APP_ID, APP_NAME, dataDirOverride, SERVER_SERVICE_NAME } from './shell-
 describe('shell config', () => {
   test('reads the data folder', () => {
     expect(dataDirOverride({})).toBeUndefined()
-    expect(dataDirOverride({ OPEN_AFLOW_DESKTOP_DATA_DIR: '' })).toBeUndefined()
-    expect(dataDirOverride({ OPEN_AFLOW_DESKTOP_DATA_DIR: 'C:\\tmp\\shell' })).toBe('C:\\tmp\\shell')
+    expect(dataDirOverride({ OPENAFLOW_DESKTOP_DATA_DIR: '' })).toBeUndefined()
+    expect(dataDirOverride({ OPENAFLOW_DESKTOP_DATA_DIR: 'C:\\tmp\\shell' })).toBe('C:\\tmp\\shell')
   })
 
   test('the identity is fixed', () => {
-    expect(APP_NAME).toBe('Open AFlow')
+    expect(APP_NAME).toBe('OpenAFlow')
     expect(APP_ID).toBe('com.alvionlabs.openaflow')
     // Task Manager shows this name for the server process.
-    expect(SERVER_SERVICE_NAME).toBe('Open AFlow server')
+    expect(SERVER_SERVICE_NAME).toBe('OpenAFlow server')
   })
 })

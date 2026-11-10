@@ -10,7 +10,7 @@ Status: open · found 2026-11-05 · PR #92 final review
 **How to reproduce:**
 1. Deny read on the old `auto-continue.json`, and start A. A logs `could not copy …` and runs on the old folder. Remove the deny.
 2. Start B. B logs `in use by process <A>` and also runs on the old folder.
-3. Stop A, then start C. C copies the old folder and runs on `open-aflow-server`.
+3. Stop A, then start C. C copies the old folder and runs on `openaflow-server`.
 4. Add a repo through B. It answers 201, but the write goes only to the old folder.
 5. Stop B and C, then start D. D doesn't list B's repo.
 

@@ -3,11 +3,13 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 
-// The app is Open AFlow, inside and out. The old name stays only in history: pod-docs reports, sprints, plans,
+// The app is OpenAFlow, inside and out. The old names stay only in history: pod-docs reports, sprints, plans,
 // research, design drafts, the handoff queue, decisions, and the History part of each feature-details file.
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
-const OLD_NAME = /pod[-_ ]board/i
+/** Pod Board, then Open AFlow. `open_aflow` alone is a test repo name with an underscore, not the old name. */
+const OLD_NAMES = [/pod[-_ ]board|open[- ]aflow/i, /OPEN_AFLOW/]
+const OLD_NAME = { test: (text: string) => OLD_NAMES.some((re) => re.test(text)) }
 
 /** Files under `dir` with one of `exts`. Tests are left out: they may hold copied data. */
 const filesUnder = (dir: string, exts: RegExp) =>
@@ -54,6 +56,8 @@ function currentText(file: string): string {
   let text = readFileSync(file, 'utf8')
   if (rel.startsWith('pod-docs/feature-details/')) text = text.replace(/^## History\n[\s\S]*?(?=^## |(?![\s\S]))/m, '')
   text = text.replace(/github\.com\/iamphduc\/pod-board\/pull\/\d+/g, '').replace(/(iamphduc\/)?pod-board-run-test/g, '')
+  // A link to an older decision keeps that decision's heading, old name and all.
+  text = text.replace(/decisions\.md#[a-z0-9-]+/g, '')
   const allowed = MOVES[rel]
   return allowed ? text.replace(allowed, '') : text
 }
@@ -70,15 +74,17 @@ describe('the brand', () => {
 
   test('the guard sees every way of writing the old name', () => {
     for (const name of ['pod-board', 'pod_board', 'POD_BOARD', 'Pod Board', 'X-Pod-Board-Token']) expect(OLD_NAME.test(name), name).toBe(true)
+    for (const name of ['open-aflow', 'Open AFlow', 'Open-AFlow', 'OPEN_AFLOW_API_PORT', 'X-Open-AFlow-Token', '@open-aflow/server']) expect(OLD_NAME.test(name), name).toBe(true)
     for (const name of ['pod-docs', 'pod-ports', 'pod docs: 2', '/pod:fix', 'iamphduc/claude-pod']) expect(OLD_NAME.test(name), name).toBe(false)
+    for (const name of ['OpenAFlow', 'openaflow-server', 'OPENAFLOW_API_PORT', 'X-OpenAFlow-Token', '@openaflow/server', 'open_aflow_long_repo']) expect(OLD_NAME.test(name), name).toBe(false)
   })
 
   test('each allowed old name is still there, so the allow list never goes stale', () => {
     for (const [file, allowed] of Object.entries(MOVES)) expect(readFileSync(join(ROOT, file), 'utf8'), file).toMatch(allowed)
   })
 
-  test('the page title and the sidebar say Open AFlow', () => {
-    expect(readFileSync(join(ROOT, 'packages/web/index.html'), 'utf8')).toContain('<title>Open AFlow</title>')
-    expect(readFileSync(join(ROOT, 'README.md'), 'utf8')).toMatch(/^# Open AFlow\n/)
+  test('the page title and the sidebar say OpenAFlow', () => {
+    expect(readFileSync(join(ROOT, 'packages/web/index.html'), 'utf8')).toContain('<title>OpenAFlow</title>')
+    expect(readFileSync(join(ROOT, 'README.md'), 'utf8')).toMatch(/^# OpenAFlow\n/)
   })
 })

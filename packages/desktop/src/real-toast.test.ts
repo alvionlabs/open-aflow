@@ -71,11 +71,11 @@ const removeWithRetry = async (path: string) => {
 }
 const POWERSHELL = join(WINDIR, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 const mainWindow = (pid: number) => spawnSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', `(Get-Process -Id ${pid}).MainWindowHandle`], { encoding: 'utf8', windowsHide: true }).stdout.trim()
-const INSTALLED_LNK = join(START_MENU, 'Open AFlow.lnk')
+const INSTALLED_LNK = join(START_MENU, 'OpenAFlow.lnk')
 const DEV_LNK = join(START_MENU, 'Electron.lnk')
 const stamp = (file: string) => (existsSync(file) ? statSync(file).mtimeMs : 'none')
 
-describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform === 'win32')('a toast click from the notification center', () => {
+describe.runIf(process.env.OPENAFLOW_REAL_ELECTRON === '1' && process.platform === 'win32')('a toast click from the notification center', () => {
   let tmp: string
   let client: string
   let shell: ChildProcess | undefined
@@ -101,7 +101,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
 
   beforeAll(async () => {
     if (!existsSync(SERVER_BUNDLE)) throw new Error(`no server bundle at ${SERVER_BUNDLE}: run pnpm build first`)
-    tmp = realpathSync.native(mkdtempSync(join(tmpdir(), 'open-aflow-real-toast-')))
+    tmp = realpathSync.native(mkdtempSync(join(tmpdir(), 'openaflow-real-toast-')))
     writeFileSync(join(tmp, 'activate.cs'), CLIENT)
     client = join(tmp, 'activate.exe')
     const built = spawnSync(CSC, ['-nologo', `-out:${client}`, join(tmp, 'activate.cs')], { encoding: 'utf8', windowsHide: true })
@@ -120,7 +120,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
     const env: NodeJS.ProcessEnv = {}
     for (const [k, v] of Object.entries(process.env)) {
       const u = k.toUpperCase()
-      if (!u.startsWith('OPEN_AFLOW_') && !u.startsWith('CLAUDE') && !u.startsWith('ELECTRON_') && !u.startsWith('VITEST') && !['NODE_PATH', 'NODE_OPTIONS'].includes(u)) env[k] = v
+      if (!u.startsWith('OPENAFLOW_') && !u.startsWith('CLAUDE') && !u.startsWith('ELECTRON_') && !u.startsWith('VITEST') && !['NODE_PATH', 'NODE_OPTIONS'].includes(u)) env[k] = v
     }
     mkdirSync(join(tmp, 'cfg'))
     const data = join(tmp, 'shell')
@@ -128,16 +128,16 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
       cwd: tmp,
       env: {
         ...env,
-        OPEN_AFLOW_API_PORT: String(await freePort()),
-        OPEN_AFLOW_CONFIG_DIR: join(tmp, 'cfg'),
-        OPEN_AFLOW_PORTS_DIR: join(tmp, 'ports'),
-        OPEN_AFLOW_CLAUDE_DIR: join(tmp, 'claude'),
-        OPEN_AFLOW_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
-        OPEN_AFLOW_DESKTOP_DATA_DIR: data,
-        OPEN_AFLOW_PROBE_APP_PATH: DESKTOP,
-        OPEN_AFLOW_PROBE_ACTIVATOR: '1',
-        OPEN_AFLOW_PROBE_STATUS: statusFile(),
-        OPEN_AFLOW_PROBE_QUIT: join(tmp, 'quit'),
+        OPENAFLOW_API_PORT: String(await freePort()),
+        OPENAFLOW_CONFIG_DIR: join(tmp, 'cfg'),
+        OPENAFLOW_PORTS_DIR: join(tmp, 'ports'),
+        OPENAFLOW_CLAUDE_DIR: join(tmp, 'claude'),
+        OPENAFLOW_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
+        OPENAFLOW_DESKTOP_DATA_DIR: data,
+        OPENAFLOW_PROBE_APP_PATH: DESKTOP,
+        OPENAFLOW_PROBE_ACTIVATOR: '1',
+        OPENAFLOW_PROBE_STATUS: statusFile(),
+        OPENAFLOW_PROBE_QUIT: join(tmp, 'quit'),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       // Not hidden: SW_HIDE would swallow the window's first show.
@@ -155,7 +155,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
       await until('the window', () => !['', '0'].includes(mainWindow(pid)), 30_000, details)
 
       // No toast ever showed in this run, as after a restart with old toasts still in the center.
-      expect(await activate(clsid, 'open-aflow-toast:#/repo%20x/fix-a')).toBe(0)
+      expect(await activate(clsid, 'openaflow-toast:#/repo%20x/fix-a')).toBe(0)
       await until('the run from the toast', () => status()?.hashes.includes('#/repo%20x/fix-a') === true, 15_000, details)
 
       // A toast from a version before this one has no run in it: the window still opens.
@@ -169,10 +169,10 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
 
       // The log file sits in the temp data folder, and holds no token.
       const log = readFileSync(join(data, LOG_FILE), 'utf8')
-      expect(log).toContain('open-aflow API listening on http://127.0.0.1:')
+      expect(log).toContain('openaflow API listening on http://127.0.0.1:')
       expect(log).not.toMatch(/token/i)
       // Its config line names a temp folder under the home folder.
-      expect(log).toMatch(/open-aflow config: ~[\\/]/)
+      expect(log).toMatch(/openaflow config: ~[\\/]/)
       expect(log.toLowerCase()).not.toContain(homedir().toLowerCase())
       // A dev run never touches a real install's shortcut, which holds its activator.
       expect(stamp(INSTALLED_LNK)).toBe(installedBefore)

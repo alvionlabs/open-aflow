@@ -89,10 +89,10 @@ export function createOwnerFile(o: {
   let errorSaid = false
 
   const heldBy = (holder: Holder | undefined) =>
-    `open-aflow: ${holder ? `process ${holder.pid}` : 'another process'} runs auto-continue for ${o.dir}; this server won't auto-continue until it restarts`
+    `openaflow: ${holder ? `process ${holder.pid}` : 'another process'} runs auto-continue for ${o.dir}; this server won't auto-continue until it restarts`
   const unsure = (holder: Holder) =>
-    `open-aflow: process ${holder.pid} may run auto-continue for ${o.dir}, and this server can't read when it started; this server won't auto-continue until it restarts`
-  const failed = (err: unknown) => `open-aflow: can't use the auto-continue owner file in ${o.dir} (${codeOf(err)}); this server won't auto-continue now`
+    `openaflow: process ${holder.pid} may run auto-continue for ${o.dir}, and this server can't read when it started; this server won't auto-continue until it restarts`
+  const failed = (err: unknown) => `openaflow: can't use the auto-continue owner file in ${o.dir} (${codeOf(err)}); this server won't auto-continue now`
 
   /** The exclusive create, with the file's whole text in one write. */
   const create = () => writeFileSync(file, JSON.stringify({ pid, id, startedAt: Date.now() }), { flag: 'wx' })

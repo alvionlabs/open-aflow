@@ -2,7 +2,7 @@
 // comes from the current Board by id, never a path. The rules and why are in
 // pod-docs/feature-details/resume.md.
 
-import { listRuns, replySession, repoPathKey, sendableReply } from '@open-aflow/model'
+import { listRuns, replySession, repoPathKey, sendableReply } from '@openaflow/model'
 import { Hono } from 'hono'
 import { isResuming, runResume, type ResumeDeps } from './auto-continue.ts'
 
