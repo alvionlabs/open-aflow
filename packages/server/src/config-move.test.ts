@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, realpathSync } from 'node:fs'
 import { copyFile, mkdir, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -6,8 +5,8 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { moveOldConfig } from './config-move.ts'
 
-/** The pid of a process that has ended: the old folder's server is gone. */
-const DEAD_PID = spawnSync(process.execPath, ['-e', ''], { windowsHide: true }).pid!
+/** A pid no process can have: the largest one `process.kill` takes. The pid of an ended child can be reused while the suite runs. */
+const DEAD_PID = 2147483647
 
 // Temp folders only: `from` and `to` are always under a fresh mkdtemp root.
 let root: string
