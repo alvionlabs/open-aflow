@@ -50,12 +50,12 @@ const MOVES: Record<string, RegExp> = {
   'packages/web/index.html': /'pod-board-theme'/g,
 }
 
-/** The text that counts: no History section, no old PR link, and no name of another repo that keeps its own. */
+/** The text that counts: no History section and no old PR link. */
 function currentText(file: string): string {
   const rel = relative(ROOT, file).replaceAll('\\', '/')
   let text = readFileSync(file, 'utf8')
   if (rel.startsWith('pod-docs/feature-details/')) text = text.replace(/^## History\n[\s\S]*?(?=^## |(?![\s\S]))/m, '')
-  text = text.replace(/github\.com\/iamphduc\/pod-board\/pull\/\d+/g, '').replace(/(iamphduc\/)?pod-board-run-test/g, '')
+  text = text.replace(/github\.com\/iamphduc\/pod-board\/pull\/\d+/g, '')
   // A link to an older decision keeps that decision's heading, old name and all.
   text = text.replace(/decisions\.md#[a-z0-9-]+/g, '')
   const allowed = MOVES[rel]
