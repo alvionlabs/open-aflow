@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
@@ -18,7 +17,8 @@ const clean = (): MachineState => ({ uninstallKeys: [], runValue: null, startMen
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /** A process ID that has already ended. */
-const deadPid = () => Number(spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8', windowsHide: true }).stdout.trim())
+/** A pid no process can have: the largest one `process.kill` takes. The pid of an ended child can be reused while the suite runs. */
+const DEAD_PID = 2147483647
 
 describe('stateDiff', () => {
   test('stateDiff names each leftover', () => {
@@ -65,7 +65,7 @@ describe('the real config folder', () => {
     owner(process.pid)
     expect(createRealConfigReader(dir)()).toEqual({ files: null, held: true })
 
-    owner(deadPid())
+    owner(DEAD_PID)
     const stale = createRealConfigReader(dir)()
     expect(stale.held).toBe(false)
     expect(stale.files?.map((f) => f.split(' ')[0]).sort()).toEqual(['auto-continue-owner.json', 'config.json'])
@@ -80,7 +80,7 @@ describe('the real config folder', () => {
     const read = createRealConfigReader(dir)
     expect(read().files).toBeNull()
     // The server ends during the proof. Both states still read null, so the diff can't name its files.
-    owner(deadPid())
+    owner(DEAD_PID)
     expect(read()).toEqual({ files: null, held: true })
   })
 
@@ -160,7 +160,7 @@ describe('withInstallLock', () => {
     expect(existsSync(opts().path)).toBe(false)
 
     // A stale holder is taken over.
-    writeFileSync(opts().path, String(deadPid()))
+    writeFileSync(opts().path, String(DEAD_PID))
     await expect(withInstallLock(async () => 'took over', opts())).resolves.toBe('took over')
 
     // A throw frees it, and the error comes through.
@@ -177,7 +177,7 @@ describe('withInstallLock', () => {
   })
 
   test('waiters on one stale lock give one holder at a time', async () => {
-    writeFileSync(opts().path, String(deadPid()))
+    writeFileSync(opts().path, String(DEAD_PID))
     expect(await contend(4)).toBe(1)
     expect(readdirSync(dir)).toEqual([])
   })

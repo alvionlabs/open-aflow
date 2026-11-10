@@ -1,6 +1,5 @@
 import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
-import { spawnSync } from 'node:child_process'
 import { request } from 'node:http'
 import { createServer, type Server } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -95,8 +94,8 @@ vi.mock('./tool-finder.ts', async (original) => {
   }
 })
 
-/** The pid of a process that has ended. */
-const DEAD_PID = spawnSync(process.execPath, ['-e', ''], { windowsHide: true }).pid!
+/** A pid no process can have: the largest one `process.kill` takes. The pid of an ended child can be reused while the suite runs. */
+const DEAD_PID = 2147483647
 const META = /<meta name="open-aflow-token" content="([^"]+)">/
 const INDEX = '<!doctype html><html><head><title>Board</title></head><body>page body</body></html>'
 
@@ -691,6 +690,8 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
   test('dev: after a copy the token file is in the new folder, where the dev page looks for it', async () => {
     await writeOld()
     await start(ownEnv({ OPEN_AFLOW_API_PORT: String(await freePort()), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
+    // A copy that didn't happen says why here, with its error code.
+    expect(logs.filter((l) => /could not copy|in use|skipped/.test(l))).toEqual([])
     expect(liveConfigDir(ownEnv(), process.platform, tmp)).toBe(newDir())
     expect(readSessionToken(newDir())).toHaveLength(43)
   })
