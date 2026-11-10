@@ -1,5 +1,5 @@
 {
-  "name": "@open-aflow/server",
+  "name": "@openaflow/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
-    "@open-aflow/model": "workspace:*",
+    "@openaflow/model": "workspace:*",
     "chokidar": "^5.0.0",
     "hono": "^4.13.13"
   },

@@ -3,8 +3,8 @@ import { appendFile, mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeF
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Board } from '@open-aflow/model'
-import * as model from '@open-aflow/model'
+import type { Board } from '@openaflow/model'
+import * as model from '@openaflow/model'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createBoardService, finalPrBranches, livePrNumbers, type BoardServiceDeps } from './board-service.ts'
 import { createGhReader, PR_CACHE_MS, type GhExec, type GhReader, type GhStatus, type PrStatus } from './gh.ts'
@@ -14,8 +14,8 @@ import { boardSignature, createBoardWatcher } from './watcher.ts'
 
 // The model as is, with handBackPr and parseAgentTranscript watched, so the test can see the
 // server uses the model's rule and parses only the transcripts that changed.
-vi.mock('@open-aflow/model', async (original) => {
-  const actual = await original<typeof import('@open-aflow/model')>()
+vi.mock('@openaflow/model', async (original) => {
+  const actual = await original<typeof import('@openaflow/model')>()
   return { ...actual, handBackPr: vi.fn(actual.handBackPr), parseAgentTranscript: vi.fn(actual.parseAgentTranscript) }
 })
 
@@ -30,7 +30,7 @@ let portsDir: string
 let claudeDir: string
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'open-aflow-a1-svc-'))
+  root = await mkdtemp(join(tmpdir(), 'openaflow-a1-svc-'))
   configFile = join(root, 'config', 'config.json')
   portsDir = join(root, 'ports')
   claudeDir = join(root, 'claude')

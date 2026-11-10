@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { buildRepoModel, listRuns, type AgentRun, type Board, type BoardRepo, type Claim, type PrStatus } from '@open-aflow/model'
-import { hashFor } from '@open-aflow/web/selection'
+import { buildRepoModel, listRuns, type AgentRun, type Board, type BoardRepo, type Claim, type PrStatus } from '@openaflow/model'
+import { hashFor } from '@openaflow/web/selection'
 import { loadFixture } from '../../model/test/load-fixture.ts'
 import { attentionItems } from './attention.ts'
 

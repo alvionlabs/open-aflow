@@ -2,7 +2,7 @@
 // merge call itself, the merge-queue question, and how the re-read maps to an outcome. Never passes --admin, --auto,
 // --squash, --rebase, or --delete-branch. The rules and why are in pod-docs/feature-details/actions.md.
 
-import type { MergeOutcome, MergePreview, MergeResult } from '@open-aflow/model'
+import type { MergeOutcome, MergePreview, MergeResult } from '@openaflow/model'
 import { rollupChecks, type ExecResult, type GhExec } from './gh.ts'
 
 export const MERGE_TIMEOUT_MS = 60_000

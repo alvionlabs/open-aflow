@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Board } from '@open-aflow/model'
+import type { Board } from '@openaflow/model'
 import {
   createBoardStream,
   healthProbe,

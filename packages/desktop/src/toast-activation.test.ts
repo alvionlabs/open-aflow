@@ -51,16 +51,16 @@ describe('the run from an activation', () => {
     ['empty: a toast from a version before this one', ''],
     ['no prefix', '#/repo/fix-a'],
     ['another prefix', 'http://evil.example/#/repo'],
-    ['the prefix alone', 'open-aflow-toast:'],
-    ['not a board hash', 'open-aflow-toast:javascript:alert(1)'],
-    ['a hash with no path', 'open-aflow-toast:#repo'],
+    ['the prefix alone', 'openaflow-toast:'],
+    ['not a board hash', 'openaflow-toast:javascript:alert(1)'],
+    ['a hash with no path', 'openaflow-toast:#repo'],
   ])('%s opens the window on no run', (_name, args) => {
     expect(hashFromActivation(args)).toBeUndefined()
   })
 })
 
 describe('the activator the app registers', () => {
-  const EXE = 'C:\\Users\\a\\AppData\\Local\\Programs\\open-aflow\\Open AFlow.exe'
+  const EXE = 'C:\\Users\\a\\AppData\\Local\\Programs\\openaflow\\OpenAFlow.exe'
   const CLSID = '{D6B1EDA6-9DC7-427D-B544-15863FECE7EB}'
 
   test("the shortcut's own CLSID, the one Windows calls for every toast", () => {

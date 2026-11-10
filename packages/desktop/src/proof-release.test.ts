@@ -15,7 +15,7 @@ import { machineState, proofLastLine, refuseRealInstall, stateDiff, withInstallL
 const here = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(here, '..', '..', '..')
 const WORKFLOW = join(ROOT, '.github', 'workflows', 'release.yml')
-const PORT = process.env.OPEN_AFLOW_PROOF_PORT ?? '3130'
+const PORT = process.env.OPENAFLOW_PROOF_PORT ?? '3130'
 const RUN_MS = 600_000
 const LOCK_MS = 40 * 60_000
 const SYS32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
@@ -39,9 +39,9 @@ const shell = (command: string, env: NodeJS.ProcessEnv) =>
   })
 
 /** This proof holds the lock, so the check must not wait for it. */
-const releaseCheck = (dir: string) => shell(`pnpm release:check "${dir}"`, { ...process.env, OPEN_AFLOW_PROOF_PORT: PORT, OPEN_AFLOW_INSTALL_LOCK_HELD: '1' })
+const releaseCheck = (dir: string) => shell(`pnpm release:check "${dir}"`, { ...process.env, OPENAFLOW_PROOF_PORT: PORT, OPENAFLOW_INSTALL_LOCK_HELD: '1' })
 
-describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && process.platform === 'win32')('the release check proof', () => {
+describe.runIf(process.env.OPENAFLOW_REAL_INSTALL === '1' && process.platform === 'win32')('the release check proof', () => {
   let freeLock: () => void = () => {}
   let lockDone: Promise<void> = Promise.resolve()
   let before: MachineState | undefined
@@ -81,7 +81,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && process.platform =
     })
     before = await machineState()
     refuseRealInstall(before)
-    work = realpathSync.native(mkdtempSync(join(tmpdir(), 'open-aflow-release-proof-')))
+    work = realpathSync.native(mkdtempSync(join(tmpdir(), 'openaflow-release-proof-')))
     good = join(work, 'good')
     const env: NodeJS.ProcessEnv = { ...process.env }
     for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'CSC_LINK', 'CSC_KEY_PASSWORD']) delete env[name]
@@ -129,7 +129,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && process.platform =
     async () => {
       const small = join(work, 'small')
       mkdirSync(small)
-      for (const name of readdirSync(good).filter((n) => /^open-aflow-setup-.*\.exe(\.blockmap)?$/.test(n) || n === 'latest.yml')) copyFileSync(join(good, name), join(small, name))
+      for (const name of readdirSync(good).filter((n) => /^openaflow-setup-.*\.exe(\.blockmap)?$/.test(n) || n === 'latest.yml')) copyFileSync(join(good, name), join(small, name))
       const installer = join(small, readdirSync(small).find((name) => name.endsWith('.exe'))!)
       writeFileSync(installer, readFileSync(installer).subarray(0, 1024 * 1024))
       const shrunk = await releaseCheck(small)
@@ -141,7 +141,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && process.platform =
         const open = join(work, 'fed-asar')
         extractAll(asar, open)
         const main = join(open, 'dist', 'main.cjs')
-        writeFileSync(main, `${readFileSync(main, 'utf8')}\n// OPEN_AFLOW_UPDATE_TEST_FEED\n`)
+        writeFileSync(main, `${readFileSync(main, 'utf8')}\n// OPENAFLOW_UPDATE_TEST_FEED\n`)
         await createPackage(open, asar)
       })
       const run = await releaseCheck(fed)

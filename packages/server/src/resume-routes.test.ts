@@ -2,7 +2,7 @@ import { realpathSync, rmSync } from 'node:fs'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildRepoModel, type AgentRun, type Board, type BoardRepo, type NewActionEntry, type PrStatus, type RepoFiles, type ResumeResult } from '@open-aflow/model'
+import { buildRepoModel, type AgentRun, type Board, type BoardRepo, type NewActionEntry, type PrStatus, type RepoFiles, type ResumeResult } from '@openaflow/model'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createApp } from './app.ts'
@@ -14,13 +14,13 @@ import { createSessionToken } from './session-token.ts'
 const API = 3060
 const WEB = 3061
 const TOKEN = createSessionToken()
-const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-open-aflow-token': TOKEN }
+const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-openaflow-token': TOKEN }
 
 let root: string
 let file: string
 
 beforeEach(async () => {
-  root = realpathSync(await mkdtemp(join(tmpdir(), 'open-aflow-s1-routes-')))
+  root = realpathSync(await mkdtemp(join(tmpdir(), 'openaflow-s1-routes-')))
   file = join(root, 'cfg', 'auto-continue.json')
 })
 
@@ -85,7 +85,7 @@ function setup(o: SetupOpts) {
   })
   const source = { board: () => board, subscribe: () => () => {}, rebuild }
   const app = createApp({ ports: [API, WEB], token: TOKEN, source, addRepo: async () => ({ error: 'not a directory' }), timeline: async () => undefined, actions: new Hono().route('/', routes) })
-  const headers = o.token === false ? { ...HEADERS, 'x-open-aflow-token': '' } : HEADERS
+  const headers = o.token === false ? { ...HEADERS, 'x-openaflow-token': '' } : HEADERS
   const post = (path: string, body: unknown) => app.request(`/api/actions/${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
   return {
     resume: (body: unknown) => post('resume', body),

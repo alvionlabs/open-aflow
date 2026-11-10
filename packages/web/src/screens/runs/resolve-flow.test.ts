@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ResolveResult } from '@open-aflow/model'
+import type { ResolveResult } from '@openaflow/model'
 import { UNREACHABLE, type ActionReply } from '../../actions-client.ts'
 import type { Post } from './answer-flow.ts'
 import { INITIAL_RESOLVE, busyLabel, createResolveFlow, reduceResolve, resolveAnchor, triageTarget, type ResolveState, type ResolveTarget } from './resolve-flow.ts'

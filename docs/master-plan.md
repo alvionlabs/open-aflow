@@ -1,4 +1,4 @@
-# Open AFlow: master plan
+# OpenAFlow: master plan
 
 _Written: 2026-10-18 · Updated: 2026-11-02 · Status: phases 1 and 2 built (pod plans `board-read`, `board-actions`); next is the Windows app (plan `windows-app`) · Design: [docs/design/preview.html](design/preview.html) ([published preview](https://claude.ai/artifact/H2xCmKqGwKRvvUyqCnx6P8))_
 
@@ -114,7 +114,7 @@ Claude Code + pod plugin ──writes──▶ <repo>/pod-docs/*.md, worktrees
         ▼
 <temp>/pod-ports/<base>  (active runs)          GitHub (gh)
         │                                           │
-        └──────────────▶  Open AFlow server ◀───────┘
+        └──────────────▶  OpenAFlow server ◀───────┘
                           (Node, on 127.0.0.1)
                           watch files → run model → server-sent events
                                   │  ▲
@@ -134,7 +134,7 @@ Claude Code + pod plugin ──writes──▶ <repo>/pod-docs/*.md, worktrees
   - Phase 2 actions need a per-launch token in the page, so another website can't post to the board.
   - Never read or show secrets: transcripts can contain them, so the engineer view shows tool names and short summaries, not raw tool output.
 
-**Config:** `~/.config/open-aflow-server/config.json` (or the OS equivalent) lists registered repos. It's added from the UI ("Add repo" picks a folder that has `pod-docs/`).
+**Config:** `~/.config/openaflow-server/config.json` (or the OS equivalent) lists registered repos. It's added from the UI ("Add repo" picks a folder that has `pod-docs/`).
 
 ## Phases
 
@@ -197,7 +197,7 @@ After it: code signing and a public launch, then Linux, then Mac. Each is its ow
 
 ## Open questions
 
-1. ~~Name: keep "Pod Board"?~~ Decided 2026-11-05: the app is Open AFlow ([decision](../pod-docs/decisions.md#2026-11-05--the-app-is-open-aflow-human-decision)).
+1. ~~Name: keep "Pod Board"?~~ Decided 2026-11-05: the app is OpenAFlow ([decision](../pod-docs/decisions.md#2026-11-05--the-app-is-open-aflow-human-decision)).
 2. ~~npm in phase 1?~~ Decided 2026-10-21: no npm publishing; the board runs from the repo ([decision](../pod-docs/decisions.md#2026-10-21--no-npm-publishing)).
 3. Phase 3 route: engineer sessions via `/pod:create-wave-prompts`, or Claude Code workflows? First test whether a workflow agent can run `pod:engineer` with its own tools and model.
 4. Phone notifications: Telegram, ntfy, or only Claude Code's `PushNotification`?

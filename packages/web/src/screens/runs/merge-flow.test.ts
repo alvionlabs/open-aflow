@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { MergeOutcome, MergePreview, MergeResult } from '@open-aflow/model'
+import type { MergeOutcome, MergePreview, MergeResult } from '@openaflow/model'
 import type { ActionReply } from '../../actions-client.ts'
 import { confirmView, createMergeFlow, type MergeState, type MergeTarget, type Post } from './merge-flow.ts'
 

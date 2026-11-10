@@ -1,13 +1,13 @@
-# Install Open AFlow
+# Install OpenAFlow
 
-Open AFlow runs on your Windows PC. It shows your pod runs across your repos.
+OpenAFlow runs on your Windows PC. It shows your pod runs across your repos.
 
 ## Download
 
 1. Open the [latest release](https://github.com/alvionlabs/openaflow/releases/latest).
-2. Download `open-aflow-setup-<version>.exe`.
-3. Double-click the file. Open AFlow installs for your user only. You don't need admin rights.
-4. The app opens when the install ends. Later, open **Open AFlow** from the Start menu.
+2. Download `openaflow-setup-<version>.exe`.
+3. Double-click the file. OpenAFlow installs for your user only. You don't need admin rights.
+4. The app opens when the install ends. Later, open **OpenAFlow** from the Start menu.
 
 ## If Windows stops the installer
 
@@ -34,13 +34,13 @@ A typed path also helps when your user folder name has letters outside English, 
 
 ## CLAUDE variables
 
-Runs that Open AFlow resumes keep only three `CLAUDE*` variables from your shell:
+Runs that OpenAFlow resumes keep only three `CLAUDE*` variables from your shell:
 
 - `CLAUDE_CONFIG_DIR`
 - `CLAUDE_CODE_GIT_BASH_PATH`, which must be an absolute path
 - `CLAUDE_CODE_MAX_OUTPUT_TOKENS`
 
-Open AFlow drops every other `CLAUDE*` variable. To use another one, put it in the `env` block of `%USERPROFILE%\.claude\settings.json`.
+OpenAFlow drops every other `CLAUDE*` variable. To use another one, put it in the `env` block of `%USERPROFILE%\.claude\settings.json`.
 
 ## Updates
 
@@ -48,10 +48,10 @@ The app checks for updates and downloads them for you. When an update is ready, 
 
 ## Report a bug
 
-The app keeps a small log at `%APPDATA%\Open AFlow\desktop.log`. It holds the app's status lines and error messages, and no tokens. It writes your user folder as `~`. An error message can quote a file the app read, so read the log before you attach it to your report.
+The app keeps a small log at `%APPDATA%\OpenAFlow\desktop.log`. It holds the app's status lines and error messages, and no tokens. It writes your user folder as `~`. An error message can quote a file the app read, so read the log before you attach it to your report.
 
 ## Uninstall
 
-Open **Settings** > **Apps** > **Installed apps**, find **Open AFlow**, and select **Uninstall**. Your running `claude` sessions keep running.
+Open **Settings** > **Apps** > **Installed apps**, find **OpenAFlow**, and select **Uninstall**. Your running `claude` sessions keep running.
 
-The uninstall keeps your settings in `%APPDATA%\open-aflow-server`. To remove them too, delete that folder.
+The uninstall keeps your settings in `%APPDATA%\openaflow-server`. To remove them too, delete that folder.

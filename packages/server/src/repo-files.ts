@@ -1,6 +1,6 @@
 import { open, readdir, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
-import type { RepoFiles } from '@open-aflow/model'
+import type { RepoFiles } from '@openaflow/model'
 
 /** Larger files are skipped: a pod doc is never this big, and the board keeps every doc in memory. */
 export const MAX_DOC_BYTES = 5 * 1024 * 1024

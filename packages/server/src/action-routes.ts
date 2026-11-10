@@ -2,7 +2,7 @@
 // merge. The repo comes from the current Board by id, and the PR must be waiting on you. The
 // rules and why are in pod-docs/feature-details/actions.md.
 
-import { waitingPrs, type Board, type BoardRepo, type GhStatus, type MergeResult, type NewActionEntry } from '@open-aflow/model'
+import { waitingPrs, type Board, type BoardRepo, type GhStatus, type MergeResult, type NewActionEntry } from '@openaflow/model'
 import { Hono, type Context } from 'hono'
 import { mergePr, readPr } from './gh-actions.ts'
 import type { GhExec } from './gh.ts'

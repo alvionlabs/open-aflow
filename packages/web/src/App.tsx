@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { buildFixPipeline, listRuns, type Board, type RunSummary } from '@open-aflow/model'
+import { buildFixPipeline, listRuns, type Board, type RunSummary } from '@openaflow/model'
 import { ErrorBoundary } from './ErrorBoundary.tsx'
 import { createBoardStream, healthProbe, type StreamState } from './board-stream.ts'
 import { boardSlices } from './screens/board/board-view.ts'

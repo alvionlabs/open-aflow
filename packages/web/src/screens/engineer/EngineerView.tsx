@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AgentRun, BoardRepo, SliceModel } from '@open-aflow/model'
+import type { AgentRun, BoardRepo, SliceModel } from '@openaflow/model'
 import { createTimelineLoader, fetchJsonVia, type TimelineState } from '../../timeline-loader.ts'
 import { Chip } from '../runs/Chip.tsx'
 import type { Chip as ChipView } from '../runs/view.ts'

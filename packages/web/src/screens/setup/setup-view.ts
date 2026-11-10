@@ -42,7 +42,7 @@ const INSTALL: Record<ToolName, string> = {
   claude: 'https://code.claude.com/docs/en/setup',
 }
 
-const ENV_VARIABLE = 'OPEN_AFLOW_CLAUDE_BIN'
+const ENV_VARIABLE = 'OPENAFLOW_CLAUDE_BIN'
 export const UNREADABLE ='The server sent an answer the page cannot read.'
 
 export const SETUP_NOTE =
@@ -101,7 +101,7 @@ function rowOf(tool: ToolState): SetupRow {
       cls: 's-bad',
       word: 'bad path',
       path: tool.path,
-      fix: { lead: `${ENV_VARIABLE} names this file, and no file is there. Correct or remove the variable, then restart Open AFlow.` },
+      fix: { lead: `${ENV_VARIABLE} names this file, and no file is there. Correct or remove the variable, then restart OpenAFlow.` },
       field: false,
     }
   }

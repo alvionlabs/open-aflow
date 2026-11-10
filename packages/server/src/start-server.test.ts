@@ -96,7 +96,7 @@ vi.mock('./tool-finder.ts', async (original) => {
 
 /** A pid no process can have: the largest one `process.kill` takes. The pid of an ended child can be reused while the suite runs. */
 const DEAD_PID = 2147483647
-const META = /<meta name="open-aflow-token" content="([^"]+)">/
+const META = /<meta name="openaflow-token" content="([^"]+)">/
 const INDEX = '<!doctype html><html><head><title>Board</title></head><body>page body</body></html>'
 
 let tmp: string
@@ -168,10 +168,10 @@ const send = (
 
 /** Temp folders for everything the server reads and writes. Never the real config or claims. */
 const envFor = (over: Record<string, string> = {}): Record<string, string> => ({
-  OPEN_AFLOW_CONFIG_DIR: cfg,
-  OPEN_AFLOW_PORTS_DIR: join(tmp, 'ports'),
-  OPEN_AFLOW_CLAUDE_DIR: join(tmp, 'claude'),
-  OPEN_AFLOW_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
+  OPENAFLOW_CONFIG_DIR: cfg,
+  OPENAFLOW_PORTS_DIR: join(tmp, 'ports'),
+  OPENAFLOW_CLAUDE_DIR: join(tmp, 'claude'),
+  OPENAFLOW_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
   ...over,
 })
 
@@ -188,7 +188,7 @@ const start = async (env: Record<string, string>, production?: Production) => {
 /** A production server on a port the test owns. */
 const startProduction = async (over: Record<string, string> = {}) => {
   const port = await freePort()
-  return start(envFor({ OPEN_AFLOW_API_PORT: String(port), ...over }), { webDir })
+  return start(envFor({ OPENAFLOW_API_PORT: String(port), ...over }), { webDir })
 }
 
 const pageToken = async (port: number): Promise<string> => {
@@ -205,13 +205,13 @@ const mergePreview = (port: number, token?: string) =>
     headers: {
       Origin: `http://127.0.0.1:${port}`,
       'Content-Type': 'application/json',
-      ...(token ? { 'X-Open-AFlow-Token': token } : {}),
+      ...(token ? { 'X-OpenAFlow-Token': token } : {}),
     },
     body: JSON.stringify({ repoId: 'x', number: 1 }),
   })
 
 beforeEach(async () => {
-  tmp = realpathSync(mkdtempSync(join(tmpdir(), 'open-aflow-start-')))
+  tmp = realpathSync(mkdtempSync(join(tmpdir(), 'openaflow-start-')))
   cfg = join(tmp, 'cfg')
   webDir = join(tmp, 'web')
   await mkdir(webDir)
@@ -242,7 +242,7 @@ describe('dev', () => {
   test('dev keeps the token file and both ports', async () => {
     const api = await freePort()
     const web = await freePort()
-    const { started } = await start(envFor({ OPEN_AFLOW_API_PORT: String(api), OPEN_AFLOW_WEB_PORT: String(web) }))
+    const { started } = await start(envFor({ OPENAFLOW_API_PORT: String(api), OPENAFLOW_WEB_PORT: String(web) }))
     expect(started.port).toBe(api)
 
     const token = (await readFile(join(cfg, 'session-token'), 'utf8')).trim()
@@ -254,31 +254,31 @@ describe('dev', () => {
     // The dev API serves no page.
     expect((await send(api, '/')).status).toBe(404)
 
-    expect(logs).toContain(`open-aflow API listening on http://127.0.0.1:${api}`)
+    expect(logs).toContain(`openaflow API listening on http://127.0.0.1:${api}`)
     expect(logs.join('\n')).not.toContain(token)
   })
 
   test('dev defaults its web port to 3001', async () => {
     const api = await freePort()
-    await start(envFor({ OPEN_AFLOW_API_PORT: String(api) }))
+    await start(envFor({ OPENAFLOW_API_PORT: String(api) }))
     expect((await send(api, '/api/health', { host: '127.0.0.1:3001' })).status).toBe(200)
   })
 
   test('a bad setting rejects, naming the variable', async () => {
-    await expect(start(envFor({ OPEN_AFLOW_API_PORT: 'abc' }))).rejects.toThrow(/OPEN_AFLOW_API_PORT/)
-    await expect(start(envFor({ OPEN_AFLOW_API_PORT: String(await freePort()), OPEN_AFLOW_WEB_PORT: 'abc' }))).rejects.toThrow(/OPEN_AFLOW_WEB_PORT/)
+    await expect(start(envFor({ OPENAFLOW_API_PORT: 'abc' }))).rejects.toThrow(/OPENAFLOW_API_PORT/)
+    await expect(start(envFor({ OPENAFLOW_API_PORT: String(await freePort()), OPENAFLOW_WEB_PORT: 'abc' }))).rejects.toThrow(/OPENAFLOW_WEB_PORT/)
     expect(spies.watcherStarts).toBe(0)
   })
 
   test('a failed token write rejects before anything watches', async () => {
     await writeFile(cfg, 'a file, not a folder')
-    await expect(start(envFor({ OPEN_AFLOW_API_PORT: String(await freePort()) }))).rejects.toThrow(/session token file/)
+    await expect(start(envFor({ OPENAFLOW_API_PORT: String(await freePort()) }))).rejects.toThrow(/session token file/)
     expect(spies.watcherStarts).toBe(0)
   })
 
   test('a busy API port rejects, sends nothing, and closes the watcher', async () => {
     const busy = await holdPort()
-    await expect(start(envFor({ OPEN_AFLOW_API_PORT: String(busy) }))).rejects.toThrow(new RegExp(`OPEN_AFLOW_API_PORT.*${busy}`))
+    await expect(start(envFor({ OPENAFLOW_API_PORT: String(busy) }))).rejects.toThrow(new RegExp(`OPENAFLOW_API_PORT.*${busy}`))
     expect(spies.watcherCloses).toBe(spies.watcherStarts)
     expect(spies.autoStarts).toBe(0)
   })
@@ -288,7 +288,7 @@ describe('production', () => {
   test('tool routes are production only', async () => {
     const { started } = await startProduction()
     const token = await pageToken(started.port)
-    const headers = { 'X-Open-AFlow-Token': token }
+    const headers = { 'X-OpenAFlow-Token': token }
     const res = await send(started.port, '/api/tools', { headers })
     expect(res.status).toBe(200)
     expect((JSON.parse(res.text) as { tools: { tool: string }[] }).tools.map((t) => t.tool)).toEqual(['git', 'gh', 'claude'])
@@ -307,9 +307,9 @@ describe('production', () => {
     // Dev has neither route, even with the right token, and it writes no file.
     const devCfg = join(tmp, 'dev-cfg')
     const apiPort = await freePort()
-    const dev = await start(envFor({ OPEN_AFLOW_CONFIG_DIR: devCfg, OPEN_AFLOW_API_PORT: String(apiPort), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
+    const dev = await start(envFor({ OPENAFLOW_CONFIG_DIR: devCfg, OPENAFLOW_API_PORT: String(apiPort), OPENAFLOW_WEB_PORT: String(await freePort()) }))
     const devToken = (await readFile(join(devCfg, 'session-token'), 'utf8')).trim()
-    const devHeaders = { 'X-Open-AFlow-Token': devToken }
+    const devHeaders = { 'X-OpenAFlow-Token': devToken }
     expect((await send(dev.started.port, '/api/tools', { headers: devHeaders })).status).toBe(404)
     const devSave = await send(dev.started.port, '/api/actions/tool-path', {
       method: 'POST',
@@ -345,7 +345,7 @@ describe('production', () => {
 
   test('production makes the config folder', async () => {
     const nested = join(tmp, 'deep', 'er', 'cfg')
-    const { started } = await startProduction({ OPEN_AFLOW_CONFIG_DIR: nested })
+    const { started } = await startProduction({ OPENAFLOW_CONFIG_DIR: nested })
     expect((await stat(nested)).isDirectory()).toBe(true)
     expect((await send(started.port, '/api/board')).status).toBe(200)
   })
@@ -353,7 +353,7 @@ describe('production', () => {
   test('production stops, naming the folder, when it cannot make the config folder', async () => {
     await writeFile(cfg, 'a file, not a folder')
     const port = await freePort()
-    await expect(start(envFor({ OPEN_AFLOW_API_PORT: String(port) }), { webDir })).rejects.toThrow(cfg)
+    await expect(start(envFor({ OPENAFLOW_API_PORT: String(port) }), { webDir })).rejects.toThrow(cfg)
     expect(spies.watcherStarts).toBe(0)
     expect(logs.join('\n')).not.toContain('listening')
   })
@@ -388,7 +388,7 @@ describe('production', () => {
 
   test('production ignores the web port', async () => {
     const web = await freePort()
-    const good = await startProduction({ OPEN_AFLOW_WEB_PORT: String(web) })
+    const good = await startProduction({ OPENAFLOW_WEB_PORT: String(web) })
     expect((await send(good.started.port, '/')).status).toBe(200)
     const refused = await send(good.started.port, '/', { host: `127.0.0.1:${web}` })
     expect(refused.status).toBe(403)
@@ -396,7 +396,7 @@ describe('production', () => {
     // The default dev web port is no exception.
     expect((await send(good.started.port, '/', { host: '127.0.0.1:3001' })).status).toBe(403)
 
-    const bad = await startProduction({ OPEN_AFLOW_WEB_PORT: 'not a port' })
+    const bad = await startProduction({ OPENAFLOW_WEB_PORT: 'not a port' })
     expect((await send(bad.started.port, '/')).status).toBe(200)
   })
 
@@ -411,8 +411,8 @@ describe('production', () => {
     expect(atPreferred.status).toBe(403)
     expect(atPreferred.text).not.toMatch(META)
 
-    expect(logs).toContain(`open-aflow: port ${busy} is busy; using ${started.port} for this launch`)
-    expect(logs).toContain(`open-aflow API listening on http://127.0.0.1:${started.port}`)
+    expect(logs).toContain(`openaflow: port ${busy} is busy; using ${started.port} for this launch`)
+    expect(logs).toContain(`openaflow API listening on http://127.0.0.1:${started.port}`)
   })
 
   test('a free preferred port is used, with no busy line', async () => {
@@ -420,35 +420,35 @@ describe('production', () => {
     const { started } = await start(envFor(), { webDir, preferredPort: port })
     expect(started.port).toBe(port)
     expect(logs.join('\n')).not.toContain('is busy')
-    expect(logs).toContain(`open-aflow API listening on http://127.0.0.1:${port}`)
+    expect(logs).toContain(`openaflow API listening on http://127.0.0.1:${port}`)
   })
 
-  test('an empty OPEN_AFLOW_API_PORT counts as unset', async () => {
+  test('an empty OPENAFLOW_API_PORT counts as unset', async () => {
     const port = await freePort()
-    const { started } = await start(envFor({ OPEN_AFLOW_API_PORT: '' }), { webDir, preferredPort: port })
+    const { started } = await start(envFor({ OPENAFLOW_API_PORT: '' }), { webDir, preferredPort: port })
     expect(started.port).toBe(port)
   })
 
   test('an explicit busy port stops the start', async () => {
     const busy = await holdPort()
     const preferred = await freePort()
-    await expect(start(envFor({ OPEN_AFLOW_API_PORT: String(busy) }), { webDir, preferredPort: preferred })).rejects.toThrow(
-      new RegExp(`OPEN_AFLOW_API_PORT.*${busy}`),
+    await expect(start(envFor({ OPENAFLOW_API_PORT: String(busy) }), { webDir, preferredPort: preferred })).rejects.toThrow(
+      new RegExp(`OPENAFLOW_API_PORT.*${busy}`),
     )
     expect(logs.join('\n')).not.toContain('listening')
     expect(spies.watcherCloses).toBe(spies.watcherStarts)
     expect(spies.autoStarts).toBe(0)
   })
 
-  test('a bad OPEN_AFLOW_API_PORT stops the start', async () => {
-    await expect(start(envFor({ OPEN_AFLOW_API_PORT: 'abc' }), { webDir })).rejects.toThrow(/OPEN_AFLOW_API_PORT/)
+  test('a bad OPENAFLOW_API_PORT stops the start', async () => {
+    await expect(start(envFor({ OPENAFLOW_API_PORT: 'abc' }), { webDir })).rejects.toThrow(/OPENAFLOW_API_PORT/)
     expect(spies.watcherStarts).toBe(0)
   })
 
   test('a bad web folder stops the start', async () => {
     const missing = join(tmp, 'no-web')
     const port = await freePort()
-    await expect(start(envFor({ OPEN_AFLOW_API_PORT: String(port) }), { webDir: missing })).rejects.toThrow(missing)
+    await expect(start(envFor({ OPENAFLOW_API_PORT: String(port) }), { webDir: missing })).rejects.toThrow(missing)
 
     expect(spies.watcherStarts).toBe(0)
     expect(spies.autoStarts).toBe(0)
@@ -475,16 +475,16 @@ describe('the owner file', () => {
 
   test('a failed start holds nothing', async () => {
     const busy = await holdPort()
-    await expect(start(envFor({ OPEN_AFLOW_API_PORT: String(busy) }))).rejects.toThrow(/OPEN_AFLOW_API_PORT/)
+    await expect(start(envFor({ OPENAFLOW_API_PORT: String(busy) }))).rejects.toThrow(/OPENAFLOW_API_PORT/)
     expect(existsSync(ownerFile())).toBe(false)
-    await expect(start(envFor({ OPEN_AFLOW_API_PORT: String(busy) }), { webDir })).rejects.toThrow(/OPEN_AFLOW_API_PORT/)
+    await expect(start(envFor({ OPENAFLOW_API_PORT: String(busy) }), { webDir })).rejects.toThrow(/OPENAFLOW_API_PORT/)
     expect(existsSync(ownerFile())).toBe(false)
     expect(spies.autoStarts).toBe(0)
   })
 
   test('both modes use the owner file', async () => {
     // Dev first: it takes the file and starts the check.
-    const dev = await start(envFor({ OPEN_AFLOW_API_PORT: String(await freePort()), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
+    const dev = await start(envFor({ OPENAFLOW_API_PORT: String(await freePort()), OPENAFLOW_WEB_PORT: String(await freePort()) }))
     const held = JSON.parse(await readFile(ownerFile(), 'utf8')) as { pid: number; id: string }
     expect(held.pid).toBe(process.pid)
     expect(spies.autoStarts).toBe(1)
@@ -529,14 +529,14 @@ describe('stop', () => {
   })
 })
 
-// No OPEN_AFLOW_CONFIG_DIR here, so the server picks its own folder. APPDATA and XDG_CONFIG_HOME point into the
+// No OPENAFLOW_CONFIG_DIR here, so the server picks its own folder. APPDATA and XDG_CONFIG_HOME point into the
 // test's temp folder, so the real folder is never read. macOS takes the folder from the home folder: not run there.
 describe.runIf(process.platform === 'win32' || process.platform === 'linux')('the config folder before the rename', () => {
   const base = () => join(tmp, 'appdata')
   const oldDir = () => join(base(), 'pod-board')
-  const newDir = () => join(base(), 'open-aflow-server')
+  const newDir = () => join(base(), 'openaflow-server')
   const ownEnv = (over: Record<string, string> = {}): Record<string, string> => {
-    const { OPEN_AFLOW_CONFIG_DIR: _cfg, ...rest } = envFor({ APPDATA: base(), XDG_CONFIG_HOME: base(), ...over })
+    const { OPENAFLOW_CONFIG_DIR: _cfg, ...rest } = envFor({ APPDATA: base(), XDG_CONFIG_HOME: base(), ...over })
     return rest
   }
 
@@ -555,8 +555,8 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     return repo
   }
 
-  /** A production server on the given env as it is: startProduction would put OPEN_AFLOW_CONFIG_DIR back. */
-  const startOwn = async (env: Record<string, string>) => start({ ...env, OPEN_AFLOW_API_PORT: String(await freePort()) }, { webDir })
+  /** A production server on the given env as it is: startProduction would put OPENAFLOW_CONFIG_DIR back. */
+  const startOwn = async (env: Record<string, string>) => start({ ...env, OPENAFLOW_API_PORT: String(await freePort()) }, { webDir })
 
   const repoNames = async (port: number) => {
     const { text } = await send(port, '/api/board')
@@ -578,7 +578,7 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
   test('the copy runs before the dev token file is written', async () => {
     await writeOld()
     const api = await freePort()
-    const { started } = await start(ownEnv({ OPEN_AFLOW_API_PORT: String(api), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
+    const { started } = await start(ownEnv({ OPENAFLOW_API_PORT: String(api), OPENAFLOW_WEB_PORT: String(await freePort()) }))
     expect(await repoNames(started.port)).toEqual(['repo:registered'])
     expect(existsSync(join(newDir(), 'session-token'))).toBe(true)
     // The board asks gh in the repo's folder: a real gh there could still hold it at teardown.
@@ -622,7 +622,7 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     const token = await pageToken(first.started.port)
     const added = await send(first.started.port, '/api/repos', {
       method: 'POST',
-      headers: { Origin: `http://127.0.0.1:${first.started.port}`, 'Content-Type': 'application/json', 'X-Open-AFlow-Token': token },
+      headers: { Origin: `http://127.0.0.1:${first.started.port}`, 'Content-Type': 'application/json', 'X-OpenAFlow-Token': token },
       body: JSON.stringify({ path: second }),
     })
     expect(added.status).toBe(201)
@@ -665,7 +665,7 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
     const token = await pageToken(a.started.port)
     const added = await send(a.started.port, '/api/repos', {
       method: 'POST',
-      headers: { Origin: `http://127.0.0.1:${a.started.port}`, 'Content-Type': 'application/json', 'X-Open-AFlow-Token': token },
+      headers: { Origin: `http://127.0.0.1:${a.started.port}`, 'Content-Type': 'application/json', 'X-OpenAFlow-Token': token },
       body: JSON.stringify({ path: second }),
     })
     expect(added.status).toBe(201)
@@ -680,7 +680,7 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
   test('dev: after a failed copy the token file is in the old folder, where the dev page looks for it', async () => {
     await writeOld()
     spies.copyFails = togglesUnreadable
-    const { started } = await start(ownEnv({ OPEN_AFLOW_API_PORT: String(await freePort()), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
+    const { started } = await start(ownEnv({ OPENAFLOW_API_PORT: String(await freePort()), OPENAFLOW_WEB_PORT: String(await freePort()) }))
     expect(await repoNames(started.port)).toEqual(['repo:registered'])
     expect(liveConfigDir(ownEnv(), process.platform, tmp)).toBe(oldDir())
     expect(readSessionToken(liveConfigDir(ownEnv(), process.platform, tmp))).toHaveLength(43)
@@ -689,16 +689,16 @@ describe.runIf(process.platform === 'win32' || process.platform === 'linux')('th
 
   test('dev: after a copy the token file is in the new folder, where the dev page looks for it', async () => {
     await writeOld()
-    await start(ownEnv({ OPEN_AFLOW_API_PORT: String(await freePort()), OPEN_AFLOW_WEB_PORT: String(await freePort()) }))
+    await start(ownEnv({ OPENAFLOW_API_PORT: String(await freePort()), OPENAFLOW_WEB_PORT: String(await freePort()) }))
     // A copy that didn't happen says why here, with its error code.
     expect(logs.filter((l) => /could not copy|in use|skipped/.test(l))).toEqual([])
     expect(liveConfigDir(ownEnv(), process.platform, tmp)).toBe(newDir())
     expect(readSessionToken(newDir())).toHaveLength(43)
   })
 
-  test('a set OPEN_AFLOW_CONFIG_DIR never copies from the folder the server would pick', async () => {
+  test('a set OPENAFLOW_CONFIG_DIR never copies from the folder the server would pick', async () => {
     await writeOld()
-    const { started } = await startOwn({ ...ownEnv(), OPEN_AFLOW_CONFIG_DIR: cfg })
+    const { started } = await startOwn({ ...ownEnv(), OPENAFLOW_CONFIG_DIR: cfg })
     expect(await repoNames(started.port)).toEqual([])
     expect(existsSync(newDir())).toBe(false)
     expect(existsSync(join(cfg, 'config.json'))).toBe(false)

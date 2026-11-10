@@ -68,7 +68,7 @@ export function createShutdown(d: ShutdownDeps): () => void {
     d.auto.stop()
     d.server.close()
     const n = d.work.size()
-    if (n > 0) log(`open-aflow: waiting for ${n} action${n === 1 ? '' : 's'} to finish; press Ctrl+C again to quit now`)
+    if (n > 0) log(`openaflow: waiting for ${n} action${n === 1 ? '' : 's'} to finish; press Ctrl+C again to quit now`)
     let timer: NodeJS.Timeout | undefined
     const cap = new Promise<void>((resolve) => {
       timer = setTimeout(resolve, capMs)

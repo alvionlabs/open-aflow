@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRepoModel, listRuns, type AgentRun, type BoardRepo, type Claim, type PrStatus, type RunSummary } from '@open-aflow/model'
+import { buildRepoModel, listRuns, type AgentRun, type BoardRepo, type Claim, type PrStatus, type RunSummary } from '@openaflow/model'
 import { loadFixture } from '../../../../model/test/load-fixture.ts'
 import { gateTitle, nextSteps, type NextItem, type NextSteps } from './next-step.ts'
 import { emptyMessage } from './view.ts'

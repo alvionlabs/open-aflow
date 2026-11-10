@@ -2,7 +2,7 @@
 // It follows the server's port, and comes back by itself when the stream is lost. The rules are in
 // pod-docs/feature-details/toasts.md.
 
-import type { Board } from '@open-aflow/model'
+import type { Board } from '@openaflow/model'
 
 export const RETRY_MS = 5000
 /** The server pings every 15 s. */

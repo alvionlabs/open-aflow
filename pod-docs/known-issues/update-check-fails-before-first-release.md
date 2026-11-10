@@ -5,7 +5,7 @@ Status: open · found 2026-11-05 · installed app test
 
 **Who it affects:** anyone running a build before the first GitHub release.
 
-**What you see:** `desktop.log` reads `open-aflow desktop: update check failed: ERR_XML_MISSED_ELEMENT` a few seconds after each start. Nothing shows in the app.
+**What you see:** `desktop.log` reads `openaflow desktop: update check failed: ERR_XML_MISSED_ELEMENT` a few seconds after each start. Nothing shows in the app.
 
 **How to reproduce:**
 1. Install a build while the repo has no release.

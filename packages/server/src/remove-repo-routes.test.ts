@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { Board, NewActionEntry } from '@open-aflow/model'
+import type { Board, NewActionEntry } from '@openaflow/model'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createApp } from './app.ts'
@@ -14,7 +14,7 @@ import { createSessionToken } from './session-token.ts'
 const API = 3060
 const WEB = 3061
 const TOKEN = createSessionToken()
-const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-open-aflow-token': TOKEN }
+const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-openaflow-token': TOKEN }
 const NOW = Date.parse('2026-11-01T12:00:00Z')
 const platform = process.platform
 
@@ -48,7 +48,7 @@ async function snapshot(dir: string): Promise<Record<string, string>> {
 }
 
 beforeEach(async () => {
-  root = await realpath(await mkdtemp(join(tmpdir(), 'open-aflow-remove-')))
+  root = await realpath(await mkdtemp(join(tmpdir(), 'openaflow-remove-')))
   regPath = join(root, 'repos', 'reg')
   bothPath = join(root, 'repos', 'both')
   claimPath = join(root, 'repos', 'claim')
@@ -263,8 +263,8 @@ describe('remove-repo route', () => {
     const before = await readFile(cfgFile)
     const { origin: _o, ...noOrigin } = HEADERS
     const cases: [Record<string, string>, string, number, string][] = [
-      [{ ...HEADERS, 'x-open-aflow-token': 'wrong' }, 'POST', 403, 'bad token'],
-      [{ ...HEADERS, 'x-open-aflow-token': '' }, 'POST', 403, 'bad token'],
+      [{ ...HEADERS, 'x-openaflow-token': 'wrong' }, 'POST', 403, 'bad token'],
+      [{ ...HEADERS, 'x-openaflow-token': '' }, 'POST', 403, 'bad token'],
       [{ ...HEADERS, host: `evil.example:${API}` }, 'POST', 403, 'forbidden host'],
       [{ ...HEADERS, origin: 'http://evil.example' }, 'POST', 403, 'forbidden origin'],
       [noOrigin, 'POST', 403, 'forbidden origin'],

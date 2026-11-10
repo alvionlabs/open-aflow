@@ -1,4 +1,4 @@
-# Open AFlow design rules
+# OpenAFlow design rules
 
 Read this before any UI change. It holds all design rules.
 

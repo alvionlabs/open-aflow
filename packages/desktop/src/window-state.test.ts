@@ -10,7 +10,7 @@ describe('window state', () => {
   let dir: string
   let file: string
   beforeEach(() => {
-    dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'open-aflow-state-')))
+    dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'openaflow-state-')))
     file = join(dir, 'window-state.json')
   })
   afterEach(() => rmSync(dir, { recursive: true, force: true }))

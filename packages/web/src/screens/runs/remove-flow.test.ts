@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { BoardRepo, RemoveRepoResult, RunSummary } from '@open-aflow/model'
+import type { BoardRepo, RemoveRepoResult, RunSummary } from '@openaflow/model'
 import type { ActionReply } from '../../actions-client.ts'
 import { RemoveConfirmView, giveFocusBack } from './RemoveConfirm.tsx'
 import { HEADER_PLACE, REMOVE_ITEM, confirmView, createRemoveFlow, hashAfterRemove, moreName, navigateAfterRemove, removeTarget, repoOfRun, type Post, type RemoveState, type RemoveTarget } from './remove-flow.ts'

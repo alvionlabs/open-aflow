@@ -105,6 +105,6 @@ export type Board = {
   actions?: ActionEntry[]
   /** The runs whose auto-continue toggle is on. Missing means all off. */
   autoContinue?: { repoId: string; run: string; lastKey?: string }[]
-  /** OPEN_AFLOW_TRANSCRIPT_DAYS: agents come only from transcripts written in this many days. Missing on older Boards (read as 30). */
+  /** OPENAFLOW_TRANSCRIPT_DAYS: agents come only from transcripts written in this many days. Missing on older Boards (read as 30). */
   transcriptDays?: number
 }

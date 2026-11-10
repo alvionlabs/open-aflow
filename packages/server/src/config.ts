@@ -24,7 +24,7 @@ export function portFromEnv(env: Env, name: string, fallback: number): number {
 
 /** Where the API server listens. Always loopback: the board reads local files. */
 export function listenConfig(env: Env): ListenConfig {
-  return { hostname: '127.0.0.1', port: portFromEnv(env, 'OPEN_AFLOW_API_PORT', DEFAULT_API_PORT) }
+  return { hostname: '127.0.0.1', port: portFromEnv(env, 'OPENAFLOW_API_PORT', DEFAULT_API_PORT) }
 }
 
 /** `env[name]`, with an empty value counted as unset. */
@@ -34,12 +34,12 @@ export function envValue(env: Env, name: string): string | undefined {
 }
 
 /**
- * The server's config folder name. It must differ from the packaged app's name (`open-aflow`) and its product name
- * (`Open AFlow`): NSIS's `--delete-app-data` removes `%APPDATA%\<each of them>`. build-config.test.ts checks it.
+ * The server's config folder name. It must differ from the packaged app's name (`openaflow`) and its product name
+ * (`OpenAFlow`): NSIS's `--delete-app-data` removes `%APPDATA%\<each of them>`. build-config.test.ts checks it.
  */
-export const CONFIG_DIR_NAME = 'open-aflow-server'
+export const CONFIG_DIR_NAME = 'openaflow-server'
 
-/** The folder name before the rename to Open AFlow. A first start copies it once (config-move.ts). */
+/** The folder name before the rename to OpenAFlow. A first start copies it once (config-move.ts). */
 const OLD_CONFIG_DIR_NAME = 'pod-board'
 
 /** The folder that holds the server's own folders on `platform`, with that OS's separators. */
@@ -53,22 +53,22 @@ function configBase(env: Env, platform: NodeJS.Platform, home: string): { p: pat
 }
 
 /**
- * Where the board keeps its own config file, per OS. `OPEN_AFLOW_CONFIG_DIR` wins everywhere. Paths use the
+ * Where the board keeps its own config file, per OS. `OPENAFLOW_CONFIG_DIR` wins everywhere. Paths use the
  * separators of `platform`, so callers (and tests) can ask for any OS from any host.
  */
 export function configPath(env: Env, platform: NodeJS.Platform, home: string): string {
-  const override = envValue(env, 'OPEN_AFLOW_CONFIG_DIR')
+  const override = envValue(env, 'OPENAFLOW_CONFIG_DIR')
   const { p, base } = configBase(env, platform, home)
   if (override) return p.join(override, 'config.json')
   return p.join(base, CONFIG_DIR_NAME, 'config.json')
 }
 
 /**
- * The config folder before the rename, beside the one `configPath` picks. None when `OPEN_AFLOW_CONFIG_DIR` is
+ * The config folder before the rename, beside the one `configPath` picks. None when `OPENAFLOW_CONFIG_DIR` is
  * set: a temp folder never copies from the real one.
  */
 export function oldConfigDir(env: Env, platform: NodeJS.Platform, home: string): string | undefined {
-  if (envValue(env, 'OPEN_AFLOW_CONFIG_DIR')) return undefined
+  if (envValue(env, 'OPENAFLOW_CONFIG_DIR')) return undefined
   const { p, base } = configBase(env, platform, home)
   return p.join(base, OLD_CONFIG_DIR_NAME)
 }

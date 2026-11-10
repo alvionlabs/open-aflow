@@ -5,8 +5,8 @@ import { execFile, spawn } from 'node:child_process'
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
-import { configPath } from '@open-aflow/server/config'
-import { processAlive } from '@open-aflow/server/parent-link'
+import { configPath } from '@openaflow/server/config'
+import { processAlive } from '@openaflow/server/parent-link'
 import { EXE_NAME, UPDATER_CACHE_DIR } from './build-config.ts'
 import { APP_ID, APP_NAME } from './shell-config.ts'
 
@@ -16,7 +16,7 @@ const SYS32 = join(SYSTEM_ROOT, 'System32')
 const RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'
 const UNINSTALL_KEY = 'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall'
 const UNINSTALLER = `Uninstall ${APP_NAME}.exe`
-const LOCK_FILE = 'open-aflow-install-proof.lock'
+const LOCK_FILE = 'openaflow-install-proof.lock'
 const LOCK_WAIT_MS = 30 * 60_000
 /** A lock file with no process ID is one that a holder is writing, until it's this old. */
 const UNREADABLE_LOCK_MS = 60_000
@@ -32,15 +32,15 @@ function strippedEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {}
   for (const [key, value] of Object.entries(process.env)) {
     const upper = key.toUpperCase()
-    const dropped = ['OPEN_AFLOW_', 'CLAUDE', 'ELECTRON_', 'VITEST', 'FAKE_CLAUDE', 'NODE_', 'NPM_', 'PNPM_'].some((prefix) => upper.startsWith(prefix))
+    const dropped = ['OPENAFLOW_', 'CLAUDE', 'ELECTRON_', 'VITEST', 'FAKE_CLAUDE', 'NODE_', 'NPM_', 'PNPM_'].some((prefix) => upper.startsWith(prefix))
     if (!dropped && upper !== 'PATH') env[key] = value
   }
   return { ...env, SystemRoot: SYSTEM_ROOT, Path: SYS32 }
 }
 
-/** Temp root named open-aflow-install-proof-*; install folder, config, shell data, ports, and claude folders inside it. */
+/** Temp root named openaflow-install-proof-*; install folder, config, shell data, ports, and claude folders inside it. */
 export function proofPlace(port: number): ProofPlace {
-  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'open-aflow-install-proof-')))
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'openaflow-install-proof-')))
   const folder = (name: string) => {
     const path = join(root, name)
     mkdirSync(path)
@@ -52,13 +52,13 @@ export function proofPlace(port: number): ProofPlace {
     installDir: join(root, 'install'),
     env: {
       ...strippedEnv(),
-      OPEN_AFLOW_API_PORT: String(port),
-      OPEN_AFLOW_CONFIG_DIR: folder('config'),
-      OPEN_AFLOW_DESKTOP_DATA_DIR: folder('shell'),
-      OPEN_AFLOW_PORTS_DIR: folder('ports'),
-      OPEN_AFLOW_CLAUDE_DIR: folder('claude'),
+      OPENAFLOW_API_PORT: String(port),
+      OPENAFLOW_CONFIG_DIR: folder('config'),
+      OPENAFLOW_DESKTOP_DATA_DIR: folder('shell'),
+      OPENAFLOW_PORTS_DIR: folder('ports'),
+      OPENAFLOW_CLAUDE_DIR: folder('claude'),
       // In production the server uses this path only, so no run can find a real claude.
-      OPEN_AFLOW_CLAUDE_BIN: join(root, 'no-claude', 'claude.cmd'),
+      OPENAFLOW_CLAUDE_BIN: join(root, 'no-claude', 'claude.cmd'),
     },
   }
 }

@@ -14,7 +14,7 @@ const FIXTURE = join(here, '..', '..', 'model', 'fixtures', 'chess-web')
 const WIN = process.platform === 'win32'
 const BOOT_MS = 30_000
 const RUN_MS = 60_000
-const META = /<meta name="open-aflow-token" content="([^"]+)"/
+const META = /<meta name="openaflow-token" content="([^"]+)"/
 
 /** On Windows a killed child's handles close a moment after it's gone, so try the removal again. */
 const removeWithRetry = async (path: string) => {
@@ -30,7 +30,7 @@ const removeWithRetry = async (path: string) => {
   }
 }
 
-const tempDir = (name: string) => realpathSync(mkdtempSync(join(tmpdir(), `open-aflow-${name}-`)))
+const tempDir = (name: string) => realpathSync(mkdtempSync(join(tmpdir(), `openaflow-${name}-`)))
 
 const freePort = (): Promise<number> =>
   new Promise((resolve, reject) => {
@@ -109,7 +109,7 @@ describe('bundleApp', () => {
     expect(existsSync(join(builtDir, 'web', 'assets', 'app-abc.js'))).toBe(true)
     const page = readFileSync(join(builtDir, 'web', 'index.html'), 'utf8')
     expect(page).toContain('fake board')
-    expect(page).not.toContain('open-aflow-token')
+    expect(page).not.toContain('openaflow-token')
   })
 
   test('the build writes its metafile beside the app folder, never in it', () => {
@@ -204,15 +204,15 @@ describe('the bundle, run alone', () => {
     const port = await freePort()
     const env: NodeJS.ProcessEnv = { ...process.env }
     for (const k of Object.keys(env)) {
-      if (k.startsWith('OPEN_AFLOW_') || /^(NODE_PATH|PATH)$/i.test(k)) delete env[k]
+      if (k.startsWith('OPENAFLOW_') || /^(NODE_PATH|PATH)$/i.test(k)) delete env[k]
     }
     Object.assign(env, {
       PATH: bin,
-      OPEN_AFLOW_API_PORT: String(port),
-      OPEN_AFLOW_CONFIG_DIR: cfg,
-      OPEN_AFLOW_PORTS_DIR: join(tmp, 'ports'),
-      OPEN_AFLOW_CLAUDE_DIR: join(tmp, 'claude'),
-      OPEN_AFLOW_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
+      OPENAFLOW_API_PORT: String(port),
+      OPENAFLOW_CONFIG_DIR: cfg,
+      OPENAFLOW_PORTS_DIR: join(tmp, 'ports'),
+      OPENAFLOW_CLAUDE_DIR: join(tmp, 'claude'),
+      OPENAFLOW_CLAUDE_BIN: join(tmp, 'missing', 'claude'),
     })
     const c = spawn(process.execPath, [join(appDir, 'server.mjs')], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
     child = c
@@ -228,7 +228,7 @@ describe('the bundle, run alone', () => {
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`no listening line in ${BOOT_MS} ms:\n${run.out()}`)), BOOT_MS)
       const check = () => {
-        if (!run.out().includes(`open-aflow API listening on http://127.0.0.1:${run.port}`)) return
+        if (!run.out().includes(`openaflow API listening on http://127.0.0.1:${run.port}`)) return
         clearTimeout(timer)
         resolve()
       }
@@ -254,7 +254,7 @@ describe('the bundle, run alone', () => {
       headers: {
         Origin: base,
         'Content-Type': 'application/json',
-        ...(token ? { 'X-Open-AFlow-Token': token } : {}),
+        ...(token ? { 'X-OpenAFlow-Token': token } : {}),
       },
       body: JSON.stringify(body),
     })
@@ -365,7 +365,7 @@ describe('the bundle, run alone', () => {
     const run = await spawnCopy((appDir) => rmSync(join(appDir, 'web'), { recursive: true }))
     const code = await new Promise<number | null>((resolve) => run.c.once('close', (n) => resolve(n)))
     expect(code).toBe(1)
-    expect(run.out()).toContain('open-aflow: ')
+    expect(run.out()).toContain('openaflow: ')
     expect(run.out()).toContain(join(run.appDir, 'web'))
     expect(run.out()).not.toContain('listening')
   }, RUN_MS)

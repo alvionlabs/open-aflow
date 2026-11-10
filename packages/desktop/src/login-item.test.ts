@@ -24,7 +24,7 @@ describe('login item', () => {
 
   test('a login start stays in the tray', () => {
     expect(isLoginStart(['electron.exe', APP, '--hidden'])).toBe(true)
-    expect(isLoginStart(['Open AFlow.exe', '--hidden'])).toBe(true)
+    expect(isLoginStart(['OpenAFlow.exe', '--hidden'])).toBe(true)
     expect(isLoginStart(['electron.exe', APP])).toBe(false)
     expect(isLoginStart(['electron.exe', '--hidden-other', 'x--hidden'])).toBe(false)
   })

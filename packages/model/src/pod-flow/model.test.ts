@@ -779,7 +779,7 @@ test('a sprint doc links its plan from pod-docs/ or, before the move, docs/', ()
   expect(parseSprint(head('docs'), false)?.plan).toBe('demo')
 })
 
-// Added in open-aflow (not in the claude-pod source): rows copied from chess-web's ladder sprint board.
+// Added in openaflow (not in the claude-pod source): rows copied from chess-web's ladder sprint board.
 const CHESS_WEB_LADDER = `# Sprint: Sparring ladder to Liem
 
 _From plan: pod-docs/plans/sparring-ladder.md · Slug: ladder · Status: active · Generated: 2026-10-18_

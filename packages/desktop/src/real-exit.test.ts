@@ -22,7 +22,7 @@ const RUN_MS = 180_000
 const BOOT_MS = 60_000
 const SESSION = 'sess-1'
 const OWNER = 'auto-continue-owner.json'
-const META = /<meta name="open-aflow-token" content="([^"]+)"/
+const META = /<meta name="openaflow-token" content="([^"]+)"/
 
 type Status = {
   mainPid: number
@@ -96,12 +96,12 @@ const removeWithRetry = async (path: string) => {
   }
 }
 
-const tempDir = (name: string) => realpathSync.native(mkdtempSync(join(tmpdir(), `open-aflow-${name}-`)))
+const tempDir = (name: string) => realpathSync.native(mkdtempSync(join(tmpdir(), `openaflow-${name}-`)))
 
 const planDoc = ['# Plan: alpha', '', '_Generated: 2026-11-01 · Status: active_', '', '## Sprint sequence', '', '| Sprint | Goal | Status | Depends on |', '|---|---|---|---|', '| one | goal | done | — |', '| two | goal | planned | — |', ''].join('\n')
 const sprintDoc = ['# Sprint: one', '', '_From plan: pod-docs/plans/alpha.md · Slug: one · Status: active · Generated: 2026-11-01_', '', '## Status board', '', '| Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |', '|---|---|---|---|---|---|---|---|', '| 1 | A1 | a | one-A1 | merged | done | high | — |', ''].join('\n')
 
-describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform === 'win32')('the real exit', () => {
+describe.runIf(process.env.OPENAFLOW_REAL_ELECTRON === '1' && process.platform === 'win32')('the real exit', () => {
   let root: string
   let exe: string
   let probe: string
@@ -142,16 +142,16 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
     const env: NodeJS.ProcessEnv = {}
     for (const [k, v] of Object.entries(process.env)) {
       const u = k.toUpperCase()
-      if (!u.startsWith('OPEN_AFLOW_') && !u.startsWith('CLAUDE') && !u.startsWith('ELECTRON_') && !['PATH', 'NODE_PATH', 'NODE_OPTIONS'].includes(u) && !u.startsWith('VITEST')) env[k] = v
+      if (!u.startsWith('OPENAFLOW_') && !u.startsWith('CLAUDE') && !u.startsWith('ELECTRON_') && !['PATH', 'NODE_PATH', 'NODE_OPTIONS'].includes(u) && !u.startsWith('VITEST')) env[k] = v
     }
     return {
       ...env,
       Path: SYS32,
-      OPEN_AFLOW_API_PORT: String(port),
-      OPEN_AFLOW_CONFIG_DIR: cfg,
-      OPEN_AFLOW_PORTS_DIR: join(tmp, 'ports'),
-      OPEN_AFLOW_CLAUDE_DIR: join(tmp, 'claude'),
-      OPEN_AFLOW_CLAUDE_BIN: join(bin, 'claude.cmd'),
+      OPENAFLOW_API_PORT: String(port),
+      OPENAFLOW_CONFIG_DIR: cfg,
+      OPENAFLOW_PORTS_DIR: join(tmp, 'ports'),
+      OPENAFLOW_CLAUDE_DIR: join(tmp, 'claude'),
+      OPENAFLOW_CLAUDE_BIN: join(bin, 'claude.cmd'),
       FAKE_CLAUDE_MODE: 'wait:600000',
       FAKE_CLAUDE_PIDS: pidsFile,
     }
@@ -201,10 +201,10 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
       cwd: tmp,
       env: {
         ...baseEnv(),
-        OPEN_AFLOW_DESKTOP_DATA_DIR: join(tmp, 'shell'),
-        OPEN_AFLOW_PROBE_APP_PATH: DESKTOP,
-        OPEN_AFLOW_PROBE_STATUS: statusFile,
-        OPEN_AFLOW_PROBE_QUIT: quitFile,
+        OPENAFLOW_DESKTOP_DATA_DIR: join(tmp, 'shell'),
+        OPENAFLOW_PROBE_APP_PATH: DESKTOP,
+        OPENAFLOW_PROBE_STATUS: statusFile,
+        OPENAFLOW_PROBE_QUIT: quitFile,
         ...over,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -256,7 +256,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
     const token = META.exec(await (await fetch(`${base()}/`)).text())![1]!
     const res = await fetch(`${base()}/api/actions/resume`, {
       method: 'POST',
-      headers: { Origin: base(), 'Content-Type': 'application/json', 'X-Open-AFlow-Token': token },
+      headers: { Origin: base(), 'Content-Type': 'application/json', 'X-OpenAFlow-Token': token },
       body: JSON.stringify({ repoId: board.repos[0]!.id, run: 'alpha', reply: 'continue' }),
     })
     expect(await res.json()).toMatchObject({ outcome: 'started' })
@@ -296,7 +296,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
         'process.parentPort?.postMessage({ execPath: process.execPath, parentPort: Boolean(process.parentPort), runAsNode: process.env.ELECTRON_RUN_AS_NODE ?? null })\n' +
           'setTimeout(() => process.exit(0), 200)\n',
       )
-      const s = startProbe('main', { OPEN_AFLOW_PROBE_REPORTER: reporter })
+      const s = startProbe('main', { OPENAFLOW_PROBE_REPORTER: reporter })
       const status = await waitReady(s)
       await until('the reporter', () => s.status()?.reporter !== undefined, BOOT_MS, details(s))
 
@@ -307,7 +307,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
 
       expect(status.mainPid).toBe(s.c.pid)
       expect(status.readyPorts).toEqual([port])
-      expect(s.out()).toContain(`open-aflow API listening on http://127.0.0.1:${port}`)
+      expect(s.out()).toContain(`openaflow API listening on http://127.0.0.1:${port}`)
       expect(await (await fetch(`${base()}/api/health`)).json()).toEqual({ ok: true })
       expect(JSON.parse(readFileSync(ownerFile(), 'utf8'))).toMatchObject({ pid: status.servers[0] })
     },
@@ -347,7 +347,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
       taskkill(s.c.pid!)
       await exitOf(s.c)
       await until('the server to end', () => !alive(server), 15_000)
-      console.info(`open-aflow proof: owner file after a killed main process: ${existsSync(ownerFile()) ? 'left behind' : 'removed'}`)
+      console.info(`openaflow proof: owner file after a killed main process: ${existsSync(ownerFile()) ? 'left behind' : 'removed'}`)
       await sleep(2000)
       expect(alive(fake)).toBe(true)
 
@@ -355,7 +355,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
       const nextPort = await freePort()
       const next = spawn(process.execPath, [SERVER_BUNDLE], {
         cwd: tmp,
-        env: { ...baseEnv(), OPEN_AFLOW_API_PORT: String(nextPort) },
+        env: { ...baseEnv(), OPENAFLOW_API_PORT: String(nextPort) },
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
         windowsHide: true,
       })
@@ -364,13 +364,13 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_ELECTRON === '1' && process.platform 
       let text = ''
       next.stdout!.on('data', (d) => (text += String(d)))
       next.stderr!.on('data', (d) => (text += String(d)))
-      await until('the next start', () => text.includes(`open-aflow API listening on http://127.0.0.1:${nextPort}`), BOOT_MS, () => text)
+      await until('the next start', () => text.includes(`openaflow API listening on http://127.0.0.1:${nextPort}`), BOOT_MS, () => text)
       await until('the owner file', () => existsSync(ownerFile()), 10_000, () => text)
       expect(JSON.parse(readFileSync(ownerFile(), 'utf8'))).toMatchObject({ pid: next.pid })
       expect(text).not.toContain("won't auto-continue")
       expect(alive(fake)).toBe(true)
 
-      next.send({ type: 'open-aflow:stop' })
+      next.send({ type: 'openaflow:stop' })
       expect(await exitOf(next)).toBe(0)
     },
     RUN_MS,

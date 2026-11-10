@@ -7,7 +7,7 @@ import { MAX_DOC_BYTES, readRepoFiles } from './repo-files.ts'
 let repo: string
 
 beforeEach(async () => {
-  repo = await mkdtemp(join(tmpdir(), 'open-aflow-d1-repo-'))
+  repo = await mkdtemp(join(tmpdir(), 'openaflow-d1-repo-'))
 })
 
 afterEach(async () => {
@@ -90,7 +90,7 @@ describe('links that point outside the repo', () => {
   let outside: string
 
   beforeEach(async () => {
-    outside = await mkdtemp(join(tmpdir(), 'open-aflow-d1-outside-'))
+    outside = await mkdtemp(join(tmpdir(), 'openaflow-d1-outside-'))
   })
 
   afterEach(async () => {
@@ -144,7 +144,7 @@ describe('links that point outside the repo', () => {
 
   test('a linked research/ folder pointing outside: its reports are skipped', async () => {
     await put('pod-docs/README.md', '# readme\n')
-    const outside = await mkdtemp(join(tmpdir(), 'open-aflow-research-out-'))
+    const outside = await mkdtemp(join(tmpdir(), 'openaflow-research-out-'))
     try {
       await writeFile(join(outside, 'secret.md'), 'outside')
       await mkdir(join(repo, 'pod-docs'), { recursive: true })

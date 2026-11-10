@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRepoModel, type AnswerResult, type BoardRepo, type RunSummary } from '@open-aflow/model'
+import { buildRepoModel, type AnswerResult, type BoardRepo, type RunSummary } from '@openaflow/model'
 import { formView, type AnswerState } from './answer-flow.ts'
 import { ANSWER_NOTE, ANSWER_NOTE_NEXT_WAVE, ANSWER_WAITING, answerNote, formAnchor, waitingRows } from './queue-view.ts'
 import { nextSteps } from './next-step.ts'

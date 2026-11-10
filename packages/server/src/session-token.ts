@@ -10,7 +10,7 @@ import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 export const TOKEN_FILE = 'session-token'
-export const TOKEN_META = 'open-aflow-token'
+export const TOKEN_META = 'openaflow-token'
 
 /** A Vite plugin, typed by shape so the server package needs no `vite`. */
 export type TokenMetaPlugin = { name: string; apply: 'serve'; transformIndexHtml: (html: string) => string }
@@ -66,5 +66,5 @@ export function injectTokenMeta(html: string, token?: string): string {
  */
 export function tokenMetaPlugin(dir: string | (() => string)): TokenMetaPlugin {
   const at = typeof dir === 'function' ? dir : () => dir
-  return { name: 'open-aflow-token', apply: 'serve', transformIndexHtml: (html) => injectTokenMeta(html, readSessionToken(at())) }
+  return { name: 'openaflow-token', apply: 'serve', transformIndexHtml: (html) => injectTokenMeta(html, readSessionToken(at())) }
 }

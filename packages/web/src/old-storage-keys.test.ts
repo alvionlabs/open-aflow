@@ -61,7 +61,7 @@ describe('moveOldKeys', () => {
   })
 
   it('the new keys carry the new name', () => {
-    expect([THEME_KEY, TAB_KEY, SIDE_KEY]).toEqual(['open-aflow-theme', 'open-aflow-tab', 'open-aflow-sidebar-width'])
+    expect([THEME_KEY, TAB_KEY, SIDE_KEY]).toEqual(['openaflow-theme', 'openaflow-tab', 'openaflow-sidebar-width'])
   })
 })
 

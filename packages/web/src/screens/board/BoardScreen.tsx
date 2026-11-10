@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type CSSProperties } from 'react'
-import type { BoardRepo } from '@open-aflow/model'
+import type { BoardRepo } from '@openaflow/model'
 import { hashFor } from '../../selection.ts'
 import { Chip } from '../runs/Chip.tsx'
 import { DocTitle } from '../runs/DocTitle.tsx'

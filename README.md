@@ -1,6 +1,6 @@
-# Open AFlow
+# OpenAFlow
 
-Open AFlow is a Windows desktop app for [pod](https://github.com/iamphduc/claude-pod) runs. Pod is a plugin for Claude Code that builds a plan with agents, wave by wave. Open AFlow shows every pod run across your repos in one window, and tells you when a run needs you.
+OpenAFlow is a Windows desktop app for [pod](https://github.com/iamphduc/claude-pod) runs. Pod is a plugin for Claude Code that builds a plan with agents, wave by wave. OpenAFlow shows every pod run across your repos in one window, and tells you when a run needs you.
 
 ## What it does
 
@@ -9,7 +9,7 @@ Open AFlow is a Windows desktop app for [pod](https://github.com/iamphduc/claude
 - **Lets you act from the app:** merge a PR, answer a question, or send `continue` to the run's Claude session.
 - **Can continue for you:** turn on Auto-continue for a run, and the app sends `continue` when pod waits for it.
 
-Open AFlow runs on your computer only. It reads your repos and Claude's session files, and it never writes inside a repo.
+OpenAFlow runs on your computer only. It reads your repos and Claude's session files, and it never writes inside a repo.
 
 ## Install
 
@@ -19,7 +19,7 @@ Follow [the install note](docs/install.md). It covers the download, the warning 
 
 ## Develop
 
-To build or change Open AFlow, see [docs/development.md](docs/development.md).
+To build or change OpenAFlow, see [docs/development.md](docs/development.md).
 
 ## License
 

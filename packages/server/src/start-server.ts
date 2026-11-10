@@ -45,7 +45,7 @@ export type Started = { port: number; stop(): void }
 function portPlan(env: Env, production: Production | undefined) {
   if (production) return { want: wantedPort(env, production.preferredPort), extraPorts: [] as number[] }
   const want = { port: listenConfig(env).port, fallback: false }
-  return { want, extraPorts: [portFromEnv(env, 'OPEN_AFLOW_WEB_PORT', 3001)] }
+  return { want, extraPorts: [portFromEnv(env, 'OPENAFLOW_WEB_PORT', 3001)] }
 }
 
 /**
@@ -103,7 +103,7 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
     : createClaudeRunner({ bin: settings.claudeBin, logDir })
   const gh = createGhReader({ exec: ghExec, ...(tools ? { ghFound: () => tools.path('gh') !== undefined } : {}) })
   const service = createBoardService({ ...settings, platform, gh, actions: log.recent, autoContinue: store.list })
-  const watcher = createBoardWatcher({ service, ...settings, poll: env.OPEN_AFLOW_POLL === '1' })
+  const watcher = createBoardWatcher({ service, ...settings, poll: env.OPENAFLOW_POLL === '1' })
 
   // The resume route and the automatic check share one set of sessions being resumed.
   const resume = {
@@ -188,9 +188,9 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
     throw err
   }
 
-  if (bound.port !== want.port) console.log(`open-aflow: port ${want.port} is busy; using ${bound.port} for this launch`)
-  console.log(`open-aflow API listening on http://${HOSTNAME}:${bound.port}`)
-  console.log(`open-aflow config: ${configFile}`)
+  if (bound.port !== want.port) console.log(`openaflow: port ${want.port} is busy; using ${bound.port} for this launch`)
+  console.log(`openaflow API listening on http://${HOSTNAME}:${bound.port}`)
+  console.log(`openaflow config: ${configFile}`)
 
   // After the bind: a server that can't start holds no file and sends no `continue` to anyone's run.
   // A second server on this folder stays off until it restarts, also after the first exits.
@@ -201,7 +201,7 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
 }
 
 /**
- * Calls startServer. On a rejection, prints `open-aflow: <message>` and exits 1. Connects SIGINT and
+ * Calls startServer. On a rejection, prints `openaflow: <message>` and exits 1. Connects SIGINT and
  * SIGTERM to `stop`. Production also takes a parent's stop message and watches for the parent to go,
  * from before the start. Dev does neither, so it reads no channel and no parent's process ID.
  */
@@ -221,7 +221,7 @@ export async function runMain(o: { production?: Production } = {}): Promise<void
     process.on('SIGINT', stops.signal)
     process.on('SIGTERM', stops.signal)
   } catch (err) {
-    console.error(`open-aflow: ${err instanceof Error ? err.message : String(err)}`)
+    console.error(`openaflow: ${err instanceof Error ? err.message : String(err)}`)
     process.exit(1)
   }
 }

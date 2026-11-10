@@ -3,7 +3,7 @@
 // small driver that sends the request. Every reply carries the number of the request it answers,
 // so a reply that arrives after a cancel or another open is dropped.
 
-import type { BoardRepo, RemoveRepoResult, RunSummary } from '@open-aflow/model'
+import type { BoardRepo, RemoveRepoResult, RunSummary } from '@openaflow/model'
 import { postAction, type ActionReply } from '../../actions-client.ts'
 import { hashFor } from '../../selection.ts'
 

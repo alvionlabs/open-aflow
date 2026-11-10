@@ -29,7 +29,7 @@ flowchart TD
 
 **Examples.** The file holds `{"pid":9760,"id":"eb4d…","startedAt":1793765338463}`.
 
-- Process 9760 is the first server. A second server logs `open-aflow: process 9760 runs auto-continue for <cfg>; this server won't auto-continue until it restarts`, and `/api/health` still answers.
+- Process 9760 is the first server. A second server logs `openaflow: process 9760 runs auto-continue for <cfg>; this server won't auto-continue until it restarts`, and `/api/health` still answers.
 - Process 9760 is a `node` program that started after that `startedAt`. The ID was reused, so the new server takes the file with no log line.
 
 **Logic lives in:** `packages/server/src/owner-file.ts`, with the alive check in `parent-link.ts`.

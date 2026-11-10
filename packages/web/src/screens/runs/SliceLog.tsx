@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import type { LogGroup } from '@open-aflow/model'
+import type { LogGroup } from '@openaflow/model'
 import { Chip } from './Chip.tsx'
 import { DocTitle } from './DocTitle.tsx'
 import { confidenceTag, logBlocks, rowFigures, type Chip as ChipView } from './view.ts'

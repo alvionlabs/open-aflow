@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { parseQueue, type Board, type NewActionEntry, type ResolveResult } from '@open-aflow/model'
+import { parseQueue, type Board, type NewActionEntry, type ResolveResult } from '@openaflow/model'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createAnswerRoutes } from './answer-routes.ts'
@@ -17,7 +17,7 @@ import { createSessionToken } from './session-token.ts'
 const API = 3060
 const WEB = 3061
 const TOKEN = createSessionToken()
-const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-open-aflow-token': TOKEN }
+const HEADERS = { host: `127.0.0.1:${API}`, origin: `http://127.0.0.1:${WEB}`, 'content-type': 'application/json', 'x-openaflow-token': TOKEN }
 const NOW = Date.parse('2026-10-31T12:00:00Z')
 const TODAY = '2026-10-31'
 
@@ -50,7 +50,7 @@ let root: string
 let repoPath: string
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'open-aflow-resolve-'))
+  root = await mkdtemp(join(tmpdir(), 'openaflow-resolve-'))
   repoPath = join(root, 'repos', 'r')
   await mkdir(join(repoPath, 'pod-docs', 'plans', 'archive'), { recursive: true })
   await writeFile(join(repoPath, 'pod-docs', 'README.md'), '# pod docs\n\npod docs: 2\n')
@@ -118,7 +118,7 @@ async function setup(opts: SetupOpts = {}) {
     ...(opts.fs ? { fs: opts.fs } : {}),
   })
   const app = createApp({ ports: [API, WEB], token: TOKEN, source, addRepo: async () => ({ error: 'not a directory' }), timeline: async () => undefined, actions: new Hono().route('/', routes) })
-  let headers: Record<string, string> = opts.token === false ? { ...HEADERS, 'x-open-aflow-token': '' } : HEADERS
+  let headers: Record<string, string> = opts.token === false ? { ...HEADERS, 'x-openaflow-token': '' } : HEADERS
   if (opts.host) headers = { ...headers, host: opts.host }
   const post = (body: unknown) => app.request('/api/actions/resolve', { method: 'POST', headers, body: JSON.stringify(body) })
   const repoId = board.repos[0]!.id

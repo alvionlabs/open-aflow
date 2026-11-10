@@ -1,7 +1,7 @@
 // The Reply panel's rows and words: which reply pod waits for, and the chat to paste it in.
 // Session ids and commands only, never prompt text.
 
-import { replySession, runReplies, sendableReply, type BoardRepo, type ReplyWord, type RunSummary } from '@open-aflow/model'
+import { replySession, runReplies, sendableReply, type BoardRepo, type ReplyWord, type RunSummary } from '@openaflow/model'
 
 export const NO_SESSION = 'No pod session found for this run. Paste it in the chat that runs it.'
 

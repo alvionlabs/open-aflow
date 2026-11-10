@@ -11,9 +11,9 @@ const PACKAGE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /**
  * The packaged app's `name`. It sets the install folder and the updater's cache folder, and NSIS's
- * `--delete-app-data` removes `%APPDATA%\<name>`, so it must never be the server's config folder, `open-aflow-server`.
+ * `--delete-app-data` removes `%APPDATA%\<name>`, so it must never be the server's config folder, `openaflow-server`.
  */
-const PACKAGED_NAME = 'open-aflow'
+const PACKAGED_NAME = 'openaflow'
 
 /** electron-builder derives the cache folder's name from the packaged name. */
 export const UPDATER_CACHE_DIR = `${PACKAGED_NAME}-updater`
@@ -90,7 +90,7 @@ export function buildConfig(o: BuildOptions): Configuration {
       installerIcon: 'assets/icon.ico',
       uninstallerIcon: 'assets/icon.ico',
       // No spaces: GitHub rewrites them in asset names, which would break latest.yml.
-      artifactName: 'open-aflow-setup-${version}.${ext}',
+      artifactName: 'openaflow-setup-${version}.${ext}',
       include: 'build/installer.nsh',
     },
     publish: { provider: 'github', owner: 'alvionlabs', repo: 'openaflow', releaseType: 'release' },

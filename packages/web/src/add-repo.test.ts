@@ -18,7 +18,7 @@ describe('postRepo', () => {
     expect(await postRepo('/repo', { fetch: fetchFn, token })).toEqual({ status: 409, error: 'already registered' })
     expect(fetchFn).toHaveBeenCalledWith('/api/repos', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Open-AFlow-Token': 'tok-123' },
+      headers: { 'Content-Type': 'application/json', 'X-OpenAFlow-Token': 'tok-123' },
       body: JSON.stringify({ path: '/repo' }),
     })
   })

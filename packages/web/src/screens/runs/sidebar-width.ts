@@ -8,7 +8,7 @@ export const SIDE_MAX = 400
 export const SIDE_DEFAULT = 260
 /** One Left or Right key press. */
 export const SIDE_STEP = 16
-export const SIDE_KEY = 'open-aflow-sidebar-width'
+export const SIDE_KEY = 'openaflow-sidebar-width'
 
 /** Whole pixels from SIDE_MIN to SIDE_MAX; anything that isn't a finite number is the default. */
 export function clampWidth(n: number): number {

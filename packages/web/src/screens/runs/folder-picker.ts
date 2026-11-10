@@ -42,7 +42,7 @@ export async function getFolders(path: string | undefined, deps: ListDeps = {}):
   let res: Response
   let text = ''
   try {
-    res = await (deps.fetch ?? fetch)(url, { method: 'GET', headers: { 'X-Open-AFlow-Token': token } })
+    res = await (deps.fetch ?? fetch)(url, { method: 'GET', headers: { 'X-OpenAFlow-Token': token } })
     text = await res.text()
   } catch {
     return { ok: false, status: 0, message: UNREACHABLE }

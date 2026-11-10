@@ -1,4 +1,4 @@
-import type { AgentTimeline, Board } from '@open-aflow/model'
+import type { AgentTimeline, Board } from '@openaflow/model'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { streamSSE } from 'hono/streaming'

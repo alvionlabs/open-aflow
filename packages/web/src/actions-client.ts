@@ -1,5 +1,5 @@
 // Sends one action to the API with the page's session token. The Vite dev
-// server puts the token in a <meta name="open-aflow-token"> tag; the API checks
+// server puts the token in a <meta name="openaflow-token"> tag; the API checks
 // it on every /api/actions/ route. Every failure comes back as words a person
 // can act on, never as a throw.
 
@@ -15,8 +15,8 @@ export const NEED_RELOAD = 'Actions need a page reload.'
 export const RESTARTED = 'The board restarted. Reload the page.'
 export const UNREACHABLE = "Can't reach the board."
 
-/** The page's session token, from the `open-aflow-token` meta tag. */
-export const pageToken = () => document.querySelector('meta[name="open-aflow-token"]')?.getAttribute('content')
+/** The page's session token, from the `openaflow-token` meta tag. */
+export const pageToken = () => document.querySelector('meta[name="openaflow-token"]')?.getAttribute('content')
 
 /**
  * POST `/api/actions/<path>` with `body` as JSON. `path` is the action's name
@@ -29,7 +29,7 @@ export async function postAction<T>(path: string, body: object, deps: ActionDeps
   try {
     res = await (deps.fetch ?? fetch)(`/api/actions/${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Open-AFlow-Token': token },
+      headers: { 'Content-Type': 'application/json', 'X-OpenAFlow-Token': token },
       body: JSON.stringify(body),
     })
   } catch {

@@ -20,23 +20,23 @@ const here = dirname(fileURLToPath(import.meta.url))
 const DESKTOP = join(here, '..')
 const ROOT = join(DESKTOP, '..', '..')
 /** The mock repo to copy. Its path is local to the maintainer's machine, so it comes from the env. */
-const MOCK = process.env.OPEN_AFLOW_MOCK_REPO ?? ''
+const MOCK = process.env.OPENAFLOW_MOCK_REPO ?? ''
 const FAKE = join(DESKTOP, '..', 'server', 'test', 'fake-claude.mjs')
 const SYS32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
 const POWERSHELL = join(SYS32, 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 const RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'
 const PROGRAMS = join(process.env.APPDATA ?? '', 'Microsoft', 'Windows', 'Start Menu', 'Programs')
-const PORT = Number(process.env.OPEN_AFLOW_PROOF_PORT ?? 3110)
-const FEED_PORT = Number(process.env.OPEN_AFLOW_PROOF_FEED_PORT ?? 3111)
+const PORT = Number(process.env.OPENAFLOW_PROOF_PORT ?? 3110)
+const FEED_PORT = Number(process.env.OPENAFLOW_PROOF_FEED_PORT ?? 3111)
 const FEED_URL = `http://127.0.0.1:${FEED_PORT}/`
 const OLDER = '0.1.0'
 const NEWER = '0.1.1'
 const RUN_MS = 300_000
 const BUILDS_MS = 15 * 60_000
 const LOCK_MS = 40 * 60_000
-const META = /<meta name="open-aflow-token" content="([^"]+)"/
+const META = /<meta name="openaflow-token" content="([^"]+)"/
 /** Set it to a file path to save a picture of the real box. */
-const BOX_PICTURE = process.env.OPEN_AFLOW_PROOF_BOX_PICTURE
+const BOX_PICTURE = process.env.OPENAFLOW_PROOF_BOX_PICTURE
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const alive = (pid: number) => {
@@ -74,7 +74,7 @@ function startFeed(folder: string) {
         res.writeHead(500).end('no')
       } else if (mode === 'bad-yml' && name === 'latest.yml') {
         res.writeHead(200).end(': [ not yaml')
-      } else if (!/^(latest\.yml|open-aflow-setup-[\d.]+\.exe(\.blockmap)?)$/.test(name) || !existsSync(join(folder, name))) {
+      } else if (!/^(latest\.yml|openaflow-setup-[\d.]+\.exe(\.blockmap)?)$/.test(name) || !existsSync(join(folder, name))) {
         res.writeHead(404).end()
       } else {
         const bytes = readFileSync(join(folder, name))
@@ -106,7 +106,7 @@ function startFeed(folder: string) {
 const planDoc = ['# Plan: alpha', '', '_Generated: 2026-11-01 · Status: active_', '', '## Sprint sequence', '', '| Sprint | Goal | Status | Depends on |', '|---|---|---|---|', '| one | goal | done | — |', '| two | goal | planned | — |', ''].join('\n')
 const sprintDoc = ['# Sprint: one', '', '_From plan: pod-docs/plans/alpha.md · Slug: one · Status: active · Generated: 2026-11-01_', '', '## Status board', '', '| Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |', '|---|---|---|---|---|---|---|---|', '| 1 | A1 | a | one-A1 | merged | done | high | — |', ''].join('\n')
 
-describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && MOCK !== '' && process.platform === 'win32')('the update proof', () => {
+describe.runIf(process.env.OPENAFLOW_REAL_INSTALL === '1' && MOCK !== '' && process.platform === 'win32')('the update proof', () => {
   let freeLock: () => void = () => {}
   let lockDone: Promise<void> = Promise.resolve()
   let before: MachineState | undefined
@@ -127,13 +127,13 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && MOCK !== '' && pro
 
   const base = () => `http://127.0.0.1:${place.port}`
   const exe = () => join(place.installDir, EXE_NAME)
-  const configDir = () => place.env.OPEN_AFLOW_CONFIG_DIR!
+  const configDir = () => place.env.OPENAFLOW_CONFIG_DIR!
   const fakePids = () => (pidsFile && existsSync(pidsFile) ? readFileSync(pidsFile, 'utf8').split('\n').filter(Boolean).map(Number) : [])
   const tokenOf = async () => META.exec(await (await fetch(`${base()}/`)).text())![1]!
   // Windows keeps four parts: 0.1.0.0.
   const exeVersion = () => powershell(`(Get-Item -LiteralPath '${exe()}' -ErrorAction SilentlyContinue).VersionInfo.ProductVersion`).replace(/\.0$/, '')
   const packagedVersion = () => (JSON.parse(extractFile(join(place.installDir, 'resources', 'app.asar'), 'package.json').toString('utf8')) as { version: string }).version
-  const installerFor = (version: string) => join(builds, version, `open-aflow-setup-${version}.exe`)
+  const installerFor = (version: string) => join(builds, version, `openaflow-setup-${version}.exe`)
 
   const pack = (args: string) => {
     const env: NodeJS.ProcessEnv = { ...process.env }
@@ -145,9 +145,9 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && MOCK !== '' && pro
 
   /** A start with the answer in the env. The file carries the same env to the app the installer starts after an update. */
   const startApp = async (answer: 'restart' | 'later' | null, delayMs = 1000) => {
-    Object.assign(place.env, { OPEN_AFLOW_UPDATE_TEST_FEED: FEED_URL, OPEN_AFLOW_UPDATE_TEST_DELAY_MS: String(delayMs) })
-    if (answer === null) delete place.env.OPEN_AFLOW_UPDATE_TEST_ANSWER
-    else place.env.OPEN_AFLOW_UPDATE_TEST_ANSWER = answer
+    Object.assign(place.env, { OPENAFLOW_UPDATE_TEST_FEED: FEED_URL, OPENAFLOW_UPDATE_TEST_DELAY_MS: String(delayMs) })
+    if (answer === null) delete place.env.OPENAFLOW_UPDATE_TEST_ANSWER
+    else place.env.OPENAFLOW_UPDATE_TEST_ANSWER = answer
     writeFileSync(join(place.root, TEST_ENV_FILE), JSON.stringify(place.env))
     const app = await launch(place)
     appPid = app.pid
@@ -177,7 +177,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && MOCK !== '' && pro
     writeFileSync(join(repo, 'pod-docs', 'plans', 'alpha.md'), planDoc)
     writeFileSync(join(repo, 'pod-docs', 'sprints', 'one.md'), sprintDoc)
 
-    const project = join(place.env.OPEN_AFLOW_CLAUDE_DIR!, 'projects', projectDirName(repo))
+    const project = join(place.env.OPENAFLOW_CLAUDE_DIR!, 'projects', projectDirName(repo))
     const sub = join(project, 'sess-1', 'subagents')
     mkdirSync(sub, { recursive: true })
     const old = new Date(Date.now() - 7_200_000)
@@ -207,7 +207,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && MOCK !== '' && pro
     for (const name of ['git.exe', 'gh.exe']) writeFileSync(join(bin, name), '')
     writeFileSync(join(configDir(), 'tool-paths.json'), JSON.stringify({ git: join(bin, 'git.exe'), gh: join(bin, 'gh.exe') }))
     pidsFile = join(place.root, 'fake-pids.txt')
-    Object.assign(place.env, { OPEN_AFLOW_CLAUDE_BIN: join(bin, 'claude.cmd'), FAKE_CLAUDE_MODE: 'wait:600000', FAKE_CLAUDE_PIDS: pidsFile })
+    Object.assign(place.env, { OPENAFLOW_CLAUDE_BIN: join(bin, 'claude.cmd'), FAKE_CLAUDE_MODE: 'wait:600000', FAKE_CLAUDE_PIDS: pidsFile })
   }
 
   beforeAll(async () => {
@@ -315,7 +315,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && MOCK !== '' && pro
       const script = [
         `Add-Type -AssemblyName System.Drawing`,
         `Add-Type 'using System;using System.Runtime.InteropServices;public class W{[DllImport("user32.dll",CharSet=CharSet.Unicode)]public static extern IntPtr FindWindow(string c,string t);[DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr h,out R r);[DllImport("user32.dll")]public static extern bool PrintWindow(IntPtr h,IntPtr d,uint f);public struct R{public int L,T,Ri,B;}}'`,
-        `$h=[W]::FindWindow('#32770','Open AFlow')`,
+        `$h=[W]::FindWindow('#32770','OpenAFlow')`,
         `$r=New-Object W+R;[void][W]::GetWindowRect($h,[ref]$r)`,
         `$b=New-Object Drawing.Bitmap(($r.Ri-$r.L),($r.B-$r.T))`,
         `$g=[Drawing.Graphics]::FromImage($b);$d=$g.GetHdc();[void][W]::PrintWindow($h,$d,2);$g.ReleaseHdc($d)`,
@@ -337,7 +337,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && MOCK !== '' && pro
       feed!.hold()
       await startApp('restart')
 
-      const headers = async () => ({ Origin: base(), 'Content-Type': 'application/json', 'X-Open-AFlow-Token': await tokenOf() })
+      const headers = async () => ({ Origin: base(), 'Content-Type': 'application/json', 'X-OpenAFlow-Token': await tokenOf() })
       const added = await fetch(`${base()}/api/repos`, { method: 'POST', headers: await headers(), body: JSON.stringify({ path: repo }) })
       expect(added.status, await added.clone().text()).toBe(201)
       configBefore = readFileSync(join(configDir(), 'config.json'), 'utf8')
@@ -415,13 +415,13 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && MOCK !== '' && pro
       expect(update).toMatchObject({ provider: 'github', owner: 'alvionlabs', repo: 'openaflow' })
       // The signature check is off: the field that turns it on is absent.
       expect(update.publisherName).toBeUndefined()
-      expect(update.updaterCacheDirName).toBe('open-aflow-updater')
+      expect(update.updaterCacheDirName).toBe('openaflow-updater')
 
       // A shipped build can't use the test feed, and a test build does hold it.
-      expect(extractFile(join(resources, 'app.asar'), 'dist/main.cjs').toString('utf8')).not.toContain('OPEN_AFLOW_UPDATE_TEST')
-      expect(extractFile(join(builds, NEWER, 'win-unpacked', 'resources', 'app.asar'), 'dist/main.cjs').toString('utf8')).toContain('OPEN_AFLOW_UPDATE_TEST')
+      expect(extractFile(join(resources, 'app.asar'), 'dist/main.cjs').toString('utf8')).not.toContain('OPENAFLOW_UPDATE_TEST')
+      expect(extractFile(join(builds, NEWER, 'win-unpacked', 'resources', 'app.asar'), 'dist/main.cjs').toString('utf8')).toContain('OPENAFLOW_UPDATE_TEST')
       // pnpm package leaves a default bundle behind in every case.
-      expect(readFileSync(join(DESKTOP, 'dist', 'main.cjs'), 'utf8')).not.toContain('OPEN_AFLOW_UPDATE_TEST')
+      expect(readFileSync(join(DESKTOP, 'dist', 'main.cjs'), 'utf8')).not.toContain('OPENAFLOW_UPDATE_TEST')
     },
     RUN_MS,
   )
@@ -436,7 +436,7 @@ describe.runIf(process.env.OPEN_AFLOW_REAL_INSTALL === '1' && MOCK !== '' && pro
       finished = true
       expect(stateDiff(before!, await machineState())).toEqual([])
       expect(JSON.stringify((await machineState()).startMenu)).toBe(startMenuBefore)
-      expect(existsSync(join(PROGRAMS, 'Open AFlow.lnk'))).toBe(false)
+      expect(existsSync(join(PROGRAMS, 'OpenAFlow.lnk'))).toBe(false)
       expect(diff).toEqual([])
       console.log(proofLastLine(diff))
     },

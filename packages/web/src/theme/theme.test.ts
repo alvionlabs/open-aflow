@@ -30,7 +30,7 @@ function fakeRoot() {
 
 describe('theme', () => {
   it('readChoice falls back to dark', () => {
-    expect(THEME_KEY).toBe('open-aflow-theme')
+    expect(THEME_KEY).toBe('openaflow-theme')
     // A stored choice round-trips.
     for (const choice of ['system', 'light', 'dark'] as const) {
       expect(readChoice(memoryStorage({ [THEME_KEY]: choice })), choice).toBe(choice)

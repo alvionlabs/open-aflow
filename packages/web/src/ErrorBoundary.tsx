@@ -17,7 +17,7 @@ export class ErrorBoundary extends Component<Props, BoundaryState> {
   }
 
   override componentDidCatch(err: unknown): void {
-    console.error('open-aflow render:', err)
+    console.error('openaflow render:', err)
   }
 
   override render(): ReactNode {

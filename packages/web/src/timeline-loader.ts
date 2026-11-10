@@ -5,7 +5,7 @@
 // change during one fetches again once it returns, and a response for an older
 // key is dropped. An error keeps the last timeline of the same agent.
 
-import type { AgentTimeline } from '@open-aflow/model'
+import type { AgentTimeline } from '@openaflow/model'
 
 export type TimelineKey = { repoId: string; agentId: string; lastAt?: number; ended: boolean }
 export type JsonReply = { status: number; body: unknown }
