@@ -15,7 +15,7 @@
       ],
       "ready": true,
       "transcript": {
-        "file": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/33247a05-9c43-4062-8a29-83ffaa56f788.jsonl",
+        "file": "~/.claude/projects/<encoded-scratch-repo>/33247a05-9c43-4062-8a29-83ffaa56f788.jsonl",
         "exists": true
       },
       "seconds": 6
@@ -156,7 +156,7 @@
         "lastEvent": {
           "event": "SessionStart",
           "session_id": "f1c0224e-1819-4cf4-8e46-311dd99db3e3",
-          "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
+          "transcript_path": "~/.claude/projects/<encoded-scratch-repo>/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
           "source": "startup",
           "at": 1794424063963
         }
@@ -169,7 +169,7 @@
         "lastEvent": {
           "event": "Stop",
           "session_id": "f1c0224e-1819-4cf4-8e46-311dd99db3e3",
-          "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
+          "transcript_path": "~/.claude/projects/<encoded-scratch-repo>/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
           "at": 1794424126348
         }
       },
@@ -200,7 +200,7 @@
         "lastEvent": {
           "event": "UserPromptSubmit",
           "session_id": "f1c0224e-1819-4cf4-8e46-311dd99db3e3",
-          "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
+          "transcript_path": "~/.claude/projects/<encoded-scratch-repo>/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
           "prompt": "half typedcontinue",
           "at": 1794424147914
         }
@@ -246,7 +246,7 @@
           "lastEvent": {
             "event": "Notification",
             "session_id": "f1c0224e-1819-4cf4-8e46-311dd99db3e3",
-            "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
+            "transcript_path": "~/.claude/projects/<encoded-scratch-repo>/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
             "notification_type": "idle_prompt",
             "message": "Claude is waiting for your input",
             "at": 1794424214355
@@ -279,7 +279,7 @@
         "lastEvent": {
           "event": "SessionStart",
           "session_id": "79ca2470-13f6-42d5-94e3-67f18b36970c",
-          "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
+          "transcript_path": "~/.claude/projects/<encoded-scratch-repo>/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
           "source": "startup",
           "at": 1794424272279
         }
@@ -300,7 +300,7 @@
           "lastEvent": {
             "event": "SessionStart",
             "session_id": "79ca2470-13f6-42d5-94e3-67f18b36970c",
-            "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
+            "transcript_path": "~/.claude/projects/<encoded-scratch-repo>/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
             "source": "startup",
             "at": 1794424272279
           }
@@ -346,7 +346,7 @@
           "lastEvent": {
             "event": "Notification",
             "session_id": "79ca2470-13f6-42d5-94e3-67f18b36970c",
-            "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
+            "transcript_path": "~/.claude/projects/<encoded-scratch-repo>/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
             "notification_type": "permission_prompt",
             "message": "Claude needs your permission",
             "at": 1794424363943
@@ -365,7 +365,7 @@
             "lastEvent": {
               "event": "Notification",
               "session_id": "79ca2470-13f6-42d5-94e3-67f18b36970c",
-              "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
+              "transcript_path": "~/.claude/projects/<encoded-scratch-repo>/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
               "notification_type": "permission_prompt",
               "message": "Claude needs your permission",
               "at": 1794424363943
