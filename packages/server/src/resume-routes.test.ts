@@ -238,6 +238,17 @@ describe('resume route', () => {
     expect(t.inFlight.size).toBe(0)
   })
 
+  test('a failed press on a toggled run marks the stop failed, and a start clears it', async () => {
+    let outcome: 'started' | 'failed' = 'failed'
+    const s = setup({ board: boardOf(planRepo(SPRINT_DONE)), result: () => ({ outcome }) })
+    await s.store.set('/r', 'alpha', true)
+    await s.resume({ repoId: 'id-r', run: 'alpha', reply: 'continue' })
+    expect(s.store.list()).toEqual([{ path: '/r', run: 'alpha', lastKey: 'sprint-done:one', lastFailed: true }])
+    outcome = 'started'
+    await s.resume({ repoId: 'id-r', run: 'alpha', reply: 'continue' })
+    expect(s.store.list()).toEqual([{ path: '/r', run: 'alpha', lastKey: 'sprint-done:one' }])
+  })
+
   test('one resume per session', async () => {
     let release!: (r: StartResult) => void
     const s = setup({ board: boardOf(planRepo(SPRINT_DONE)), result: () => new Promise<StartResult>((r) => (release = r)) })
@@ -273,6 +284,7 @@ describe('resume route', () => {
       list: () => real.list(),
       set: (...a) => real.set(...a),
       forgetPath: (...a) => real.forgetPath(...a),
+      saveFailed: (...a) => real.saveFailed(...a),
       saveKey: async () => {
         throw new Error('disk full')
       },

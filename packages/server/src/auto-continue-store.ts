@@ -18,6 +18,11 @@ export type AutoContinueStore = {
    * toggle is gone; throws when the save fails, and nothing changes.
    */
   saveKey(path: string, run: string, key: string): Promise<boolean>
+  /**
+   * Marks the send of `key` failed, so the stop raises an item again. Only while `key` is still the toggle's `lastKey`: a later
+   * send's key isn't marked. `false` when there is nothing to mark; throws when the save fails, and nothing changes.
+   */
+  saveFailed(path: string, run: string, key: string): Promise<boolean>
   /** Forgets every toggle of this repo path. Throws when the save fails, and nothing changes. */
   forgetPath(path: string): Promise<void>
 }
@@ -59,6 +64,12 @@ export function createAutoContinueStore(o: { file: string; write?: (file: string
     },
     saveKey: (path, run, key) =>
       update((current) => (current.some((t) => same(t, path, run)) ? current.map((t) => (same(t, path, run) ? saved(t, key) : t)) : undefined)),
+    saveFailed: (path, run, key) =>
+      update((current) =>
+        current.some((t) => same(t, path, run) && t.lastKey === key && !t.lastFailed)
+          ? current.map((t) => (same(t, path, run) ? { ...t, lastFailed: true as const } : t))
+          : undefined,
+      ),
     async forgetPath(path) {
       await update((current) => {
         const rest = current.filter((t) => t.path !== path)
@@ -68,8 +79,8 @@ export function createAutoContinueStore(o: { file: string; write?: (file: string
   }
 }
 
-/** The toggle after a send of `key`. */
-function saved(t: AutoToggle, key: string): AutoToggle {
+/** The toggle after a send of `key` starts: a new start clears `lastFailed`. */
+function saved({ lastFailed: _, ...t }: AutoToggle, key: string): AutoToggle {
   const answeredKeys = withAnsweredKey(t.answeredKeys, key)
   return answeredKeys === undefined ? { ...t, lastKey: key } : { ...t, lastKey: key, answeredKeys }
 }
@@ -87,10 +98,11 @@ function readToggles(file: string): AutoToggle[] {
   const out: AutoToggle[] = []
   for (const r of runs) {
     if (!r || typeof r !== 'object' || Array.isArray(r)) continue
-    const { path, run, lastKey, answeredKeys } = r as Record<string, unknown>
+    const { path, run, lastKey, lastFailed, answeredKeys } = r as Record<string, unknown>
     if (typeof path !== 'string' || typeof run !== 'string' || (lastKey !== undefined && typeof lastKey !== 'string')) continue
     if (out.some((t) => t.path === path && t.run === run)) continue
     const t: AutoToggle = lastKey === undefined ? { path, run } : { path, run, lastKey }
+    if (lastKey !== undefined && lastFailed === true) t.lastFailed = true
     // A bad list is dropped and the toggle kept; only its strings count.
     if (Array.isArray(answeredKeys)) t.answeredKeys = answeredKeys.filter((k): k is string => typeof k === 'string')
     out.push(t)

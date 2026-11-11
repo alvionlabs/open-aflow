@@ -6,11 +6,12 @@ import { SEND_SIGNALS, replySession, runReplies, type RunReply } from './replies
 
 /**
  * A run whose auto-continue toggle is on. `path` is its repo's `repoPathKey`, not its id: an id changes when
- * a clash with another repo forms or ends, and another repo can take it. `lastKey` is the stop it last sent for; `answeredKeys` the
+ * a clash with another repo forms or ends, and another repo can take it. `lastKey` is the stop it last sent for, and `lastFailed`
+ * marks a send of that stop, by the check or a press, that failed to start; `answeredKeys` the
  * `answered` keys it sent (newest last, at most `ANSWERED_KEYS_MAX`), so a pod that never rewrites an
  * answered entry's Resolution doesn't get the same answers sent again after another stop.
  */
-export type AutoToggle = { path: string; run: string; lastKey?: string; answeredKeys?: string[] }
+export type AutoToggle = { path: string; run: string; lastKey?: string; lastFailed?: true; answeredKeys?: string[] }
 
 /** How a toggle names a repo: its normalized path, case-folded where its file system ignores case (the `sameRepoPath` rule). */
 export const repoPathKey = (repo: { path: string; caseless?: boolean }): string => (repo.caseless ? repo.path.toLowerCase() : repo.path)

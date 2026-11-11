@@ -103,8 +103,8 @@ export type Board = {
   repos: BoardRepo[]
   /** The action log, newest first, at most 50. */
   actions?: ActionEntry[]
-  /** The runs whose auto-continue toggle is on. Missing means all off. */
-  autoContinue?: { repoId: string; run: string; lastKey?: string }[]
+  /** The runs whose auto-continue toggle is on. Missing means all off. `lastFailed`: the last send of `lastKey` failed to start. */
+  autoContinue?: { repoId: string; run: string; lastKey?: string; lastFailed?: true }[]
   /** OPENAFLOW_TRANSCRIPT_DAYS: agents come only from transcripts written in this many days. Missing on older Boards (read as 30). */
   transcriptDays?: number
 }

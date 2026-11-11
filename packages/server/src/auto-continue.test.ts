@@ -185,6 +185,8 @@ describe('automatic check', () => {
     expect(s.logged).toEqual([
       { action: 'resume', repoId: 'id-r', repo: 'r', target: 'alpha · continue', result: 'failed', message: 'claude not found', reply: 'continue', auto: true },
     ])
+    // The toggle marks the failure, before the rebuild, so the Board raises the stop again (attention.ts).
+    expect(store.list()).toEqual([{ path: '/r', run: 'alpha', lastKey: expect.any(String), lastFailed: true }])
 
     // New Boards and more checks on the same stop send nothing.
     s.emit(boardOf(planRepo(SPRINT_DONE)))
@@ -206,6 +208,8 @@ describe('automatic check', () => {
     await again.auto.check()
     expect(runner.starts).toHaveLength(2)
     expect(again.logged.at(-1)).toMatchObject({ result: 'started', auto: true })
+    // A send that starts clears the mark.
+    expect(again.store.list()[0]).not.toHaveProperty('lastFailed')
     again.auto.stop()
   })
 
@@ -240,6 +244,7 @@ describe('automatic check', () => {
       list: () => real.list(),
       set: (...a) => real.set(...a),
       forgetPath: (...a) => real.forgetPath(...a),
+      saveFailed: (...a) => real.saveFailed(...a),
       saveKey: async (...a) => {
         if (fail) throw new Error('disk full')
         return real.saveKey(...a)
@@ -300,6 +305,7 @@ describe('automatic check', () => {
     expect(s.logged).toEqual([
       { action: 'resume', repoId: 'id-r', repo: 'r', target: 'alpha · continue', result: 'failed', message: 'spawn EPERM', reply: 'continue', auto: true },
     ])
+    expect(store.list()[0]).toMatchObject({ lastFailed: true })
     expect(s.inFlight.size).toBe(0)
   })
 

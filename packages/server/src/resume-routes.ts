@@ -31,10 +31,11 @@ export function createResumeRoutes(deps: ResumeDeps): Hono {
       // A continue marks this stop sent, so the automatic check won't send it again. A failed save
       // doesn't stop a resume you asked for.
       const key = repoPathKey(repo)
-      if (word === 'continue' && deps.store.list().some((t) => t.path === key && t.run === run)) {
-        await settle(() => deps.store.saveKey(key, run, sendable.key))
-      }
+      const toggled = word === 'continue' && deps.store.list().some((t) => t.path === key && t.run === run)
+      if (toggled) await settle(() => deps.store.saveKey(key, run, sendable.key))
       const result = await runResume(deps, { repo, run, session: session.id, word, auto: false })
+      // A press that fails to start keeps the stop raised, as a failed automatic send does, so the dot stays on.
+      if (toggled && result.outcome === 'failed') await settle(() => deps.store.saveFailed(key, run, sendable.key))
       // The Board carries the new log entry before the response.
       await settle(deps.rebuild)
       return c.json(result)
