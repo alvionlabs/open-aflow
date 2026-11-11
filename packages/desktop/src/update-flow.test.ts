@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createUpdateFlow, FIRST_CHECK_MS, RECHECK_MS, type UpdaterPort } from './update-flow.ts'
+import { createUpdateFlow, FIRST_CHECK_MS, LAST_CHANCE_MS, RECHECK_MS, type UpdaterPort } from './update-flow.ts'
 
 type Answer = 'restart' | 'later'
 
@@ -113,7 +113,7 @@ function setup(o: { packaged?: boolean; firstCheckMs?: number; stop?: () => Prom
 describe('createUpdateFlow', () => {
   test('no check when unpackaged', async () => {
     const t = setup({ packaged: false })
-    t.flow.ready()
+    t.flow.start()
     await t.clock.advance(RECHECK_MS * 3)
     expect(t.checks()).toBe(0)
     expect(t.logs).toEqual([])
@@ -128,14 +128,14 @@ describe('createUpdateFlow', () => {
     await t.clock.advance(FIRST_CHECK_MS * 10)
     expect(t.checks()).toBe(0)
 
-    t.flow.ready()
+    t.flow.start()
     await t.clock.advance(FIRST_CHECK_MS - 1)
     expect(t.checks()).toBe(0)
     await t.clock.advance(1)
     expect(t.checks()).toBe(1)
 
     // A server restart's second ready adds no timer, before or after the first check.
-    t.flow.ready()
+    t.flow.start()
     expect(t.clock.count()).toBe(1)
     await t.clock.advance(RECHECK_MS - 1)
     expect(t.checks()).toBe(1)
@@ -146,10 +146,10 @@ describe('createUpdateFlow', () => {
     expect(t.clock.count()).toBe(1)
   })
 
-  test('a second ready before the first check adds no timer', async () => {
+  test('a second start before the first check adds no timer', async () => {
     const t = setup()
-    t.flow.ready()
-    t.flow.ready()
+    t.flow.start()
+    t.flow.start()
     expect(t.clock.count()).toBe(1)
     await t.clock.advance(FIRST_CHECK_MS)
     expect(t.checks()).toBe(1)
@@ -158,7 +158,7 @@ describe('createUpdateFlow', () => {
 
   test('the first delay can be replaced', async () => {
     const t = setup({ firstCheckMs: 500 })
-    t.flow.ready()
+    t.flow.start()
     await t.clock.advance(500)
     expect(t.checks()).toBe(1)
     await t.clock.advance(RECHECK_MS)
@@ -169,7 +169,7 @@ describe('createUpdateFlow', () => {
     const t = setup()
     const check = deferred<null>()
     t.port.nextCheck = () => check.promise
-    t.flow.ready()
+    t.flow.start()
     await t.clock.advance(FIRST_CHECK_MS)
     expect(t.checks()).toBe(1)
     await t.clock.advance(RECHECK_MS)
@@ -201,7 +201,7 @@ describe('createUpdateFlow', () => {
       void t.error(failure)
       return Promise.reject(failure)
     }
-    t.flow.ready()
+    t.flow.start()
     await t.clock.advance(FIRST_CHECK_MS)
     expect(t.logs).toHaveLength(1)
     expect(t.logs[0]).toContain('HTTP_ERROR_500')
@@ -226,7 +226,7 @@ describe('createUpdateFlow', () => {
       const download = Promise.reject(failure)
       return Promise.resolve({ downloadPromise: download })
     }
-    t.flow.ready()
+    t.flow.start()
     await t.clock.advance(FIRST_CHECK_MS)
     await t.error(failure)
     expect(t.logs).toHaveLength(1)
@@ -247,7 +247,7 @@ describe('createUpdateFlow', () => {
     expect(t.logs[2]).not.toContain('example.com')
 
     const bad = setup({ updaterThrows: true })
-    expect(() => bad.flow.ready()).not.toThrow()
+    expect(() => bad.flow.start()).not.toThrow()
     await bad.clock.advance(RECHECK_MS * 2)
     expect(bad.logs).toHaveLength(1)
     expect(bad.logs[0]).not.toContain('example.com')
@@ -256,7 +256,7 @@ describe('createUpdateFlow', () => {
 
   test('when it asks', async () => {
     const t = setup()
-    t.flow.ready()
+    t.flow.start()
     await t.download('1.0.1')
     expect(t.events).toEqual(['ask 1.0.1'])
     expect(t.logs.join('\n')).toContain('1.0.1')
@@ -278,7 +278,7 @@ describe('createUpdateFlow', () => {
         return box.promise
       },
     })
-    t.flow.ready()
+    t.flow.start()
     await t.download('1.0.1')
     await t.download('1.0.2')
     expect(asked).toEqual(['1.0.1'])
@@ -295,7 +295,7 @@ describe('createUpdateFlow', () => {
 
   test('no box opens once a quit has begun, and no check runs', async () => {
     const t = setup()
-    t.flow.ready()
+    t.flow.start()
     t.beginQuit()
     await t.download('1.0.1')
     await t.clock.advance(FIRST_CHECK_MS + RECHECK_MS)
@@ -305,7 +305,7 @@ describe('createUpdateFlow', () => {
   test('an answer after a quit began installs nothing', async () => {
     const box = deferred<Answer>()
     const t = setup({ ask: () => box.promise })
-    t.flow.ready()
+    t.flow.start()
     await t.download('1.0.1')
     t.beginQuit()
     box.resolve('restart')
@@ -316,13 +316,13 @@ describe('createUpdateFlow', () => {
   test('later installs nothing', async () => {
     const t = setup()
     t.answers.push('later')
-    t.flow.ready()
+    t.flow.start()
     await t.download('1.0.1')
     expect(t.events).toEqual(['ask 1.0.1'])
 
     // A box that fails counts as Later.
     const broken = setup({ ask: () => Promise.reject(new Error('https://example.com')) })
-    broken.flow.ready()
+    broken.flow.start()
     await broken.download('1.0.1')
     expect(broken.events).toEqual([])
     expect(broken.logs.join()).not.toContain('example.com')
@@ -332,7 +332,7 @@ describe('createUpdateFlow', () => {
     const stop = deferred<string>()
     const t = setup({ stop: () => stop.promise })
     t.answers.push('restart')
-    t.flow.ready()
+    t.flow.start()
     await t.download('1.0.1')
     expect(t.events).toEqual(['ask 1.0.1'])
     stop.resolve(result)
@@ -344,7 +344,7 @@ describe('createUpdateFlow', () => {
   test('restart stops first, and a stop that throws goes on', async () => {
     const t = setup({ stop: () => Promise.reject(new Error('gone')) })
     t.answers.push('restart')
-    t.flow.ready()
+    t.flow.start()
     await t.download('1.0.1')
     expect(t.events).toEqual(['ask 1.0.1', 'install'])
   })
@@ -353,7 +353,7 @@ describe('createUpdateFlow', () => {
     const stop = deferred<string>()
     const t = setup({ stop: () => stop.promise })
     t.answers.push('restart')
-    t.flow.ready()
+    t.flow.start()
     await t.download('1.0.1')
     await t.clock.advance(FIRST_CHECK_MS + RECHECK_MS * 2)
     await t.download('1.0.2')
@@ -366,7 +366,7 @@ describe('createUpdateFlow', () => {
     t.port.installImpl = () => {
       throw Object.assign(new Error('spawn https://example.com'), { code: 'EACCES' })
     }
-    t.flow.ready()
+    t.flow.start()
     await t.download('1.0.1')
     expect(t.events).toEqual(['ask 1.0.1', 'stop', 'install', 'quit'])
     expect(t.logs.join()).toContain('EACCES')
@@ -378,7 +378,7 @@ describe('createUpdateFlow', () => {
     const t = setup()
     t.answers.push('restart')
     t.port.installImpl = () => void t.error(new Error('No update filepath provided'))
-    t.flow.ready()
+    t.flow.start()
     await t.download('1.0.1')
     await t.error(new Error('again'))
     expect(t.events).toEqual(['ask 1.0.1', 'stop', 'install', 'quit'])
@@ -389,12 +389,112 @@ describe('createUpdateFlow', () => {
     const stop = deferred<string>()
     const t = setup({ stop: () => stop.promise })
     t.answers.push('restart')
-    t.flow.ready()
+    t.flow.start()
     await t.download('1.0.1')
     await t.error(new Error('late check failure'))
     expect(t.events).toEqual(['ask 1.0.1'])
     stop.resolve('stopped')
     await settle()
     expect(t.events).toEqual(['ask 1.0.1', 'install'])
+  })
+
+  describe('last chance, after the server failed', () => {
+    /** Tracks whether lastChance resolved. */
+    const watch = (p: Promise<void>) => {
+      const s = { done: false }
+      void p.then(() => (s.done = true))
+      return s
+    }
+
+    test('checks at once, before the first timed check, and resolves when no update comes', async () => {
+      const t = setup()
+      t.flow.start()
+      const s = watch(t.flow.lastChance())
+      await settle()
+      expect(t.checks()).toBe(1)
+      expect(s.done).toBe(true)
+      expect(t.events).not.toContain('quit')
+    })
+
+    test('an update found asks, and Restart now installs and never resolves', async () => {
+      const t = setup()
+      t.answers.push('restart')
+      t.port.nextCheck = async () => {
+        await t.download('1.0.1')
+        return null
+      }
+      t.flow.start()
+      const s = watch(t.flow.lastChance())
+      await settle()
+      expect(t.events).toEqual(['check', 'ask 1.0.1', 'stop', 'install'])
+      await t.clock.advance(LAST_CHANCE_MS)
+      expect(s.done).toBe(false)
+    })
+
+    test('Later resolves', async () => {
+      const t = setup()
+      t.port.nextCheck = async () => {
+        await t.download('1.0.1')
+        return null
+      }
+      t.flow.start()
+      const s = watch(t.flow.lastChance())
+      await settle()
+      expect(t.events).toEqual(['check', 'ask 1.0.1'])
+      await settle()
+      expect(s.done).toBe(true)
+    })
+
+    test('a failed check resolves', async () => {
+      const t = setup()
+      t.port.nextCheck = () => Promise.reject(new Error('net::ERR_INTERNET_DISCONNECTED'))
+      t.flow.start()
+      const s = watch(t.flow.lastChance())
+      await settle()
+      expect(s.done).toBe(true)
+    })
+
+    test('waits for a check that runs now and for an open box', async () => {
+      const download = deferred()
+      const box = deferred<Answer>()
+      const t = setup({ ask: () => box.promise })
+      t.port.nextCheck = () => Promise.resolve({ downloadPromise: download.promise })
+      t.flow.start()
+      await t.clock.advance(FIRST_CHECK_MS)
+      const s = watch(t.flow.lastChance())
+      await settle()
+      // One check: the one that runs now.
+      expect(t.checks()).toBe(1)
+      expect(s.done).toBe(false)
+      await t.download('1.0.1')
+      download.resolve()
+      await settle()
+      expect(s.done).toBe(false)
+      box.resolve('later')
+      await settle()
+      expect(s.done).toBe(true)
+    })
+
+    test('a download that hangs resolves after the limit', async () => {
+      const t = setup()
+      t.port.nextCheck = () => Promise.resolve({ downloadPromise: new Promise(() => {}) })
+      t.flow.start()
+      const s = watch(t.flow.lastChance())
+      await t.clock.advance(LAST_CHANCE_MS - 1)
+      expect(s.done).toBe(false)
+      await t.clock.advance(1)
+      expect(s.done).toBe(true)
+      expect(t.logs.at(-1)).toContain('no update in time')
+    })
+
+    test('an unpackaged app, or an updater that failed to start, resolves at once', async () => {
+      for (const t of [setup({ packaged: false }), setup({ updaterThrows: true })]) {
+        t.flow.start()
+        const s = watch(t.flow.lastChance())
+        await settle()
+        expect(s.done).toBe(true)
+        expect(t.checks()).toBe(0)
+      }
+    })
   })
 })

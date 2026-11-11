@@ -6,7 +6,7 @@ import { autoUpdater } from 'electron-updater'
 import { APP_NAME } from './shell-config.ts'
 import type { ShellContext } from './shell-main.ts'
 import { readTestUpdate } from './update-feed.ts'
-import { createUpdateFlow, type UpdaterPort } from './update-flow.ts'
+import { createUpdateFlow, type UpdateFlow, type UpdaterPort } from './update-flow.ts'
 
 /** `pnpm package --test-feed` sets this. In every other build the test feed's code is removed. */
 declare const __OPENAFLOW_TEST_FEED__: boolean
@@ -46,7 +46,8 @@ async function askBox(version: string): Promise<'restart' | 'later'> {
   return response === RESTART ? 'restart' : 'later'
 }
 
-export function startUpdater(ctx: ShellContext): void {
+/** Undefined when this build has no feed. */
+export function startUpdater(ctx: ShellContext): Pick<UpdateFlow, 'lastChance'> | undefined {
   let feed: string | null = null
   let firstCheckMs: number | undefined
   let ask = askBox
@@ -54,7 +55,7 @@ export function startUpdater(ctx: ShellContext): void {
     const test = readTestUpdate(ctx.env)
     if (app.isPackaged && test.feed === null) {
       console.error('openaflow desktop: update test feed ignored: it is not a loopback URL, so this build has no feed')
-      return
+      return undefined
     }
     feed = test.feed
     firstCheckMs = test.firstCheckMs ?? undefined
@@ -82,5 +83,7 @@ export function startUpdater(ctx: ShellContext): void {
     log: (line) => console.log(line),
     firstCheckMs,
   })
-  ctx.host.onReady(() => flow.ready())
+  // At the start, not at the server's ready: a release whose server can't start must still get its fix.
+  flow.start()
+  return flow
 }

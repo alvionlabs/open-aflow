@@ -10,7 +10,8 @@
 - **After the install.** A normal install opens the app (`runAfterFinish`). A silent install stays closed, so a proof never starts the app with no temp env. The update path is silent with `--force-run`, which starts its one new copy, as it always did. The template rule is `${ifNot} ${Silent} ${orIf} ${isForceRun}` in `installSection.nsh`, and `build-config.test.ts` fails if a new electron-builder changes it.
 - **Release.** `release.yml` runs only on a tag `v<major>.<minor>.<patch>` that equals `version` in `packages/desktop/package.json`. Job `build` has a read token: it runs `pnpm verify`, `pnpm package`, and `pnpm release:check`. Job `publish` needs `build`, has the write token, and runs no repo code.
 - **Check.** `pnpm release:check` checks the size, `latest.yml`, and the blockmap, then installs, starts, and uninstalls the app. `pnpm test:install` runs the longer proofs. Each ends with `state diff: []`.
-- **Update.** Only in a packaged app. First check 30 s after the first server ready, then every 6 h. `autoDownload` on. `autoInstallOnAppQuit` and `allowDowngrade` off.
+- **Update.** Only in a packaged app. First check 30 s after the app starts, then every 6 h. It doesn't wait for the server.
+- **Last chance.** When the server fails for good, the app checks at once after the error box. No update, a failed check, or Later: it quits. Restart now: it installs. It quits anyway after 10 minutes (`LAST_CHANCE_MS`). The tray stays, so Quit works the whole time. `autoDownload` on. `autoInstallOnAppQuit` and `allowDowngrade` off.
 
 ```mermaid
 flowchart TD
@@ -35,6 +36,7 @@ flowchart TD
 - **Only the human's tag publishes.** The sprint contract replaced the plan's two throwaway test releases with a local feed. Trade-off: the GitHub path stays unproved until the first two tags.
 - **`openaflow` as the packaged name.** It names the install folder and the updater's cache folder. NSIS's `--delete-app-data` removes `%APPDATA%\<name>`, and `%APPDATA%\<product name>` (`OpenAFlow`), so neither may be the server's config folder, `openaflow-server`. `build-config.test.ts` checks it against `CONFIG_DIR_NAME`.
 - **The server stops first on Restart now.** The installer's `Stop-Process` would end it with no drain.
+- **The updater doesn't wait for the server.** A release whose server can't start on a machine must still get its fix. Recovery code that needs the failing part can't run. See [the research](../research/updater-independent-of-server.md).
 - **The test feed is compiled out.** A build-time flag removes it from every shipped build, and `release:check` refuses a build that holds its text.
 
 ## Watch out
@@ -42,7 +44,6 @@ flowchart TD
 - **Start the app's exe with `windowsHide: false` in a proof.** `windowsHide` starts it with SW_HIDE, and Windows applies that to the first `ShowWindow`, so the window never shows on a sound app. The exe has no console, so nothing extra opens. `hidden-processes.test.ts` allows this only in the files it names. After a failed `installed app runs`, the next tests fail too: that test throws before it stops the app, so the app keeps the lock and later launches exit at once.
 - **Quit and update must never tree-kill.** electron-builder 26.18.1 uses `Stop-Process -Id` or `taskkill /IM`. `build-config.test.ts` fails if a bump adds `taskkill /T`.
 - **The workflow has never run on GitHub.** Its launch check on `windows-latest`, `gh release create`, and the GitHub provider are unproved.
-- **Open queue item (now):** the updater starts after the first server ready, so a build whose server can't start on one machine can't update itself out.
 - **Open queue item (before hosting):** no Electron fuses are set, so `ELECTRON_RUN_AS_NODE` still works on the shipped exe.
 - A real install makes `refuseRealInstall` stop every proof. Uninstall first.
 - `pnpm package --test-feed` is for proofs only. Never upload its files.

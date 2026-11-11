@@ -33,11 +33,18 @@ export type ShellOptions = {
   onServer?(pid: number): void
   /** Default: only a packaged app. The real toast test turns it on and removes what it leaves. */
   activatorAtStart?: boolean
-  /** In place of the error box, which waits for a click. The app quits after either. */
+  /** In place of the error box, which waits for a click. After either, the app checks for an update, then quits. */
   onFailed?(error: string): void
 }
 
-const showFailure = (error: string) => dialog.showErrorBox(APP_NAME, `The server stopped and could not restart.\n\n${error}`)
+/** Where a user gets a new version by hand, when the app can't update itself. */
+export const RELEASES_URL = 'https://github.com/alvionlabs/openaflow/releases'
+
+const showFailure = (error: string) =>
+  dialog.showErrorBox(
+    APP_NAME,
+    `The server stopped and could not restart.\n\n${error}\n\n${APP_NAME} checks for an update before it closes. You can also get the latest version from ${RELEASES_URL}`,
+  )
 
 /** Returns `undefined` on a second launch, which starts no server and exits. */
 export function startShell(o: ShellOptions): ShellContext | undefined {
@@ -80,15 +87,18 @@ export function startShell(o: ShellOptions): ShellContext | undefined {
   // `session-end` is a window's event, so each window reports it.
   app.on('browser-window-created', (_e, win) => win.on('session-end', () => flow.sessionEnd()))
   app.on('second-instance', () => bus.showWindow())
+  let updater: ReturnType<typeof startUpdater>
   host.onFailed((error) => {
     ;(o.onFailed ?? showFailure)(error)
-    app.quit()
+    // The page has no server. The tray stays, so Quit still works while the update check runs.
+    for (const win of BrowserWindow.getAllWindows()) win.hide()
+    void (updater?.lastChance() ?? Promise.resolve()).finally(() => app.quit())
   })
 
   void app.whenReady().then(() => {
     startWindow(ctx)
     startNotifier(ctx)
-    startUpdater(ctx)
+    updater = startUpdater(ctx)
     host.start()
   })
   return ctx
