@@ -2,7 +2,15 @@
 
 _Run: 2026-11-11 · Linux (Fedora 44, Wayland, Electron 45.2.1, Node 26.13.0, Claude Code 2.1.322) · Windows: not run · Used by: [terminal-host.md](terminal-host.md)_
 
-**Status:** the spike ran on Linux. All 11 checks pass on Linux, after two fixes to the design (see [Design changes](#design-changes)). Windows was not run: the human chose no CI, and no Windows machine run was set up.
+**Status:** the spike ran on Linux only. Its own pass bar asks for Linux and Windows, so the spike is **not complete**. On Linux, every check passes, with these limits:
+
+- Two checks passed only after a fix to the design: 5 (the draft rule) and 6 (a sweep after a host crash). See [Design changes](#design-changes).
+- Part 5a ran with the first version of the gate. Its send path did not change, and the new gate opened at an idle prompt in the rerun.
+- The 5b-c rerun verdict was set by hand. The check's file test hit a file left by the first run. The hook events and the screen show that nothing was approved.
+- Check 8 ran check 1 on the packaged app with the fake `claude`, not the real one.
+- A child that clears its env survives quit unless the run is in a systemd scope (an option in the spike).
+
+Windows was not run. The human answered "No CI", and no run on a Windows machine is set up.
 
 The prototype is throwaway code on the branch `spike/terminal-host`, in `packages/desktop/spike/`. It never merges to `main`. The raw results are in `packages/desktop/spike/results/` on that branch.
 
@@ -10,7 +18,9 @@ The prototype is throwaway code on the branch `spike/terminal-host`, in `package
 
 - The VS Code design works for OpenAFlow. A pty host in a second `utilityProcess` keeps each run alive through a closed window, a window reload, a new window, and a server crash. Replay through a `MessagePort` lost no line and repeated no line.
 - Quit ends every process of a run, if the host ends more than the pty. Closing the pty is not enough: a detached child survives. The spike ends the process tree, every process that holds the run's env marker, and (as an option) the run's systemd scope.
-- After an app crash (`SIGKILL` of the main process), the host, the server, and `claude` end by themselves. A detached child survives. The next start finds it by its env marker and ends it.
+- After an app crash (`SIGKILL` of the main process), the host, the server, and `claude` (real and fake) end by themselves. A detached child survives. The next start finds it by its env marker and ends it.
+- After a host crash, a detached child also survives. The first version of the spike left it running. Main now ends it by marker when the host exits.
+- Real `claude` ends on SIGHUP in about 1 s. On SIGTERM it ended in 0.7 s once, and it was still running after 3 s once, so the SIGKILL fallback is needed.
 - Auto-continue is **not safe** with the planned rules alone. A send after the typing wait went into a half-typed input box and submitted it. Hook events plus a "draft" rule fix this without reading the screen.
 - `/clear` changes the session ID. The plugin's `SessionStart` hook reports each new ID with its cause, so the app can follow the session.
 - `node-pty` 1.1.0 has no Linux prebuilt binary. The spike used the fork `@lydell/node-pty`, which has one for each platform. In the package, node-pty adds 144 KB.
@@ -26,14 +36,15 @@ Linux only. "Fake" means the fake `claude` (`spike/fake-claude.mjs`); "real" mea
 | 3 | Server life (fake) | Pass | Not run | Server killed by PID. New server PID, `/api/health` 200. Terminal went 10 → 21 lines with no gap. |
 | 4 | Clean quit (fake) | Pass | Not run | Dialog text and buttons correct; **Cancel** keeps app, run, and child. **Quit and end runs** leaves no process and no listening port. One gap, closed by a systemd scope; see [Ending a run](#ending-a-run). |
 | 5 | Safe auto-continue (real) | Pass, after a fix | Not run | a) `continue` became a user turn in the transcript. b) Failed with the planned rules; passes with the draft rule. c) No send during a permission dialog held 70 s. |
-| 6 | Host crash (fake) | Pass | Not run | Host killed by PID. App started a new host. Run read `host crashed`; `claude` ended. **Resume** started `claude --resume <uuid>`. |
+| 6 | Host crash (fake) | Pass, after a fix | Not run | Host killed by PID. App started a new host. Run read `host crashed`; `claude` ended. A detached child survived until main swept it by marker (added after the first run). **Resume** started `claude --resume <uuid>`. |
 | 7 | App crash (fake) | Pass | Not run | Run read `app closed` with its last saved screen. A detached child survived the crash; the start sweep ended it. Nothing started by itself. |
 | 8 | Package and memory (fake) | Pass | Not run | Linux `dir` package. node-pty loaded with no build step. Checks 1 (fake start) and 4 passed on the packaged app. Sizes and memory below. |
 | 9 | Session ID drift (real) | Finding | Not run | See [Session IDs](#session-ids). |
 | 10 | Electron test | Pass | Not run | `spike/checks.mjs` runs every check with Playwright `_electron`. |
 | 11 | Session-only plugin (real) | Pass | Not run | `/openaflow-spike:hello` ran the skill in the app. Plain `claude` in the same repo: `No commands match "/openaflow-spike:hello"`. |
+| — | Real `claude` kills (real, no turn) | Finding | Not run | Real `claude` ended after a host crash (about 1 s, no sweep), a quit, and an app crash. See [Ending a run](#ending-a-run). |
 
-Real `claude` use: about 10 short Haiku turns, a little above the 6-8 that the human approved. The extra turns came from check 5: one turn sent by the bug that check found, and one rerun after the fix.
+Real `claude` use: 10 short Haiku turns (9 typed prompts and one skill run), counted from the transcripts. The human approved about 6-8. The extra turns came from check 5: one turn sent by the bug that the check found, and one rerun after the fix. The kill checks typed nothing and spent no turn.
 
 ## Findings
 
@@ -45,7 +56,7 @@ Real `claude` use: about 10 short Haiku turns, a little above the 6-8 that the h
   - Use `@lydell/node-pty`. Pin it, and review each update.
   - Use `node-pty`, and build the Linux binary in our release workflow. Linux users then still get a prebuilt binary from us.
   - Wait for `node-pty` 1.2.0, which is in beta now (`1.2.0-beta.18`). _Not checked:_ whether its prebuilds include Linux.
-- pnpm: `pnpm-workspace.yaml` has an `allowBuilds` list. `electron` and node-pty's install scripts need an entry. Without one, pnpm skips the Electron binary download.
+- pnpm: `pnpm-workspace.yaml` has an `allowBuilds` list, and pnpm skips any install script not in it. On this machine the Electron binary was missing after `pnpm install`. An `electron: true` entry and `pnpm rebuild electron` did not download it. Only `node node_modules/electron/install.js` (in `packages/desktop`) did. CI on Windows gets the binary today, so _not checked:_ why it differs here.
 - A native `.node` file can't load from inside an asar. The spike puts node-pty in `resources/native/node_modules/` and names that folder to the host in env. electron-builder's `asarUnpack` is the usual way.
 
 ### Window and server life
@@ -75,6 +86,23 @@ What each way found, for a child HTTP server that tries to outlive `claude`:
 - The marker finds most orphans, because children inherit env. A child that clears its env escapes it.
 - A cgroup holds every process, whatever it does. On Linux with systemd, the host can start each run as `systemd-run --user --scope --unit=openaflow-run-<id>.scope claude ...` and end it with `systemctl --user stop <unit>`. This worked here. _Not tested:_ Linux without systemd, and macOS, which has no cgroups.
 - Windows needs its own way: a Job Object with `KILL_ON_JOB_CLOSE`, as `terminal-host.md` proposes. Not tested.
+
+Real `claude`, started with no prompt typed (check 12):
+
+| Event | Real `claude` |
+|---|---|
+| Host crash, no sweep | Ended in about 1 s (SIGHUP from the closed pty) |
+| Quit, SIGHUP first | Ended in about 1 s |
+| Quit, SIGTERM first | Ended in 0.7 s in one run. In another run it was still running after 3 s and got SIGKILL. |
+| App crash | Ended within 3 s |
+
+So the host sends SIGHUP first, as a closed terminal does, then SIGTERM, then SIGKILL. _Not tested:_ real `claude` with a turn or a tool in flight, and real `claude` with its own children (MCP servers, Bash tools).
+
+### Host crash
+
+- When the host ends, every pty closes, and the fake `claude` ended. A detached child did not.
+- The first spike build only marked the runs `host crashed`. The start sweep covers only runs with no stop reason, and quit covers only live runs. So that child had no owner, and it ran until the end of the session.
+- Main now ends every process with the run's marker when the host exits. Check 6 passed with this sweep: the child's port closed.
 
 ### App crash
 
@@ -119,7 +147,7 @@ The hooks of a small spike plugin (`--plugin-dir`) wrote each event to a file. E
 - **The idle rule must come from hooks.** Idle means the newest of `SessionStart`, `Stop`, and `Notification` `idle_prompt`, with no event after it except `SubagentStop` and `SessionEnd`. Any `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, or `Notification` `permission_prompt` after it means busy or a dialog. In the first design of the gate, `idle_prompt` counted as busy, so it blocked every send after 60 s at an empty prompt.
 - `PermissionRequest` fires before the dialog's `Notification`, so the gate closes at once, not 6 s later.
 - The `UserPromptSubmit` payload holds the submitted text (`prompt`). The app can use it to log what each automatic send became.
-- The user's `defaultMode: auto` setting approves most Bash commands by itself. The test used `--permission-mode default` to get a dialog. The plan must not assume that every user sees dialogs.
+- A user setting of `defaultMode: auto` approves most Bash commands with no dialog. The test machine has it, so the test used `--permission-mode default` to get a dialog. The plan must not assume that every user sees dialogs.
 
 ### Session IDs
 
@@ -156,7 +184,7 @@ Check 9, in one hosted terminal started with `--session-id A`:
 These change [terminal-host.md](terminal-host.md). The same edits are in that file.
 
 1. **Auto-continue gate.** Add the draft rule, and define idle from hook events as above. Send Enter exactly once, after a pause.
-2. **Ending a run.** Snapshot the tree and the env marker before any signal. On Linux with systemd, put each run in its own user scope. On the next start after a crash, end leftovers by marker and by scope.
+2. **Ending a run.** Snapshot the tree and the env marker before any signal. Send SIGHUP, then SIGTERM, then SIGKILL. On Linux with systemd, put each run in its own user scope. After a host crash, and at the next start after an app crash, end leftovers by marker and by scope.
 3. **Session IDs.** Follow the live session through the plugin's `SessionStart` hook.
 4. **Folder trust.** The app never answers the trust prompt. The Terminal tab must show a run that waits on it.
 5. **Save screens on a timer** (10 s), not only at quit.
@@ -165,6 +193,8 @@ These change [terminal-host.md](terminal-host.md). The same edits are in that fi
 ## Not tested
 
 - Windows: every check. ConPTY, Job Objects, and packaging there.
+- The gate during a question dialog (`AskUserQuestion`), a plan approval, and the trust prompt (default **No, exit**). Each may fire other hook events than a permission dialog.
+- The gate with subagents or background work still running after `Stop`. The 60 s transcript idle rule stays for that case.
 - macOS.
 - The heartbeat banner (a host that hangs but stays alive).
 - Flow control at 100,000 unacknowledged characters.
@@ -177,7 +207,8 @@ These change [terminal-host.md](terminal-host.md). The same edits are in that fi
 On the branch `spike/terminal-host`, in `packages/desktop`:
 
 ```sh
-pnpm install            # needs the allowBuilds entries for electron
+pnpm install
+node node_modules/electron/install.js   # the Electron binary, if pnpm skipped it
 pnpm -w build           # the server bundle
 npx tsx spike/bundle.ts # dist-spike/
 node spike/checks.mjs   # the fake-only checks: 2 3 4 6 7 8-memory

@@ -50,6 +50,24 @@ Short notes on the options not chosen, so they can be weighed again later. Each 
 - **Detached host that outlives the app.** Runs survive quit, updates, and app crashes. Rejected: background runs use RAM and make the app hard to predict. It also needs Windows job-object work so Electron doesn't end the children.
 - **tmux as the host (Linux and macOS).** Free persistence, and you could attach from your own terminal. Rejected: Windows has no tmux, so two hosts to keep up.
 
+**Ending a run (decision 4), from the spike**
+- **Close the pty only.** Rejected: a detached child, such as a dev server, survives (check 4).
+- **Process tree only.** Rejected: misses a child whose parent has exited (check 4).
+- **Env marker only.** Kept, with the tree, but not enough alone: a child that clears its env escapes it. A systemd scope closes that gap on Linux.
+
+**Auto-continue gate (decision 9), from the spike**
+- **Typing wait only.** Rejected: once the wait ran out, a send went into a half-typed box and submitted it (check 5).
+- **Clear the box with Ctrl+U before the send.** Rejected: it deletes your draft.
+- **Read the screen to see if the box is empty.** Rejected for now: it breaks the "files, not screen" rule, and the screen changes with each Claude Code release. The draft rule needs no screen.
+
+**Following the live session ID, from the spike**
+- **The newest transcript whose `cwd` is the repo.** Rejected: a guess that breaks with two terminals in one repo. The `SessionStart` hook names the session and the cause.
+
+**node-pty, from the spike (open)**
+- **`node-pty` 1.1.0:** no Linux prebuilt binary, so Linux needs our own build in CI.
+- **`@lydell/node-pty`:** prebuilt for all three, but a third-party beta.
+- **`node-pty` 1.2.0 when released:** _not checked_ for Linux prebuilds.
+
 **Resume (decision 5)**
 - **Resume on its own at start.** Fewer clicks after a reboot. Rejected: it starts long runs that use the plan quota with no action from you.
 
@@ -205,7 +223,8 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 - Linux and macOS: closing the pty sends SIGHUP to the session. Children in another process group, such as a dev server an engineer started with `nohup` or `&`, can survive. Spike check 4 confirmed this.
 - Each run's env gets a marker, `OPENAFLOW_RUN=<run id>`. To end a run: take a snapshot of the process tree and of every process whose env holds the marker; send SIGTERM to the process group and to each process; wait; send SIGKILL to survivors; check for survivors.
 - The marker misses a child that clears its env (`env -i`) after it leaves the tree. On Linux with systemd, start each run in its own user scope (`systemd-run --user --scope --unit=openaflow-run-<id>.scope`) and end it with `systemctl --user stop`. The scope ended that child in the spike. macOS has no cgroups: there, the marker is the best way found.
-- **After an app crash,** the host, the server, and `claude` end by themselves, but a detached child survives (spike check 7). On the next start, end each leftover of a run that had no stop reason, by marker and by scope.
+- Send SIGHUP first, as a closed terminal does. Real `claude` ended on SIGHUP in about 1 s. On SIGTERM it once ran past 3 s, so keep SIGKILL as the last step.
+- **After a host crash or an app crash,** the host, the server, and `claude` end by themselves, but a detached child survives (spike checks 6 and 7). When the host exits, main ends each leftover of the runs it marks `host crashed`. At the next start after an app crash, it ends each leftover of a run that had no stop reason. Both use the marker and the scope.
 - Windows: closing the ConPTY ends attached console processes. Children started detached, or with their own console, can survive. Use a Job Object with `KILL_ON_JOB_CLOSE` for each run, or end the tree by process ID.
 - Engineers start dev servers in worktrees, so this is a real case, not an edge case. The spike must test it.
 
@@ -215,7 +234,8 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 - The app writes `continue` (or `go`) to the pty, with Enter, only when all of these are true:
   - The run's toggle is on, or you pressed the button.
   - The model says the run waits for that word (the existing sendable rule).
-  - The session is idle, from the plugin's hook events (spike check 5): the newest of `SessionStart`, `Stop`, and `Notification` `idle_prompt`, with no `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, or `Notification` `permission_prompt` after it. A permission dialog fires `PermissionRequest` at once and nothing more while it stays open, so the gate stays closed. Enter in that dialog accepts the highlighted choice, **1. Yes**.
+  - The session is idle by the existing 60 s rule on the transcript and `subagents/` files. Keep it: the spike did not test subagents or background work after `Stop`.
+  - The session is idle by the plugin's hook events too (spike check 5): the newest of `SessionStart`, `Stop`, and `Notification` `idle_prompt`, with no `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, or `Notification` `permission_prompt` after it. A permission dialog fires `PermissionRequest` at once and nothing more while it stays open, so the gate stays closed. Enter in that dialog accepts the highlighted choice, **1. Yes**.
   - The input box holds no draft. **This is required.** The host sees every byte you type. If you typed after the newest submit (`UserPromptSubmit` or `SessionStart`) and pressed no Enter, the box may hold text, and the send waits until your next submit. In spike check 5, a send with the typing wait only went into a half-typed box and submitted `half typedcontinue`.
   - You have not typed in that terminal for the typing wait: 30 s by default, a user setting (decision 9).
   - The terminal is live. A stopped run gets nothing (see [Resume](#resume)).
