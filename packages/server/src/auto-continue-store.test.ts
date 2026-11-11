@@ -170,6 +170,17 @@ describe('auto-continue store', () => {
     await store.set('r1', 'alpha', true)
     expect(store.list()).toEqual([{ path: 'r1', run: 'alpha' }])
 
+    // A failed answered send leaves answeredKeys, so the board may send it later. Other answered keys stay.
+    await store.saveKey('r1', 'alpha', 'answered:alpha:1:aaaaaaaa')
+    await store.saveKey('r1', 'alpha', 'answered:alpha:2:bbbbbbbb')
+    expect(await store.saveFailed('r1', 'alpha', 'answered:alpha:2:bbbbbbbb')).toBe(true)
+    expect(store.list()).toEqual([{ path: 'r1', run: 'alpha', lastKey: 'answered:alpha:2:bbbbbbbb', lastFailed: true, answeredKeys: ['answered:alpha:1:aaaaaaaa'] }])
+    await store.set('r1', 'alpha', true)
+    await store.saveKey('r1', 'alpha', 'answered:alpha:3:cccccccc')
+    await store.saveFailed('r1', 'alpha', 'answered:alpha:3:cccccccc')
+    expect(store.list()).toEqual([{ path: 'r1', run: 'alpha', lastKey: 'answered:alpha:3:cccccccc', lastFailed: true }])
+    await store.set('r1', 'alpha', true)
+
     // In the file, only `true` with a key counts.
     put(JSON.stringify({ runs: [{ path: 'r1', run: 'alpha', lastFailed: true }, { path: 'r2', run: 'beta', lastKey: 'k', lastFailed: 'yes' }] }))
     expect(createAutoContinueStore({ file }).list()).toEqual([

@@ -189,7 +189,7 @@ describe('attention items', () => {
 
   test('a plan run whose send of this key failed raises the item, with a session too', () => {
     const failed = (lastKey: string) => attentionItems(boardOf([sendable()], { autoContinue: [{ repoId: 'chess', run: PLAN, lastKey, lastFailed: true }] }), NOW).map((i) => i.id)
-    expect(failed('wave-merged:78')).toEqual(['chess\nwave-merged:78'])
+    expect(failed('wave-merged:78')).toEqual(['chess\nfailed:wave-merged:78'])
     // A mark on another key is an older stop: the board sends this one by itself.
     expect(failed('wave-merged:77')).toEqual([])
   })
@@ -201,7 +201,8 @@ describe('attention items', () => {
       attentionItems(boardOf([repoAt], { autoContinue: [{ repoId: 'chess', run: FIX, ...toggle }], actions: [...actions] }), NOW).map((i) => i.id)
 
     test('raises the item when the send for this key failed', () => {
-      expect(idsWith({ lastKey: 'fix-merged:36', lastFailed: true })).toEqual(['chess\nfix-merged:36'])
+      // Its own id, so it sends a toast even when the stop already did.
+      expect(idsWith({ lastKey: 'fix-merged:36', lastFailed: true })).toEqual(['chess\nfailed:fix-merged:36'])
     })
 
     test('stays quiet when the send for this key started, whatever the action log says', () => {

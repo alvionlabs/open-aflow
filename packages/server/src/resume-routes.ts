@@ -32,7 +32,8 @@ export function createResumeRoutes(deps: ResumeDeps): Hono {
       // doesn't stop a resume you asked for.
       // `false`: no toggle. `undefined`: the save failed.
       const key = repoPathKey(repo)
-      const saved = word === 'continue' ? await settle(() => deps.store.saveKey(key, run, sendable.key)) : false
+      const toggled = word === 'continue' && deps.store.list().some((t) => t.path === key && t.run === run)
+      const saved = toggled ? await settle(() => deps.store.saveKey(key, run, sendable.key)) : false
       const result = await runResume(deps, { repo, run, session: session.id, word, auto: false })
       // A press that fails to start keeps the stop raised, as a failed automatic send does, so the dot stays on.
       if (saved !== false && result.outcome === 'failed') await settle(() => deps.store.saveFailed(key, run, sendable.key))

@@ -13,9 +13,9 @@ The Electron shell's notifier reads the live Board in the main process, so it wo
 - a `fix-merged` whose key the run's toggle already sent (`lastKey` on `Board.autoContinue`), by the board or by your press. The key is saved before the start. A send that started and then stalled has only its card
 - anything from a repo in `error` or `unsupported`
 
-One case overrides the two auto-continue rules above: when a toggled run's send of a stop fails to start, by the board or by your press, the toggle's `lastFailed` raises that stop as an item on any run, until a send of it starts. The board won't retry that key. It sends a toast only when this app run hasn't shown that item yet. Otherwise only the dot comes back
+One case overrides the two auto-continue rules above: a send that failed to start. The board or your press can send it, on any run. The toggle's `lastFailed` then raises the stop as an item, with the key `failed:<key>`. The item stays until a send of that stop starts, because the board won't retry that key. Its own key gives it one toast, even when this app run already showed the stop
 
-**Identity.** `<repoId>\n<key>`, where the key is `entry:<line>`, `pr:<number>`, or the model's key for one stop. The seen set lasts the app run and only grows.
+**Identity.** `<repoId>\n<key>`, where the key is `entry:<line>`, `pr:<number>`, the model's key for one stop, or `failed:` and that key. The seen set lasts the app run and only grows.
 
 ```mermaid
 flowchart TD

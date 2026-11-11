@@ -44,9 +44,10 @@ export function attentionItems(board: Board, now: number): AttentionItem[] {
 }
 
 /**
- * The reply's own stop key, or undefined when it isn't an item of its own: the reply that follows a
- * merge the run already lists, or a `continue` the board sends by itself on a toggled run. It won't send an old `fix-merged`, so that stays an item,
- * and it won't send a stop again after its send failed to start (`lastFailed`), so that stays an item too.
+ * The reply's own stop key, or undefined when it isn't an item of its own. Two replies aren't items: the reply that
+ * follows a merge the run already lists, and a `continue` the board sends by itself on a toggled run. The board won't
+ * send an old `fix-merged`, so that stays an item. The board won't send a stop again after its send failed to start, so
+ * that stays an item too, as `failed:<key>`.
  */
 function replyKey(board: Board, repo: BoardRepo, item: NextItem, found: NextItem[], stop: RunReply | undefined, now: number): string | undefined {
   if (item.action.kind !== 'reply' || !stop) return undefined
@@ -55,7 +56,8 @@ function replyKey(board: Board, repo: BoardRepo, item: NextItem, found: NextItem
   const toggle = board.autoContinue?.find((t) => t.repoId === target.repoId && t.run === target.run)
   if (toggle?.lastKey === stop.key) {
     // A send of this stop failed to start, on any run. The board won't retry that key, so the item stays until a send starts.
-    if (toggle.lastFailed) return stop.key
+    // Its own key, so it sends a toast even when this app run already showed the stop.
+    if (toggle.lastFailed) return `failed:${stop.key}`
     // A fix run stays listed long after its merge. Sent already: a toast would only offer the same word again, into a session
     // that may still be busy with it.
     if (stop.signal === 'fix-merged') return undefined

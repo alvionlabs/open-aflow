@@ -67,7 +67,7 @@ export function createAutoContinueStore(o: { file: string; write?: (file: string
     saveFailed: (path, run, key) =>
       update((current) =>
         current.some((t) => same(t, path, run) && t.lastKey === key && !t.lastFailed)
-          ? current.map((t) => (same(t, path, run) ? { ...t, lastFailed: true as const } : t))
+          ? current.map((t) => (same(t, path, run) ? failed(t, key) : t))
           : undefined,
       ),
     async forgetPath(path) {
@@ -77,6 +77,13 @@ export function createAutoContinueStore(o: { file: string; write?: (file: string
       })
     },
   }
+}
+
+/** The toggle after a send of `key` failed to start. An `answered` key leaves `answeredKeys`, so the board may send it later. */
+function failed(t: AutoToggle, key: string): AutoToggle {
+  const answeredKeys = t.answeredKeys?.filter((k) => k !== key)
+  const { answeredKeys: _, ...rest } = t
+  return answeredKeys?.length ? { ...rest, lastFailed: true, answeredKeys } : { ...rest, lastFailed: true }
 }
 
 /** The toggle after a send of `key` starts: a new start clears `lastFailed`. */
