@@ -1,6 +1,6 @@
 # Idea: CLI runner
 
-Status: parked
+Status: superseded by [research/terminal-host.md](../research/terminal-host.md) (2026-11-11)
 
 ## The idea
 The board's server runs your own `claude` binary with your own login:
