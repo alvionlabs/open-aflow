@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+<title>OpenAFlow terminal spike</title>
+<link rel="stylesheet" href="xterm.css">
+<style>
+  body { margin: 0; font: 13px system-ui, sans-serif; background: #1e1e1e; color: #ddd; }
+  #bar { padding: 6px 8px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid #333; }
+  #banner { display: none; background: #7a4b00; padding: 4px 8px; }
+  .run { padding: 2px 6px; border: 1px solid #444; border-radius: 3px; }
+  .run.sel { border-color: #6af; }
+  button { font: inherit; }
+  #term { padding: 4px; }
+</style>
+</head>
+<body>
+<div id="banner">Terminals are not responding.</div>
+<div id="bar"><button id="new">New run</button><span id="runs"></span></div>
+<div id="term"></div>
+<script src="page.js"></script>
+</body>
+</html>

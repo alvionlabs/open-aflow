@@ -9,3 +9,5 @@ coverage/
 .vite/
 *.tsbuildinfo
 CLAUDE.local.md
+packages/desktop/dist-spike/
+packages/desktop/release-spike/

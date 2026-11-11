@@ -6,3 +6,6 @@ allowBuilds:
   # Squirrel only. The NSIS target never runs it.
   electron-winstaller: false
   esbuild: true
+  # Spike only: the Electron binary and node-pty's prebuilt binary.
+  electron: true
+  node-pty: false
