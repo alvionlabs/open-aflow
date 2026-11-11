@@ -213,6 +213,7 @@ pnpm -w build           # the server bundle
 npx tsx spike/bundle.ts # dist-spike/
 node spike/checks.mjs   # the fake-only checks: 2 3 4 6 7 8-memory
 node spike/checks.mjs 1-real-start 5-auto-continue 5-auto-continue-bc 9-session-drift 11-plugin  # real claude, uses turns
+node spike/checks.mjs 12-real-kill 12b-real-kill-variants  # real claude, no turns
 npx tsx spike/package.ts && SPIKE_PACKAGED=1 SPIKE_ELECTRON=$PWD/release-spike/linux-unpacked/openaflow-spike node spike/checks.mjs 8-package 8-memory
 ```
 
