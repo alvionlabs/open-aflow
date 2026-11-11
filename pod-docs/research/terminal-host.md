@@ -126,6 +126,25 @@ Read from the VS Code source on `main`, 2026-11-11.
 
 Known field problem: Cursor and other VS Code forks report "No ptyHost heartbeat after 6 seconds" and frozen terminals, mostly over Remote SSH or on slow machines. The heartbeat finds the problem. It doesn't fix it.
 
+## How VS Code tests its terminal
+
+Read from the VS Code repo on `main`, 2026-11-11.
+
+| Layer | What runs | Where | Terminal examples |
+|---|---|---|---|
+| Unit | Mocha tests inside an Electron renderer, with DOM and Node APIs ("the closest to the environment in which VS Code itself ships"). The `common` and `browser` layers also run in Chromium and WebKit through Playwright. | `test/unit` | `ptyService.test.ts`: `XtermSerializer` replay keeps the screen; `attachToProcess` attaches only when the pid matches. `ptyHostService.test.ts`: `restartPtyHost` disposes old listeners. Also `terminalProcess`, `childProcessMonitor`, `autoReplies` tests. |
+| API integration | Extension tests against a running VS Code | `extensions/vscode-api-tests` | `terminal.test.ts`, `terminal.shellIntegration.test.ts` |
+| Smoke (UI) | Playwright drives the **real Electron app** with `_electron.launch` (`playwrightElectron.ts`). The same suites also run against the web build with `--web --browser chromium|webkit`, and `--headless` works only with `--web`. | `test/smoke`, `test/automation` | `terminal-persistence.test.ts`: "restores completed output exactly once and in order after window reload" and after detach/attach. Also input, tabs, profiles, and shell-integration suites. |
+
+How the smoke tests read and type into a terminal:
+- They do not read pixels or the DOM text of the terminal. The app has a test driver with `getTerminalBuffer(selector)` and `writeInTerminal(selector, value)`. The test polls the xterm buffer as lines of text until a check passes (`waitForTerminalText`).
+- Most terminal smoke suites are skipped on Linux (`skipSuite: process.platform === 'linux'`). They run on Windows and macOS.
+
+What this means for us:
+- Testing the real Electron app is normal practice, not a workaround. VS Code's main UI checks run that way, and the web build is a second target.
+- A small test hook in the app (read the terminal buffer as text, write to it) makes terminal checks reliable, with no screenshots.
+- Our repo already starts the real Electron binary in `real-*.test.ts` files on Windows. Playwright's `_electron` would add page control to that.
+
 ## What we copy, and what we change
 
 | VS Code | OpenAFlow | Why |
@@ -323,6 +342,10 @@ Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a bran
 - [VS Code `ptyService.ts`](https://github.com/microsoft/vscode/blob/main/src/vs/platform/terminal/node/ptyService.ts)
 - [VS Code `terminal.ts`](https://github.com/microsoft/vscode/blob/main/src/vs/platform/terminal/common/terminal.ts)
 - [VS Code `terminalConfiguration.ts`](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/terminal/common/terminalConfiguration.ts)
+- [VS Code smoke test README](https://github.com/microsoft/vscode/blob/main/test/smoke/README.md)
+- [VS Code unit test README](https://github.com/microsoft/vscode/blob/main/test/unit/README.md)
+- [VS Code `playwrightElectron.ts`](https://github.com/microsoft/vscode/blob/main/test/automation/src/playwrightElectron.ts)
+- [VS Code smoke `terminal-persistence.test.ts`](https://github.com/microsoft/vscode/blob/main/test/smoke/src/areas/terminal/terminal-persistence.test.ts)
 - [VS Code docs: Terminal Advanced](https://code.visualstudio.com/docs/terminal/advanced)
 - [node-pty README](https://github.com/microsoft/node-pty)
 - [DeepWiki: VS Code terminal architecture](https://deepwiki.com/microsoft/vscode/6.1-terminal-architecture-and-process-management)
