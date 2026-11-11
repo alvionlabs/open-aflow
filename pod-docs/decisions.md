@@ -274,3 +274,23 @@ Consequences: only the repo name changes. The product names stay `open-aflow`: t
 Context: the GitHub repo is `alvionlabs/openaflow`. The app still said Open AFlow, and its internal names were `open-aflow`. No release or tag exists yet, so only the human's machine has data under the old names.
 Decision: the human's decision: the name is OpenAFlow, with no space, and every internal name follows it. The window, the exe `OpenAFlow.exe`, the Start menu, and Installed apps say OpenAFlow. The packages are `@openaflow/*`, the env vars `OPENAFLOW_*`, the config folder `openaflow-server`, the token header `X-OpenAFlow-Token`, the installer `openaflow-setup-<version>.exe`, and the browser keys `openaflow-*`. This replaces the names in the 2026-11-05 decisions and in the 2026-11-09 repo rename.
 Consequences: no code moves the `open-aflow` data: the human's config folder was copied by hand, and the theme, tab, and sidebar width start fresh. The one-time copy from `pod-board` stays. `brand.test.ts` flags both old names in current files. The human's installed copy keeps the old name until it is uninstalled.
+
+## 2026-11-11 — OpenAFlow hosts terminals that run claude (human decision, not in force until planned)
+Context: the app is unusable without the pod plugin. Research: [terminal-host.md](research/terminal-host.md).
+Decision: OpenAFlow wraps a terminal. It controls the terminal, not Claude Code. A plugin still drives the workflow. OpenAFlow creates its own `.openaflow/` folder in a repo; claude-pod is its default template for now. The terminal host follows VS Code's design.
+Consequences: a spike comes first. Everything else in the research doc is a proposal until a plan takes it.
+
+## 2026-11-11 — Quit confirms and ends running sessions (human decision, not in force until planned)
+Context: with a terminal host, a session can outlive the app or end with it.
+Decision: quitting the app shows a confirm dialog that ends the running sessions. Sessions are not left running in the background, because they use RAM and make the app hard to predict.
+Consequences: reverses "a quit never ends a resumed `claude`".
+
+## 2026-11-11 — Resume is a button, never automatic (human decision, not in force until planned)
+Context: after a quit, a crash, or a reboot, the hosted sessions are gone.
+Decision: show a **Resume** button on each stopped run. Never resume on its own.
+Consequences: none yet.
+
+## 2026-11-11 — The terminal is a tab; the Workflow view stays (human decision, not in force until planned)
+Context: with a terminal host, the run list could list terminals, sessions, or plans.
+Decision: keep the UI as it is. A row is still a run. The run view with nodes and arrows is called **Workflow**, the screen to sit and watch. The terminal is a new tab in the run view, shown when the user wants to see it.
+Consequences: terminals attach to a run; they are not rows. A terminal that starts before its plan exists needs a home (proposal in the research doc).
