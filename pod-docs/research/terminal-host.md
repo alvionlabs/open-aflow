@@ -2,7 +2,7 @@
 
 _Generated: 2026-11-11 · Depth: deep on session life, shallow on the rest · Sources: VS Code source on `main`, Claude Code legal page, node-pty README, news on Anthropic's 2026 policy_
 
-**Status:** direction chosen by the human. Not planned yet. The next step is the spike in [Spike](#spike). This doc replaces the parked idea [cli-runner.md](../ideas/cli-runner.md).
+**Status:** direction chosen by the human. Not planned yet. The spike ran on Linux on 2026-11-11; its findings are in [terminal-host-spike.md](terminal-host-spike.md), and the design below includes them. Windows is not tested yet. This doc replaces the parked idea [cli-runner.md](../ideas/cli-runner.md).
 
 ## Summary
 
@@ -49,6 +49,24 @@ Short notes on the options not chosen, so they can be weighed again later. Each 
 - **Terminals inside the app's main or server process.** Simplest, but a server crash or restart ends every run.
 - **Detached host that outlives the app.** Runs survive quit, updates, and app crashes. Rejected: background runs use RAM and make the app hard to predict. It also needs Windows job-object work so Electron doesn't end the children.
 - **tmux as the host (Linux and macOS).** Free persistence, and you could attach from your own terminal. Rejected: Windows has no tmux, so two hosts to keep up.
+
+**Ending a run (decision 4), from the spike**
+- **Close the pty only.** Rejected: a detached child, such as a dev server, survives (check 4).
+- **Process tree only.** Rejected: misses a child whose parent has exited (check 4).
+- **Env marker only.** Kept, with the tree, but not enough alone: a child that clears its env escapes it. A systemd scope closes that gap on Linux.
+
+**Auto-continue gate (decision 9), from the spike**
+- **Typing wait only.** Rejected: once the wait ran out, a send went into a half-typed box and submitted it (check 5).
+- **Clear the box with Ctrl+U before the send.** Rejected: it deletes your draft.
+- **Read the screen to see if the box is empty.** Rejected for now: it breaks the "files, not screen" rule, and the screen changes with each Claude Code release. The draft rule needs no screen.
+
+**Following the live session ID, from the spike**
+- **The newest transcript whose `cwd` is the repo.** Rejected: a guess that breaks with two terminals in one repo. The `SessionStart` hook names the session and the cause.
+
+**node-pty, from the spike (open)**
+- **`node-pty` 1.1.0:** no Linux prebuilt binary, so Linux needs our own build in CI.
+- **`@lydell/node-pty`:** prebuilt for all three, but a third-party beta.
+- **`node-pty` 1.2.0 when released:** _not checked_ for Linux prebuilds.
 
 **Resume (decision 5)**
 - **Resume on its own at start.** Fewer clicks after a reboot. Rejected: it starts long runs that use the plan quota with no action from you.
@@ -147,7 +165,7 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 - **Resume** starts `claude --resume <uuid>` in a new terminal, in the same folder.
 - Store, per run: repo path, session ID, start time, and stop reason. Store it in the config folder, not in the repo, so Resume works after a crash.
 - Keep the existing checks: a session must be provably the repo's (`cwd` check), and the child env drops `ANTHROPIC_*` and `CLAUDE*` except the exact allowlist.
-- **The ID can go stale.** `/clear` very likely starts a new session ID, and `/resume` inside the terminal switches to another session. Then the stored UUID no longer names what runs in the terminal. Not verified; spike check 9. A fix would be to follow the newest transcript whose `cwd` is the repo and whose start time is after the terminal's start, or to read a state file written by the plugin's `SessionStart` hook.
+- **The ID goes stale.** Spike check 9: `/clear` starts a new session ID and a new transcript file, and `/resume <id>` inside the terminal switches to that session. Then the stored UUID no longer names what runs in the terminal. **Fix:** the plugin's `SessionStart` hook reports each new ID with its cause (`startup`, `clear`, `resume`). The hook also sees the run's env marker, so it writes the run ID and the live session ID to a state file. Don't guess from the newest transcript.
 - **A row is a run, as today (decision 6).** Terminals attach to the run; they are not rows. One run can have more than one terminal over time (after `/clear`, or after a Resume), and the **Terminal** tab shows the live one. Proposals for the cases this leaves:
   - **Before a plan exists** (you chat, then run `/pod:plan`): the terminal sits on the repo's row, which already shows "no active plan". When the plan doc appears, the terminal moves to that run. Join them by the session's `cwd` and the plan's first transcript mention, as the run model joins agents today.
   - **After `/clear`:** same terminal, same run. Only the session ID changes.
@@ -202,7 +220,11 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 ### Ending a process tree
 
 - Quit must leave no `claude`, and no child of it, running. This was the reason for decision 4.
-- Linux and macOS: closing the pty sends SIGHUP to the session. Children in another process group, such as a dev server an engineer started with `nohup` or `&`, can survive. Send SIGTERM, then SIGKILL, to the process group, and check for survivors.
+- Linux and macOS: closing the pty sends SIGHUP to the session. Children in another process group, such as a dev server an engineer started with `nohup` or `&`, can survive. Spike check 4 confirmed this.
+- Each run's env gets a marker, `OPENAFLOW_RUN=<run id>`. To end a run: take a snapshot of the process tree and of every process whose env holds the marker; send SIGTERM to the process group and to each process; wait; send SIGKILL to survivors; check for survivors.
+- The marker misses a child that clears its env (`env -i`) after it leaves the tree. On Linux with systemd, start each run in its own user scope (`systemd-run --user --scope --unit=openaflow-run-<id>.scope`) and end it with `systemctl --user stop`. The scope ended that child in the spike. macOS has no cgroups: there, the marker is the best way found.
+- Send SIGHUP first, as a closed terminal does. Real `claude` ended on SIGHUP in about 1 s. On SIGTERM it once ran past 3 s, so keep SIGKILL as the last step.
+- **After a host crash or an app crash,** the host, the server, and `claude` end by themselves, but a detached child survives (spike checks 6 and 7). When the host exits, main ends each leftover of the runs it marks `host crashed`. At the next start after an app crash, it ends each leftover of a run that had no stop reason. Both use the marker and the scope.
 - Windows: closing the ConPTY ends attached console processes. Children started detached, or with their own console, can survive. Use a Job Object with `KILL_ON_JOB_CLOSE` for each run, or end the tree by process ID.
 - Engineers start dev servers in worktrees, so this is a real case, not an edge case. The spike must test it.
 
@@ -212,10 +234,12 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 - The app writes `continue` (or `go`) to the pty, with Enter, only when all of these are true:
   - The run's toggle is on, or you pressed the button.
   - The model says the run waits for that word (the existing sendable rule).
-  - The session is idle: the existing 60 s rule on the transcript and `subagents/` files.
-  - The terminal is at an empty input prompt. **This is required.** The 60 s idle rule is probably also true while a permission or question dialog is open, and Enter there would accept the highlighted choice. How to know it without reading the screen is open: a state file written by the plugin's hooks (for example `Stop` and `Notification`) keeps the "files, not screen" rule. Spike check 5.
+  - The session is idle by the existing 60 s rule on the transcript and `subagents/` files. Keep it: the spike did not test subagents or background work after `Stop`.
+  - The session is idle by the plugin's hook events too (spike check 5): the newest of `SessionStart`, `Stop`, and `Notification` `idle_prompt`, with no `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, or `Notification` `permission_prompt` after it. A permission dialog fires `PermissionRequest` at once and nothing more while it stays open, so the gate stays closed. Enter in that dialog accepts the highlighted choice, **1. Yes**.
+  - The input box holds no draft. **This is required.** The host sees every byte you type. If you typed after the newest submit (`UserPromptSubmit` or `SessionStart`) and pressed no Enter, the box may hold text, and the send waits until your next submit. In spike check 5, a send with the typing wait only went into a half-typed box and submitted `half typedcontinue`.
   - You have not typed in that terminal for the typing wait: 30 s by default, a user setting (decision 9).
   - The terminal is live. A stopped run gets nothing (see [Resume](#resume)).
+- Write the word, then Enter once, after a short pause. Never send a second Enter "to be sure": it can land in a dialog that opened in between.
 - The old `claude -p --resume` runner stays only for runs the app does not host, if those are kept (see [Open questions](#open-questions)).
 - With a hosted terminal, the known gap "a terminal still open on the session splits the conversation" goes away: the app holds the only terminal.
 
@@ -245,11 +269,12 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 
 | Risk | Why it matters | How to settle it |
 |---|---|---|
-| node-pty native module in Electron 45 | node-pty 1.1.0 uses `node-addon-api` (N-API) and runs `scripts/prebuild.js` before `node-gyp rebuild`, so prebuilt binaries are likely. The npm package is 64 MB unpacked. The README asks for Electron 19+, and VS Code builds it itself. | Spike: install in `packages/desktop`, package, run on Windows and Linux with no build tools. Measure the installer size against `release-rules.ts`. |
+| node-pty native module in Electron 45 | node-pty 1.1.0 has prebuilt binaries for Windows and macOS only; on Linux it compiles, and fails with no `g++` (spike). The fork `@lydell/node-pty` (beta) has prebuilt binaries for all three and loaded in Electron 45 packaged and unpackaged. In the package, node-pty is 144 KB. | The plan chooses: the fork, our own Linux build in CI, or node-pty 1.2.0. Windows packaging is still to test. |
+| Folder-trust prompt | In a new folder, `claude` asks first, and the default is **No, exit** (spike). | The app never answers it. The Terminal tab shows a run that waits on it. |
 | node-pty is not thread-safe | The README says so. | Use it in one process (the host) on one thread. |
-| Process trees survive quit | Breaks decision 4. | Spike check 4. |
+| Process trees survive quit | Breaks decision 4. | Spike check 4: tree snapshot plus env marker ended every child but one that clears its env; a systemd scope ended that one too (Linux). Windows Job Objects are still to test. |
 | Windows ConPTY on old builds | node-pty needs Windows 10 1809 or later. | State it in the install note. |
-| Typing conflicts | An automatic send can mix with your typing. | The "no typing within a set time" rule; spike check 5. |
+| Typing conflicts | An automatic send can mix with your typing. Spike check 5: with the typing wait only, it did. | The draft rule in [Input and auto-continue](#input-and-auto-continue), plus the typing wait. |
 | Policy changes | Auto-continue is in a grey area. | Check before each release; keep it a toggle. |
 | Heartbeat false alarms | Seen in VS Code forks on slow machines. | Copy the two-timer rule; log, don't kill, on the first miss. |
 | Host crash ends runs | A crash costs work in flight. Pod resumes from files and Claude from the transcript, but an agent's unsaved turn is lost. | Keep the host small. Copy the restart limit. Test resume after a forced kill. |
@@ -258,7 +283,9 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 
 ## Spike
 
-Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a branch, not on `main`. Pass means every check below passes on Linux (Fedora) and Windows 11.
+**Ran on Linux on 2026-11-11. Results: [terminal-host-spike.md](terminal-host-spike.md).** Windows was not run, by the human's choice.
+
+Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a branch, not on `main`. Pass means every check below passes on Linux (Fedora). Windows 11 was dropped for now (human decision, 2026-11-11); test it before a plan ships the host on Windows.
 
 1. **Start and show.** The desktop app starts a pty host utility process. The host starts `claude --session-id <uuid>` in a test repo. The window shows it with xterm.js, and you can type in it and sign in.
 2. **Window life.** Close the window to the tray, wait, and reopen it. The screen is replayed and the run went on. Reload the window: same.

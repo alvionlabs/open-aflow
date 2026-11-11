@@ -319,3 +319,8 @@ Consequences: the spike measures the memory of one terminal at 5,000 lines.
 Context: the window must reach the pty host, and agents must be able to test the Terminal tab. VS Code tests its terminal against the real Electron app. Research: [vscode-terminal.md](research/vscode-terminal.md).
 Decision: the window talks to the pty host through `MessagePort` only, with no WebSocket. Terminal checks run against the real Electron app with Playwright `_electron` and a test hook that reads and writes the terminal as text. The browser build stays for the rest of the UI, with no Terminal tab.
 Consequences: terminal checks need a display (`xvfb` on Linux), so the smoke recipe gains a step for terminal slices.
+
+## 2026-11-11 — The terminal-host spike runs on Linux only, for now (human decision)
+Context: the spike's pass bar asked for Linux and Windows 11. The spike ran on Linux. Windows needed a CI workflow or a run on a Windows machine. Results: [terminal-host-spike.md](research/terminal-host-spike.md).
+Decision: run the spike on Linux only for now. No CI workflow, and no Windows run.
+Consequences: the spike counts as done on Linux. Windows (ConPTY, Job Objects, packaging) stays untested; a plan that ships the terminal host on Windows must test it first.
