@@ -18,7 +18,7 @@
 ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
  Do you want to proceed?
  ❯ 1. Yes
-   2. Yes, and always allow access to /tmp/claude-1000/-home-iamphduc-Documents-Projects-alvionlabs-openaflow/7ba7057f-4
+   2. Yes, and always allow access to <scratch>
       4e7-40c0-9f14-31dd3ca3d464/scratchpad/w/spike-real-repo from this project
    3. Yes, and switch to auto mode · auto mode handles these prompts for you
    4. No
