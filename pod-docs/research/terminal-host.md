@@ -20,7 +20,7 @@ These are the human's words. They are recorded in [decisions.md](../decisions.md
 4. **Quit confirms and ends runs.** Quitting the app shows a confirm dialog that ends the running sessions. Leaving them running uses RAM and makes the app hard to predict.
 5. **Resume is a button.** Show **Resume** buttons. Never resume on its own.
 6. **The UI stays as it is.** A row in the list is still a run of the workflow. The run view with nodes and arrows is called **Workflow**: the screen you sit and watch to see how a run is going. The terminal is a new tab in the run view, for when you want to see it. It is not a new kind of row.
-7. **Hosted runs only.** The app tracks only runs started in its own terminals. A run you start in your own terminal, outside the app, is ignored: outside the app the workflow plugin is not loaded, so nothing writes `.openaflow/` and the app has nothing to track.
+7. **Hosted runs only (tentative, under discussion).** The app tracks only runs started in its own terminals. A run you start in your own terminal, outside the app, is ignored: outside the app the workflow plugin is not loaded, so nothing writes `.openaflow/` and the app has nothing to track.
 
 ## Proposals (not decided)
 
@@ -265,7 +265,7 @@ Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a bran
 ## Open questions
 
 1. ~~What is a "run"?~~ Answered 2026-11-11 (decision 6): a row stays a run, and the terminal is a tab in it. Still open: confirm the proposals under [One run, one session ID](#one-run-one-session-id) for a terminal that starts before its plan exists.
-2. ~~Runs started outside the app?~~ Answered 2026-11-11 (decision 7): ignored.
+2. Runs started outside the app: tentative answer is to ignore them (decision 7). Still under discussion.
 3. How does the app install and update the workflow plugin? Proposal: ship it in the app and load it with `--plugin-dir` (see [`.openaflow/` and the plugin](#openaflow-and-the-plugin)). Confirm in the spike.
 4. Is `.openaflow/` committed (as `pod-docs/` is, and pod merges it through PRs) or ignored?
 5. How long after your last keystroke may an automatic send happen?
