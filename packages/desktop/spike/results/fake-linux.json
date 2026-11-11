@@ -209,11 +209,21 @@
     "pass": true,
     "notes": {
       "after kill": {
-        "oldHost": 3904342,
-        "newHost": 3904871,
+        "oldHost": 3911280,
+        "newHost": 3911833,
         "hostStarts": 2,
         "stopReason": "host crashed",
-        "fakeAlive": false
+        "fakeAlive": false,
+        "childLeft": [],
+        "sweep": [
+          {
+            "runId": "75cb60d0",
+            "markerPids": [
+              3911770
+            ]
+          }
+        ],
+        "childPort": false
       },
       "stopped screen tail": [
         "line 18",
@@ -222,7 +232,7 @@
       "resume": {
         "argv": [
           "--resume",
-          "af6b9110-cbcd-4260-a1fb-6a113e4feacc"
+          "fb564896-99a1-4d18-b1de-4ec04dc5848d"
         ],
         "noAutoStart": true,
         "liveAfterResume": {
@@ -234,7 +244,7 @@
       },
       "seconds": 18
     },
-    "why": "host restarted; run read \"host crashed\"; claude ended; Resume started claude --resume <uuid>"
+    "why": "host restarted; run read \"host crashed\"; claude and its detached child ended (sweep); Resume started claude --resume <uuid>"
   },
   "7-app-crash": {
     "pass": true,

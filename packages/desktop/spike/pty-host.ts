@@ -13,7 +13,8 @@ import { Terminal } from '@xterm/headless'
 const SCROLLBACK = Number(process.env.OPENAFLOW_SPIKE_SCROLLBACK ?? 5000)
 const HEARTBEAT_MS = 5000
 const SCOPE = process.platform === 'linux' && process.env.OPENAFLOW_SPIKE_SCOPE === '1'
-const KILL_WAIT_MS = 3000
+const KILL_WAIT_MS = Number(process.env.OPENAFLOW_SPIKE_KILL_WAIT_MS ?? 3000)
+const HUP_FIRST = process.env.OPENAFLOW_SPIKE_KILL_ORDER === 'hup-first'
 
 type PortMain = {
   on(ev: 'message', fn: (e: { data: any }) => void): void
@@ -58,10 +59,20 @@ async function killTree(t: Term) {
   const all = [...new Set([t.pid, ...byTree, ...byMarker, ...byScope])]
   // `systemctl stop` sends SIGTERM to every process in the cgroup, then SIGKILL after its timeout.
   if (t.unit) spawnSync('systemctl', ['--user', 'stop', t.unit], { timeout: KILL_WAIT_MS + 2000 })
+  const t0 = Date.now()
+  if (HUP_FIRST) {
+    // As a closed terminal does: SIGHUP to the pty's process group, then wait, before any SIGTERM.
+    signal(-t.pid, 'SIGHUP')
+    const hupEnd = Date.now() + KILL_WAIT_MS
+    while (Date.now() < hupEnd && alive(t.pid)) await new Promise((r) => setTimeout(r, 50))
+  }
+  const hupMs = Date.now() - t0
+  const afterHup = all.filter(alive)
   signal(-t.pid, 'SIGTERM') // the pty's session leader heads its own process group
   for (const pid of all) signal(pid, 'SIGTERM')
   const end = Date.now() + KILL_WAIT_MS
   while (Date.now() < end && all.some(alive)) await new Promise((r) => setTimeout(r, 100))
+  const termMs = Date.now() - t0 - hupMs
   const forced = all.filter(alive)
   for (const pid of forced) signal(pid, 'SIGKILL')
   await new Promise((r) => setTimeout(r, 200))
@@ -70,7 +81,7 @@ async function killTree(t: Term) {
   } catch {
     // closed
   }
-  return { pid: t.pid, byTree, byMarker, byScope, forced, survivors: all.filter(alive) }
+  return { pid: t.pid, byTree, byMarker, byScope, hupFirst: HUP_FIRST, hupMs, afterHup, termMs, forced, survivors: all.filter(alive) }
 }
 
 function scopePids(unit: string): number[] {

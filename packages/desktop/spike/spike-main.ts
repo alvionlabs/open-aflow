@@ -70,6 +70,7 @@ const readScreen = (runId: string) => {
 
 // At start: a run with no stop reason was live when the app last ended without a clean quit.
 const startupLeftovers: { runId: string; markerPids: number[] }[] = []
+const hostCrashSweeps: { runId: string; markerPids: number[] }[] = []
 for (const r of runs) {
   if (r.stopReason === null) {
     r.stopReason = 'app closed'
@@ -157,10 +158,21 @@ function startHost() {
     for (const [, fn] of pending) fn(null)
     pending.clear()
     if (quitting) return
-    // The pty master closed with the host, so each run's claude got SIGHUP. Show them as stopped.
+    // The pty master closed with the host, so each run's claude got SIGHUP. Show them as stopped, and end
+    // anything that still holds a run's marker (a detached child outlives the pty).
     for (const r of live()) {
       r.stopReason = 'host crashed'
       r.termId = null
+      const found = process.platform === 'linux' && env.OPENAFLOW_SPIKE_NO_SWEEP !== '1' ? markerPids(r.id) : []
+      for (const pid of found) {
+        try {
+          process.kill(pid, 'SIGKILL')
+        } catch {
+          // gone
+        }
+      }
+      hostCrashSweeps.push({ runId: r.id, markerPids: found })
+      log('host crash sweep', r.id, found)
     }
     saveStore()
     if (hostRestarts < HOST_RESTARTS) {
@@ -424,7 +436,7 @@ void app.whenReady().then(async () => {
 
 if (TEST) {
   ;(globalThis as any).__spike = {
-    status: () => ({ mainPid: process.pid, hostPid, hostStarts, hostRestarts, hostAlarm, serverPids, serverPort: server.port(), runs, startupLeftovers, quitResults, typingWaitMs: TYPING_WAIT_MS }),
+    status: () => ({ mainPid: process.pid, hostPid, hostStarts, hostRestarts, hostAlarm, serverPids, serverPort: server.port(), runs, startupLeftovers, hostCrashSweeps, quitResults, typingWaitMs: TYPING_WAIT_MS }),
     startRun,
     resumeRun,
     hostBuffer: (termId: string) => hostCall({ op: 'buffer', id: termId }),

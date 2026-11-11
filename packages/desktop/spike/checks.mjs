@@ -133,7 +133,7 @@ async function close(a) {
     })
     await a.app.evaluate(({ app }) => app.quit())
   } catch {}
-  await Promise.race([a.exited, sleep(15_000)])
+  await Promise.race([a.exited, sleep(30_000)])
   if (alive(a.pid)) kill(a.pid)
 }
 
@@ -270,7 +270,9 @@ checks['4-clean-quit'] = async () => {
 checks['6-host-crash'] = async () => {
   const c = '6-host-crash'
   const w = world('c6')
-  const a = await launch(w, { FAKE_INTERVAL_MS: '500' })
+  const port = portSeq++
+  const marker = `openaflow-spike-child-hostcrash-${port}`
+  const a = await launch(w, { FAKE_INTERVAL_MS: '500', FAKE_CHILD_PORT: String(port), FAKE_CHILD_MODE: 'detached', FAKE_MARKER: marker })
   try {
     const run = await sp(a, 'startRun')
     await sleep(11_500) // one screen save
@@ -283,7 +285,8 @@ checks['6-host-crash'] = async () => {
     }, 15_000)
     await sleep(1000)
     const fakeAlive = alive(fakePid)
-    note(c, 'after kill', { oldHost: s0.hostPid, newHost: s1?.hostPid, hostStarts: s1?.hostStarts, stopReason: s1?.runs[0].stopReason, fakeAlive })
+    const child = pgrep(marker)
+    note(c, 'after kill', { oldHost: s0.hostPid, newHost: s1?.hostPid, hostStarts: s1?.hostStarts, stopReason: s1?.runs[0].stopReason, fakeAlive, childLeft: child, sweep: s1?.hostCrashSweeps, childPort: await portOpen(port) })
     const screen = await pageLines(a.page)
     note(c, 'stopped screen tail', screen.slice(-2))
     const recBefore = readFileSync(w.record, 'utf8').trim().split('\n').length
@@ -297,10 +300,11 @@ checks['6-host-crash'] = async () => {
     await sleep(1500)
     const live = contiguity(await pageLines(a.page))
     note(c, 'resume', { argv: resumed?.argv, noAutoStart: recBefore === recIdle, liveAfterResume: live })
-    const ok = s1 && s1.runs[0].stopReason === 'host crashed' && !fakeAlive && recBefore === recIdle && resumed?.argv[0] === '--resume' && resumed.argv[1] === run.sessionId && live.count > 0
-    verdict(c, !!ok, ok ? 'host restarted; run read "host crashed"; claude ended; Resume started claude --resume <uuid>' : 'see notes')
+    const ok = s1 && s1.runs[0].stopReason === 'host crashed' && !fakeAlive && child.length === 0 && recBefore === recIdle && resumed?.argv[0] === '--resume' && resumed.argv[1] === run.sessionId && live.count > 0
+    verdict(c, !!ok, ok ? 'host restarted; run read "host crashed"; claude and its detached child ended (sweep); Resume started claude --resume <uuid>' : 'see notes')
   } finally {
     await close(a)
+    for (const pid of pgrep(marker)) kill(pid)
   }
 }
 
@@ -587,6 +591,101 @@ checks['9-session-drift'] = async () => {
   } finally {
     await close(a)
   }
+}
+
+/** Test-side: processes whose env holds OPENAFLOW_RUN=<runId>. */
+function markerScan(runId) {
+  const needle = `OPENAFLOW_RUN=${runId}\0`
+  const out = []
+  for (const n of readdirSync('/proc')) {
+    if (!/^\d+$/.test(n)) continue
+    try {
+      if (readFileSync(`/proc/${n}/environ`, 'latin1').includes(needle)) out.push({ pid: Number(n), cmd: readFileSync(`/proc/${n}/cmdline`, 'latin1').split('\0').slice(0, 3).join(' ').slice(0, 80) })
+    } catch {}
+  }
+  return out
+}
+
+checks['12-real-kill'] = async () => {
+  // Real claude, no prompt typed, so no turn: does it end on host crash, app crash, and quit?
+  const c = '12-real-kill'
+  const out = {}
+  let r = await realLaunch('c12')
+  try {
+    // a) host crash
+    let run = await sp(r.a, 'startRun', { extraArgs: REAL_ARGS })
+    await waitReady(r.a, run.termId, c)
+    await sleep(3000)
+    const before = markerScan(run.runId)
+    const s0 = await sp(r.a, 'status')
+    kill(s0.hostPid)
+    await sleep(4000)
+    const s1 = await sp(r.a, 'status')
+    out.hostCrash = { before, left: markerScan(run.runId), sweep: s1.hostCrashSweeps }
+    note(c, 'a) host crash', out.hostCrash)
+    // b) quit with the dialog
+    run = await sp(r.a, 'startRun', { extraArgs: REAL_ARGS })
+    await waitReady(r.a, run.termId, c)
+    await sleep(3000)
+    const beforeQ = markerScan(run.runId)
+    await close(r.a)
+    const log = readFileSync(join(r.w.T, 'config', 'spike', 'main.log'), 'utf8').split('\n').filter((l) => l.includes('killAll'))
+    out.quit = { before: beforeQ, left: markerScan(run.runId), killAll: log }
+    note(c, 'b) quit', out.quit)
+  } finally {
+    if (alive(r.a.pid)) await close(r.a)
+  }
+  // c) app crash
+  r = await realLaunch('c12b')
+  try {
+    const run = await sp(r.a, 'startRun', { extraArgs: REAL_ARGS })
+    await waitReady(r.a, run.termId, c)
+    await sleep(3000)
+    const before = markerScan(run.runId)
+    kill(r.a.pid)
+    await Promise.race([r.a.exited, sleep(5000)])
+    await sleep(3000)
+    out.appCrash = { before, left: markerScan(run.runId) }
+    note(c, 'c) app crash (3 s after SIGKILL of main)', out.appCrash)
+    for (const p of out.appCrash.left) kill(p.pid)
+  } finally {
+    if (alive(r.a.pid)) kill(r.a.pid)
+  }
+  const ok = out.hostCrash.left.length === 0 && out.quit.left.length === 0 && out.appCrash.left.length === 0
+  verdict(c, ok, `real claude left after: host crash ${out.hostCrash.left.length}, quit ${out.quit.left.length}, app crash ${out.appCrash.left.length} (before sweeps: see notes)`)
+}
+
+checks['12b-real-kill-variants'] = async () => {
+  // Real claude, no turns. a) host crash with no sweep: does SIGHUP alone end it? b) quit, SIGTERM, 15 s wait. c) quit, SIGHUP first.
+  const c = '12b-real-kill-variants'
+  let r = await realLaunch('c12c', { OPENAFLOW_SPIKE_NO_SWEEP: '1' })
+  try {
+    const run = await sp(r.a, 'startRun', { extraArgs: REAL_ARGS })
+    await waitReady(r.a, run.termId, c)
+    await sleep(3000)
+    const before = markerScan(run.runId)
+    kill((await sp(r.a, 'status')).hostPid)
+    const t0 = Date.now()
+    const gone = await waitFor(() => markerScan(run.runId).length === 0, 10_000, 100)
+    note(c, 'a) host crash, no sweep', { before, goneWithinMs: gone ? Date.now() - t0 : null, left: markerScan(run.runId) })
+    for (const p of markerScan(run.runId)) kill(p.pid)
+  } finally {
+    await close(r.a)
+  }
+  for (const [name, extra] of [['b) quit, SIGTERM, wait 15 s', { OPENAFLOW_SPIKE_KILL_WAIT_MS: '15000' }], ['c) quit, SIGHUP first', { OPENAFLOW_SPIKE_KILL_ORDER: 'hup-first' }]]) {
+    r = await realLaunch('c12d', extra)
+    try {
+      const run = await sp(r.a, 'startRun', { extraArgs: REAL_ARGS })
+      await waitReady(r.a, run.termId, c)
+      await sleep(3000)
+      await close(r.a)
+      const log = readFileSync(join(r.w.T, 'config', 'spike', 'main.log'), 'utf8').split('\n').filter((l) => l.includes('killAll'))
+      note(c, name, { killAll: log.map((l) => JSON.parse(l.slice(l.indexOf('['))))[0], left: markerScan(run.runId) })
+    } finally {
+      if (alive(r.a.pid)) await close(r.a)
+    }
+  }
+  verdict(c, true, 'finding only: see notes')
 }
 
 checks['11-plugin'] = async () => {

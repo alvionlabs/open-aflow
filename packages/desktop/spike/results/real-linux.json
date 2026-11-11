@@ -10,7 +10,7 @@
       "trust prompt": [
         " Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source",
         " project, or work from your team). If not, take a moment to review what's in this folder first.",
-        " \u276f No, exit",
+        " ❯ No, exit",
         "   Yes, I trust this folder"
       ],
       "ready": true,
@@ -30,7 +30,7 @@
         "unknown": true,
         "ranSkill": false,
         "tail": [
-          "\u001b7\u001b8\u001b[<u\u001b[>5u\u001b[>4;2m\u001b]0;\u2733 Claude Code\u0007\u001b]9;4;0;\u0007\u001b[<u\u001b[>5u\u001b[>4;2m\r \u2590\u259b\u2588\u2588\u2588\u259b\u2588Claude Codev2.1.322\r\u259d\u259c\u2588\u2588\u2588\u2588\u2588\u2588\u2580Haiku 5.5 \u00b7 Claude Max\r \u259d\u259d   \u259d\u259d /\u2026/7ba7057f-44e7-40c0-9f14-31dd3ca3d464/scratchpad/w/spike-real-repo\r\u25d0 medium \u00b7 /effort\r\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\r\u276f\u00a0Try \"how do I log an error?\"\r\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\r\u23f5\u23f5 auto mode on (shift+tab to cycle) \u00b7 \u2190 for agents\u001b[>0q\u001b]7501;?\u0007\rNo commands match \"/openaflow-spike:hello\"\r\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\r\u276f\u00a0/openaflow-spike:hello\r\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\r  Haiku 5.5 (1M) medium |  spike-real-repo (master)\r\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0% 1M      |  5h --  7d --\r\rNo commands match \"/openaflow-spike:hello\"\r[-]\r\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\r\u2588\u2588\u2580\u2588\u2588\u2588\u2588\u2588\u2588\u2580\u2588\u2588\r\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588chilling\r\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\r\u2588\u2588\u2588\u2588\r                                          \u25d0 medium \u00b7 /effort\r\r\r\r\r\r\r\rNo commands match \"/openaflow-spike:hello\"\r\u25cfUnknown command: /openaflow-spike:hello\r                                          \u25d0 medium \u00b7 /effort\r\r \u00b7 \u2190 for agents"
+          "\u001b7\u001b8\u001b[<u\u001b[>5u\u001b[>4;2m\u001b]0;✳ Claude Code\u0007\u001b]9;4;0;\u0007\u001b[<u\u001b[>5u\u001b[>4;2m\r ▐▛███▛█Claude Codev2.1.322\r▝▜██████▀Haiku 5.5 · <plan>\r ▝▝   ▝▝ /…/7ba7057f-44e7-40c0-9f14-31dd3ca3d464/scratchpad/w/spike-real-repo\r◐ medium · /effort\r────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r❯ Try \"how do I log an error?\"\r────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r⏵⏵ auto mode on (shift+tab to cycle) · ← for agents\u001b[>0q\u001b]7501;?\u0007\rNo commands match \"/openaflow-spike:hello\"\r────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r❯ /openaflow-spike:hello\r────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r  Haiku 5.5 (1M) medium |  spike-real-repo (master)\r░░░░░░░░░░ 0% 1M      |  <usage meters removed>\r\rNo commands match \"/openaflow-spike:hello\"\r[-]\r████████████\r██▀██████▀██\r████████████████chilling\r████████████\r████\r                                          ◐ medium · /effort\r\r\r\r\r\r\r\rNo commands match \"/openaflow-spike:hello\"\r●Unknown command: /openaflow-spike:hello\r                                          ◐ medium · /effort\r\r · ← for agents"
         ]
       },
       "seconds": 11
@@ -77,14 +77,14 @@
             }
           ],
           "afterResumeScreen": [
-            "    \u2588 \u2588    \u2588 \u2588",
+            "    █ █    █ █",
             "",
-            "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
-            "\u276f\u00a0",
-            "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+            "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+            "❯ ",
+            "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
             "  Haiku 5.5 (1M) medium |  spike-real-repo (master)",
-            "  \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 4% 1M      |  5h 14% \u21e348% 1h  7d 28% \u21e12% 5d",
-            "  \u23f5\u23f5 auto mode on (shift+tab to cycle)"
+            "  ░░░░░░░░░░ 4% 1M      |  <usage meters removed>",
+            "  ⏵⏵ auto mode on (shift+tab to cycle)"
           ]
         },
         "newFiles": [
@@ -206,7 +206,7 @@
         }
       },
       "b) screen line holding the text": [
-        "\u276f half typedcontinue                                                                                                    "
+        "❯ half typedcontinue                                                                                                    "
       ],
       "c) permission dialog on screen": true,
       "c) hook events since the request": [
@@ -376,5 +376,107 @@
       "seconds": 160
     },
     "why": "b) draft blocks the send after the typing wait: true; c) no send during the permission dialog for 70 s: true (corrected by hand: fileMade was a file left in the shared scratch repo by the first 5 run; no PostToolUse event fired and the dialog was still open at 70 s)"
+  },
+  "12-real-kill": {
+    "pass": true,
+    "notes": {
+      "a) host crash": {
+        "before": [
+          {
+            "pid": 3912340,
+            "cmd": "~/.local/bin/claude --session-id eec999fd-1820-43ee-af4c-1a5842e63b"
+          }
+        ],
+        "left": [],
+        "sweep": [
+          {
+            "runId": "e0cbd321",
+            "markerPids": [
+              3912340
+            ]
+          }
+        ]
+      },
+      "b) quit": {
+        "before": [
+          {
+            "pid": 3912629,
+            "cmd": "~/.local/bin/claude --session-id f818a9a9-e726-453a-91f5-5d6abb08ac"
+          }
+        ],
+        "left": [],
+        "killAll": [
+          "2026-11-11T19:22:40.129Z killAll [{\"pid\":3912629,\"byTree\":[],\"byMarker\":[3912629],\"byScope\":[],\"forced\":[3912629],\"survivors\":[]}]"
+        ]
+      },
+      "c) app crash (3 s after SIGKILL of main)": {
+        "before": [
+          {
+            "pid": 3913343,
+            "cmd": "~/.local/bin/claude --session-id b6965a0b-cc7c-4252-bbdd-d79a6f63f5"
+          }
+        ],
+        "left": []
+      },
+      "seconds": 23
+    },
+    "why": "real claude left after: host crash 0, quit 0, app crash 0 (before sweeps: see notes)"
+  },
+  "12b-real-kill-variants": {
+    "pass": true,
+    "notes": {
+      "a) host crash, no sweep": {
+        "before": [
+          {
+            "pid": 3914322,
+            "cmd": "~/.local/bin/claude --session-id 918dbd15-28f3-4abc-bb85-35a567add4"
+          }
+        ],
+        "goneWithinMs": 1022,
+        "left": []
+      },
+      "b) quit, SIGTERM, wait 15 s": {
+        "killAll": [
+          {
+            "pid": 3915048,
+            "byTree": [],
+            "byMarker": [
+              3915048
+            ],
+            "byScope": [],
+            "hupFirst": false,
+            "hupMs": 0,
+            "afterHup": [
+              3915048
+            ],
+            "termMs": 706,
+            "forced": [],
+            "survivors": []
+          }
+        ],
+        "left": []
+      },
+      "c) quit, SIGHUP first": {
+        "killAll": [
+          {
+            "pid": 3915748,
+            "byTree": [],
+            "byMarker": [
+              3915748
+            ],
+            "byScope": [],
+            "hupFirst": true,
+            "hupMs": 1063,
+            "afterHup": [],
+            "termMs": 0,
+            "forced": [],
+            "survivors": []
+          }
+        ],
+        "left": []
+      },
+      "seconds": 17
+    },
+    "why": "finding only: see notes"
   }
 }
