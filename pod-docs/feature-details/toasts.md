@@ -10,8 +10,10 @@ The Electron shell's notifier reads the live Board in the main process, so it wo
 
 - a reply on a PR that is already a merge item of that run
 - a `continue` on a run with auto-continue on and a session, because the board sends it itself. An old `fix-merged` is an item, because the board won't send it (`autoMaySend`)
-- a `fix-merged` whose key the run's toggle already sent (`lastKey` on `Board.autoContinue`), by the board or by your press. The key is saved before the start. When the board's send of that key fails to start, the toggle's `lastFailed` raises the item again, until a send of that stop starts. A send that started and then stalled has only its card
+- a `fix-merged` whose key the run's toggle already sent (`lastKey` on `Board.autoContinue`), by the board or by your press. The key is saved before the start. A send that started and then stalled has only its card
 - anything from a repo in `error` or `unsupported`
+
+One case overrides the two auto-continue rules above: when a toggled run's send of a stop fails to start, by the board or by your press, the toggle's `lastFailed` raises that stop as an item on any run, until a send of it starts. The board won't retry that key. It sends a toast only when this app run hasn't shown that item yet. Otherwise only the dot comes back
 
 **Identity.** `<repoId>\n<key>`, where the key is `entry:<line>`, `pr:<number>`, or the model's key for one stop. The seen set lasts the app run and only grows.
 

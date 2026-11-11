@@ -187,6 +187,13 @@ describe('attention items', () => {
     expect(attentionItems(boardOf([sendable()], on), NOW)).toEqual([])
   })
 
+  test('a plan run whose send of this key failed raises the item, with a session too', () => {
+    const failed = (lastKey: string) => attentionItems(boardOf([sendable()], { autoContinue: [{ repoId: 'chess', run: PLAN, lastKey, lastFailed: true }] }), NOW).map((i) => i.id)
+    expect(failed('wave-merged:78')).toEqual(['chess\nwave-merged:78'])
+    // A mark on another key is an older stop: the board sends this one by itself.
+    expect(failed('wave-merged:77')).toEqual([])
+  })
+
   describe('a failed send on a toggled fix run', () => {
     const repoAt = chess([onlyQueue()], { claims: [fixClaim], agents: [fixEngineer, fixReviewer], prs: [gh(36, 'merged', { branch: FIX, mergedAt: NOW - 5 * MIN })] })
     const actions = [{ at: NOW - MIN, action: 'resume', repoId: 'chess', repo: 'chess', target: `${FIX} · continue`, result: 'failed', reply: 'continue', auto: true }] as const

@@ -45,16 +45,21 @@ export function attentionItems(board: Board, now: number): AttentionItem[] {
 
 /**
  * The reply's own stop key, or undefined when it isn't an item of its own: the reply that follows a
- * merge the run already lists, or a `continue` the board sends by itself on a toggled run. It won't send an old `fix-merged`, so that stays an item.
+ * merge the run already lists, or a `continue` the board sends by itself on a toggled run. It won't send an old `fix-merged`, so that stays an item,
+ * and it won't send a stop again after its send failed to start (`lastFailed`), so that stays an item too.
  */
 function replyKey(board: Board, repo: BoardRepo, item: NextItem, found: NextItem[], stop: RunReply | undefined, now: number): string | undefined {
   if (item.action.kind !== 'reply' || !stop) return undefined
   if (found.some((other) => other.action.kind === 'merge' && other.action.number === stop.pr)) return undefined
   const { target, rows } = item.action.panel
   const toggle = board.autoContinue?.find((t) => t.repoId === target.repoId && t.run === target.run)
-  // A fix run stays listed long after its merge. Sent already: a toast would only offer the same word again, into a session
-  // that may still be busy with it. A send that failed to start (`lastFailed`) raises it again: the board won't retry that key, so the dot stays on until a send starts.
-  if (stop.signal === 'fix-merged' && toggle?.lastKey === stop.key) return toggle.lastFailed ? stop.key : undefined
+  if (toggle?.lastKey === stop.key) {
+    // A send of this stop failed to start, on any run. The board won't retry that key, so the item stays until a send starts.
+    if (toggle.lastFailed) return stop.key
+    // A fix run stays listed long after its merge. Sent already: a toast would only offer the same word again, into a session
+    // that may still be busy with it.
+    if (stop.signal === 'fix-merged') return undefined
+  }
   if (toggle && rows.some((r) => r.send === 'continue') && autoMaySend(repo, stop, now)) return undefined
   return stop.key
 }

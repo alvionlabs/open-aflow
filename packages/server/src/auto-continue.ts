@@ -103,7 +103,8 @@ export function createAutoContinue(
           const saved = await settle(() => d.store.saveKey(repoPathKey(repo), s.run, s.key))
           if (saved !== true) return
           const result = await runResume(d, { repo, run: s.run, session: s.session, word: 'continue', auto: true })
-          // A failed start raises the stop again (attention.ts), so a toast tells you. A failed save leaves it quiet, as before.
+          // A failed start raises the stop again (attention.ts): a toast, or only the dot when this app run already showed
+          // that stop. A failed save of the mark leaves it quiet, as before.
           if (result.outcome === 'failed') await settle(() => d.store.saveFailed(repoPathKey(repo), s.run, s.key))
           await settle(d.rebuild)
         } finally {
