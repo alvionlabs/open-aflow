@@ -294,3 +294,8 @@ Consequences: none yet.
 Context: with a terminal host, the run list could list terminals, sessions, or plans.
 Decision: keep the UI as it is. A row is still a run. The run view with nodes and arrows is called **Workflow**, the screen to sit and watch. The terminal is a new tab in the run view, shown when the user wants to see it.
 Consequences: terminals attach to a run; they are not rows. A terminal that starts before its plan exists needs a home (proposal in the research doc).
+
+## 2026-11-11 — Only runs started in the app are tracked (human decision, not in force until planned)
+Context: a run can start in the app's terminal or in the user's own terminal.
+Decision: the app tracks only runs started in its own terminals. A run in the user's own terminal is ignored: outside the app the workflow plugin is not loaded, so nothing writes `.openaflow/`.
+Consequences: the `pod-docs/` fallback is dropped, so pod runs started outside the app stop showing once the app moves to `.openaflow/`. Proposal in the research doc: the app loads its plugin per session with `claude --plugin-dir`.
