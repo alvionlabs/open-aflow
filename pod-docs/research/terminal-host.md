@@ -23,6 +23,7 @@ These are the human's words. They are recorded in [decisions.md](../decisions.md
 7. **Outside runs are watch-only.** Runs started in the app get Workflow, the Terminal tab, Continue, and auto-continue. Runs started in your own terminal still use OpenAFlow's plugin, so they write `.openaflow/`; they get Workflow, merge, and answer only. Reading state never depends on whether a run is hosted.
 8. **`.openaflow/` is committed,** as `pod-docs/` is today.
 9. **Typing wait for automatic sends: 30 s by default, as a user setting.** After you type in a run's terminal, the app waits this long before auto-continue may type `continue`.
+10. **Scrollback: 5,000 lines per terminal by default, as a user setting.** The pty host keeps this much of each terminal's output for replay and for the last screen shown next to **Resume**.
 
 ## Proposals (not decided)
 
@@ -67,6 +68,11 @@ Short notes on the options not chosen, so they can be weighed again later. Each 
 - **No wait; rely on the empty-prompt check alone.** Rejected: right after you clear your text, a send could land.
 - **No automatic sends while the Terminal tab is open.** Rejected: it stops runs while you only watch, and watching is the app's main use.
 - **A fixed 30 s with no setting.** Rejected in favor of a setting, so you choose the wait.
+
+**Scrollback per terminal (decision 10)**
+- **1,000 lines.** Low memory, but a long Claude turn can push out what you want to see.
+- **10,000 lines or more.** More history, but more memory per run and a slower replay when the tab opens.
+- Either stays reachable through the setting.
 
 ## Policy
 
@@ -294,7 +300,7 @@ Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a bran
 5. **Auto-continue input.** Write `continue` plus Enter to an idle session. Claude Code takes it as a normal turn. Then type while a send is due; the send waits. Then open a permission dialog (ask for a tool that needs approval) and leave it for over 60 s: no send happens, and the app knows the prompt isn't empty without reading the screen.
 6. **Host crash.** Kill the host. The app restarts it, shows the run as stopped, and **Resume** starts `claude --resume <uuid>` with the old conversation.
 7. **Reboot path.** Kill the whole app. On the next start, the run shows as stopped, with its last saved screen and **Resume**. Nothing starts by itself.
-8. **Package.** `pnpm package` includes node-pty. The installed app passes checks 1 and 4 on a machine with no build tools. Record the installer size.
+8. **Package.** `pnpm package` includes node-pty. The installed app passes checks 1 and 4 on a machine with no build tools. Record the installer size. Also measure the memory of one terminal holding 5,000 lines of scrollback.
 9. **Session ID drift.** In a hosted terminal, run `/clear`, then `/resume` to another session. Record which session ID each step leaves, and whether the app can still name the terminal's session.
 10. **Browser build.** `pnpm dev` starts the host as a plain Node child. The browser shows the terminal over the WebSocket. A request with no token or a wrong `Origin` gets no terminal data.
 11. **Session-only plugin.** Start `claude --plugin-dir <path>` in a hosted terminal: the plugin's skills work. Start plain `claude` in your own terminal in the same repo: the plugin's skills are absent.
@@ -306,7 +312,7 @@ Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a bran
 3. How does the app install and update the workflow plugin? Proposal: ship it in the app and load it with `--plugin-dir` (see [`.openaflow/` and the plugin](#openaflow-and-the-plugin)). Confirm in the spike.
 4. ~~Commit or ignore `.openaflow/`?~~ Answered 2026-11-11 (decision 8): committed.
 5. ~~How long after your last keystroke may an automatic send happen?~~ Answered 2026-11-11 (decision 9): 30 s by default, a user setting.
-6. How many lines of scrollback per run? VS Code's persistent scrollback is a setting; pick a fixed default for us.
+6. ~~How many lines of scrollback per run?~~ Answered 2026-11-11 (decision 10): 5,000 by default, a user setting.
 7. The browser build must host terminals (agents test there). Does the desktop window also use the WebSocket path, or only `MessagePort`?
 
 ## Sources

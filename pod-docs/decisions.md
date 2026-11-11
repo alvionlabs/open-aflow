@@ -309,3 +309,8 @@ Consequences: engineers in worktrees read the docs from their checkout, and doc 
 Context: an automatic `continue` typed into a hosted terminal can mix with the user's own typing.
 Decision: after the user types in a run's terminal, auto-continue waits before it may type. The default is 30 s, and the user can change it in a setting.
 Consequences: this adds to the other send checks (toggle on, 60 s idle session, empty prompt, live terminal).
+
+## 2026-11-11 — Scrollback is 5,000 lines per terminal, as a setting (human decision, not in force until planned)
+Context: the pty host keeps each terminal's output in memory for replay and for the last screen next to Resume.
+Decision: 5,000 lines per terminal by default; the user can change it in a setting.
+Consequences: the spike measures the memory of one terminal at 5,000 lines.
