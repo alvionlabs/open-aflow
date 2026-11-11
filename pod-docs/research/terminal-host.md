@@ -20,7 +20,7 @@ These are the human's words. They are recorded in [decisions.md](../decisions.md
 4. **Quit confirms and ends runs.** Quitting the app shows a confirm dialog that ends the running sessions. Leaving them running uses RAM and makes the app hard to predict.
 5. **Resume is a button.** Show **Resume** buttons. Never resume on its own.
 6. **The UI stays as it is.** A row in the list is still a run of the workflow. The run view with nodes and arrows is called **Workflow**: the screen you sit and watch to see how a run is going. The terminal is a new tab in the run view, for when you want to see it. It is not a new kind of row.
-7. **Hosted runs only (tentative, under discussion).** The app tracks only runs started in its own terminals. A run you start in your own terminal, outside the app, is ignored: outside the app the workflow plugin is not loaded, so nothing writes `.openaflow/` and the app has nothing to track.
+7. **Outside runs are watch-only.** Runs started in the app get Workflow, the Terminal tab, Continue, and auto-continue. Runs started in your own terminal still use OpenAFlow's plugin, so they write `.openaflow/`; they get Workflow, merge, and answer only. Reading state never depends on whether a run is hosted.
 
 ## Proposals (not decided)
 
@@ -214,9 +214,10 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 
 - The app creates `.openaflow/` from the template when you add a repo and agree. This breaks the README line "it never writes inside a repo". Change that line.
 - Claude Code loads skills and agents from a plugin or from `.claude/`, not from `.openaflow/`. So the workflow ships as a plugin (a fork of claude-pod, renamed), and only state docs go in `.openaflow/`.
-- **Proposal: the app ships the plugin and loads it per session.** The app starts `claude --plugin-dir <app>/plugin`. The `claude` CLI help says `--plugin-dir` loads "a plugin from a directory or .zip for this session only". So the plugin is active only in hosted terminals, which makes decision 7 true by design. The plugin updates with the app, with no marketplace and no install step. Spike check 11.
+- **Proposal: the app ships the plugin and loads it per session.** The app starts `claude --plugin-dir <app>/plugin`. The `claude` CLI help says `--plugin-dir` loads "a plugin from a directory or .zip for this session only". The plugin updates with the app, with no marketplace and no install step. Spike check 11.
+- **Outside runs need the plugin too (decision 7).** Offer a normal install for your own terminal as well. Then a hosted session could load the plugin twice (installed and `--plugin-dir`), maybe at two versions. The spike must check what Claude Code does then; skip `--plugin-dir` when the installed version matches, if needed.
 - If you also install claude-pod globally, a hosted session loads both plugins. Their skills have different prefixes (`pod:` and the new one), but both may write docs. The plan must say whether the app warns about this.
-- **Dropped: the `pod-docs/` fallback.** Decision 7 means pod runs started outside the app are not tracked. So the app no longer reads `pod-docs/`, and today's board for pod runs (this repo's own development too) stops working once the app moves to `.openaflow/`. The plan must decide when that switch happens.
+- **The `pod-docs/` fallback is open.** Runs with claude-pod (not OpenAFlow's plugin) write `pod-docs/`. Reading it watch-only costs little, since the parsers are the same, and keeps this repo's own development on the board while it moves over. Proposal: keep it until OpenAFlow develops itself with its own plugin.
 - The path is hard-coded in about 12 lines today: `packages/model/src/run-model.ts:68-149`, `packages/server/src/repo-files.ts:8-9`, `watcher.ts:73`, `queue-writer.ts:31`, `folder-list.ts:159`.
 - Other pod names to move behind the template: `pod:*` agent names in transcripts, `pod-ports` claim files, the `pod-staging` branch, and the reply words.
 
@@ -265,7 +266,7 @@ Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a bran
 ## Open questions
 
 1. ~~What is a "run"?~~ Answered 2026-11-11 (decision 6): a row stays a run, and the terminal is a tab in it. Still open: confirm the proposals under [One run, one session ID](#one-run-one-session-id) for a terminal that starts before its plan exists.
-2. Runs started outside the app: tentative answer is to ignore them (decision 7). Still under discussion.
+2. ~~Runs started outside the app?~~ Answered 2026-11-11 (decision 7): watch-only.
 3. How does the app install and update the workflow plugin? Proposal: ship it in the app and load it with `--plugin-dir` (see [`.openaflow/` and the plugin](#openaflow-and-the-plugin)). Confirm in the spike.
 4. Is `.openaflow/` committed (as `pod-docs/` is, and pod merges it through PRs) or ignored?
 5. How long after your last keystroke may an automatic send happen?
