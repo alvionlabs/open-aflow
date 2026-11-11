@@ -299,3 +299,8 @@ Consequences: terminals attach to a run; they are not rows. A terminal that star
 Context: a run can start in the app's terminal or in the user's own terminal. Both use OpenAFlow's plugin, so both write `.openaflow/`.
 Decision: runs started in the app get everything: Workflow, the Terminal tab, Continue, and auto-continue. Runs started in the user's own terminal are watch-only: Workflow, merge, and answer, with no Terminal tab, no Continue, and no auto-continue. Reading state never depends on whether a run is hosted.
 Consequences: the old `claude -p --resume` runner is not needed. For outside runs to write `.openaflow/`, the plugin must also be installable outside the app, not only loaded with `--plugin-dir`.
+
+## 2026-11-11 — `.openaflow/` is committed (human decision, not in force until planned)
+Context: the folder can be committed, ignored, or partly ignored.
+Decision: `.openaflow/` is committed, as `pod-docs/` is today.
+Consequences: engineers in worktrees read the docs from their checkout, and doc changes go through PRs. Options not chosen are in the research doc under "Options considered".

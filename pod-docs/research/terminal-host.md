@@ -21,6 +21,7 @@ These are the human's words. They are recorded in [decisions.md](../decisions.md
 5. **Resume is a button.** Show **Resume** buttons. Never resume on its own.
 6. **The UI stays as it is.** A row in the list is still a run of the workflow. The run view with nodes and arrows is called **Workflow**: the screen you sit and watch to see how a run is going. The terminal is a new tab in the run view, for when you want to see it. It is not a new kind of row.
 7. **Outside runs are watch-only.** Runs started in the app get Workflow, the Terminal tab, Continue, and auto-continue. Runs started in your own terminal still use OpenAFlow's plugin, so they write `.openaflow/`; they get Workflow, merge, and answer only. Reading state never depends on whether a run is hosted.
+8. **`.openaflow/` is committed,** as `pod-docs/` is today.
 
 ## Proposals (not decided)
 
@@ -31,6 +32,35 @@ Everything else in this doc is a proposal for the plan to confirm. The main ones
 - The quit dialog's default button is **Cancel**.
 - An app update never restarts the app while a run is live.
 - Auto-continue stays, as a toggle that is off by default. See [Policy](#policy).
+
+## Options considered
+
+Short notes on the options not chosen, so they can be weighed again later. Each row names the decision it lost to.
+
+**How OpenAFlow gets independent of pod (decision 1)**
+- **A. Read a new folder only.** Read `.openaflow/`, fall back to `pod-docs/`, and keep the pod plugin as the writer (with a docs-folder setting added to claude-pod). Small, but the app still needs the pod plugin, so it doesn't fix "I can't use the app".
+- **B. Own plugin, no terminal.** Ship a renamed claude-pod plugin; you run `claude` in your own terminal. Independent of pod, but the app can't show or type into the session. Decision 1 is B plus a terminal.
+- **C. Full harness.** The app drives Claude Code itself (Agent SDK or `claude -p`). Rejected in the master plan: a second product, no in-chat plan interview, and the Agent SDK needs an API key under Anthropic's rules.
+
+**Session life (decisions 3 and 4)**
+- **Terminals inside the app's main or server process.** Simplest, but a server crash or restart ends every run.
+- **Detached host that outlives the app.** Runs survive quit, updates, and app crashes. Rejected: background runs use RAM and make the app hard to predict. It also needs Windows job-object work so Electron doesn't end the children.
+- **tmux as the host (Linux and macOS).** Free persistence, and you could attach from your own terminal. Rejected: Windows has no tmux, so two hosts to keep up.
+
+**Resume (decision 5)**
+- **Resume on its own at start.** Fewer clicks after a reboot. Rejected: it starts long runs that use the plan quota with no action from you.
+
+**What a row is (decision 6)**
+- **A row per terminal** (my first proposal). Predictable, because the app owns the terminal's whole life. Rejected: it changes the run list, and the Workflow view is the screen to watch.
+- **A row per Claude session.** Rejected: `/clear` and Resume make new sessions, so rows would split one piece of work.
+
+**Runs started outside the app (decision 7)**
+- **Hosted runs only.** Simplest, and one input path. Rejected: watching costs almost nothing, since state comes from files; and users on tmux, SSH, or containers would lose the app.
+- **Watch and continue,** as today, with `claude -p --resume`. Rejected: two ways to send input, and two processes on one session can split the conversation.
+
+**`.openaflow/` in git (decision 8)**
+- **Ignore the whole folder.** Clean history. Rejected: engineers in worktrees read the sprint docs from their checkout, and the merge flow and hand-backs go through git. Ignoring it means a new way for agents to share state.
+- **Ignore only the parts for you** (for example `research/` and `reports/`). Less noise, same workflow. Still open as a later change if the noise bothers you.
 
 ## Policy
 
@@ -268,7 +298,7 @@ Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a bran
 1. ~~What is a "run"?~~ Answered 2026-11-11 (decision 6): a row stays a run, and the terminal is a tab in it. Still open: confirm the proposals under [One run, one session ID](#one-run-one-session-id) for a terminal that starts before its plan exists.
 2. ~~Runs started outside the app?~~ Answered 2026-11-11 (decision 7): watch-only.
 3. How does the app install and update the workflow plugin? Proposal: ship it in the app and load it with `--plugin-dir` (see [`.openaflow/` and the plugin](#openaflow-and-the-plugin)). Confirm in the spike.
-4. Is `.openaflow/` committed (as `pod-docs/` is, and pod merges it through PRs) or ignored?
+4. ~~Commit or ignore `.openaflow/`?~~ Answered 2026-11-11 (decision 8): committed.
 5. How long after your last keystroke may an automatic send happen?
 6. How many lines of scrollback per run? VS Code's persistent scrollback is a setting; pick a fixed default for us.
 7. The browser build must host terminals (agents test there). Does the desktop window also use the WebSocket path, or only `MessagePort`?
