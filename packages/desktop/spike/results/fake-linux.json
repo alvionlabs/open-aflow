@@ -1,0 +1,284 @@
+{
+  "2-window-life": {
+    "pass": true,
+    "notes": {
+      "steps": {
+        "reopen": {
+          "count": 72,
+          "max": 72,
+          "ok": true,
+          "bad": []
+        },
+        "reload": {
+          "count": 84,
+          "max": 84,
+          "ok": true,
+          "bad": []
+        },
+        "recreate": {
+          "count": 113,
+          "max": 113,
+          "ok": true,
+          "bad": []
+        },
+        "host": {
+          "count": 113,
+          "max": 113,
+          "ok": true,
+          "bad": []
+        },
+        "replays": 1
+      },
+      "seconds": 23
+    },
+    "why": "every number once and in order after reopen, reload, and a new window (last 113)"
+  },
+  "3-server-life": {
+    "pass": true,
+    "notes": {
+      "before": {
+        "serverPid": 3901546,
+        "port": 47800,
+        "health": 200
+      },
+      "after": {
+        "serverPid": 3902034,
+        "port": 47800,
+        "health": 200,
+        "before": {
+          "count": 10,
+          "max": 10,
+          "ok": true,
+          "bad": []
+        },
+        "after": {
+          "count": 21,
+          "max": 21,
+          "ok": true,
+          "bad": []
+        }
+      },
+      "seconds": 5
+    },
+    "why": "server restarted (new pid, health 200); terminal kept going 10 -> 21 with no gap"
+  },
+  "4-clean-quit": {
+    "pass": true,
+    "notes": {
+      "detached": {
+        "childUp": true,
+        "childPids": [
+          3902579
+        ],
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-11T19:15:46.348Z killAll [{\"pid\":3902567,\"byTree\":[3902579],\"byMarker\":[3902567,3902579],\"byScope\":[],\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "orphan": {
+        "childUp": true,
+        "childPids": [
+          3903142
+        ],
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-11T19:15:49.985Z killAll [{\"pid\":3903129,\"byTree\":[],\"byMarker\":[3903129,3903142],\"byScope\":[],\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "orphan-clean-env": {
+        "childUp": true,
+        "childPids": [
+          3903695
+        ],
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [
+            3903695
+          ],
+          "ss": [
+            "LISTEN 0      511        127.0.0.1:48739      0.0.0.0:*    users:((\"node-MainThread\",pid=3903695,fd=21))"
+          ],
+          "childUp": true
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-11T19:15:53.602Z killAll [{\"pid\":3903680,\"byTree\":[],\"byMarker\":[3903680],\"byScope\":[],\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": false
+      },
+      "orphan-clean-env with a systemd scope": {
+        "childUp": true,
+        "childPids": [
+          3904250
+        ],
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-11T19:15:57.145Z killAll [{\"pid\":3904236,\"byTree\":[],\"byMarker\":[3904236],\"byScope\":[3904236,3904250],\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "seconds": 14
+    },
+    "why": "scope fix for the cleared env: clean; detached: clean; orphan: clean; orphan with env cleared: LEFT (known gap)"
+  },
+  "6-host-crash": {
+    "pass": true,
+    "notes": {
+      "after kill": {
+        "oldHost": 3904342,
+        "newHost": 3904871,
+        "hostStarts": 2,
+        "stopReason": "host crashed",
+        "fakeAlive": false
+      },
+      "stopped screen tail": [
+        "line 18",
+        "line 19"
+      ],
+      "resume": {
+        "argv": [
+          "--resume",
+          "af6b9110-cbcd-4260-a1fb-6a113e4feacc"
+        ],
+        "noAutoStart": true,
+        "liveAfterResume": {
+          "count": 3,
+          "max": 3,
+          "ok": true,
+          "bad": []
+        }
+      },
+      "seconds": 18
+    },
+    "why": "host restarted; run read \"host crashed\"; claude ended; Resume started claude --resume <uuid>"
+  },
+  "7-app-crash": {
+    "pass": true,
+    "notes": {
+      "left 3 s after SIGKILL of main": {
+        "host": false,
+        "server": false,
+        "fake": false,
+        "child": [
+          3905435
+        ]
+      },
+      "next start": {
+        "stopReason": "app closed",
+        "startupLeftovers": [
+          {
+            "runId": "bbd62a4a",
+            "markerPids": [
+              3905435
+            ]
+          }
+        ],
+        "savedScreenRows": 21,
+        "lastRow": "line 19",
+        "fakeAlive": false,
+        "child": [],
+        "newClaudeStarted": false
+      },
+      "seconds": 19
+    },
+    "why": "run read \"app closed\" with its saved screen; nothing left running (after the start sweep); nothing started by itself"
+  },
+  "8-memory": {
+    "pass": true,
+    "notes": {
+      "host memory": {
+        "idleVmRssKb": 124548,
+        "withRunVmRssKb": 157620,
+        "heapUsed": 10015044,
+        "bufferRows": 5031,
+        "firstRow": "burst 970 xxxxxxxxxx"
+      },
+      "seconds": 3
+    },
+    "why": "host VmRSS 124548 kB idle, 157620 kB holding 5031 rows (scrollback 5,000 + screen)"
+  }
+}

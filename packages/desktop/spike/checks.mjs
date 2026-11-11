@@ -4,7 +4,7 @@
 // or by the unique marker of a process this script started.
 
 import { execFileSync, spawnSync } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createConnection } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -404,18 +404,33 @@ async function waitReady(a, termId, c) {
     if (!trusted && /trust/i.test(t) && /folder|files/i.test(t)) {
       note(c, 'trust prompt', t.split('\n').filter((l) => /trust|proceed|yes|no/i.test(l)).slice(0, 6))
       trusted = true
+      // The highlighted default is "No, exit": move down to "Yes, I trust this folder" first.
+      await sp(a, 'write', termId, '\u001b[B')
+      await sleep(700)
       await sp(a, 'write', termId, '\r')
       return false
     }
-    return /❯|>\s*$|\? for shortcuts|bypass|accept edits|auto mode/i.test(t) && !/trust the files/i.test(t)
+    return /for shortcuts|shift\+tab|auto mode|accept edits|plan mode/i.test(t) && !/trust this folder/i.test(t)
   }, 60_000, 1000)
+  writeFileSync(join(OUT, `${c}-ready-screen.txt`), await screenText(a, termId))
   return ok
 }
-const typeLine = async (a, termId, text) => {
+/** Types a line and presses Enter; presses Enter again if the text still sits in the input box. */
+const typeLine = async (a, termId, text, retry = true) => {
   await sp(a, 'write', termId, text)
-  await sleep(500)
+  await sleep(1000)
   await sp(a, 'write', termId, '\r')
+  const probe = text.slice(0, 30)
+  for (let i = 0; i < (retry ? 3 : 0); i++) {
+    await sleep(1500)
+    const box = (await screenText(a, termId)).split('\n').filter((l) => l.startsWith('❯') && l.includes(probe))
+    const lastIsBox = (await screenText(a, termId)).split('\n').filter((l) => l.startsWith('❯')).at(-1)?.includes(probe)
+    if (!box.length || !lastIsBox) return
+    note('typing', `enter again (${i + 1})`, probe)
+    await sp(a, 'write', termId, '\r')
+  }
 }
+const answerLine = (word) => (lines) => lines.some((l) => new RegExp(`^\\s*(⏺|●)?\\s*${word}\\.?\\s*$`).test(l))
 
 checks['1-real-start'] = async () => {
   const c = '1-real-start'
@@ -425,9 +440,10 @@ checks['1-real-start'] = async () => {
     note(c, 'run', run)
     note(c, 'ready', await waitReady(a, run.termId, c))
     await typeLine(a, run.termId, 'Reply with the word PONG and nothing else.')
-    const got = await waitFor(async () => /\bPONG\b/.test((await screenText(a, run.termId)).split('Reply with the word')[1] ?? ''), 90_000, 1000)
-    const pageHas = (await pageLines(a.page)).some((l) => /\bPONG\b/.test(l) && !/Reply with/.test(l))
+    const got = await waitFor(async () => answerLine('PONG')((await sp(a, 'hostBuffer', run.termId)) ?? []), 90_000, 1000)
+    const pageHas = answerLine('PONG')(await pageLines(a.page))
     note(c, 'transcript', { file: transcript(w.repo, run.sessionId), exists: existsSync(transcript(w.repo, run.sessionId)) })
+    writeFileSync(join(OUT, `${c}-end-screen.txt`), await screenText(a, run.termId))
     verdict(c, got && pageHas, got ? 'claude answered PONG in the hosted terminal (host buffer and window)' : 'no PONG')
   } finally {
     await close(a)
@@ -487,6 +503,52 @@ checks['5-auto-continue'] = async () => {
     const okC = dlg && !gateC.ok && !fileMade && turnsC.filter((t) => t === 'continue').length === 1
     note(c, 'parts', { a: okA, b: okB, c: okC })
     verdict(c, okA && okB && okC, `a) send became a user turn: ${okA}; b) send waited while typing: ${okB}; c) no send during the permission dialog: ${okC}`)
+  } finally {
+    await close(a)
+  }
+}
+
+checks['5-auto-continue-bc'] = async () => {
+  // Rerun of parts b and c with the fixed gate. Part a passed in the first run (see 5-auto-continue).
+  const c = '5-auto-continue-bc'
+  const { w, a } = await realLaunch('c5bc', { OPENAFLOW_SPIKE_TYPING_WAIT_MS: '8000' })
+  try {
+    const run = await sp(a, 'startRun', { extraArgs: [...REAL_ARGS, '--plugin-dir', PLUGIN, '--permission-mode', 'default'] })
+    await waitReady(a, run.termId, c)
+    await sleep(10_000) // past the typing wait, so only the hook state and the draft rule decide
+    note(c, 'gate at a fresh empty prompt', await sp(a, 'sendGate', run.runId))
+    // b) A draft typed in the window, then the typing wait runs out: the send must still wait.
+    await a.page.click('#term')
+    await a.page.keyboard.type('half typed')
+    const sb = await sp(a, 'requestSend', run.runId)
+    await sleep(12_000)
+    const gateB = await sp(a, 'sendGate', run.runId)
+    const submitted = (await sp(a, 'hookEvents')).filter((e) => e.event === 'UserPromptSubmit').map((e) => e.prompt)
+    note(c, 'b) draft, 12 s later (wait is 8 s)', { request: sb, gate: gateB, submitted })
+    await sp(a, 'cancelSend', run.runId)
+    const okB = submitted.length === 0 && !gateB.ok
+    // Clear the draft (Ctrl+U), then submit the Bash request; that submit resets the draft rule.
+    await sp(a, 'write', run.termId, '\u0015')
+    await sleep(800)
+    rmSync(join(w.repo, 'spike-permission-test.txt'), { force: true })
+    const evStart = (await sp(a, 'hookEvents')).length
+    await typeLine(a, run.termId, 'Use the Bash tool to run exactly: touch spike-permission-test.txt', false)
+    const dlg = await waitFor(async () => /Do you want to proceed|Yes, and don't ask/i.test(await screenText(a, run.termId)), 90_000, 1000)
+    writeFileSync(join(OUT, `${c}-dialog-screen.txt`), await screenText(a, run.termId))
+    note(c, 'c) permission dialog on screen', dlg)
+    const sc = await sp(a, 'requestSend', run.runId)
+    await sleep(70_000)
+    const evs = (await sp(a, 'hookEvents')).slice(evStart)
+    const gateC = await sp(a, 'sendGate', run.runId)
+    const fileMade = existsSync(join(w.repo, 'spike-permission-test.txt'))
+    const stillDialog = /Do you want to proceed/i.test(await screenText(a, run.termId))
+    note(c, 'c) hook events while the dialog is open (70 s)', evs.map((e) => ({ event: e.event, tool: e.tool_name, type: e.notification_type, message: e.message, sinceMs: e.at - evs[0].at })))
+    note(c, 'c) after 70 s', { request: sc, gate: gateC, fileMade, stillDialog, sendLogTail: (await sp(a, 'sendLog')).slice(-1) })
+    await sp(a, 'cancelSend', run.runId)
+    await sp(a, 'write', run.termId, '\u001b') // Esc declines
+    await sleep(2000)
+    const okC = dlg && !gateC.ok && !fileMade && stillDialog && !evs.some((e) => e.event === 'PostToolUse')
+    verdict(c, okB && okC, `b) draft blocks the send after the typing wait: ${okB}; c) no send during the permission dialog for 70 s: ${okC}`)
   } finally {
     await close(a)
   }

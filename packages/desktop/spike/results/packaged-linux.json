@@ -1,0 +1,47 @@
+{
+  "8-package": {
+    "pass": true,
+    "notes": {
+      "packaged start": {
+        "rows": 10,
+        "first": "fake-claude pid=3899562 argv=[\"--session-id\",\"a224184c-fb96-4a85-9ab9-124d0f989954\"]",
+        "ptyHostOk": true
+      },
+      "packaged quit": {
+        "childUp": true,
+        "childPids": [
+          3900182
+        ],
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-11T19:15:03.052Z killAll [{\"pid\":3900150,\"byTree\":[3900182],\"byMarker\":[3900150,3900182],\"byScope\":[],\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "seconds": 7
+    },
+    "why": "node-pty loaded in the packaged app and the window shows the run"
+  }
+}

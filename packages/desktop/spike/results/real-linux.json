@@ -1,0 +1,380 @@
+{
+  "1-real-start": {
+    "pass": true,
+    "notes": {
+      "run": {
+        "runId": "4383eb50",
+        "termId": "4383eb50-1",
+        "sessionId": "33247a05-9c43-4062-8a29-83ffaa56f788"
+      },
+      "trust prompt": [
+        " Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source",
+        " project, or work from your team). If not, take a moment to review what's in this folder first.",
+        " \u276f No, exit",
+        "   Yes, I trust this folder"
+      ],
+      "ready": true,
+      "transcript": {
+        "file": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/33247a05-9c43-4062-8a29-83ffaa56f788.jsonl",
+        "exists": true
+      },
+      "seconds": 6
+    },
+    "why": "claude answered PONG in the hosted terminal (host buffer and window)"
+  },
+  "11-plugin": {
+    "pass": true,
+    "notes": {
+      "in app": true,
+      "outside": {
+        "unknown": true,
+        "ranSkill": false,
+        "tail": [
+          "\u001b7\u001b8\u001b[<u\u001b[>5u\u001b[>4;2m\u001b]0;\u2733 Claude Code\u0007\u001b]9;4;0;\u0007\u001b[<u\u001b[>5u\u001b[>4;2m\r \u2590\u259b\u2588\u2588\u2588\u259b\u2588Claude Codev2.1.322\r\u259d\u259c\u2588\u2588\u2588\u2588\u2588\u2588\u2580Haiku 5.5 \u00b7 Claude Max\r \u259d\u259d   \u259d\u259d /\u2026/7ba7057f-44e7-40c0-9f14-31dd3ca3d464/scratchpad/w/spike-real-repo\r\u25d0 medium \u00b7 /effort\r\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\r\u276f\u00a0Try \"how do I log an error?\"\r\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\r\u23f5\u23f5 auto mode on (shift+tab to cycle) \u00b7 \u2190 for agents\u001b[>0q\u001b]7501;?\u0007\rNo commands match \"/openaflow-spike:hello\"\r\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\r\u276f\u00a0/openaflow-spike:hello\r\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\r  Haiku 5.5 (1M) medium |  spike-real-repo (master)\r\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0% 1M      |  5h --  7d --\r\rNo commands match \"/openaflow-spike:hello\"\r[-]\r\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\r\u2588\u2588\u2580\u2588\u2588\u2588\u2588\u2588\u2588\u2580\u2588\u2588\r\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588chilling\r\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\r\u2588\u2588\u2588\u2588\r                                          \u25d0 medium \u00b7 /effort\r\r\r\r\r\r\r\rNo commands match \"/openaflow-spike:hello\"\r\u25cfUnknown command: /openaflow-spike:hello\r                                          \u25d0 medium \u00b7 /effort\r\r \u00b7 \u2190 for agents"
+        ]
+      },
+      "seconds": 11
+    },
+    "why": "skill ran in the app: true; outside: absent"
+  },
+  "9-session-drift": {
+    "pass": true,
+    "notes": {
+      "steps": {
+        "step1": {
+          "started": "413bfa3f-8396-4248-92e5-87d1aea7949c",
+          "alphaIn": true
+        },
+        "step2": {
+          "bravoFile": "1c1e78a6-cef3-4c68-b86f-dc8c5f1f2d36.jsonl",
+          "sameAsStart": false,
+          "sessionStarts": [
+            {
+              "id": "413bfa3f-8396-4248-92e5-87d1aea7949c",
+              "source": "startup"
+            },
+            {
+              "id": "1c1e78a6-cef3-4c68-b86f-dc8c5f1f2d36",
+              "source": "clear"
+            }
+          ]
+        },
+        "step3": {
+          "charlieFile": "413bfa3f-8396-4248-92e5-87d1aea7949c.jsonl",
+          "backToStart": true,
+          "sessionStarts": [
+            {
+              "id": "413bfa3f-8396-4248-92e5-87d1aea7949c",
+              "source": "startup"
+            },
+            {
+              "id": "1c1e78a6-cef3-4c68-b86f-dc8c5f1f2d36",
+              "source": "clear"
+            },
+            {
+              "id": "413bfa3f-8396-4248-92e5-87d1aea7949c",
+              "source": "resume"
+            }
+          ],
+          "afterResumeScreen": [
+            "    \u2588 \u2588    \u2588 \u2588",
+            "",
+            "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+            "\u276f\u00a0",
+            "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+            "  Haiku 5.5 (1M) medium |  spike-real-repo (master)",
+            "  \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 4% 1M      |  5h 14% \u21e348% 1h  7d 28% \u21e12% 5d",
+            "  \u23f5\u23f5 auto mode on (shift+tab to cycle)"
+          ]
+        },
+        "newFiles": [
+          "1c1e78a6-cef3-4c68-b86f-dc8c5f1f2d36.jsonl",
+          "413bfa3f-8396-4248-92e5-87d1aea7949c.jsonl"
+        ]
+      },
+      "hook events": [
+        {
+          "event": "SessionStart",
+          "id": "413bfa3f",
+          "source": "startup"
+        },
+        {
+          "event": "UserPromptSubmit",
+          "id": "413bfa3f"
+        },
+        {
+          "event": "Stop",
+          "id": "413bfa3f"
+        },
+        {
+          "event": "SessionEnd",
+          "id": "413bfa3f"
+        },
+        {
+          "event": "SessionStart",
+          "id": "1c1e78a6",
+          "source": "clear"
+        },
+        {
+          "event": "UserPromptSubmit",
+          "id": "1c1e78a6"
+        },
+        {
+          "event": "Stop",
+          "id": "1c1e78a6"
+        },
+        {
+          "event": "SessionEnd",
+          "id": "1c1e78a6"
+        },
+        {
+          "event": "SessionStart",
+          "id": "413bfa3f",
+          "source": "resume"
+        },
+        {
+          "event": "UserPromptSubmit",
+          "id": "413bfa3f"
+        },
+        {
+          "event": "Stop",
+          "id": "413bfa3f"
+        }
+      ],
+      "seconds": 25
+    },
+    "why": "finding: /clear -> new session file; /resume <id> -> back to the first file; SessionStart hook carries the new id: true"
+  },
+  "5-auto-continue": {
+    "pass": false,
+    "notes": {
+      "gate before any turn": {
+        "ok": false,
+        "reasons": [
+          "last hook event is SessionStart"
+        ],
+        "lastEvent": {
+          "event": "SessionStart",
+          "session_id": "f1c0224e-1819-4cf4-8e46-311dd99db3e3",
+          "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
+          "source": "startup",
+          "at": 1794424063963
+        }
+      },
+      "gate after the turn (typing wait running)": {
+        "ok": false,
+        "reasons": [
+          "typed 2516 ms ago"
+        ],
+        "lastEvent": {
+          "event": "Stop",
+          "session_id": "f1c0224e-1819-4cf4-8e46-311dd99db3e3",
+          "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
+          "at": 1794424126348
+        }
+      },
+      "a) request right after typing": {
+        "sent": false,
+        "waiting": [
+          "typed 2520 ms ago"
+        ]
+      },
+      "a) transcript user turns": [
+        "Reply with the word READY and nothing else.",
+        "continue"
+      ],
+      "b) request with text in the box": {
+        "request": {
+          "sent": false,
+          "waiting": [
+            "typed 3 ms ago"
+          ]
+        },
+        "sentWhileTyping": false
+      },
+      "b) gate after the typing wait, text still in the box": {
+        "ok": false,
+        "reasons": [
+          "last hook event is UserPromptSubmit"
+        ],
+        "lastEvent": {
+          "event": "UserPromptSubmit",
+          "session_id": "f1c0224e-1819-4cf4-8e46-311dd99db3e3",
+          "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
+          "prompt": "half typedcontinue",
+          "at": 1794424147914
+        }
+      },
+      "b) screen line holding the text": [
+        "\u276f half typedcontinue                                                                                                    "
+      ],
+      "c) permission dialog on screen": true,
+      "c) hook events since the request": [
+        {
+          "event": "UserPromptSubmit"
+        },
+        {
+          "event": "PreToolUse",
+          "tool": "Bash"
+        },
+        {
+          "event": "PermissionRequest",
+          "tool": "Bash"
+        },
+        {
+          "event": "PostToolUse",
+          "tool": "Bash"
+        },
+        {
+          "event": "Stop"
+        },
+        {
+          "event": "SubagentStop"
+        },
+        {
+          "event": "Notification",
+          "type": "idle_prompt",
+          "message": "Claude is waiting for your input"
+        }
+      ],
+      "c) after 65 s": {
+        "gate": {
+          "ok": false,
+          "reasons": [
+            "last hook event is Notification"
+          ],
+          "lastEvent": {
+            "event": "Notification",
+            "session_id": "f1c0224e-1819-4cf4-8e46-311dd99db3e3",
+            "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/f1c0224e-1819-4cf4-8e46-311dd99db3e3.jsonl",
+            "notification_type": "idle_prompt",
+            "message": "Claude is waiting for your input",
+            "at": 1794424214355
+          }
+        },
+        "sentDuringDialog": false,
+        "fileMade": true
+      },
+      "parts": {
+        "a": true,
+        "b": true,
+        "c": false
+      },
+      "seconds": 160
+    },
+    "why": "a) send became a user turn: true; b) send waited while typing: true; c) no send during the permission dialog: false"
+  },
+  "typing": {
+    "pass": null,
+    "notes": {
+      "enter again (1)": "Use the Bash tool to run exact"
+    }
+  },
+  "5-auto-continue-bc": {
+    "pass": true,
+    "notes": {
+      "gate at a fresh empty prompt": {
+        "ok": true,
+        "reasons": [],
+        "lastEvent": {
+          "event": "SessionStart",
+          "session_id": "79ca2470-13f6-42d5-94e3-67f18b36970c",
+          "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
+          "source": "startup",
+          "at": 1794424272279
+        }
+      },
+      "b) draft, 12 s later (wait is 8 s)": {
+        "request": {
+          "sent": false,
+          "waiting": [
+            "typed 4 ms ago",
+            "draft in the input box (typed with no submit since)"
+          ]
+        },
+        "gate": {
+          "ok": false,
+          "reasons": [
+            "draft in the input box (typed with no submit since)"
+          ],
+          "lastEvent": {
+            "event": "SessionStart",
+            "session_id": "79ca2470-13f6-42d5-94e3-67f18b36970c",
+            "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
+            "source": "startup",
+            "at": 1794424272279
+          }
+        },
+        "submitted": []
+      },
+      "c) permission dialog on screen": true,
+      "c) hook events while the dialog is open (70 s)": [
+        {
+          "event": "UserPromptSubmit",
+          "sinceMs": 0
+        },
+        {
+          "event": "PreToolUse",
+          "tool": "Bash",
+          "sinceMs": 1676
+        },
+        {
+          "event": "PermissionRequest",
+          "tool": "Bash",
+          "sinceMs": 1733
+        },
+        {
+          "event": "Notification",
+          "type": "permission_prompt",
+          "message": "Claude needs your permission",
+          "sinceMs": 7754
+        }
+      ],
+      "c) after 70 s": {
+        "request": {
+          "sent": false,
+          "waiting": [
+            "typed 2028 ms ago",
+            "busy or dialog: UserPromptSubmit, PreToolUse, PermissionRequest"
+          ]
+        },
+        "gate": {
+          "ok": false,
+          "reasons": [
+            "busy or dialog: UserPromptSubmit, PreToolUse, PermissionRequest, Notification(permission_prompt)"
+          ],
+          "lastEvent": {
+            "event": "Notification",
+            "session_id": "79ca2470-13f6-42d5-94e3-67f18b36970c",
+            "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
+            "notification_type": "permission_prompt",
+            "message": "Claude needs your permission",
+            "at": 1794424363943
+          }
+        },
+        "fileMade": true,
+        "stillDialog": true,
+        "sendLogTail": [
+          {
+            "at": 1794424427210,
+            "runId": "1e704b8c",
+            "ok": false,
+            "reasons": [
+              "busy or dialog: UserPromptSubmit, PreToolUse, PermissionRequest, Notification(permission_prompt)"
+            ],
+            "lastEvent": {
+              "event": "Notification",
+              "session_id": "79ca2470-13f6-42d5-94e3-67f18b36970c",
+              "transcript_path": "~/.claude/projects/-tmp-claude-1000--home-iamphduc-Documents-Projects-alvionlabs-openaflow-7ba7057f-44e7-40c0-9f14-31dd3ca3d464-scratchpad-w-spike-real-repo/79ca2470-13f6-42d5-94e3-67f18b36970c.jsonl",
+              "notification_type": "permission_prompt",
+              "message": "Claude needs your permission",
+              "at": 1794424363943
+            }
+          }
+        ]
+      },
+      "seconds": 160
+    },
+    "why": "b) draft blocks the send after the typing wait: true; c) no send during the permission dialog for 70 s: true (corrected by hand: fileMade was a file left in the shared scratch repo by the first 5 run; no PostToolUse event fired and the dialog was still open at 70 s)"
+  }
+}

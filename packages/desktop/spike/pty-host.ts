@@ -4,7 +4,9 @@
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { alive, descendants, markerPids } from './proc.ts'
-import { spawn as ptySpawn, type IPty } from '@lydell/node-pty'
+import type { IPty } from '@lydell/node-pty'
+// Packaged: main names node-pty's folder in resources/native, outside the asar. Unpackaged: normal lookup.
+const { spawn: ptySpawn } = require(process.env.OPENAFLOW_PTY_PATH ?? '@lydell/node-pty') as typeof import('@lydell/node-pty')
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { Terminal } from '@xterm/headless'
 
@@ -128,7 +130,7 @@ function attach(id: string, port: PortMain) {
     const d = e.data
     if (d?.op === 'write' && typeof d.data === 'string') {
       t.pty.write(d.data)
-      send({ op: 'input', id, at: Date.now() })
+      send({ op: 'input', id, at: Date.now(), enter: d.data.includes('\r') })
     } else if (d?.op === 'resize') {
       t.pty.resize(d.cols, d.rows)
       t.head.resize(d.cols, d.rows)

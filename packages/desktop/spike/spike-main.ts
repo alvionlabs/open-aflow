@@ -99,11 +99,15 @@ let quitting = false
 let reqSeq = 0
 const pending = new Map<number, (v: any) => void>()
 const lastInput = new Map<string, number>()
+/** Per terminal: the time of the newest input that was not Enter. Cleared by nothing but a later submit. */
+const lastDraft = new Map<string, number>()
 const hostEntry = join(__dirname, 'pty-host.cjs')
 
 function startHost() {
   hostStarts++
-  const child = utilityProcess.fork(hostEntry, [], { stdio: 'pipe', serviceName: 'OpenAFlow pty host', env: serverEnv(env, process.pid) })
+  const hostEnv = serverEnv(env, process.pid)
+  if (app.isPackaged) hostEnv.OPENAFLOW_PTY_PATH = join(process.resourcesPath, 'native', 'node_modules', '@lydell', 'node-pty')
+  const child = utilityProcess.fork(hostEntry, [], { stdio: 'pipe', serviceName: 'OpenAFlow pty host', env: hostEnv })
   host = child
   child.stdout?.on('data', (d) => log('[host]', String(d).trimEnd()))
   child.stderr?.on('data', (d) => log('[host:err]', String(d).trimEnd()))
@@ -133,6 +137,7 @@ function startHost() {
       }
     } else if (m.op === 'input') {
       lastInput.set(m.id, m.at)
+      if (!m.enter) lastDraft.set(m.id, m.at)
     } else if (m.op === 'exit') {
       const r = runs.find((x) => x.termId === m.id)
       log('term exit', m)
@@ -258,11 +263,20 @@ function sendGate(runId: string) {
   if (!r || r.stopReason !== null || !r.termId) reasons.push('not live')
   const typed = r?.termId ? lastInput.get(r.termId) : undefined
   if (typed && Date.now() - typed < TYPING_WAIT_MS) reasons.push(`typed ${Date.now() - typed} ms ago`)
-  // Hook state, not the screen. Idle = the newest event is Stop. A Notification or PermissionRequest after it = a dialog.
-  const evs = hookEvents()
+  // Hook state, not the screen. Idle = the newest idle event (SessionStart, Stop, Notification idle_prompt)
+  // with nothing after it that opens a turn or a dialog (UserPromptSubmit, PreToolUse, PermissionRequest,
+  // Notification permission_prompt, ...).
+  const evs = r ? hookEvents() : []
+  const isIdle = (e: HookEvent) => e.event === 'Stop' || e.event === 'SessionStart' || (e.event === 'Notification' && e.notification_type === 'idle_prompt')
+  const idleAt = evs.map(isIdle).lastIndexOf(true)
   const last = evs[evs.length - 1]
-  if (!last) reasons.push('no hook state yet')
-  else if (last.event !== 'Stop') reasons.push(`last hook event is ${last.event}`)
+  if (idleAt < 0) reasons.push('no idle hook event yet')
+  const after = evs.slice(idleAt + 1).filter((e) => !isIdle(e) && e.event !== 'SubagentStop' && e.event !== 'SessionEnd')
+  if (idleAt >= 0 && after.length) reasons.push(`busy or dialog: ${after.map((e) => e.event + (e.notification_type ? `(${e.notification_type})` : '')).join(', ')}`)
+  // A draft: input with no Enter after the newest submit. The box may hold text; only a submit proves it empty.
+  const submitAt = Math.max(0, ...evs.filter((e) => e.event === 'UserPromptSubmit' || e.event === 'SessionStart').map((e) => e.at))
+  const draft = r?.termId ? lastDraft.get(r.termId) : undefined
+  if (draft && draft > submitAt) reasons.push('draft in the input box (typed with no submit since)')
   return { ok: reasons.length === 0, reasons, lastEvent: last ?? null }
 }
 
@@ -420,6 +434,7 @@ if (TEST) {
     write: (termId: string, text: string) => {
       host?.postMessage({ op: 'write', id: termId, data: text })
       lastInput.set(termId, Date.now())
+      if (!text.includes('\r')) lastDraft.set(termId, Date.now())
     },
     sendGate,
     requestSend,
