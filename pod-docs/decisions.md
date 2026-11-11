@@ -314,3 +314,8 @@ Consequences: this adds to the other send checks (toggle on, 60 s idle session, 
 Context: the pty host keeps each terminal's output in memory for replay and for the last screen next to Resume.
 Decision: 5,000 lines per terminal by default; the user can change it in a setting.
 Consequences: the spike measures the memory of one terminal at 5,000 lines.
+
+## 2026-11-11 — Follow VS Code for the terminal link and terminal tests (human decision, not in force until planned)
+Context: the window must reach the pty host, and agents must be able to test the Terminal tab. VS Code tests its terminal against the real Electron app. Research: [vscode-terminal.md](research/vscode-terminal.md).
+Decision: the window talks to the pty host through `MessagePort` only, with no WebSocket. Terminal checks run against the real Electron app with Playwright `_electron` and a test hook that reads and writes the terminal as text. The browser build stays for the rest of the UI, with no Terminal tab.
+Consequences: terminal checks need a display (`xvfb` on Linux), so the smoke recipe gains a step for terminal slices.

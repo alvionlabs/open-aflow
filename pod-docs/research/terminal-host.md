@@ -24,6 +24,7 @@ These are the human's words. They are recorded in [decisions.md](../decisions.md
 8. **`.openaflow/` is committed,** as `pod-docs/` is today.
 9. **Typing wait for automatic sends: 30 s by default, as a user setting.** After you type in a run's terminal, the app waits this long before auto-continue may type `continue`.
 10. **Scrollback: 5,000 lines per terminal by default, as a user setting.** The pty host keeps this much of each terminal's output for replay and for the last screen shown next to **Resume**.
+11. **Follow VS Code for the window link and for tests.** The window talks to the pty host through `MessagePort` only, with no WebSocket. Terminal checks run against the real Electron app with Playwright `_electron` and a small test hook that reads and writes the terminal as text. The browser build stays for the rest of the UI, with no Terminal tab.
 
 ## Proposals (not decided)
 
@@ -74,6 +75,11 @@ Short notes on the options not chosen, so they can be weighed again later. Each 
 - **10,000 lines or more.** More history, but more memory per run and a slower replay when the tab opens.
 - Either stays reachable through the setting.
 
+**Window link and tests (decision 11)**
+- **B. WebSocket through the server, for both the app and the browser build.** One path that agents test in a browser. Rejected: a server crash stops the terminal view, it adds a WebSocket to guard, and VS Code shows that testing the real Electron app is normal.
+- **C. The host serves its own WebSocket.** One path, no server dependence. Rejected: the host gets a network port and its own security, against keeping the host small.
+- **Drop the browser build entirely.** One test target. Not chosen for now: it would change how every slice of the other UI is checked. Still open.
+
 ## Policy
 
 Source: [Claude Code legal and compliance](https://code.claude.com/docs/en/legal-and-compliance) (no last-updated date on the page; read 2026-11-11).
@@ -99,66 +105,9 @@ Source: [Claude Code legal and compliance](https://code.claude.com/docs/en/legal
 - Every automatic send is logged, as today.
 - Check the legal page again before each release. If it bans automated input, remove auto-continue and keep manual send.
 
-## How VS Code does it
+## What we learned from VS Code
 
-Read from the VS Code source on `main`, 2026-11-11.
-
-| Part | What VS Code does | File |
-|---|---|---|
-| Host process | The main process starts the pty host as an Electron `UtilityProcess` (`type: 'ptyHost'`, entry `vs/platform/terminal/node/ptyHostMain`). It passes the grace times and scrollback size in env. | `platform/terminal/electron-main/electronPtyHostStarter.ts` |
-| Window link | Each window asks the main process for a channel (`vscode:createPtyHostMessageChannel`). The main process calls `utilityProcess.connect()` and sends the window a `MessagePort`. The window then talks to the host directly, not through the main process. | same |
-| Host lifetime | The host is a child of the main process. When the main process ends, the host ends. | same |
-| Heartbeat | The host beats every 5 s (`BeatInterval`). The first beat may take 20 s (`ConnectingBeatInterval`). After 6 s with no beat (5 s × 1.2), VS Code logs a warning. After about 11 s, it tells the user the host is unresponsive. The second timer avoids a false alarm after the computer wakes from sleep. | `platform/terminal/common/terminal.ts`, `node/ptyHostService.ts` |
-| Host restart | If the host process ends, VS Code starts it again, up to 5 times (`MaxRestarts`). | `node/ptyHostService.ts` |
-| Process start timeout | A `createProcess` call with no answer counts as unresponsive (`CreateProcessTimeout`). | same |
-| Persistent process | Each terminal is a `PersistentTerminalProcess` in the host. It keeps a headless xterm buffer (`XtermSerializer`, `@xterm/addon-serialize`), so a new window can replay the screen. | `node/ptyService.ts` |
-| Reconnect | After a window reload, the new window lists the host's terminals and attaches. The host sends a replay event first, then live data. | same |
-| Detach | When a window detaches, a terminal that had any use stays alive for the grace time. A terminal that was never used ends at once. | `ptyService.ts` `detach()` |
-| Grace time | A terminal with no window attached ends after 60 s (`GraceTime`). A second timer of 6 s (`ShortGraceTime`, commented "maximal grace time between the first and the last reconnection") starts when `reduceConnectionGraceTime()` is called; we did not read what calls it. | `terminal.ts` `LocalReconnectConstants`, `ptyService.ts` |
-| Orphans | _Read from names only:_ the host fires `onProcessOrphanQuestion` and waits for `orphanQuestionReply` before it treats a terminal as an orphan. | `ptyService.ts` |
-| Flow control | The host pauses the pty when 100,000 characters are sent but not acknowledged (`HighWatermarkChars`), and resumes when the window catches up. | `terminal.ts` |
-| Data batching | Output is batched (`TerminalDataBufferer`) to cut the number of messages. | `ptyService.ts` |
-| Auto replies | _Read from names only:_ the host can answer fixed prompts by itself (`AutoRepliesPtyServiceContribution`). | `ptyService.ts` |
-| App quit | `shutdownAll()` disposes every process. The setting text says that when "the terminal process must be shut down (for example on window or application close)", the contents are restored and the process recreated next time. `serializeTerminalState` saves the screens; _we did not read who calls it at quit._ | `ptyService.ts`, `terminalConfiguration.ts` |
-| Revive | On the next start, `reviveTerminalProcesses` shows the saved screen with a "restored" note, and starts a **new** process with the old environment. The old process is gone. | `ptyService.ts` |
-| Revive setting | `onExit` (default): revive after quit. `onExitAndWindowClose`: also after a window close. `never`: no revive. | `terminalConfiguration.ts` |
-| Quit confirm | `terminal.integrated.confirmOnExit`: `never` (default), `always`, or `hasChildProcesses`. | `terminalConfiguration.ts` |
-
-Known field problem: Cursor and other VS Code forks report "No ptyHost heartbeat after 6 seconds" and frozen terminals, mostly over Remote SSH or on slow machines. The heartbeat finds the problem. It doesn't fix it.
-
-## How VS Code tests its terminal
-
-Read from the VS Code repo on `main`, 2026-11-11.
-
-| Layer | What runs | Where | Terminal examples |
-|---|---|---|---|
-| Unit | Mocha tests inside an Electron renderer, with DOM and Node APIs ("the closest to the environment in which VS Code itself ships"). The `common` and `browser` layers also run in Chromium and WebKit through Playwright. | `test/unit` | `ptyService.test.ts`: `XtermSerializer` replay keeps the screen; `attachToProcess` attaches only when the pid matches. `ptyHostService.test.ts`: `restartPtyHost` disposes old listeners. Also `terminalProcess`, `childProcessMonitor`, `autoReplies` tests. |
-| API integration | Extension tests against a running VS Code | `extensions/vscode-api-tests` | `terminal.test.ts`, `terminal.shellIntegration.test.ts` |
-| Smoke (UI) | Playwright drives the **real Electron app** with `_electron.launch` (`playwrightElectron.ts`). The same suites also run against the web build with `--web --browser chromium|webkit`, and `--headless` works only with `--web`. | `test/smoke`, `test/automation` | `terminal-persistence.test.ts`: "restores completed output exactly once and in order after window reload" and after detach/attach. Also input, tabs, profiles, and shell-integration suites. |
-
-How the smoke tests read and type into a terminal:
-- They do not read pixels or the DOM text of the terminal. The app has a test driver with `getTerminalBuffer(selector)` and `writeInTerminal(selector, value)`. The test polls the xterm buffer as lines of text until a check passes (`waitForTerminalText`).
-- Most terminal smoke suites are skipped on Linux (`skipSuite: process.platform === 'linux'`). They run on Windows and macOS.
-
-What this means for us:
-- Testing the real Electron app is normal practice, not a workaround. VS Code's main UI checks run that way, and the web build is a second target.
-- A small test hook in the app (read the terminal buffer as text, write to it) makes terminal checks reliable, with no screenshots.
-- Our repo already starts the real Electron binary in `real-*.test.ts` files on Windows. Playwright's `_electron` would add page control to that.
-
-## What we copy, and what we change
-
-| VS Code | OpenAFlow | Why |
-|---|---|---|
-| Host as a `UtilityProcess` of the main process | Copy. A second utility process, separate from the server's | A server crash, restart, or update must not end a run. |
-| Window gets a `MessagePort` to the host | Copy for the desktop. The browser build (`pnpm dev`, `pnpm start`) uses a WebSocket through the server instead | The browser build is the agents' test bench and has no Electron. |
-| Heartbeat 5 s, warn at 6 s, alarm at about 11 s | Copy the numbers | They are tested at scale, with the sleep case handled. |
-| Restart the host up to 5 times | Copy, but the runs in it are gone after a restart. Show them as stopped, with **Resume** | A restarted host has no ptys. |
-| Headless xterm buffer per terminal, replay on attach | Copy | A window reload or reopen from the tray shows the full screen. |
-| Flow control at 100,000 characters | Copy | `claude` output can be large and fast. |
-| 60 s grace time after a window detaches | **Change: no grace time.** A closed window hides to the tray, and runs go on | Runs take hours. A hidden window is normal use. |
-| Revive starts a new shell | **Change:** revive runs `claude --resume <session>`, and only when you press **Resume** | Claude Code keeps the conversation. Pod keeps the plan state in files. |
-| `confirmOnExit` default `never` | **Change: always confirm when a run is live** | Quit ends runs (decision 4). |
-| Auto replies | Not now. Auto-continue is our only automatic input | Keep automatic input small (policy). |
+Moved to [vscode-terminal.md](vscode-terminal.md): how VS Code's pty host works, how VS Code tests its terminal, and what we copy and change.
 
 ## Design
 
@@ -171,14 +120,13 @@ Electron main ──starts──▶ server (utilityProcess, exists today)
       └──starts──▶ pty host (utilityProcess, new)
                      node-pty ──▶ claude (one per run, unmodified, your login)
                      headless xterm buffer per run
-window ◀──MessagePort──▶ pty host
+window ◀──MessagePort──▶ pty host   (the only terminal path)
 
-Browser build (pnpm dev / pnpm start, no Electron):
-server ──starts──▶ pty host (plain Node child process, same code)
-browser ◀──WebSocket──▶ server ◀──▶ pty host
+Browser build (pnpm dev / pnpm start, no Electron): the rest of the UI only.
+No pty host and no Terminal tab.
 ```
 
-- Agents test in the browser build, so the host must also start as a plain Node child process, as `server.mjs` already runs alone. The host code must not import `electron`, the same rule `packages/desktop` has today.
+- Terminal checks run against the real Electron app (decision 11). The host code still imports no `electron` outside its `*-main.ts` entry, as `packages/desktop` does today, so its logic has plain unit tests with fakes.
 - The pty host does only terminal work: start, write, resize, kill, list, replay, heartbeat. It has no knowledge of plans, PRs, or pod.
 - The host keeps a small, stable message protocol. Logic stays in the server and UI.
 - The server tells the host what to start. The host tells the server when a process exits.
@@ -187,8 +135,8 @@ browser ◀──WebSocket──▶ server ◀──▶ pty host
 
 A terminal channel lets anyone who reaches it type commands on the machine. It needs at least the guards the action routes have today, carried over from [cli-runner.md](../ideas/cli-runner.md):
 
-- The server and host bind to `127.0.0.1` only. The desktop host takes no network port at all: it talks through `MessagePort` only.
-- The WebSocket upgrade (browser build) checks the loopback `Host`, the `Origin`, and the per-launch session token before it accepts. A failed check closes the socket with no terminal data sent.
+- The pty host takes no network port at all. It talks only through `MessagePort` to the window and Electron's process channels to the main process and the server. No WebSocket exists for terminals (decision 11).
+- The server keeps its existing guards: `127.0.0.1` only, `Host`, `Origin`, and the session token.
 - The host takes commands only from the main process and the server. A window can write to and resize a terminal, but it cannot choose the program or arguments to start. The server builds the `claude` command line.
 - Never start `claude --bare`, which needs an API key.
 - Keep the existing env filter and the `claude` path rules from the resume runner (`resume.md`): absolute path, no repo-folder lookup, drop `ANTHROPIC_*` and `CLAUDE*` except the exact allowlist.
@@ -321,7 +269,7 @@ Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a bran
 7. **Reboot path.** Kill the whole app. On the next start, the run shows as stopped, with its last saved screen and **Resume**. Nothing starts by itself.
 8. **Package.** `pnpm package` includes node-pty. The installed app passes checks 1 and 4 on a machine with no build tools. Record the installer size. Also measure the memory of one terminal holding 5,000 lines of scrollback.
 9. **Session ID drift.** In a hosted terminal, run `/clear`, then `/resume` to another session. Record which session ID each step leaves, and whether the app can still name the terminal's session.
-10. **Browser build.** `pnpm dev` starts the host as a plain Node child. The browser shows the terminal over the WebSocket. A request with no token or a wrong `Origin` gets no terminal data.
+10. **Electron test.** A Playwright `_electron` test starts the built app, opens the Terminal tab, writes `echo ready` through the test hook, and reads `ready` back from the buffer, on Linux (with a display or `xvfb`) and Windows.
 11. **Session-only plugin.** Start `claude --plugin-dir <path>` in a hosted terminal: the plugin's skills work. Start plain `claude` in your own terminal in the same repo: the plugin's skills are absent.
 
 ## Open questions
@@ -332,7 +280,7 @@ Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a bran
 4. ~~Commit or ignore `.openaflow/`?~~ Answered 2026-11-11 (decision 8): committed.
 5. ~~How long after your last keystroke may an automatic send happen?~~ Answered 2026-11-11 (decision 9): 30 s by default, a user setting.
 6. ~~How many lines of scrollback per run?~~ Answered 2026-11-11 (decision 10): 5,000 by default, a user setting.
-7. The browser build must host terminals (agents test there). Does the desktop window also use the WebSocket path, or only `MessagePort`?
+7. ~~How does the window connect to the terminals?~~ Answered 2026-11-11 (decision 11): `MessagePort` only, as VS Code does.
 
 ## Sources
 
