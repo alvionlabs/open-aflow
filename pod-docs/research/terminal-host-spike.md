@@ -2,7 +2,7 @@
 
 _Run: 2026-11-11 · Linux (Fedora 44, Wayland, Electron 45.2.1, Node 26.13.0, Claude Code 2.1.322) · Windows: not run · Used by: [terminal-host.md](terminal-host.md)_
 
-**Status:** the spike ran on Linux only. Its own pass bar asks for Linux and Windows, so the spike is **not complete**. On Linux, every check passes, with these limits:
+**Status:** done on Linux. The human chose Linux only for now (2026-11-11, [decisions.md](../decisions.md)), so Windows is out of scope for this spike. On Linux, every check passes, with these limits:
 
 - Two checks passed only after a fix to the design: 5 (the draft rule) and 6 (a sweep after a host crash). See [Design changes](#design-changes).
 - Part 5a ran with the first version of the gate. Its send path did not change, and the new gate opened at an idle prompt in the rerun.
@@ -10,7 +10,7 @@ _Run: 2026-11-11 · Linux (Fedora 44, Wayland, Electron 45.2.1, Node 26.13.0, Cl
 - Check 8 ran check 1 on the packaged app with the fake `claude`, not the real one.
 - A child that clears its env survives quit unless the run is in a systemd scope (an option in the spike).
 
-Windows was not run. The human answered "No CI", and no run on a Windows machine is set up.
+Windows was not run, by the human's choice. It stays untested: a plan that ships the terminal host on Windows must test it first.
 
 The prototype is throwaway code on the branch `spike/terminal-host`, in `packages/desktop/spike/`. It never merges to `main`. The raw results are in `packages/desktop/spike/results/` on that branch.
 

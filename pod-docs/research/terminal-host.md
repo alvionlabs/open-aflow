@@ -283,9 +283,9 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 
 ## Spike
 
-**Ran on Linux on 2026-11-11. Results: [terminal-host-spike.md](terminal-host-spike.md).** Windows was not run.
+**Ran on Linux on 2026-11-11. Results: [terminal-host-spike.md](terminal-host-spike.md).** Windows was not run, by the human's choice.
 
-Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a branch, not on `main`. Pass means every check below passes on Linux (Fedora) and Windows 11.
+Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a branch, not on `main`. Pass means every check below passes on Linux (Fedora). Windows 11 was dropped for now (human decision, 2026-11-11); test it before a plan ships the host on Windows.
 
 1. **Start and show.** The desktop app starts a pty host utility process. The host starts `claude --session-id <uuid>` in a test repo. The window shows it with xterm.js, and you can type in it and sign in.
 2. **Window life.** Close the window to the tray, wait, and reopen it. The screen is replayed and the run went on. Reload the window: same.
