@@ -22,6 +22,7 @@ These are the human's words. They are recorded in [decisions.md](../decisions.md
 6. **The UI stays as it is.** A row in the list is still a run of the workflow. The run view with nodes and arrows is called **Workflow**: the screen you sit and watch to see how a run is going. The terminal is a new tab in the run view, for when you want to see it. It is not a new kind of row.
 7. **Outside runs are watch-only.** Runs started in the app get Workflow, the Terminal tab, Continue, and auto-continue. Runs started in your own terminal still use OpenAFlow's plugin, so they write `.openaflow/`; they get Workflow, merge, and answer only. Reading state never depends on whether a run is hosted.
 8. **`.openaflow/` is committed,** as `pod-docs/` is today.
+9. **Typing wait for automatic sends: 30 s by default, as a user setting.** After you type in a run's terminal, the app waits this long before auto-continue may type `continue`.
 
 ## Proposals (not decided)
 
@@ -61,6 +62,11 @@ Short notes on the options not chosen, so they can be weighed again later. Each 
 **`.openaflow/` in git (decision 8)**
 - **Ignore the whole folder.** Clean history. Rejected: engineers in worktrees read the sprint docs from their checkout, and the merge flow and hand-backs go through git. Ignoring it means a new way for agents to share state.
 - **Ignore only the parts for you** (for example `research/` and `reports/`). Less noise, same workflow. Still open as a later change if the noise bothers you.
+
+**Typing wait for automatic sends (decision 9)**
+- **No wait; rely on the empty-prompt check alone.** Rejected: right after you clear your text, a send could land.
+- **No automatic sends while the Terminal tab is open.** Rejected: it stops runs while you only watch, and watching is the app's main use.
+- **A fixed 30 s with no setting.** Rejected in favor of a setting, so you choose the wait.
 
 ## Policy
 
@@ -235,7 +241,7 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
   - The model says the run waits for that word (the existing sendable rule).
   - The session is idle: the existing 60 s rule on the transcript and `subagents/` files.
   - The terminal is at an empty input prompt. **This is required.** The 60 s idle rule is probably also true while a permission or question dialog is open, and Enter there would accept the highlighted choice. How to know it without reading the screen is open: a state file written by the plugin's hooks (for example `Stop` and `Notification`) keeps the "files, not screen" rule. Spike check 5.
-  - You have not typed in that terminal within a set time, so the two inputs don't mix.
+  - You have not typed in that terminal for the typing wait: 30 s by default, a user setting (decision 9).
   - The terminal is live. A stopped run gets nothing (see [Resume](#resume)).
 - The old `claude -p --resume` runner stays only for runs the app does not host, if those are kept (see [Open questions](#open-questions)).
 - With a hosted terminal, the known gap "a terminal still open on the session splits the conversation" goes away: the app holds the only terminal.
@@ -299,7 +305,7 @@ Goal: prove the session life before any plan. Time: 1 to 2 days. Build in a bran
 2. ~~Runs started outside the app?~~ Answered 2026-11-11 (decision 7): watch-only.
 3. How does the app install and update the workflow plugin? Proposal: ship it in the app and load it with `--plugin-dir` (see [`.openaflow/` and the plugin](#openaflow-and-the-plugin)). Confirm in the spike.
 4. ~~Commit or ignore `.openaflow/`?~~ Answered 2026-11-11 (decision 8): committed.
-5. How long after your last keystroke may an automatic send happen?
+5. ~~How long after your last keystroke may an automatic send happen?~~ Answered 2026-11-11 (decision 9): 30 s by default, a user setting.
 6. How many lines of scrollback per run? VS Code's persistent scrollback is a setting; pick a fixed default for us.
 7. The browser build must host terminals (agents test there). Does the desktop window also use the WebSocket path, or only `MessagePort`?
 

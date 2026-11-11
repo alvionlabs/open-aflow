@@ -304,3 +304,8 @@ Consequences: the old `claude -p --resume` runner is not needed. For outside run
 Context: the folder can be committed, ignored, or partly ignored.
 Decision: `.openaflow/` is committed, as `pod-docs/` is today.
 Consequences: engineers in worktrees read the docs from their checkout, and doc changes go through PRs. Options not chosen are in the research doc under "Options considered".
+
+## 2026-11-11 — Auto-continue waits 30 s after your typing, as a setting (human decision, not in force until planned)
+Context: an automatic `continue` typed into a hosted terminal can mix with the user's own typing.
+Decision: after the user types in a run's terminal, auto-continue waits before it may type. The default is 30 s, and the user can change it in a setting.
+Consequences: this adds to the other send checks (toggle on, 60 s idle session, empty prompt, live terminal).
