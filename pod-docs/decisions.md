@@ -275,6 +275,81 @@ Context: the GitHub repo is `alvionlabs/openaflow`. The app still said Open AFlo
 Decision: the human's decision: the name is OpenAFlow, with no space, and every internal name follows it. The window, the exe `OpenAFlow.exe`, the Start menu, and Installed apps say OpenAFlow. The packages are `@openaflow/*`, the env vars `OPENAFLOW_*`, the config folder `openaflow-server`, the token header `X-OpenAFlow-Token`, the installer `openaflow-setup-<version>.exe`, and the browser keys `openaflow-*`. This replaces the names in the 2026-11-05 decisions and in the 2026-11-09 repo rename.
 Consequences: no code moves the `open-aflow` data: the human's config folder was copied by hand, and the theme, tab, and sidebar width start fresh. The one-time copy from `pod-board` stays. `brand.test.ts` flags both old names in current files. The human's installed copy keeps the old name until it is uninstalled.
 
+## 2026-11-11 — OpenAFlow hosts terminals that run claude (human decision, not in force until planned)
+Context: the app is unusable without the pod plugin. Research: [terminal-host.md](research/terminal-host.md).
+Decision: OpenAFlow wraps a terminal. It controls the terminal, not Claude Code. A plugin still drives the workflow. OpenAFlow creates its own `.openaflow/` folder in a repo; claude-pod is its default template for now. The terminal host follows VS Code's design.
+Consequences: a spike comes first. Everything else in the research doc is a proposal until a plan takes it.
+
+## 2026-11-11 — Quit confirms and ends running sessions (human decision, not in force until planned)
+Context: with a terminal host, a session can outlive the app or end with it.
+Decision: quitting the app shows a confirm dialog that ends the running sessions. Sessions are not left running in the background, because they use RAM and make the app hard to predict.
+Consequences: reverses "a quit never ends a resumed `claude`".
+
+## 2026-11-11 — Resume is a button, never automatic (human decision, not in force until planned)
+Context: after a quit, a crash, or a reboot, the hosted sessions are gone.
+Decision: show a **Resume** button on each stopped run. Never resume on its own.
+Consequences: none yet.
+
+## 2026-11-11 — The terminal is a tab; the Workflow view stays (human decision, not in force until planned)
+Context: with a terminal host, the run list could list terminals, sessions, or plans.
+Decision: keep the UI as it is. A row is still a run. The run view with nodes and arrows is called **Workflow**, the screen to sit and watch. The terminal is a new tab in the run view, shown when the user wants to see it.
+Consequences: terminals attach to a run; they are not rows. A terminal that starts before its plan exists needs a home (proposal in the research doc).
+
+## 2026-11-11 — Outside runs are watch-only (human decision, not in force until planned)
+Context: a run can start in the app's terminal or in the user's own terminal. Both use OpenAFlow's plugin, so both write `.openaflow/`.
+Decision: runs started in the app get everything: Workflow, the Terminal tab, Continue, and auto-continue. Runs started in the user's own terminal are watch-only: Workflow, merge, and answer, with no Terminal tab, no Continue, and no auto-continue. Reading state never depends on whether a run is hosted.
+Consequences: the old `claude -p --resume` runner is not needed. For outside runs to write `.openaflow/`, the plugin must also be installable outside the app, not only loaded with `--plugin-dir`.
+
+## 2026-11-11 — `.openaflow/` is committed (human decision, not in force until planned)
+Context: the folder can be committed, ignored, or partly ignored.
+Decision: `.openaflow/` is committed, as `pod-docs/` is today.
+Consequences: engineers in worktrees read the docs from their checkout, and doc changes go through PRs. Options not chosen are in the research doc under "Options considered".
+
+## 2026-11-11 — Auto-continue waits 30 s after your typing, as a setting (human decision, not in force until planned)
+Context: an automatic `continue` typed into a hosted terminal can mix with the user's own typing.
+Decision: after the user types in a run's terminal, auto-continue waits before it may type. The default is 30 s, and the user can change it in a setting.
+Consequences: this adds to the other send checks (toggle on, 60 s idle session, empty prompt, live terminal).
+
+## 2026-11-11 — Scrollback is 5,000 lines per terminal, as a setting (human decision, not in force until planned)
+Context: the pty host keeps each terminal's output in memory for replay and for the last screen next to Resume.
+Decision: 5,000 lines per terminal by default; the user can change it in a setting.
+Consequences: the spike measures the memory of one terminal at 5,000 lines.
+
+## 2026-11-11 — Follow VS Code for the terminal link and terminal tests (human decision, not in force until planned)
+Context: the window must reach the pty host, and agents must be able to test the Terminal tab. VS Code tests its terminal against the real Electron app. Research: [vscode-terminal.md](research/vscode-terminal.md).
+Decision: the window talks to the pty host through `MessagePort` only, with no WebSocket. Terminal checks run against the real Electron app with Playwright `_electron` and a test hook that reads and writes the terminal as text. The browser build stays for the rest of the UI, with no Terminal tab.
+Consequences: terminal checks need a display (`xvfb` on Linux), so the smoke recipe gains a step for terminal slices.
+
+## 2026-11-11 — The terminal-host spike runs on Linux only, for now (human decision)
+Context: the spike's pass bar asked for Linux and Windows 11. The spike ran on Linux. Windows needed a CI workflow or a run on a Windows machine. Results: [terminal-host-spike.md](research/terminal-host-spike.md).
+Decision: run the spike on Linux only for now. No CI workflow, and no Windows run.
+Consequences: the spike counts as done on Linux. Windows (ConPTY, Job Objects, packaging) stays untested; a plan that ships the terminal host on Windows must test it first.
+
+## 2026-11-11 — Terminal host: node-pty is upstream 1.2.0-beta.18, pinned (human decision, not in force until planned)
+Context: node-pty 1.1.0 has no Linux prebuilt binary; upstream 1.2.0-beta.18 has one. Research: [terminal-host-spike.md](research/terminal-host-spike.md).
+Decision: use upstream `node-pty@1.2.0-beta.18`, pinned. The first slice proves it in Electron 45. If it fails, use `@lydell/node-pty`. Move to 1.2.0 stable when it ships.
+Consequences: `allowBuilds` needs an entry for it.
+
+## 2026-11-11 — Automatic input: draft rule, two idle rules, one checked send path (human decision, not in force until planned)
+Context: in the spike, a send after the typing wait submitted a half-typed draft. A wrong automatic send can drift the whole workflow.
+Decision: a draft (input with no Enter after the newest submit) blocks every automatic send until the next submit. Idle needs both the 60 s transcript rule and the hook rule. All app-written input goes through one send path that logs each attempt and checks the next `UserPromptSubmit` prompt; on a mismatch, auto-continue turns off for that run and the app alerts you. Manual **Continue** skips only the typing wait, and when blocked shows why and offers **Open terminal**. Every automatic input is listed with its gate and tests in [automatic-input.md](research/automatic-input.md).
+Consequences: a PR that adds or changes an automatic input updates `automatic-input.md` and its tests. Gaps to test before shipping: question dialogs, plan approvals, the trust prompt, subagents after `Stop`.
+
+## 2026-11-11 — Run wrapper and stop command are text settings (human decision, not in force until planned)
+Context: a child that clears its env survives quit unless the run is in a systemd scope.
+Decision: two text settings, stored in the app's config folder only. Defaults on Linux: `systemd-run --user --scope --quiet --unit=openaflow-run-{runId}.scope` and `systemctl --user stop openaflow-run-{runId}.scope`. Placeholders `{runId}` and `{unit}`, a full-command preview, and **Reset to default**. No shell: the app splits the arguments. The default wrapper falls back silently (logged) when it can't start; a changed wrapper that fails stops the run with an error and **Open settings**. Shown on Linux and macOS (default on Linux only); hidden on Windows, which uses a Job Object. Changes apply to new runs.
+Consequences: the app's own tree, marker, and signal steps always run after the stop command.
+
+## 2026-11-11 — Quit ends runs with SIGHUP, SIGTERM, SIGKILL (human decision, not in force until planned)
+Context: real `claude` ended on SIGHUP in about 1 s; on SIGTERM it once ran past 3 s.
+Decision: all runs end in parallel: SIGHUP, up to 3 s, SIGTERM, up to 3 s, SIGKILL. The app shows "Ending N runs…".
+Consequences: a quit with live runs takes at most about 6 s after you confirm.
+
+## 2026-11-11 — Keep the browser build and the pod-docs/ fallback (human decision, not in force until planned)
+Context: both were open in [terminal-host.md](research/terminal-host.md).
+Decision: keep the browser build as the agents' test bench for the non-terminal UI, with no Terminal tab. Keep reading `pod-docs/`, watch-only, until OpenAFlow develops itself with its own plugin; then remove it in its own plan.
+Consequences: `CLAUDE.md` and the smoke recipe stay as they are.
+
 ## 2026-11-11 — A failed send raises its stop, on any run (human decision)
 Context: queue entry 172. The toggle saves a stop's key before the send starts, so a send that failed to start raised no toast or dot, and the board never retries that key. The run waited, and nothing told the human.
 Decision: the human's decision: the toggle keeps `lastFailed` beside `lastKey`. A send of that stop that fails to start, by the check or by a press, sets it. A send that starts clears it. While it is set, the stop is an item, on plan runs and fix runs alike.
