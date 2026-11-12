@@ -6,6 +6,7 @@ import { describe, expect, test } from 'vitest'
 import { buildConfig, builderOptions, checkVersion, EXE_NAME, parsePackageArgs, UPDATER_CACHE_DIR } from './build-config.ts'
 import { CONFIG_DIR_NAME } from '@openaflow/server/config'
 import { APP_ID, APP_NAME } from './shell-config.ts'
+import { RELEASES_URL } from './update-flow.ts'
 
 const pkg = join(dirname(fileURLToPath(import.meta.url)), '..')
 type Manifest = { version: string; dependencies?: Record<string, string>; devDependencies: Record<string, string> }
@@ -80,6 +81,11 @@ describe('electron-builder config', () => {
     const c = config()
     expect(c.publish).toEqual({ provider: 'github', owner: 'alvionlabs', repo: 'openaflow', releaseType: 'release' })
     expect(c.win?.verifyUpdateCodeSignature).toBe(false)
+  })
+
+  test("the error box's Releases link names the repo that publishes", () => {
+    const publish = config().publish as { owner: string; repo: string }
+    expect(RELEASES_URL).toBe(`https://github.com/${publish.owner}/${publish.repo}/releases`)
   })
 
   test('a local build never publishes and never signs', () => {
