@@ -377,6 +377,21 @@ describe('sidebar', () => {
     expect(headerOf(html)).toMatch(/<h1 class="run-name" tabindex="-1">gh pr list times out<\/h1>/)
   })
 
+  it('names a /pod:task card by its PR title, with one task tag and no fix tag', () => {
+    const name = 'task-sprint-column'
+    const claim: Claim = { portBase: 3100, repoPath: '/c', plan: name }
+    const pr = gh(58, 'open', { branch: name, title: 'fix(server): gh pr list times out' })
+    const { html } = render({ repo: chess([onlyQueue()], { claims: [claim], prs: [pr] }), plan: name })
+    const side = sideOf(html)
+    const card = /<a class="run" href="#\/chess\/task-sprint-column"[\s\S]*?<\/a>/.exec(side)?.[0] ?? ''
+    expect(card).toMatch(/aria-label="gh pr list times out [^"]* chess-web task"/)
+    expect(card).toMatch(/<span class="run-repo muted">chess-web<\/span><span class="chip tag">task<\/span>/)
+    expect(card).not.toMatch(/chip tag">fix/)
+    expect(headerOf(html)).toMatch(/<h1 class="run-name" tabindex="-1">gh pr list times out<\/h1>/)
+    // No wave board link on a one-off run, and the /board view falls back to the run.
+    expect(headerOf(html)).not.toMatch(/wave board/i)
+  })
+
   it('shows lost · retrying beside the title only while lost', () => {
     const repo = chess([onlyQueue()])
     const lost = sideOf(render({ repo, stream: 'lost' }).html)

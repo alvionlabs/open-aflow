@@ -3,6 +3,7 @@ import type { BoardRepo, RunSummary } from '@openaflow/model'
 import { hashFor } from '../../selection.ts'
 import { moreButtonId, moreName, repoOfRun } from './remove-flow.ts'
 import { RunMoreMenu } from './RunMoreMenu.tsx'
+import { runTag } from './plan-view.ts'
 import { runCard, runChip } from './view.ts'
 
 type Props = {
@@ -32,7 +33,7 @@ const breakAfterUnderscores = (text: string) =>
 
 /**
  * The runs: one card each with the run header's name, its state as a dot and a word, and its repo as a muted
- * line with the `fix` tag. Beside each card's link, never inside it, a ⋯ button when its repo can be removed. A
+ * line with the `task` or `fix` tag (`runTag`). Beside each card's link, never inside it, a ⋯ button when its repo can be removed. A
  * hyphen or an underscore is a line break opportunity, so such a word gets its own box to stay whole when it fits.
  */
 export function RunsList({ runs, selected, repos, removable, onRemove, panelFor }: Props) {
@@ -45,10 +46,10 @@ export function RunsList({ runs, selected, repos, removable, onRemove, panelFor 
             const href = hashFor(r)
             const state = runChip(r.state)
             const card = runCard(r, repoOfRun(repos, r))
-            const fix = r.fix !== undefined
+            const tag = runTag(r)
             const more = onRemove && removable?.(r)
             // In plain text: a <wbr> would read as a space in the link's accessible name.
-            const label = [card.name, state.label, card.repo, fix ? 'fix' : undefined].filter((part) => part !== undefined).join(' ')
+            const label = [card.name, state.label, card.repo, tag].filter((part) => part !== undefined).join(' ')
             return (
               // Two repos can share an id (and so a hash); the repo name keeps the keys apart.
               <li key={`${href}|${r.repo}`} className="run-item">
@@ -66,7 +67,7 @@ export function RunsList({ runs, selected, repos, removable, onRemove, panelFor 
                       <span className={`status ${state.cls}`}>{state.label}</span>
                       <span className="run-line">
                         {card.repo !== undefined && <span className="run-repo muted">{breakAfterUnderscores(card.repo)}</span>}
-                        {fix && <span className="chip tag">fix</span>}
+                        {tag && <span className="chip tag">{tag}</span>}
                       </span>
                     </span>
                   </a>

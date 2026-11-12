@@ -8,7 +8,7 @@ import { postAction, type ActionReply } from '../../actions-client.ts'
 import { outcomeChip } from './action-log-view.ts'
 import type { Chip } from './view.ts'
 
-/** The run a request is for: its repo and its run (a plan slug or `fix-<slug>`). */
+/** The run a request is for: its repo and its run (a plan slug, or a one-off run's `task-<slug>` or `fix-<slug>`). */
 export type RunTarget = { repoId: string; run: string }
 export type Post = <T>(path: string, body: object) => Promise<ActionReply<T>>
 

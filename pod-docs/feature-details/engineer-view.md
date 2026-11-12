@@ -2,7 +2,7 @@
 
 ## What it is
 
-Screen 3. With a slice open on the wave board (`#/<repoId>/<plan>/board/<code>`), the engineer view sits under the board frame: the slice's engineer, its details (branch, files owned, tests first, last active, model, tokens), and a live tool timeline of tool names and short summaries. Covers the features.md rows Engineer view and Engineer view shows no secrets. A fix run's engineers open the same view under its agent log (`#/<repoId>/fix-<slug>/agent/<id>`), headed by their role and the slug, with Files owned `not listed` (a fix has no slice). Rules in `packages/web/src/screens/engineer/view.ts`, fetching in `timeline-loader.ts`; the timeline itself is built by the model's `parseAgentTimeline` and served by `GET /api/agents/:repoId/:agentId/timeline`.
+Screen 3. With a slice open on the wave board (`#/<repoId>/<plan>/board/<code>`), the engineer view sits under the board frame: the slice's engineer, its details (branch, files owned, tests first, last active, model, tokens), and a live tool timeline of tool names and short summaries. Covers the features.md rows Engineer view and Engineer view shows no secrets. A fix run's engineers open the same view under its agent log (`#/<repoId>/task-<slug>/agent/<id>`, or `fix-<slug>` from older pod), headed by their role and the slug, with Files owned `not listed` (a fix has no slice). Rules in `packages/web/src/screens/engineer/view.ts`, fetching in `timeline-loader.ts`; the timeline itself is built by the model's `parseAgentTimeline` and served by `GET /api/agents/:repoId/:agentId/timeline`.
 
 ## How it works
 

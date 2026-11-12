@@ -3,8 +3,9 @@
 //   #/<repoId>/<plan>                 a run's pipeline (screen 1)
 //   #/<repoId>/<plan>/board           its wave board (screen 2)
 //   #/<repoId>/<plan>/board/<code>    the board with slice <code> open (screen 3)
-//   #/<repoId>/fix-<slug>             a fix run's pipeline and agent log (it has no wave board)
-//   #/<repoId>/fix-<slug>/agent/<id>  the same, with that engineer's view open
+//   #/<repoId>/task-<slug>            a one-off run's pipeline and agent log (it has no wave board);
+//                                     an older /pod:fix run's is #/<repoId>/fix-<slug>
+//   #/<repoId>/task-<slug>/agent/<id> the same, with that engineer's view open
 // A hash that names no run falls back to the first run's pipeline; no runs means
 // none, with an empty hash. `resolveSelection` also returns the hash that names what it picked, so the
 // page can put it in the URL and a vanished run's hash doesn't come back to life.
