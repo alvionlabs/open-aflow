@@ -37,7 +37,7 @@ function toastsFor(fresh: AttentionItem[]): Toast[] {
 
 export function createNotifier(o: NotifierOptions): Notifier {
   const seen = new Set<string>()
-  /** The repos that have had their first readable Board. It only grows, so a repo is the baseline once per app run. */
+  /** The repos on the Board that have had their first readable Board. A repo that leaves the Board leaves this set. */
   const known = new Set<string>()
   /** The asks gh hadn't answered at their repo's first Board. What their first read finds is old news. */
   const awaited = new Set<string>()
@@ -69,10 +69,13 @@ export function createNotifier(o: NotifierOptions): Notifier {
   }
 
   /**
-   * The repos this Board shows readable for the first time: on the app's first Board, every repo. Their items are
-   * the baseline, and each of their unread asks waits, so what its first read finds is old news too.
+   * The repos this Board shows readable for the first time, or for the first time since they left the Board: on the
+   * app's first Board, every repo. Their items are the baseline, and each of their unread asks waits, so what its first
+   * read finds is old news too. A repo with an `error` is still on the Board, so a read error is not a leave.
    */
   const firstSeen = (board: Board): Set<string> => {
+    const present = new Set(board.repos.map((repo) => repo.id))
+    for (const id of known) if (!present.has(id)) known.delete(id)
     const added = new Set<string>()
     for (const repo of board.repos) {
       if (repo.error !== undefined || known.has(repo.id)) continue

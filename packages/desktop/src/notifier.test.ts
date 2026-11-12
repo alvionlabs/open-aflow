@@ -321,11 +321,37 @@ describe('notifier', () => {
       s.notifier.close()
     })
 
-    test('a repo that leaves and comes back is not the baseline again: what it already showed stays quiet, and a new item sends', () => {
+    test('a repo removed and added again is the baseline again: what arrived while it was gone sends nothing', () => {
       const s = setup()
       s.notifier.board(boardOf())
       s.notifier.board(boardOf(three('r1')))
       s.notifier.board(boardOf())
+      s.notifier.board(boardOf(repoWith(['r1 A', 'r1 B', 'r1 C', 'r1 D', 'r1 E'], { id: 'r1' })))
+      // Re-added one by one, several repos can't add up to a flood either.
+      s.notifier.board(boardOf(three('r2')))
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(repoWith(['r2 A', 'r2 B', 'r2 C', 'r2 D'], { id: 'r2' })))
+      expect(s.toasts).toEqual([])
+      expect(s.dot.at(-1)).toBe(true)
+      s.notifier.close()
+    })
+
+    test('a new item after a re-add still sends one toast', () => {
+      const s = setup()
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(three('r1')))
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(repoWith(['r1 A', 'r1 B', 'r1 C', 'r1 D'], { id: 'r1' })))
+      s.notifier.board(boardOf(repoWith(['r1 A', 'r1 B', 'r1 C', 'r1 D', 'r1 E'], { id: 'r1' })))
+      expect(s.toasts.map((t) => t.body)).toEqual(['r1 E is stuck.'])
+      s.notifier.close()
+    })
+
+    test('a repo that shows with a read error for a Board has not left: its new items send when it reads again', () => {
+      const s = setup()
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(three('r1')))
+      s.notifier.board(boardOf({ ...three('r1'), error: 'folder missing', model: buildRepoModel({}), prs: [] }))
       s.notifier.board(boardOf(repoWith(['r1 A', 'r1 B', 'r1 C', 'r1 D'], { id: 'r1' })))
       expect(s.toasts.map((t) => t.body)).toEqual(['r1 D is stuck.'])
       s.notifier.close()

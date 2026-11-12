@@ -17,7 +17,7 @@ One case overrides the two auto-continue rules above: a send that failed to star
 
 **Identity.** `<repoId>\n<key>`, where the key is `entry:<line>`, `pr:<number>`, the model's key for one stop, or `failed:` and that key. The seen set lasts the app run and only grows.
 
-**A repo's first Board is its baseline.** The first Board that shows a repo with no `error` marks its items seen and sends none of them. The dot still counts them. On the app's first Board, this is every repo. A repo added later, or one that first shows with an `error`, gets the same rule on its own first readable Board. The set of repos that had their first Board lasts the app run and only grows, so a repo that leaves and comes back isn't the baseline again. The burst count leaves out the items of a repo's first Board.
+**A repo's first Board is its baseline.** The first Board that shows a repo with no `error` marks its items seen and sends none of them. The dot still counts them. On the app's first Board, this is every repo. A repo added later, or one that first shows with an `error`, gets the same rule on its own first readable Board. A repo leaves the Board when a Board doesn't list it, such as after Remove or when its claim ends. When it comes back, its first readable Board is its baseline again, so a re-add is the same as a first add. A repo that shows with an `error` is still on the Board, so a read error doesn't make it leave. The burst count leaves out the items of a repo's first Board.
 
 ```mermaid
 flowchart TD
@@ -63,6 +63,7 @@ flowchart TD
 - **Each item gets one try.** It is marked seen before its send, so a send that throws can't repeat on every tick.
 - **A summary over 3 new items.** Agent default, so a burst doesn't fill the screen.
 - **No toast for a repo you add.** Agent default: you added it, so the page shows its items, and the dot counts them. Turned down: one summary toast for each add, and a time window that sums up toasts over several passes.
+- **A re-add is a fresh add.** The human's choice. Before, a repo removed and added again sent a toast for each item that arrived while it was gone, and several re-adds could add up to a flood. Only a Board that doesn't list the repo counts as a leave. A half-saved doc changes a repo's items, not whether the Board lists it, and a read error shows the repo with an `error`. Trade-off: a real new item that arrives while the repo is gone sends no toast. The dot and the card show it.
 - **The server's reads, not a timer.** Only the server knows when a read ended, and a timer was wrong both ways: an offline start sent old PRs, and a new doc-named merge got no toast. Turned down: a longer hold, and a hold on the `merge` tier, because the docs alone can name a merge. Trade-off: one more field on the Board, and one more Board event when a read finds nothing.
 - **A toast after you answer a `BLOCKED`.** [Agent default](../decisions.md#2026-11-03--toast-after-you-answer-a-plans-blocked-agent-default--override-anytime): it tells you a run can go on. Turned down: no toast for a reply you just caused.
 
@@ -76,7 +77,7 @@ flowchart TD
 - **A really new staging PR can go quiet.** This happens only if its ask first shows on the same Board where a noted read found a PR.
 - **A forgotten PR doesn't wait again.** A merge route's `forget` and a server restart both set `read` back to false. Only the first Board of each repo notes its asks, once per app run, and the seen set still covers what already showed.
 - A PR `gh` can never read (a folder with no remote) stays `read: false` for good. It can't name an item, so this costs one Board row.
-- A repo added after the start is the baseline on its first Board. Its open items send nothing, and neither do the PRs that `gh` first reads for it. Before this fix, each add was its own pass with up to 3 items, so the burst rule never applied: 5 repos sent 15 toasts.
+- A repo added after the start is the baseline on its first Board. Its open items send nothing, and neither do the PRs that `gh` first reads for it. Before this fix, each add was its own pass with up to 3 items, so the burst rule never applied: 5 repos sent 15 toasts. A repo that comes back after it left the Board is the baseline again.
 - A repo id change reads as a new repo, so its items go quiet. A queue line someone edits sends again, because the identity changes.
 - Items that arrive over several passes, up to 3 at a time, each send. Only the items of one pass make a burst. There is no timer.
 - Never import `@openaflow/web`'s `.tsx` files or its package root. `notifier.test.ts` checks that the main bundle holds no React.
@@ -105,3 +106,4 @@ To uninstall: Settings, Apps, Installed apps, OpenAFlow, Uninstall.
 - 2026-11-04 · fix-late-merge-continue review · fixed: a queue line with U+FFFE, U+FFFF, or a surrogate with no partner sent no toast. Those characters now leave the toast, and an emoji stays.
 - 2026-11-05 · fix-rename-open-aflow · renamed: a toast shows the app name Open AFlow, from the `Open AFlow.lnk` Start-menu shortcut and the app ID `com.alvionlabs.openaflow`.
 - 2026-11-11 · fix-toast-burst · fixed: repos added one by one sent up to 3 toasts each (15 for 5 repos), because only the app's first Board was the baseline. Now the first readable Board of each repo is its baseline, also for the PRs that `gh` first reads for it.
+- 2026-11-11 · fix-toast-burst review · fixed: a repo removed and added again sent a toast for each item that arrived while it was gone. Now its first readable Board after the return is its baseline again. A read error is not a leave.
