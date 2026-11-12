@@ -149,8 +149,9 @@ describe('notifier', () => {
     three.notifier.close()
 
     // Four new items: one summary. The top tier opens, not the first run: a merge in `aaa`, blocked entries in `bbb`.
+    // Both repos are on the first Board, so their items are new: a repo's own first Board is its baseline.
     const s = setup()
-    s.notifier.board(boardOf())
+    s.notifier.board(boardOf(repoWith([], { id: 'aaa' }), repoWith([], { id: 'bbb' })))
     const four = boardOf(repoWith([], { pr: prOf(78, 'open'), id: 'aaa' }), repoWith(['B', 'C', 'D'], { id: 'bbb' }))
     s.notifier.board(four)
     expect(s.toasts).toHaveLength(1)
@@ -165,7 +166,7 @@ describe('notifier', () => {
     // New items only: an old blocked item isn't counted and doesn't pick the target.
     const n = setup()
     const old = repoWith(['Old'], { id: 'aaa' })
-    n.notifier.board(boardOf(old))
+    n.notifier.board(boardOf(old, repoWith([], { id: 'bbb' })))
     n.notifier.board(boardOf(old, repoWith(['B', 'C', 'D', 'E'], { id: 'bbb' })))
     expect(n.toasts).toHaveLength(1)
     expect(n.toasts[0]).toMatchObject({ title: '4 items need you', hash: `#/bbb/${PLAN}` })
@@ -174,7 +175,7 @@ describe('notifier', () => {
 
   test('what a toast says and opens', () => {
     const s = setup()
-    s.notifier.board(boardOf())
+    s.notifier.board(withEntries())
     const repo = repoWith(['A'])
     s.notifier.board(boardOf(repo))
     const title = repo.model.plans.find((p) => p.slug === PLAN)?.title
@@ -243,6 +244,127 @@ describe('notifier', () => {
     s.notifier.board(withEntries('A'))
     expect(s.toasts).toEqual([])
     expect(s.dot).toEqual([false])
+  })
+
+  describe('a repo added after the first Board', () => {
+    /** Three new items per repo: one pass each, so the burst rule alone never sums them up. */
+    const three = (id: string) => repoWith([`${id} A`, `${id} B`, `${id} C`], { id })
+
+    test('repos added one by one send no toast, and the dot shows their items', () => {
+      const s = setup()
+      s.notifier.board(boardOf(repoWith([], { id: 'base' })))
+      const added: BoardRepo[] = [repoWith([], { id: 'base' })]
+      for (const id of ['r1', 'r2', 'r3', 'r4', 'r5']) {
+        added.push(three(id))
+        s.notifier.board(boardOf(...added))
+      }
+      vi.advanceTimersByTime(LIVE_TICK_MS * 3)
+      expect(s.toasts).toEqual([])
+      expect(s.dot.at(-1)).toBe(true)
+      s.notifier.close()
+    })
+
+    test('a real new item in an added repo still sends one toast', () => {
+      const s = setup()
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(three('r1')))
+      s.notifier.board(boardOf(repoWith(['r1 A', 'r1 B', 'r1 C', 'r1 D'], { id: 'r1' })))
+      expect(s.toasts.map((t) => t.body)).toEqual(['r1 D is stuck.'])
+      s.notifier.close()
+    })
+
+    test("in one pass, the old repo's new item sends alone and the added repo's items don't count toward a burst", () => {
+      const s = setup()
+      s.notifier.board(boardOf(repoWith([], { id: 'old' })))
+      s.notifier.board(boardOf(repoWith(['New'], { id: 'old' }), three('r1')))
+      expect(s.toasts).toEqual([expect.objectContaining({ body: 'New is stuck.', hash: `#/old/${PLAN}` })])
+      s.notifier.close()
+    })
+
+    test("an added repo's PRs that gh reads later are old news, and a later ask still sends", () => {
+      const FIX = 'fix-scroll'
+      const at = NOW
+      const engineer: AgentRun = { id: 'f1', session: 'sess-1', type: 'pod:engineer', tokens: 0, ended: true, branch: FIX, startedAt: at - 90 * 60_000, lastAt: at - 60 * 60_000 }
+      const reviewer: AgentRun = { ...engineer, id: 'f2', type: 'pod:reviewer', kind: 'fix', startedAt: at - 50 * 60_000, lastAt: at - 5 * 60_000 }
+      const fixRepo = (reads: GhRead[], pr: boolean): BoardRepo => {
+        const base = repoWith([], { id: 'r1' })
+        return { ...base, claims: [{ portBase: 3100, repoPath: base.path, plan: FIX }], agents: [engineer, reviewer], prs: pr ? [{ ...prOf(36, 'open'), branch: FIX }] : [], ghReads: reads }
+      }
+      const s = setup()
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(fixRepo([{ branch: FIX, read: false }], false)))
+      // gh's first read lands on a later Board: the PR was there before the add.
+      s.notifier.board(boardOf(fixRepo([{ branch: FIX, read: true }], true)))
+      expect(s.toasts).toEqual([])
+      expect(s.dot.at(-1)).toBe(true)
+      s.notifier.close()
+
+      // Control: the ask comes up after the repo's first Board, so the PR its first read finds is new.
+      const t = setup()
+      t.notifier.board(boardOf())
+      t.notifier.board(boardOf(fixRepo([{ pr: 99, read: true }], false)))
+      t.notifier.board(boardOf(fixRepo([{ pr: 99, read: true }, { branch: FIX, read: false }], false)))
+      t.notifier.board(boardOf(fixRepo([{ pr: 99, read: true }, { branch: FIX, read: true }], true)))
+      expect(t.toasts).toMatchObject([{ body: 'Merge PR #36' }])
+      t.notifier.close()
+    })
+
+    test('a repo that first shows with an error is the baseline once it reads', () => {
+      const s = setup()
+      s.notifier.board(boardOf())
+      const broken: BoardRepo = { ...three('r1'), error: 'folder missing', model: buildRepoModel({}), prs: [] }
+      s.notifier.board(boardOf(broken))
+      s.notifier.board(boardOf(three('r1')))
+      expect(s.toasts).toEqual([])
+      s.notifier.board(boardOf(repoWith(['r1 A', 'r1 B', 'r1 C', 'r1 D'], { id: 'r1' })))
+      expect(s.toasts.map((t) => t.body)).toEqual(['r1 D is stuck.'])
+      s.notifier.close()
+    })
+
+    test('a repo removed and added again is the baseline again: what arrived while it was gone sends nothing', () => {
+      const s = setup()
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(three('r1')))
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(repoWith(['r1 A', 'r1 B', 'r1 C', 'r1 D', 'r1 E'], { id: 'r1' })))
+      // Re-added one by one, several repos can't add up to a flood either.
+      s.notifier.board(boardOf(three('r2')))
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(repoWith(['r2 A', 'r2 B', 'r2 C', 'r2 D'], { id: 'r2' })))
+      expect(s.toasts).toEqual([])
+      expect(s.dot.at(-1)).toBe(true)
+      s.notifier.close()
+    })
+
+    test('a new item after a re-add still sends one toast', () => {
+      const s = setup()
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(three('r1')))
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(repoWith(['r1 A', 'r1 B', 'r1 C', 'r1 D'], { id: 'r1' })))
+      s.notifier.board(boardOf(repoWith(['r1 A', 'r1 B', 'r1 C', 'r1 D', 'r1 E'], { id: 'r1' })))
+      expect(s.toasts.map((t) => t.body)).toEqual(['r1 E is stuck.'])
+      s.notifier.close()
+    })
+
+    test('a repo that shows with a read error for a Board has not left: its new items send when it reads again', () => {
+      const s = setup()
+      s.notifier.board(boardOf())
+      s.notifier.board(boardOf(three('r1')))
+      s.notifier.board(boardOf({ ...three('r1'), error: 'folder missing', model: buildRepoModel({}), prs: [] }))
+      s.notifier.board(boardOf(repoWith(['r1 A', 'r1 B', 'r1 C', 'r1 D'], { id: 'r1' })))
+      expect(s.toasts.map((t) => t.body)).toEqual(['r1 D is stuck.'])
+      s.notifier.close()
+    })
+
+    test('a repo added while the stream is lost is the baseline on the next Board', () => {
+      const s = setup()
+      s.notifier.board(boardOf())
+      s.notifier.lost()
+      s.notifier.board(boardOf(three('r1'), three('r2')))
+      expect(s.toasts).toEqual([])
+      s.notifier.close()
+    })
   })
 
   describe("the PRs gh hadn't read at the first Board", () => {

@@ -3,6 +3,7 @@
 // The shapes are the sprint's shared contract (pod-docs/sprints/server-runs.md).
 
 import type { ActionEntry } from './actions.ts'
+import type { AutoToggle } from './auto-continue.ts'
 import type { RepoModel } from './run-model.ts'
 
 /** One pod agent, read from its transcript. Never holds transcript text, tool input, or tool output. */
@@ -103,8 +104,8 @@ export type Board = {
   repos: BoardRepo[]
   /** The action log, newest first, at most 50. */
   actions?: ActionEntry[]
-  /** The runs whose auto-continue toggle is on. Missing means all off. */
-  autoContinue?: { repoId: string; run: string; lastKey?: string }[]
+  /** The runs whose auto-continue toggle is on. Missing means all off. `lastFailed`: the last send of `lastKey` failed to start. */
+  autoContinue?: ({ repoId: string } & Pick<AutoToggle, 'run' | 'lastKey' | 'lastFailed'>)[]
   /** OPENAFLOW_TRANSCRIPT_DAYS: agents come only from transcripts written in this many days. Missing on older Boards (read as 30). */
   transcriptDays?: number
 }

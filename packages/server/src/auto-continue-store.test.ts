@@ -148,6 +148,47 @@ describe('auto-continue store', () => {
     ])
   })
 
+  test('marks a failed send of the last key, until a send starts', async () => {
+    const store = createAutoContinueStore({ file })
+    await store.set('r1', 'alpha', true)
+    // Nothing to mark with no key, or for another key, or for no toggle.
+    expect(await store.saveFailed('r1', 'alpha', 'fix-merged:36')).toBe(false)
+    await store.saveKey('r1', 'alpha', 'fix-merged:36')
+    expect(await store.saveFailed('r1', 'alpha', 'fix-merged:99')).toBe(false)
+    expect(await store.saveFailed('r9', 'nope', 'fix-merged:36')).toBe(false)
+    expect(store.list()).toEqual([{ path: 'r1', run: 'alpha', lastKey: 'fix-merged:36' }])
+
+    expect(await store.saveFailed('r1', 'alpha', 'fix-merged:36')).toBe(true)
+    expect(store.list()).toEqual([{ path: 'r1', run: 'alpha', lastKey: 'fix-merged:36', lastFailed: true }])
+    // A restart reads it back.
+    expect(createAutoContinueStore({ file }).list()).toEqual(store.list())
+
+    // A new send, of this key or another, clears it; so does turning the toggle on again.
+    await store.saveKey('r1', 'alpha', 'fix-merged:36')
+    expect(store.list()).toEqual([{ path: 'r1', run: 'alpha', lastKey: 'fix-merged:36' }])
+    await store.saveFailed('r1', 'alpha', 'fix-merged:36')
+    await store.set('r1', 'alpha', true)
+    expect(store.list()).toEqual([{ path: 'r1', run: 'alpha' }])
+
+    // A failed answered send leaves answeredKeys, so the board may send it later. Other answered keys stay.
+    await store.saveKey('r1', 'alpha', 'answered:alpha:1:aaaaaaaa')
+    await store.saveKey('r1', 'alpha', 'answered:alpha:2:bbbbbbbb')
+    expect(await store.saveFailed('r1', 'alpha', 'answered:alpha:2:bbbbbbbb')).toBe(true)
+    expect(store.list()).toEqual([{ path: 'r1', run: 'alpha', lastKey: 'answered:alpha:2:bbbbbbbb', lastFailed: true, answeredKeys: ['answered:alpha:1:aaaaaaaa'] }])
+    await store.set('r1', 'alpha', true)
+    await store.saveKey('r1', 'alpha', 'answered:alpha:3:cccccccc')
+    await store.saveFailed('r1', 'alpha', 'answered:alpha:3:cccccccc')
+    expect(store.list()).toEqual([{ path: 'r1', run: 'alpha', lastKey: 'answered:alpha:3:cccccccc', lastFailed: true }])
+    await store.set('r1', 'alpha', true)
+
+    // In the file, only `true` with a key counts.
+    put(JSON.stringify({ runs: [{ path: 'r1', run: 'alpha', lastFailed: true }, { path: 'r2', run: 'beta', lastKey: 'k', lastFailed: 'yes' }] }))
+    expect(createAutoContinueStore({ file }).list()).toEqual([
+      { path: 'r1', run: 'alpha' },
+      { path: 'r2', run: 'beta', lastKey: 'k' },
+    ])
+  })
+
   test('a failed write keeps the file and the toggles', async () => {
     const store = createAutoContinueStore({ file })
     await store.set('r1', 'alpha', true)

@@ -160,12 +160,12 @@ describe('board service', () => {
     const repo = copyFixture()
     await register(repo)
     const key = caseless ? normalizeRepoPath(repo, platform).toLowerCase() : normalizeRepoPath(repo, platform)
-    toggles = [{ path: key, run: 'alpha', lastKey: 'sprint-done:one' }, { path: key, run: 'fix-scroll' }, { path: '/not/on/the/board', run: 'alpha' }]
+    toggles = [{ path: key, run: 'alpha', lastKey: 'sprint-done:one' }, { path: key, run: 'fix-scroll', lastKey: 'fix-merged:36', lastFailed: true }, { path: '/not/on/the/board', run: 'alpha' }]
     // Read on every build, under the repo's id now, with the stop it last sent. A repo that isn't on the Board reads off.
     const id = repoId(repo, platform, caseless)
     expect((await withToggles.build()).autoContinue).toEqual([
       { repoId: id, run: 'alpha', lastKey: 'sprint-done:one' },
-      { repoId: id, run: 'fix-scroll' },
+      { repoId: id, run: 'fix-scroll', lastKey: 'fix-merged:36', lastFailed: true },
     ])
     expect(await createBoardService(deps()).build()).not.toHaveProperty('autoContinue')
   })

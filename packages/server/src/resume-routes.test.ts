@@ -238,6 +238,37 @@ describe('resume route', () => {
     expect(t.inFlight.size).toBe(0)
   })
 
+  test('a failed press on a toggled run marks the stop failed, and a start clears it', async () => {
+    let outcome: 'started' | 'failed' = 'failed'
+    const s = setup({ board: boardOf(planRepo(SPRINT_DONE)), result: () => ({ outcome }) })
+    await s.store.set('/r', 'alpha', true)
+    await s.resume({ repoId: 'id-r', run: 'alpha', reply: 'continue' })
+    expect(s.store.list()).toEqual([{ path: '/r', run: 'alpha', lastKey: 'sprint-done:one', lastFailed: true }])
+    outcome = 'started'
+    await s.resume({ repoId: 'id-r', run: 'alpha', reply: 'continue' })
+    expect(s.store.list()).toEqual([{ path: '/r', run: 'alpha', lastKey: 'sprint-done:one' }])
+  })
+
+  test('a press that starts after a failed save still clears an old failed mark', async () => {
+    const real = createAutoContinueStore({ file })
+    await real.set('/r', 'alpha', true)
+    await real.saveKey('/r', 'alpha', 'sprint-done:one')
+    await real.saveFailed('/r', 'alpha', 'sprint-done:one')
+    // The save before the start fails once (a locked file), then works.
+    let fails = 1
+    const store: AutoContinueStore = {
+      ...real,
+      saveKey: async (...a) => {
+        if (fails-- > 0) throw new Error('EPERM')
+        return real.saveKey(...a)
+      },
+    }
+    const s = setup({ board: boardOf(planRepo(SPRINT_DONE)), store })
+    expect(await json(await s.resume({ repoId: 'id-r', run: 'alpha', reply: 'continue' }))).toMatchObject({ outcome: 'started' })
+    // No false `Send continue` into the session that is now busy.
+    expect(real.list()).toEqual([{ path: '/r', run: 'alpha', lastKey: 'sprint-done:one' }])
+  })
+
   test('one resume per session', async () => {
     let release!: (r: StartResult) => void
     const s = setup({ board: boardOf(planRepo(SPRINT_DONE)), result: () => new Promise<StartResult>((r) => (release = r)) })
@@ -273,6 +304,7 @@ describe('resume route', () => {
       list: () => real.list(),
       set: (...a) => real.set(...a),
       forgetPath: (...a) => real.forgetPath(...a),
+      saveFailed: (...a) => real.saveFailed(...a),
       saveKey: async () => {
         throw new Error('disk full')
       },
