@@ -17,12 +17,14 @@ One case overrides the two auto-continue rules above: a send that failed to star
 
 **Identity.** `<repoId>\n<key>`, where the key is `entry:<line>`, `pr:<number>`, the model's key for one stop, or `failed:` and that key. The seen set lasts the app run and only grows.
 
+**A repo's first Board is its baseline.** The first Board that shows a repo with no `error` marks its items seen and sends none of them. The dot still counts them. On the app's first Board, this is every repo. A repo added later, or one that first shows with an `error`, gets the same rule on its own first readable Board. The set of repos that had their first Board lasts the app run and only grows, so a repo that leaves and comes back isn't the baseline again. The burst count leaves out the items of a repo's first Board.
+
 ```mermaid
 flowchart TD
   P[Each Board, and every LIVE_TICK_MS] --> I[Work out items; dot on if any]
   I --> F[Fresh items are marked seen]
-  F --> B{First Board of this app run?}
-  B -->|yes| Q[Send nothing. Note each ask gh hasn't read yet]
+  F --> B{Is the item's repo on its first readable Board?}
+  B -->|yes| Q[Send nothing. Note each ask of that repo that gh hasn't read yet]
   B -->|no| H{Would a Board without the PRs of noted asks have this item?}
   H -->|yes| S[Send]
   H -->|no| T[Old news: stays seen, no toast]
@@ -31,16 +33,16 @@ flowchart TD
   C -->|yes| O[One toast: N items need you]
 ```
 
-**Old news arriving late.** An item is part of the baseline if only a `gh` read that hadn't happened at the first Board could name it. There is no timer.
+**Old news arriving late.** An item is part of the baseline if only a `gh` read that hadn't happened at its repo's first Board could name it. There is no timer.
 
 - Each repo on the Board has `ghReads`: one row per PR the server asks about, by number or by head branch, with `read`. A failed read isn't a read. A branch list with no PR is. The read mark and the PR land in the same moment, so a Board never shows a read with its PR missing.
-- The first Board notes every row with `read: false`. A later ask is never noted.
+- A repo's first Board notes each of its rows with `read: false`. A later ask is never noted.
 - Each pass works out the items twice: on the Board, and on the Board without the PRs of noted asks. A fresh item that only the first has is old news: it is marked seen, the dot counts it, and no toast sends. This covers a reply too, such as the `Send continue` a merged PR asks for.
 - A noted row leaves the list on the Board that shows it read. So only its first read is old news: a later change sends.
 - A row that goes missing from a Board stays noted, because a half-saved doc can drop it for one Board.
 - A staging ask comes from another PR's base, so a noted read that found a PR also notes the staging asks that are unread on that Board.
 
-**Old PR read late, or new PR?** The ask tells them apart. Its first read was still to come at the first Board: old. Its first read came earlier and found no PR, or the ask came up after the first Board: new.
+**Old PR read late, or new PR?** The ask tells them apart. Its first read was still to come at its repo's first Board: old. Its first read came earlier and found no PR, or the ask came up after that Board: new.
 
 **The stream.** A `fetch` of `GET /api/events` on the shell's port. Bad JSON is skipped. A failed or closed stream retries after 5 s. 45 s with no bytes counts as lost. `host.onReady` moves it to a new port. The clock waits while the stream is lost.
 
@@ -60,6 +62,7 @@ flowchart TD
 - **Only three tiers.** `pending` entries aren't urgent enough to interrupt. Trade-off: a pending decision never toasts.
 - **Each item gets one try.** It is marked seen before its send, so a send that throws can't repeat on every tick.
 - **A summary over 3 new items.** Agent default, so a burst doesn't fill the screen.
+- **No toast for a repo you add.** Agent default: you added it, so the page shows its items, and the dot counts them. Turned down: one summary toast for each add, and a time window that sums up toasts over several passes.
 - **The server's reads, not a timer.** Only the server knows when a read ended, and a timer was wrong both ways: an offline start sent old PRs, and a new doc-named merge got no toast. Turned down: a longer hold, and a hold on the `merge` tier, because the docs alone can name a merge. Trade-off: one more field on the Board, and one more Board event when a read finds nothing.
 - **A toast after you answer a `BLOCKED`.** [Agent default](../decisions.md#2026-11-03--toast-after-you-answer-a-plans-blocked-agent-default--override-anytime): it tells you a run can go on. Turned down: no toast for a reply you just caused.
 
@@ -69,12 +72,13 @@ flowchart TD
 - **Nothing registers the activator until the first `Notification` call.** Electron starts with a random CLSID, and takes the shortcut's CLSID only at that call. Before it, a click starts a second copy, which loses its run to the single-instance lock. That is why the shell calls `Notification.isSupported()` at the start.
 - **That first call writes a Start-menu shortcut named for the exe,** so an unpackaged run would leave `Electron.lnk` at each start. Only a packaged app makes the call at its start (`activatorAtStart`). `real-toast.test.ts` turns it on and removes what it leaves.
 - **Each new shortcut CLSID leaves a key** under `HKCU\Software\Classes\CLSID`, and uninstall doesn't remove it. Each toast from an unpackaged run or a temp install has left one. The key does nothing once its exe is gone.
-- **A PR that opens while `gh` is out reads as old, on an ask noted at the first Board.** Its first read is the only sign of it, so that first read can't tell "opened at 9:00" from "opened last week". The same holds for a PR that merged while `gh` was out. No toast sends, but the dot and the card show it. A PR on an ask that came up after the first Board, or whose first read found no PR, always sends.
+- **A PR that opens while `gh` is out reads as old, on an ask noted at its repo's first Board.** Its first read is the only sign of it, so that first read can't tell "opened at 9:00" from "opened last week". The same holds for a PR that merged while `gh` was out. No toast sends, but the dot and the card show it. A PR on an ask that came up after that Board, or whose first read found no PR, always sends.
 - **A really new staging PR can go quiet.** This happens only if its ask first shows on the same Board where a noted read found a PR.
-- **A forgotten PR doesn't wait again.** A merge route's `forget` and a server restart both set `read` back to false. Only the first Board of an app run notes asks, and the seen set still covers what already showed.
+- **A forgotten PR doesn't wait again.** A merge route's `forget` and a server restart both set `read` back to false. Only the first Board of each repo notes its asks, once per app run, and the seen set still covers what already showed.
 - A PR `gh` can never read (a folder with no remote) stays `read: false` for good. It can't name an item, so this costs one Board row.
-- A repo added after the start isn't in the baseline, so its open items send.
-- A repo id change, or a queue line someone edits, sends again, because the identity changes.
+- A repo added after the start is the baseline on its first Board. Its open items send nothing, and neither do the PRs that `gh` first reads for it. Before this fix, each add was its own pass with up to 3 items, so the burst rule never applied: 5 repos sent 15 toasts.
+- A repo id change reads as a new repo, so its items go quiet. A queue line someone edits sends again, because the identity changes.
+- Items that arrive over several passes, up to 3 at a time, each send. Only the items of one pass make a burst. There is no timer.
 - Never import `@openaflow/web`'s `.tsx` files or its package root. `notifier.test.ts` checks that the main bundle holds no React.
 - An unpackaged toast can leave `Electron.lnk` in the Start menu, with the app's AppID, and `Get-StartApps` then lists `Electron`. Delete it after a run. A friend's machine has no unpackaged run.
 
@@ -100,3 +104,4 @@ To uninstall: Settings, Apps, Installed apps, OpenAFlow, Uninstall.
 - 2026-11-04 · fix-late-merge-continue · fixed: a click on a toast in the notification center opened nothing. The toast now carries its run, and `Notification.handleActivation` opens it, also from a closed app.
 - 2026-11-04 · fix-late-merge-continue review · fixed: a queue line with U+FFFE, U+FFFF, or a surrogate with no partner sent no toast. Those characters now leave the toast, and an emoji stays.
 - 2026-11-05 · fix-rename-open-aflow · renamed: a toast shows the app name Open AFlow, from the `Open AFlow.lnk` Start-menu shortcut and the app ID `com.alvionlabs.openaflow`.
+- 2026-11-11 · fix-toast-burst · fixed: repos added one by one sent up to 3 toasts each (15 for 5 repos), because only the app's first Board was the baseline. Now the first readable Board of each repo is its baseline, also for the PRs that `gh` first reads for it.

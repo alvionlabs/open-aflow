@@ -37,8 +37,9 @@ function toastsFor(fresh: AttentionItem[]): Toast[] {
 
 export function createNotifier(o: NotifierOptions): Notifier {
   const seen = new Set<string>()
-  let baseline = true
-  /** The asks gh hadn't answered at the first Board. What their first read finds is old news. */
+  /** The repos that have had their first readable Board. It only grows, so a repo is the baseline once per app run. */
+  const known = new Set<string>()
+  /** The asks gh hadn't answered at their repo's first Board. What their first read finds is old news. */
   const awaited = new Set<string>()
   let latest: Board | undefined
   let closed = false
@@ -67,20 +68,32 @@ export function createNotifier(o: NotifierOptions): Notifier {
     }
   }
 
-  /** What this pass may send: what a Board with no late PR would also have. Reads the wait, so it runs once per pass. */
-  const sendable = (board: Board, fresh: AttentionItem[], now: number): AttentionItem[] => {
-    if (baseline) {
-      baseline = false
-      for (const repo of board.repos) for (const ask of repo.ghReads ?? []) if (!ask.read) awaited.add(readKey(repo, ask))
-      return []
+  /**
+   * The repos this Board shows readable for the first time: on the app's first Board, every repo. Their items are
+   * the baseline, and each of their unread asks waits, so what its first read finds is old news too.
+   */
+  const firstSeen = (board: Board): Set<string> => {
+    const added = new Set<string>()
+    for (const repo of board.repos) {
+      if (repo.error !== undefined || known.has(repo.id)) continue
+      known.add(repo.id)
+      added.add(repo.id)
+      for (const ask of repo.ghReads ?? []) if (!ask.read) awaited.add(readKey(repo, ask))
     }
-    if (awaited.size === 0 || fresh.length === 0) {
+    return added
+  }
+
+  /** What this pass may send: no item of a repo's first Board, and only what a Board with no late PR would also have. Changes the wait, so it runs once per pass. */
+  const sendable = (board: Board, fresh: AttentionItem[], now: number): AttentionItem[] => {
+    const added = firstSeen(board)
+    const candidates = fresh.filter((item) => !added.has(item.repoId))
+    if (awaited.size === 0 || candidates.length === 0) {
       settle(board)
-      return fresh
+      return candidates
     }
     const named = new Set(attentionItems(withoutAwaited(board), now).map((item) => item.id))
     settle(board)
-    return fresh.filter((item) => named.has(item.id))
+    return candidates.filter((item) => named.has(item.id))
   }
 
   const pass = (board: Board) => {

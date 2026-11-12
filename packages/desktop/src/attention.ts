@@ -11,6 +11,8 @@ export type AttentionTier = 'blocked' | 'merge' | 'reply'
 export type AttentionItem = {
   /** `<repoId>\n<key>`, stable across Boards: `entry:<line>`, `pr:<number>`, or the reply's stop key. */
   id: string
+  /** The repo the item belongs to. */
+  repoId: string
   tier: AttentionTier
   /** The run's human name. */
   run: string
@@ -37,7 +39,7 @@ export function attentionItems(board: Board, now: number): AttentionItem[] {
       const key = item.action.kind === 'reply' ? replyKey(board, repo, item, found, runReplies(repo, item.action.panel.target.run, now)[0], now) : item.key
       if (key === undefined) continue
       const id = `${repo.id}\n${key}`
-      if (!items.has(id)) items.set(id, { id, tier: item.tier, run: runName(run, repo), title: item.title, hash: hashFor(run) })
+      if (!items.has(id)) items.set(id, { id, repoId: repo.id, tier: item.tier, run: runName(run, repo), title: item.title, hash: hashFor(run) })
     }
   }
   return [...items.values()]
