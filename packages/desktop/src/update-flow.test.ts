@@ -566,6 +566,31 @@ describe('createUpdateFlow', () => {
       expect(s.done).toBe(true)
     })
 
+    test('a check that reports a newer version never asks for the older download, whose file is gone', async () => {
+      for (const failing of [false, true]) {
+        const t = setup()
+        t.flow.start()
+        await t.download('1.0.1')
+        // electron-updater empties its cache before it downloads 1.0.2.
+        const download = failing ? Promise.reject(new Error('net::ERR_CONNECTION_RESET')) : new Promise(() => {})
+        t.port.nextCheck = () => Promise.resolve({ updateInfo: { version: '1.0.2' }, downloadPromise: download })
+        const s = watch(t.flow.lastChance())
+        await t.clock.advance(LAST_CHANCE_MS)
+        expect(s.done).toBe(true)
+        expect(t.events).toEqual(['ask 1.0.1', 'check'])
+      }
+    })
+
+    test('a check that reports the downloaded version still asks from the record', async () => {
+      const t = setup()
+      t.flow.start()
+      await t.download('1.0.1')
+      t.port.nextCheck = () => Promise.resolve({ updateInfo: { version: '1.0.1' }, downloadPromise: Promise.reject(new Error('EBUSY')) })
+      void t.flow.lastChance()
+      await settle()
+      expect(t.events).toEqual(['ask 1.0.1', 'check', 'ask 1.0.1'])
+    })
+
     test('asks only for the newest download', async () => {
       const t = setup()
       t.flow.start()
