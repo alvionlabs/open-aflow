@@ -127,7 +127,9 @@ const readsPlanProse = (type: string) => isType(type, 'sprint-planner') || isTyp
  * Fenced code blocks never count. Plan, the first source that gives a value: a `plan slug`
  * field, a `plan` field, then (sprint planners and reporters only) the exact prose form
  * ``for plan `<slug>` ``. A source that gives nothing (no field, or a path) never blocks
- * the next one. Engineers get no plan. Reviewers alone get `kind` and `pr`.
+ * the next one. Branch: the `branch name` field, then a `branch` field, so a `Branch: …` sentence in a
+ * /pod:task engineer's task text (which comes before `branch name`) never counts. Engineers get no plan.
+ * Reviewers alone get `kind` and `pr`.
  */
 export function readDispatch(prompt: string, agentType: string): DispatchFields {
   const lines = unfencedLines(prompt)
@@ -141,7 +143,7 @@ export function readDispatch(prompt: string, agentType: string): DispatchFields 
   return {
     sprint: field(lines, 'sprint slug'),
     slice: field(lines, 'slice code'),
-    branch: field(lines, 'branch(?: name)?'),
+    branch: field(lines, 'branch name') ?? field(lines, 'branch'),
     plan,
     round: Number.isInteger(round) && round > 0 ? round : undefined,
     kind: reviewer ? field(lines, 'kind') : undefined,

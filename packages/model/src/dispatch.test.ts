@@ -539,6 +539,19 @@ describe('readDispatch reads a /pod:task engineer and reviewer', () => {
     expect(readDispatch(TASK_ENGINEER, 'pod:engineer')).toMatchObject({ branch: 'task-support-pod-task', plan: undefined, sprint: undefined, slice: undefined })
   })
 
+  it('reads the engineer branch name field, not a Branch: sentence in the task text before it', () => {
+    const prompt = [
+      'Standalone /pod:task dispatch (no sprint slug).',
+      '',
+      '- **task:** The toast fires twice after a merge. Branch: pod-staging has it too.',
+      '- **branch name:** task-toast-twice',
+      '- **merge-target branch:** pod-staging',
+    ].join('\n')
+    expect(readDispatch(prompt, 'pod:engineer').branch).toBe('task-toast-twice')
+    // With no branch name field, a branch field still counts (older /pod:fix dispatches).
+    expect(readDispatch('Standalone /pod:fix slice. Parent repo: E:/r. Branch: fix-clock.', 'pod:engineer').branch).toBe('fix-clock')
+  })
+
   it('reads the reviewer kind, PR number, branch, and round', () => {
     expect(readDispatch(TASK_REVIEWER, 'pod:reviewer')).toMatchObject({ kind: 'task', pr: 104, branch: 'task-404-page', round: 1, plan: undefined })
   })
