@@ -644,6 +644,8 @@ describe('createUpdateFlow', () => {
       await settle()
       expect(s.done).toBe(false)
       expect(t.flow.reopen()).toBe('relaunch')
+      // Each app.relaunch() starts one more copy, so a second click starts none.
+      expect(t.flow.reopen()).toBe('wait')
       await settle()
       expect(s.done).toBe(true)
       // The app is on its way out: no box opens.
@@ -675,6 +677,7 @@ describe('createUpdateFlow', () => {
       t.flow.start()
       await t.flow.lastChance()
       expect(t.flow.reopen()).toBe('relaunch')
+      expect(t.flow.reopen()).toBe('wait')
     })
 
     test('the relaunch drops the login flag, so the window shows', () => {

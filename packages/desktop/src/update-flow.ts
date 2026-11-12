@@ -75,7 +75,8 @@ export type UpdateFlow = {
   lastChance(): Promise<void>
   /**
    * A second launch or the tray's Open. `show`: before lastChance. `wait`: a box is open, or a restart runs and the
-   * installer starts the new copy. `relaunch`: lastChance resolves now, and the caller starts a fresh copy.
+   * installer starts the new copy, or a relaunch already runs. `relaunch`: once; lastChance resolves now, and the caller starts a
+   * fresh copy.
    */
   reopen(): 'show' | 'relaunch' | 'wait'
 }
@@ -100,6 +101,8 @@ export function createUpdateFlow(o: UpdateFlowOptions): UpdateFlow {
   /** `over` from the end of lastChance: the app quits, so no check runs and no box opens. */
   let phase: 'normal' | 'last chance' | 'over' = 'normal'
   let endWait = () => {}
+  /** Each app.relaunch() starts one more copy, so only the first reopen relaunches. */
+  let relaunched = false
   let installOver = () => {}
   const installEnded = new Promise<void>((resolve) => (installOver = resolve))
 
@@ -199,7 +202,8 @@ export function createUpdateFlow(o: UpdateFlowOptions): UpdateFlow {
     willCheck: () => port !== undefined,
     reopen() {
       if (phase === 'normal') return 'show'
-      if (boxOpen || restarting) return 'wait'
+      if (boxOpen || restarting || relaunched) return 'wait'
+      relaunched = true
       endWait()
       return 'relaunch'
     },
