@@ -134,7 +134,7 @@ describe('createUpdateFlow', () => {
     await t.clock.advance(1)
     expect(t.checks()).toBe(1)
 
-    // A server restart's second ready adds no timer, before or after the first check.
+    // A second start adds no timer after the first check either.
     t.flow.start()
     expect(t.clock.count()).toBe(1)
     await t.clock.advance(RECHECK_MS - 1)
