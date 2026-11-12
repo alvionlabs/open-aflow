@@ -354,3 +354,8 @@ Consequences: `CLAUDE.md` and the smoke recipe stay as they are.
 Context: queue entry 172. The toggle saves a stop's key before the send starts, so a send that failed to start raised no toast or dot, and the board never retries that key. The run waited, and nothing told the human.
 Decision: the human's decision: the toggle keeps `lastFailed` beside `lastKey`. A send of that stop that fails to start, by the check or by a press, sets it. A send that starts clears it. While it is set, the stop is an item, on plan runs and fix runs alike.
 Consequences: the item has its own key, `failed:<key>`, so the first failure of a stop sends a toast. A failed `answered` send leaves the toggle's `answeredKeys`, so the board may send it later. A send that starts and then stalls still has only its card. If the save of the mark fails, the stop stays quiet, as before.
+
+## 2026-11-11 — A repo's first Board sends no toast (human decision)
+Context: queue entry 150. About 15 toasts arrived at once when repos were added, because only the app's first Board was the toast baseline. Each added repo came on its own Board with up to 3 items, so the summary rule never applied.
+Decision: the human's decision: a repo's first readable Board is its own baseline, and adding a repo sends no toast. A repo that leaves the Board and comes back is a fresh add. A repo whose id changes reads as a new repo, so its open items stay quiet.
+Consequences: the tray dot and the run cards still show a new repo's items. A real new item that arrives while a repo is off the Board sends no toast when it comes back. A read error isn't a leave, because the Board still lists the repo.
