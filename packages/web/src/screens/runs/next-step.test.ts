@@ -338,6 +338,19 @@ describe('next step', () => {
     expect(order(fix)).toEqual(['merge pr:36', `reply reply:${name}`, `pending ${entryKey(UNJOINED)}`])
     expect(fix.card).toMatchObject({ title: 'Merge PR #36', detail: 'The fix PR is reviewed and waits for you.', action: { kind: 'merge', repoId: 'chess', number: 36 } })
 
+    // A /pod:task run: the same items, its PR named a task PR.
+    const tname = 'task-scroll'
+    const task = chess([addQueue(UNJOINED)], {
+      claims: [{ ...claim, plan: tname }],
+      agents: [{ ...eng, branch: tname }, { ...rev, kind: 'task', branch: tname }],
+      prs: [gh(36, 'open', { branch: tname })],
+    })
+    const tsteps = steps(task, tname)
+    expect(order(tsteps)).toEqual(['merge pr:36', `reply reply:${tname}`, `pending ${entryKey(UNJOINED)}`])
+    expect(tsteps.card).toMatchObject({ title: 'Merge PR #36', detail: 'The task PR is reviewed and waits for you.', action: { kind: 'merge', repoId: 'chess', number: 36 } })
+    const tmerged = chess([], { claims: [{ ...claim, plan: tname }], agents: [{ ...eng, branch: tname }, { ...rev, kind: 'task', branch: tname }], prs: [gh(36, 'merged', { branch: tname, mergedAt: NOW - MIN })] })
+    expect(steps(tmerged, tname).card).toMatchObject({ tier: 'reply', title: 'Send continue', detail: 'PR #36 merged.' })
+
     // The plan run never gets the fix PR, nor the fix's reply.
     expect(order(steps(repo))).toEqual([`pending ${entryKey(H1)}`, `pending ${entryKey(U1)}`, `pending ${entryKey(WAVE2)}`, `pending ${entryKey(UNJOINED)}`])
 

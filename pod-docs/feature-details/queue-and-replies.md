@@ -55,7 +55,7 @@ Which reply pod waits for on a run (`continue`, `go`, or `try`), why, and the ch
 - pod-staging is shared by every plan, so two listed plans past their final PR both list the same open staging PR, each in its own run.
 - The kind dots reuse the status colors, so a decision's dot is the running blue. It never breathes (`runs.css` stops the animation for `.wait-kind`); a pulsing dot there would read as work in progress.
 - A kind is read only from the first words of the body. A reviewer entry that starts with anything else (for example `Someday maybe:`) is `other`, and it sorts above Someday.
-- Fix runs get no `answered`: no queue field joins an entry to `fix-<slug>`.
+- One-off runs (task and fix) get no `answered`: no queue field joins an entry to `task-<slug>` or `fix-<slug>`.
 - A plan whose sprints are all `done`, with no halt, hand-back, or agent, isn't a run, so an answered `PENDING` there shows no reply.
 - The `cd` line is `cd '<path>'` for a POSIX path (each `'` written `'\''`) and `cd "<path>"` for a Windows path. A Windows path holding `$`, `(`, `)`, a backtick, or a curly double quote (`“`, `”`, `„`, which PowerShell reads as closing the string) gets no `cd` line: no one quoting is safe in cmd.exe, PowerShell and bash at once. `Run it yourself` then shows the folder as plain text, with no Copy. `%NAME%` keeps its line: cmd.exe puts the variable's value in, so the `cd` can fail or land elsewhere, but a Windows folder name can't hold the `"` or `:` that would let it run a command.
 

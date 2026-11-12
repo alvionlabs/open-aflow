@@ -1,7 +1,7 @@
 // The run's flow (columns of step cards), its fold line for phones, and the run header (title, meta
 // line, progress strip, `Wave N of M`), from the model's flow. Pure; the Flow and the header only render these.
 
-import { buildFlow, fixPr, fixRunAgents, isPlanAgent, type BoardRepo, type RunSummary, type Stage, type Step, type StepState } from '@openaflow/model'
+import { buildFlow, fixPr, fixRunAgents, isPlanAgent, oneOffKind, type BoardRepo, type OneOffKind, type RunSummary, type Stage, type Step, type StepState } from '@openaflow/model'
 
 export type Segment = 'done' | 'current' | 'rest'
 /** `meta`: `<repo> · <Plan|Fix> · started <when>`, unknown parts left out; empty for a repo row, whose title is the repo. */
@@ -136,11 +136,18 @@ export function runName(run: RunSummary, repo: BoardRepo | undefined): string {
   return run.title ?? repo?.model.plans.find((p) => p.slug === run.plan)?.title ?? readable(run.plan)
 }
 
-/** `<repo> · <Plan|Fix> · started <when>`; a part that isn't known is left out. */
+/** A one-off run's tag: `task` for a /pod:task run (`task-<slug>`), `fix` for an older /pod:fix run; undefined for any other run. */
+export const runTag = (run: Pick<RunSummary, 'plan' | 'fix'>): OneOffKind | undefined =>
+  run.fix === undefined || run.plan === undefined ? undefined : (oneOffKind(run.plan) ?? 'fix')
+
+const TAG_WORD: Record<OneOffKind, string> = { task: 'Task', fix: 'Fix' }
+
+/** `<repo> · <Plan|Task|Fix> · started <when>`; a part that isn't known is left out. */
 function runMeta(run: RunSummary, repo: BoardRepo, now: number, transcriptDays: number): string {
   if (run.plan === undefined) return ''
   const started = startedText(run, repo, now, transcriptDays)
-  return [run.repo, run.fix !== undefined ? 'Fix' : 'Plan', started === undefined ? undefined : `started ${started}`].filter((x) => x !== undefined).join(' · ')
+  const tag = runTag(run)
+  return [run.repo, tag === undefined ? 'Plan' : TAG_WORD[tag], started === undefined ? undefined : `started ${started}`].filter((x) => x !== undefined).join(' · ')
 }
 
 const MIN = 60_000

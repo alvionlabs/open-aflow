@@ -297,6 +297,17 @@ describe('plan view', () => {
     expect(runHeader(fix, old, NOW, 30)?.meta).toBe('chess-web · Fix · started 40 days ago')
   })
 
+  it('run header for a /pod:task run: Task in the meta line; the name as a fix run reads it', () => {
+    const name = 'task-sprint-column'
+    const claim: Claim = { portBase: 3100, repoPath: '/c', plan: name }
+    const task = { repoId: 'chess', repo: 'chess-web', plan: name, fix: 'sprint-column', where: 'build', state: 'running' } satisfies RunSummary
+    const engineer: AgentRun = { id: 'e1', session: 's', type: 'pod:engineer', branch: name, startedAt: NOW - 5 * 60_000, tokens: 0, ended: false }
+    expect(runHeader(task, chess(() => {}, { claims: [claim] }), NOW)).toEqual({ title: 'Sprint column', meta: 'chess-web · Task', segments: [] })
+    expect(runHeader(task, chess(() => {}, { claims: [claim], agents: [engineer] }), NOW)?.meta).toBe('chess-web · Task · started 5 min ago')
+    const pr: PrStatus = { number: 58, state: 'open', checks: 'none', checkedAt: NOW, branch: name, title: 'feat(model): read task runs' }
+    expect(runHeader(task, chess(() => {}, { claims: [claim], prs: [pr] }), NOW)?.title).toBe('read task runs')
+  })
+
   it('run header for a repo row, a plan the repo lacks, and no run', () => {
     const repo = chess()
     // A repo with no plan: the repo is the title, so the meta line has nothing more to say.

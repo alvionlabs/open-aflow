@@ -513,6 +513,50 @@ describe('drive paths and fenced blocks, end to end', () => {
   })
 })
 
+// /pod:task dispatch shapes (pod 0.10.0+), as real ones write them (made-up values): the engineer's
+// `branch name` and the reviewer's `kind: task` and `branch` come after a long free-text `task` field.
+const TASK_ENGINEER = [
+  'Standalone /pod:task dispatch (no sprint slug).',
+  '',
+  "- **task:** Make the board read `/pod:task` runs. Today it knows only `fix-<slug>` claims and `kind: fix` reviewers.",
+  '- **branch name:** task-support-pod-task (off origin/main)',
+  '- **merge-target branch:** pod-staging',
+  '- **worktree path:** E:/r/.claude/worktrees/task-support-pod-task',
+].join('\n')
+const TASK_REVIEWER = [
+  '- **kind:** task',
+  '- **PR URL:** https://github.com/o/r/pull/104',
+  '- **merge-target:** main',
+  '- **task:**',
+  '  Add a 404 page. Human decisions: one heading, a link to /.',
+  '- **branch:** task-404-page',
+  '- **parent-repo path:** E:/r',
+  '- **round:** 1',
+].join('\n')
+
+describe('readDispatch reads a /pod:task engineer and reviewer', () => {
+  it('reads the engineer branch, and no plan', () => {
+    expect(readDispatch(TASK_ENGINEER, 'pod:engineer')).toMatchObject({ branch: 'task-support-pod-task', plan: undefined, sprint: undefined, slice: undefined })
+  })
+
+  it('reads the engineer branch name field, not a Branch: sentence in the task text before it', () => {
+    const prompt = [
+      'Standalone /pod:task dispatch (no sprint slug).',
+      '',
+      '- **task:** The toast fires twice after a merge. Branch: pod-staging has it too.',
+      '- **branch name:** task-toast-twice',
+      '- **merge-target branch:** pod-staging',
+    ].join('\n')
+    expect(readDispatch(prompt, 'pod:engineer').branch).toBe('task-toast-twice')
+    // With no branch name field, a branch field still counts (older /pod:fix dispatches).
+    expect(readDispatch('Standalone /pod:fix slice. Parent repo: E:/r. Branch: fix-clock.', 'pod:engineer').branch).toBe('fix-clock')
+  })
+
+  it('reads the reviewer kind, PR number, branch, and round', () => {
+    expect(readDispatch(TASK_REVIEWER, 'pod:reviewer')).toMatchObject({ kind: 'task', pr: 104, branch: 'task-404-page', round: 1, plan: undefined })
+  })
+})
+
 // /pod:fix reviewer shapes, as real ones write them (made-up values).
 const FIX_REVIEWER_LINES = [
   'kind: fix',

@@ -4,6 +4,7 @@ import { EngineerView } from '../engineer/EngineerView.tsx'
 import { ActionLog } from './ActionLog.tsx'
 import { Chip } from './Chip.tsx'
 import { OtherActivity } from './OtherActivity.tsx'
+import { runTag } from './plan-view.ts'
 import { SliceLog } from './SliceLog.tsx'
 import { agentChip, agentLogRows, logRunChip } from './view.ts'
 import './tabs.css'
@@ -45,7 +46,7 @@ function FixLog({ repo, run, pipeline, agent, now }: { repo: BoardRepo; run: Run
   return (
     <>
       {rows.length === 0 ? (
-        <p className="muted note">No agent has started on this fix yet.</p>
+        <p className="muted note">No agent has started on this {runTag(run) ?? 'fix'} yet.</p>
       ) : (
         <div className="log-frame" role="region" aria-label="Agent log" tabIndex={0}>
           <section className="log-group" aria-labelledby={id}>

@@ -8,7 +8,7 @@ Status: open · found 2026-11-05 · PR #88
 **What you see:** the run stays in the sidebar for good, its tray dot stays on, and it adds a line to the urgent banner on every run page.
 
 **How to reproduce:**
-1. Run `/pod:fix` and merge its PR.
+1. Run `/pod:task` (`/pod:fix` in pod before 0.10) and merge its PR.
 2. Don't reply `continue`, and close the session.
 3. The run stays listed, because its port claim file stays.
 
