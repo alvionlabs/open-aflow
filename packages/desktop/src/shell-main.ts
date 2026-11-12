@@ -13,6 +13,7 @@ import { createShellBus, type ShellBus } from './shell-bus.ts'
 import { APP_ID, APP_NAME, dataDirOverride } from './shell-config.ts'
 import { createLogFile, LOG_FILE, nodeLogFs, teeConsole } from './shell-log.ts'
 import { applyTestEnv, TEST_ENV_FILE } from './update-feed.ts'
+import { failureText, relaunchArgs } from './update-flow.ts'
 import { startUpdater } from './updater-main.ts'
 import { startWindow } from './window-main.ts'
 
@@ -34,18 +35,11 @@ export type ShellOptions = {
   onServer?(pid: number): void
   /** Default: only a packaged app. The real toast test turns it on and removes what it leaves. */
   activatorAtStart?: boolean
-  /** In place of the error box, which waits for a click. After either, the app checks for an update, then quits. */
+  /** In place of the error box, which waits for a click. After either, a packaged app checks for an update, then quits. */
   onFailed?(error: string): void
 }
 
-/** Where a user gets a new version by hand, when the app can't update itself. */
-export const RELEASES_URL = 'https://github.com/alvionlabs/openaflow/releases'
-
-const showFailure = (error: string) =>
-  dialog.showErrorBox(
-    APP_NAME,
-    `The server stopped and could not restart.\n\n${error}\n\n${APP_NAME} checks for an update before it closes. You can also get the latest version from ${RELEASES_URL}`,
-  )
+const showFailure = (error: string, willCheck: boolean) => dialog.showErrorBox(APP_NAME, failureText(error, willCheck))
 
 /** Returns `undefined` on a second launch, which starts no server and exits. */
 export function startShell(o: ShellOptions): ShellContext | undefined {
@@ -74,7 +68,17 @@ export function startShell(o: ShellOptions): ShellContext | undefined {
   const host = createServerHost({
     fork: () => forkServer({ entry, env: serverEnv(o.env, process.pid), onSpawn: o.onServer }),
   })
-  const bus = createShellBus()
+  let updater: ReturnType<typeof startUpdater>
+  const shellBus = createShellBus()
+  // A second launch and the tray's Open come here. After the server failed for good, the page is dead: start fresh.
+  const bus: ShellBus = {
+    ...shellBus,
+    showWindow(hash) {
+      const next = updater?.reopen() ?? 'show'
+      if (next === 'show') shellBus.showWindow(hash)
+      else if (next === 'relaunch') app.relaunch({ args: relaunchArgs(process.argv) })
+    },
+  }
   const ctx: ShellContext = { host, bus, env: o.env, activatorAtStart: o.activatorAtStart ?? app.isPackaged }
 
   const flow = createQuitFlow({
@@ -86,9 +90,8 @@ export function startShell(o: ShellOptions): ShellContext | undefined {
   // `session-end` is a window's event, so each window reports it.
   app.on('browser-window-created', (_e, win) => win.on('session-end', () => flow.sessionEnd()))
   app.on('second-instance', () => bus.showWindow())
-  let updater: ReturnType<typeof startUpdater>
   host.onFailed((error) => {
-    ;(o.onFailed ?? showFailure)(error)
+    ;(o.onFailed ?? showFailure)(error, updater?.willCheck() ?? false)
     // The page has no server. The tray stays, so Quit still works while the update check runs.
     hideWindows(BrowserWindow.getAllWindows())
     void (updater?.lastChance() ?? Promise.resolve()).finally(() => app.quit())

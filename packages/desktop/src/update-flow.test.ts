@@ -1,5 +1,17 @@
-import { describe, expect, test } from 'vitest'
-import { createUpdateFlow, FIRST_CHECK_MS, LAST_CHANCE_MS, RECHECK_MS, type UpdaterPort } from './update-flow.ts'
+import { STOP_MESSAGE } from '@openaflow/server/parent-link'
+import { describe, expect, test, vi } from 'vitest'
+import { createServerHost, type ServerProcess } from './server-host.ts'
+import {
+  createUpdateFlow,
+  failureText,
+  FIRST_CHECK_MS,
+  INSTALL_LIMIT_MS,
+  LAST_CHANCE_MS,
+  RECHECK_MS,
+  relaunchArgs,
+  RELEASES_URL,
+  type UpdaterPort,
+} from './update-flow.ts'
 
 type Answer = 'restart' | 'later'
 
@@ -360,6 +372,17 @@ describe('createUpdateFlow', () => {
     expect(t.events).toEqual(['ask 1.0.1'])
   })
 
+  test('a Restart now whose installer never quits the app quits after the limit', async () => {
+    const t = setup()
+    t.answers.push('restart')
+    t.flow.start()
+    await t.download('1.0.1')
+    expect(t.events).toEqual(['ask 1.0.1', 'stop', 'install'])
+    await t.clock.advance(FIRST_CHECK_MS + INSTALL_LIMIT_MS)
+    expect(t.events).toEqual(['ask 1.0.1', 'stop', 'install', 'quit'])
+    expect(t.checks()).toBe(0)
+  })
+
   test('a failed install quits', async () => {
     const t = setup()
     t.answers.push('restart')
@@ -368,6 +391,8 @@ describe('createUpdateFlow', () => {
     }
     t.flow.start()
     await t.download('1.0.1')
+    expect(t.events).toEqual(['ask 1.0.1', 'stop', 'install', 'quit'])
+    await t.clock.advance(INSTALL_LIMIT_MS)
     expect(t.events).toEqual(['ask 1.0.1', 'stop', 'install', 'quit'])
     expect(t.logs.join()).toContain('EACCES')
     expect(t.logs.join()).not.toContain('example.com')
@@ -416,7 +441,7 @@ describe('createUpdateFlow', () => {
       expect(t.events).not.toContain('quit')
     })
 
-    test('an update found asks, and Restart now installs and never resolves', async () => {
+    test('an update found asks, and Restart now installs and waits for the installer to quit the app', async () => {
       const t = setup()
       t.answers.push('restart')
       t.port.nextCheck = async () => {
@@ -427,8 +452,35 @@ describe('createUpdateFlow', () => {
       const s = watch(t.flow.lastChance())
       await settle()
       expect(t.events).toEqual(['check', 'ask 1.0.1', 'stop', 'install'])
-      await t.clock.advance(LAST_CHANCE_MS)
+      await t.clock.advance(INSTALL_LIMIT_MS - 1)
       expect(s.done).toBe(false)
+      expect(t.events).not.toContain('quit')
+    })
+
+    test('an install that never quits the app resolves after INSTALL_LIMIT_MS', async () => {
+      expect(INSTALL_LIMIT_MS).toBe(2 * 60_000)
+      const stop = deferred<string>()
+      const t = setup({ stop: () => stop.promise })
+      t.answers.push('restart')
+      t.port.nextCheck = async () => {
+        await t.download('1.0.1')
+        return null
+      }
+      t.flow.start()
+      const s = watch(t.flow.lastChance())
+      await settle()
+      // The limit starts at the call to the installer, not at the click: the stop can take 80 s.
+      await t.clock.advance(LAST_CHANCE_MS + INSTALL_LIMIT_MS)
+      expect(s.done).toBe(false)
+      stop.resolve('stopped')
+      await settle()
+      expect(t.events).toEqual(['check', 'ask 1.0.1', 'install'])
+      await t.clock.advance(INSTALL_LIMIT_MS - 1)
+      expect(s.done).toBe(false)
+      await t.clock.advance(1)
+      expect(s.done).toBe(true)
+      expect(t.events).toEqual(['check', 'ask 1.0.1', 'install', 'quit'])
+      expect(t.logs.at(-1)).toContain('install did not quit')
     })
 
     test('Later resolves', async () => {
@@ -485,6 +537,216 @@ describe('createUpdateFlow', () => {
       await t.clock.advance(1)
       expect(s.done).toBe(true)
       expect(t.logs.at(-1)).toContain('no update in time')
+    })
+
+    test('asks again for a version put off with Later earlier in this run', async () => {
+      const t = setup()
+      t.flow.start()
+      await t.download('1.0.1')
+      expect(t.events).toEqual(['ask 1.0.1'])
+      // electron-updater emits the cached download again on the next check.
+      t.port.nextCheck = async () => {
+        await t.download('1.0.1')
+        return null
+      }
+      t.answers.push('restart')
+      void t.flow.lastChance()
+      await settle()
+      expect(t.events).toEqual(['ask 1.0.1', 'check', 'ask 1.0.1', 'stop', 'install'])
+    })
+
+    test('a failed check still asks for a version downloaded earlier, once', async () => {
+      const t = setup()
+      t.flow.start()
+      await t.download('1.0.1')
+      t.port.nextCheck = () => Promise.reject(new Error('net::ERR_INTERNET_DISCONNECTED'))
+      const s = watch(t.flow.lastChance())
+      await settle()
+      expect(t.events).toEqual(['ask 1.0.1', 'check', 'ask 1.0.1'])
+      expect(s.done).toBe(true)
+    })
+
+    test('asks only for the newest download', async () => {
+      const t = setup()
+      t.flow.start()
+      await t.download('1.0.1')
+      await t.download('1.0.2')
+      t.port.nextCheck = () => Promise.reject(new Error('offline'))
+      void t.flow.lastChance()
+      await settle()
+      expect(t.events).toEqual(['ask 1.0.1', 'ask 1.0.2', 'check', 'ask 1.0.2'])
+    })
+
+    test('a box open when the last chance starts is not asked twice', async () => {
+      const box = deferred<Answer>()
+      const asked: string[] = []
+      const t = setup({
+        ask: (version) => {
+          asked.push(version)
+          return box.promise
+        },
+      })
+      t.flow.start()
+      await t.download('1.0.1')
+      const s = watch(t.flow.lastChance())
+      await settle()
+      expect(t.checks()).toBe(0)
+      box.resolve('later')
+      await settle()
+      expect(asked).toEqual(['1.0.1'])
+      expect(s.done).toBe(true)
+    })
+
+    test('the limit never closes an open box, and a late Restart now installs', async () => {
+      const box = deferred<Answer>()
+      const t = setup({
+        ask: (version) => {
+          t.events.push(`ask ${version}`)
+          return box.promise
+        },
+      })
+      t.port.nextCheck = async () => {
+        await t.download('1.0.1')
+        return null
+      }
+      t.flow.start()
+      const s = watch(t.flow.lastChance())
+      await settle()
+      await t.clock.advance(LAST_CHANCE_MS * 3)
+      expect(s.done).toBe(false)
+      expect(t.logs.join('\n')).not.toContain('no update in time')
+      box.resolve('restart')
+      await settle()
+      expect(t.events).toEqual(['check', 'ask 1.0.1', 'stop', 'install'])
+      expect(s.done).toBe(false)
+    })
+
+    test('a download that lands after the limit opens no box', async () => {
+      const download = deferred()
+      const t = setup()
+      t.port.nextCheck = () => Promise.resolve({ downloadPromise: download.promise })
+      t.flow.start()
+      const s = watch(t.flow.lastChance())
+      await t.clock.advance(LAST_CHANCE_MS)
+      expect(s.done).toBe(true)
+      await t.download('1.0.1')
+      download.resolve()
+      await settle()
+      expect(t.events).toEqual(['check'])
+    })
+
+    test('a second launch: show before the last chance, then end the wait and relaunch', async () => {
+      const t = setup()
+      t.port.nextCheck = () => Promise.resolve({ downloadPromise: new Promise(() => {}) })
+      t.flow.start()
+      expect(t.flow.reopen()).toBe('show')
+      const s = watch(t.flow.lastChance())
+      await settle()
+      expect(s.done).toBe(false)
+      expect(t.flow.reopen()).toBe('relaunch')
+      await settle()
+      expect(s.done).toBe(true)
+      // The app is on its way out: no box opens.
+      await t.download('1.0.1')
+      expect(t.events).toEqual(['check'])
+    })
+
+    test('a second launch waits while a box is open or a restart runs', async () => {
+      const box = deferred<Answer>()
+      const stop = deferred<string>()
+      const t = setup({ ask: () => box.promise, stop: () => stop.promise })
+      t.port.nextCheck = async () => {
+        await t.download('1.0.1')
+        return null
+      }
+      t.flow.start()
+      const s = watch(t.flow.lastChance())
+      await settle()
+      expect(t.flow.reopen()).toBe('wait')
+      box.resolve('restart')
+      await settle()
+      // The installer starts the new copy.
+      expect(t.flow.reopen()).toBe('wait')
+      expect(s.done).toBe(false)
+    })
+
+    test('a second launch relaunches when no check runs', async () => {
+      const t = setup({ packaged: false })
+      t.flow.start()
+      await t.flow.lastChance()
+      expect(t.flow.reopen()).toBe('relaunch')
+    })
+
+    test('the relaunch drops the login flag, so the window shows', () => {
+      expect(relaunchArgs(['OpenAFlow.exe', '--hidden'])).toEqual([])
+      expect(relaunchArgs(['electron.exe', 'C:\\app', '--hidden', '--x'])).toEqual(['C:\\app', '--x'])
+      expect(relaunchArgs(['OpenAFlow.exe'])).toEqual([])
+    })
+
+    test('the error box says the app checks only when a check runs', () => {
+      const packaged = setup()
+      packaged.flow.start()
+      expect(packaged.flow.willCheck()).toBe(true)
+      for (const t of [setup({ packaged: false }), setup({ updaterThrows: true })]) {
+        t.flow.start()
+        expect(t.flow.willCheck()).toBe(false)
+      }
+
+      const checks = failureText('exit 1', true)
+      expect(checks).toContain('exit 1')
+      expect(checks).toContain('checks for an update')
+      expect(checks).toContain(RELEASES_URL)
+      const none = failureText('exit 1', false)
+      expect(none).not.toMatch(/check/i)
+      expect(none).toContain(RELEASES_URL)
+    })
+
+    test("a Restart now during the server's first launch stops it before ready, then installs", async () => {
+      vi.useFakeTimers()
+      try {
+        let onExit: (code: number) => void = () => {}
+        let onMessage: (m: unknown) => void = () => {}
+        const sent: unknown[] = []
+        let forks = 0
+        const host = createServerHost({
+          fork: (): ServerProcess => {
+            forks++
+            return {
+              pid: 100,
+              postMessage: (m) => void sent.push(m),
+              kill: () => true,
+              onMessage: (fn) => void (onMessage = fn),
+              onExit: (fn) => void (onExit = fn),
+              onOutput: () => {},
+            }
+          },
+        })
+        const failed = vi.fn()
+        const ready = vi.fn()
+        host.onFailed(failed)
+        host.onReady(ready)
+        const t = setup({ stop: () => host.stop() })
+        t.answers.push('restart')
+        t.flow.start()
+        host.start()
+        await t.download('1.0.1')
+        expect(sent).toEqual([STOP_MESSAGE])
+        expect(t.events).toEqual(['ask 1.0.1'])
+        // The server answers ready late, then drains and exits.
+        onMessage({ type: 'openaflow:ready', port: 3110 })
+        onExit(0)
+        await settle()
+        expect(t.events).toEqual(['ask 1.0.1', 'install'])
+        vi.advanceTimersByTime(10 * 60_000)
+        expect(forks).toBe(1)
+        expect(ready).not.toHaveBeenCalled()
+        expect(failed).not.toHaveBeenCalled()
+        // The quit that the installer starts waits for the same stop.
+        await expect(host.stop()).resolves.toBe('stopped')
+        expect(sent).toEqual([STOP_MESSAGE])
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     test('an unpackaged app, or an updater that failed to start, resolves at once', async () => {

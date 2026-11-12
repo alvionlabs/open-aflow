@@ -48,7 +48,7 @@ async function askBox(version: string): Promise<'restart' | 'later'> {
 }
 
 /** Undefined when this build has no feed. */
-export function startUpdater(ctx: ShellContext): Pick<UpdateFlow, 'lastChance'> | undefined {
+export function startUpdater(ctx: ShellContext): UpdateFlow | undefined {
   let feed: string | null = null
   let firstCheckMs: number | undefined
   let ask = askBox

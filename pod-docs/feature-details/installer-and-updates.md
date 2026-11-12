@@ -10,8 +10,9 @@
 - **After the install.** A normal install opens the app (`runAfterFinish`). A silent install stays closed, so a proof never starts the app with no temp env. The update path is silent with `--force-run`, which starts its one new copy, as it always did. The template rule is `${ifNot} ${Silent} ${orIf} ${isForceRun}` in `installSection.nsh`, and `build-config.test.ts` fails if a new electron-builder changes it.
 - **Release.** `release.yml` runs only on a tag `v<major>.<minor>.<patch>` that equals `version` in `packages/desktop/package.json`. Job `build` has a read token: it runs `pnpm verify`, `pnpm package`, and `pnpm release:check`. Job `publish` needs `build`, has the write token, and runs no repo code.
 - **Check.** `pnpm release:check` checks the size, `latest.yml`, and the blockmap, then installs, starts, and uninstalls the app. `pnpm test:install` runs the longer proofs. Each ends with `state diff: []`.
-- **Update.** Only in a packaged app. First check 30 s after the app starts, then every 6 h. It doesn't wait for the server.
-- **Last chance.** When the server fails for good, the app checks at once after the error box. No update, a failed check, or Later: it quits. Restart now: it installs. It quits anyway after 10 minutes (`LAST_CHANCE_MS`). The tray stays, so Quit works the whole time. `autoDownload` on. `autoInstallOnAppQuit` and `allowDowngrade` off.
+- **Update.** Only in a packaged app. First check 30 s after the app starts, then every 6 h. It doesn't wait for the server. After Restart now, the app quits if it still runs 2 minutes after the call to the installer (`INSTALL_LIMIT_MS`). `autoDownload` on. `autoInstallOnAppQuit` and `allowDowngrade` off.
+- **Last chance.** When the server fails for good, the app checks at once after the error box. The box says so only when a check runs: not in an unpackaged app or a build with no feed. The check asks again for a version that got Later earlier in this run. A failed check still asks for the newest version that downloaded in this run. No update, a failed check with no download, or Later: it quits. Restart now: it installs. The check and the download have 10 minutes (`LAST_CHANCE_MS`). An open box has no limit, so the app never quits while the user chooses. The tray stays, so Quit works the whole time.
+- **Second launch during the last chance.** A second launch or the tray's Open ends the wait. The app quits and starts a fresh copy (`app.relaunch`), which tries the server again and shows the window, also after a login start. While a box is open or a Restart now runs, it does nothing: the box is on the screen, and the installer starts the new copy.
 
 ```mermaid
 flowchart TD
@@ -37,6 +38,8 @@ flowchart TD
 - **`openaflow` as the packaged name.** It names the install folder and the updater's cache folder. NSIS's `--delete-app-data` removes `%APPDATA%\<name>`, and `%APPDATA%\<product name>` (`OpenAFlow`), so neither may be the server's config folder, `openaflow-server`. `build-config.test.ts` checks it against `CONFIG_DIR_NAME`.
 - **The server stops first on Restart now.** The installer's `Stop-Process` would end it with no drain.
 - **The updater doesn't wait for the server.** A release whose server can't start on a machine must still get its fix. Recovery code that needs the failing part can't run. See [the research](../research/updater-independent-of-server.md).
+- **A fresh start for a second launch during the last chance.** The old copy holds the single-instance lock and a dead page. Showing that page helps nobody. A relaunch retries the server, and the user asked for the app. Turned down: ignore the launch, because the user then sees nothing.
+- **One place for the release repo.** `RELEASE_REPO` in `update-flow.ts` names the owner and the repo. `build-config.ts` takes `publish` from it, and the error box's Releases link comes from it.
 - **The test feed is compiled out.** A build-time flag removes it from every shipped build, and `release:check` refuses a build that holds its text.
 
 ## Watch out
@@ -49,6 +52,8 @@ flowchart TD
 - `pnpm package --test-feed` is for proofs only. Never upload its files.
 - An uninstall leaves `%LOCALAPPDATA%\openaflow-updater`, about 122 MB. It keeps `%APPDATA%\openaflow-server`, and the old config folder that the first start copied from.
 - `quitAndInstall` often emits `error` and doesn't throw, so the flow treats that as a failed install: it logs and quits.
+- On a check, electron-updater emits `update-downloaded` again for a version that is in its cache. The last chance relies on this to ask again, and asks from its own record when the check fails.
+- A Restart now can come during the server's first launch, because the updater no longer waits for the ready. The host sends the stop before the ready and ignores a late ready. `update-flow.test.ts` holds this with the real host.
 - The templates match a process by `StartsWith($INSTDIR)`, so an exe in a sibling folder with that prefix also ends.
 - The local proof shows the full-download fallback, not a differential download.
 - This machine has Developer Mode on, so "no Windows setting needed" for electron-builder isn't proved.
@@ -76,3 +81,5 @@ To pull a bad release, delete it on the Releases page, then tag a higher version
 - 2026-11-05 · fix-rename-internals · renamed: every internal name is `open-aflow`; the server's config folder is `%APPDATA%\open-aflow-server`, copied once from the old folder.
 - 2026-11-09 · repo rename · the update feed and the release link use `alvionlabs/openaflow`, the GitHub repo's new name.
 - 2026-11-09 · rename to OpenAFlow · renamed: the app is OpenAFlow, with no space: `OpenAFlow.exe`, the `OpenAFlow` Start-menu and Installed apps entries, `openaflow-setup-<version>.exe`, and the install folder `%LOCALAPPDATA%\Programs\openaflow`.
+- 2026-11-11 · queue entry 118 · the updater starts with the app, not at the server's first ready. When the server fails for good, the app checks once before it quits.
+- 2026-11-11 · task-fix-updater-last-chance · the last chance asks again for a version put off with Later, gives an open box no limit, and quits 2 minutes after an install that doesn't quit the app. A second launch or the tray's Open during the last chance starts a fresh copy. The error box names the check only when one runs. The Releases link and `publish` share one repo name.

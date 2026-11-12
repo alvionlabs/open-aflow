@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import type { Configuration } from 'electron-builder'
 import manifest from '../package.json' with { type: 'json' }
 import { APP_ID, APP_NAME } from './shell-config.ts'
+import { RELEASE_REPO } from './update-flow.ts'
 
 const PACKAGE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -93,7 +94,7 @@ export function buildConfig(o: BuildOptions): Configuration {
       artifactName: 'openaflow-setup-${version}.${ext}',
       include: 'build/installer.nsh',
     },
-    publish: { provider: 'github', owner: 'alvionlabs', repo: 'openaflow', releaseType: 'release' },
+    publish: { provider: 'github', owner: RELEASE_REPO.owner, repo: RELEASE_REPO.repo, releaseType: 'release' },
   }
 }
 
