@@ -4,6 +4,7 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { APP_NAME } from './shell-config.ts'
+import { hideWindows } from './hide-windows.ts'
 import type { ShellContext } from './shell-main.ts'
 import { readTestUpdate } from './update-feed.ts'
 import { createUpdateFlow, type UpdateFlow, type UpdaterPort } from './update-flow.ts'
@@ -74,7 +75,7 @@ export function startUpdater(ctx: ShellContext): Pick<UpdateFlow, 'lastChance'> 
     ask,
     stop: () => {
       // The page has no server from here on.
-      for (const win of BrowserWindow.getAllWindows()) win.hide()
+      hideWindows(BrowserWindow.getAllWindows())
       return ctx.host.stop()
     },
     quit: () => app.quit(),

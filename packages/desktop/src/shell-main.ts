@@ -3,6 +3,7 @@
 
 import { dirname, join } from 'node:path'
 import { app, BrowserWindow, dialog, Menu } from 'electron'
+import { hideWindows } from './hide-windows.ts'
 import { forkServer } from './host-main.ts'
 import { startNotifier } from './notifier-main.ts'
 import { createQuitFlow } from './quit-flow.ts'
@@ -78,9 +79,7 @@ export function startShell(o: ShellOptions): ShellContext | undefined {
 
   const flow = createQuitFlow({
     stop: () => host.stop(),
-    hide: () => {
-      for (const win of BrowserWindow.getAllWindows()) win.hide()
-    },
+    hide: () => hideWindows(BrowserWindow.getAllWindows()),
     quit: () => app.quit(),
   })
   app.on('before-quit', (e) => flow.beforeQuit(e))
@@ -91,7 +90,7 @@ export function startShell(o: ShellOptions): ShellContext | undefined {
   host.onFailed((error) => {
     ;(o.onFailed ?? showFailure)(error)
     // The page has no server. The tray stays, so Quit still works while the update check runs.
-    for (const win of BrowserWindow.getAllWindows()) win.hide()
+    hideWindows(BrowserWindow.getAllWindows())
     void (updater?.lastChance() ?? Promise.resolve()).finally(() => app.quit())
   })
 
