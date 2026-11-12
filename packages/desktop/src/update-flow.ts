@@ -98,8 +98,11 @@ export function createUpdateFlow(o: UpdateFlowOptions): UpdateFlow {
   const asked = new Set<string>()
   /** The newest version downloaded in this run. */
   let newest: string | undefined
-  /** The version the last check reported, before its download. Undefined when the check gave no answer. */
-  let reported: string | undefined
+  /**
+   * Set when any check starts a download of a version other than `newest`: electron-updater empties its cache first,
+   * so the installer of `newest` is gone. Only the next download clears it.
+   */
+  let newestGone = false
   /** `over` from the end of lastChance: the app quits, so no check runs and no box opens. */
   let phase: 'normal' | 'last chance' | 'over' = 'normal'
   let endWait = () => {}
@@ -132,11 +135,11 @@ export function createUpdateFlow(o: UpdateFlowOptions): UpdateFlow {
     if (running) return running
     if (boxOpen || restarting || phase === 'over' || o.quitting()) return Promise.resolve()
     failureLogged = false
-    reported = undefined
     const run = (async () => {
       try {
         const result = await port!.check()
-        reported = result?.updateInfo?.version
+        const version = result?.updateInfo?.version
+        if (result?.downloadPromise && version !== undefined && version !== newest) newestGone = true
         await result?.downloadPromise
       } catch (error) {
         onError(error)
@@ -179,6 +182,7 @@ export function createUpdateFlow(o: UpdateFlowOptions): UpdateFlow {
 
   const onDownloaded = (version: string) => {
     newest = version
+    newestGone = false
     if (boxOpen || restarting || phase === 'over' || o.quitting() || asked.has(version)) return
     asked.add(version)
     boxDone = askAndAct(version)
@@ -245,8 +249,8 @@ export function createUpdateFlow(o: UpdateFlowOptions): UpdateFlow {
           if (restarting) return await installEnded
           // A failed check, or a cached download that the check didn't report again.
           if (newest === undefined || asked.has(newest) || o.quitting()) break
-          // A newer version empties electron-updater's cache before its download, so the older file is gone.
-          if (reported !== undefined && reported !== newest) break
+          // A check in this run started another version's download, so this file is gone.
+          if (newestGone) break
           onDownloaded(newest)
         }
         if (timedOut) o.log(`${LOG} no update in time, quitting`)

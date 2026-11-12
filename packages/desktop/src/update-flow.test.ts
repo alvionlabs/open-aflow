@@ -581,6 +581,34 @@ describe('createUpdateFlow', () => {
       }
     })
 
+    test('an earlier check that started a newer download keeps the older download out of the box', async () => {
+      const t = setup()
+      t.flow.start()
+      await t.download('1.0.1')
+      // The 6-hour check finds 1.0.2: electron-updater empties its cache, then the download fails offline.
+      t.port.nextCheck = () => Promise.resolve({ updateInfo: { version: '1.0.2' }, downloadPromise: Promise.reject(new Error('net::ERR_INTERNET_DISCONNECTED')) })
+      await t.clock.advance(FIRST_CHECK_MS)
+      // Still offline when the server fails for good.
+      t.port.nextCheck = () => Promise.reject(new Error('net::ERR_INTERNET_DISCONNECTED'))
+      const s = watch(t.flow.lastChance())
+      await settle()
+      expect(s.done).toBe(true)
+      expect(t.events).toEqual(['ask 1.0.1', 'check', 'check'])
+    })
+
+    test('a new download clears the mark, so the record is asked again', async () => {
+      const t = setup()
+      t.flow.start()
+      await t.download('1.0.1')
+      t.port.nextCheck = () => Promise.resolve({ updateInfo: { version: '1.0.2' }, downloadPromise: Promise.reject(new Error('offline')) })
+      await t.clock.advance(FIRST_CHECK_MS)
+      await t.download('1.0.2')
+      t.port.nextCheck = () => Promise.reject(new Error('offline'))
+      void t.flow.lastChance()
+      await settle()
+      expect(t.events).toEqual(['ask 1.0.1', 'check', 'ask 1.0.2', 'check', 'ask 1.0.2'])
+    })
+
     test('a check that reports the downloaded version still asks from the record', async () => {
       const t = setup()
       t.flow.start()
