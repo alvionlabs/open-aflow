@@ -41,7 +41,11 @@ const SESSION_ID = /^[A-Za-z0-9-]{1,64}$/
 const mergeFirst = (signal: ReplySignal, n: number): RunReply => ({ reply: 'continue', signal, why: `Merge PR #${n}, then reply continue.`, pr: n, key: `${signal}:${n}` })
 const merged = (signal: ReplySignal, n: number, why = `PR #${n} merged.`): RunReply => ({ reply: 'continue', signal, why, pr: n, key: `${signal}:${n}` })
 
-/** The replies pod waits for on a run (a plan slug or `fix-<slug>`), at most one per word. None while pod works. */
+/**
+ * The replies pod waits for on a run (a plan slug, or a one-off run's `task-<slug>` or `fix-<slug>`), at most one per word.
+ * None while pod works. A one-off run of either kind gives `fix-waiting` and `fix-merged`: the names are stored in
+ * auto-continue toggles (`lastKey`), so they stay as they are.
+ */
 export function runReplies(repo: BoardRepo, run: string, now: number): RunReply[] {
   const plan = repo.model.plans.find((p) => p.slug === run)
   if (plan) return planReplies(repo, plan, now)

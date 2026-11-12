@@ -259,7 +259,7 @@ export function finalPrBranches(model: RepoModel, claims: Pick<Claim, 'plan'>[] 
     .map((plan) => plan.slug)
 }
 
-/** The head branches gh is asked about: each fix run's, then each final PR's. */
+/** The head branches gh is asked about: each one-off (task or fix) run's, then each final PR's. */
 const prBranches = (repo: Pick<BoardRepo, 'model' | 'claims'>) => [...fixRunNames(repo), ...finalPrBranches(repo.model, repo.claims)]
 
 function folderError(err: unknown): string {

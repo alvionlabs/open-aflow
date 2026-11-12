@@ -107,6 +107,14 @@ describe('waitingPrs', () => {
     expect(waitingPrs(repo(files(noHandBack), { prs: [gh(12, 'open', { branch: 'alpha' })] }), NOW)).toEqual([])
   })
 
+  it('task PR waits after review, as kind task', () => {
+    const name = 'task-scroll'
+    const eng = ended({ branch: name, startedAt: NOW - 90 * MIN, lastAt: NOW - 60 * MIN })
+    const rev = ended({ type: 'pod:reviewer', kind: 'task', branch: name, startedAt: NOW - 50 * MIN, lastAt: NOW - 40 * MIN })
+    const r = { ...repo({}), claims: [claim(name)], model: buildRepoModel({ 'pod-docs/README.md': README }), agents: [eng, rev], prs: [gh(36, 'open', { branch: name })] }
+    expect(waitingPrs(r, NOW)).toEqual([{ kind: 'task', number: 36, url: 'https://github.com/o/r/pull/36', run: name }])
+  })
+
   it('fix PR waits after review', () => {
     const name = 'fix-scroll'
     const base = { claims: [claim(name)], model: buildRepoModel({ 'pod-docs/README.md': README }) }

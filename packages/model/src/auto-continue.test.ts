@@ -99,9 +99,10 @@ function planRepo(opts: Opts, extra: Partial<BoardRepo> = {}, session = 'sess-1'
 }
 
 const FIX = 'fix-scroll'
-function fixRepo(state: PrStatus['state'], session = 'sess-1'): BoardRepo {
-  const eng = ended({ branch: FIX, session, startedAt: NOW - 90 * MIN, lastAt: NOW - 60 * MIN })
-  const rev = ended({ type: 'pod:reviewer', kind: 'fix', branch: FIX, session, startedAt: NOW - 50 * MIN, lastAt: NOW - 5 * MIN })
+/** A one-off run: a /pod:fix run by default, or a /pod:task run (`task-<slug>`, `kind: task`). */
+function fixRepo(state: PrStatus['state'], session = 'sess-1', name = FIX, kind = 'fix'): BoardRepo {
+  const eng = ended({ branch: name, session, startedAt: NOW - 90 * MIN, lastAt: NOW - 60 * MIN })
+  const rev = ended({ type: 'pod:reviewer', kind, branch: name, session, startedAt: NOW - 50 * MIN, lastAt: NOW - 5 * MIN })
   return {
     id: 'id-r',
     name: 'r',
@@ -109,8 +110,8 @@ function fixRepo(state: PrStatus['state'], session = 'sess-1'): BoardRepo {
     source: 'registered',
     model: buildRepoModel({ 'pod-docs/README.md': README }),
     agents: [eng, rev],
-    prs: [gh(36, state, { branch: FIX, ...(state === 'merged' ? { mergedAt: NOW - MIN } : {}) })],
-    claims: [claim(FIX)],
+    prs: [gh(36, state, { branch: name, ...(state === 'merged' ? { mergedAt: NOW - MIN } : {}) })],
+    claims: [claim(name)],
   }
 }
 
@@ -402,5 +403,33 @@ describe('autoSends', () => {
     expect(autoSends(board(a, c), [toggle('alpha'), toggle('alpha', undefined, '/b')], NOW, always).map((x) => x.session)).toEqual(['sess-1', 'sess-2'])
     // A busy first session doesn't stop the second.
     expect(autoSends(board(a, c), [toggle('alpha'), toggle('alpha', undefined, '/b')], NOW, (_r, s) => s === 'sess-2').map((x) => x.session)).toEqual(['sess-2'])
+  })
+})
+
+describe('auto-continue on a merged task run (/pod:task)', () => {
+  const TASK = 'task-scroll'
+  const merged = (mergedAt: number | undefined) => {
+    const r = fixRepo('merged', 'sess-1', TASK, 'task')
+    return { ...r, prs: [gh(36, 'merged', { branch: TASK, ...(mergedAt === undefined ? {} : { mergedAt }) })] }
+  }
+  const sends = (r: BoardRepo, lastKey?: string) =>
+    autoSends({ generatedAt: NOW, gh: 'ok', repos: [r] }, [{ path: repoPathKey(r), run: TASK, ...(lastKey === undefined ? {} : { lastKey }) }], NOW, () => true).map((s) => s.key)
+
+  it('sends within 30 minutes of the merge, with the same key a fix run uses', () => {
+    expect(sends(merged(NOW - MIN))).toEqual(['fix-merged:36'])
+    expect(sends(merged(NOW - MIN), 'fix-merged:36')).toEqual([])
+  })
+
+  it('never on an old merge, or with no merge time, but the Continue button has no limit', () => {
+    for (const r of [merged(NOW - 45 * MIN), merged(undefined)]) {
+      expect(sends(r)).toEqual([])
+      const reply = sendableReply(r, TASK, 'continue', NOW)!
+      expect(reply.key).toBe('fix-merged:36')
+      expect(autoMaySend(r, reply, NOW)).toBe(false)
+    }
+  })
+
+  it('an open, reviewed task PR waits for your merge first', () => {
+    expect(runReplies(fixRepo('open', 'sess-1', TASK, 'task'), TASK, NOW).map((r) => r.signal)).toEqual(['fix-waiting'])
   })
 })

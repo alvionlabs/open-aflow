@@ -193,10 +193,10 @@ const hasCode = (s: SprintModel, code: string) => s.waves.some((w) => w.slices.s
 
 /**
  * What an agent does for a plan: a review round, the fix pass, a wave's fix, a slice, or nothing of it.
- * A reviewer dispatched with `kind: fix` reviews a /pod:fix PR, never a plan's round.
+ * A reviewer dispatched with `kind: task` (or the older `kind: fix`) reviews a one-off PR, never a plan's round.
  */
 export function roleOf(a: AgentRun, plan: PlanModel): AgentRole {
-  if (isType(a, 'reviewer')) return a.plan === plan.slug && a.kind !== 'fix' ? { kind: 'review' } : { kind: 'other' }
+  if (isType(a, 'reviewer')) return a.plan === plan.slug && a.kind !== 'fix' && a.kind !== 'task' ? { kind: 'review' } : { kind: 'other' }
   const branch = a.branch ?? ''
   if (isType(a, 'engineer')) {
     if (branch === `${plan.slug}-fix`) return { kind: 'fix-pass' }
@@ -616,7 +616,7 @@ function checkSteps(ctx: Ctx): Step[] {
   return [review, fix]
 }
 
-/** A PR gh found by its head branch: a fix run's `fix-<slug>`, or a plan's final PR on `<plan-slug>`. */
+/** A PR gh found by its head branch: a one-off run's `task-<slug>` or `fix-<slug>`, or a plan's final PR on `<plan-slug>`. */
 export const prByBranch = (repo: Pick<BoardRepo, 'prs'>, branch: string): PrStatus | undefined => repo.prs.find((p) => p.branch === branch)
 
 /**

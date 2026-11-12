@@ -16,7 +16,7 @@ export type GhReader = {
   /** When `gh auth status` last ran. */
   checkedAt(): number | undefined
   get(repoPath: string, n: number): PrStatus | undefined
-  /** The PR found by its head branch (a fix run's `fix-<slug>`, or a plan's final PR on `<plan-slug>`), with `branch` set. */
+  /** The PR found by its head branch (a one-off run's `task-<slug>` or `fix-<slug>`, or a plan's final PR on `<plan-slug>`), with `branch` set. */
   getBranch(repoPath: string, branch: string): PrStatus | undefined
   /** Whether gh has answered for this PR once. A failed read isn't an answer. No method: the Board says nothing. */
   prRead?(repoPath: string, n: number): boolean

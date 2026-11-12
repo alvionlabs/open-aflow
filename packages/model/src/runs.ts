@@ -12,9 +12,9 @@ export type RunState = 'blocked' | 'needs-you' | 'running' | 'idle' | 'unsupport
 export type RunSummary = {
   repoId: string
   repo: string
-  /** The plan slug; for a fix run, its claim name `fix-<slug>`, which names no plan. */
+  /** The plan slug; for a one-off run, its claim name `task-<slug>` or `fix-<slug>`, which names no plan. */
   plan?: string
-  /** Set on a /pod:fix run: its slug. */
+  /** Set on a one-off run (/pod:task, or /pod:fix on older pod): its slug. `oneOffKind(plan)` gives which. */
   fix?: string
   title?: string
   where: string

@@ -1,4 +1,6 @@
-// Fix runs: a /pod:fix run, read from its port claim (`<repo> fix-<slug>`) and its agents.
+// Fix runs: a one-off run, read from its port claim and its agents. pod 0.10.0+ names it
+// `/pod:task` (`<repo> task-<slug>`, a `kind: task` reviewer); older pod names it `/pod:fix`
+// (`<repo> fix-<slug>`, a `kind: fix` reviewer). Both forms are read.
 // Its pipeline (Build → Review → Ship), its agent log, and the repo's other activity:
 // agents tied to no run. Pure. The rules and why are in
 // pod-docs/feature-details/runs-and-pipeline.md.
@@ -12,7 +14,26 @@ import { agentState } from './transcript.ts'
 export const OTHER_WINDOW_MS = 2 * 60 * 60 * 1000
 export const OTHER_CAP = 8
 
-const FIX_PREFIX = 'fix-'
+/** What started a one-off run: `/pod:task` (pod 0.10.0+) or `/pod:fix` (older pod). */
+export type OneOffKind = 'task' | 'fix'
+
+/** The claim and branch prefix of each one-off kind. Its reviewer's `kind` field is the same word. */
+const ONE_OFF: readonly { prefix: string; kind: OneOffKind }[] = [
+  { prefix: 'task-', kind: 'task' },
+  { prefix: 'fix-', kind: 'fix' },
+]
+const ONE_OFF_KINDS: ReadonlySet<string | undefined> = new Set(ONE_OFF.map((o) => o.kind))
+
+const oneOff = (name: string) => ONE_OFF.find((o) => name.startsWith(o.prefix) && name.length > o.prefix.length)
+
+/** The kind of a one-off run's claim name (`task-<slug>` or `fix-<slug>`); undefined for any other name. */
+export const oneOffKind = (name: string): OneOffKind | undefined => oneOff(name)?.kind
+
+/** A reviewer's `kind` field names a one-off run (`task` or `fix`), never a plan's review. */
+export const isOneOffReviewKind = (kind: string | undefined): boolean => ONE_OFF_KINDS.has(kind)
+
+/** The slug after the claim name's one-off prefix. */
+const slugOf = (name: string) => name.slice(oneOff(name)?.prefix.length ?? 0)
 
 export type FixRole = 'engineer' | 'fix pass' | 'reviewer'
 export type FixLogRow = { agentId: string; role: FixRole; turn?: number; round?: number; startedAt?: number; endedAt?: number; state: AgentState; engineer: boolean }
@@ -24,10 +45,10 @@ type FixAgent = { a: AgentRun; turn?: number; role: FixRole; round?: number; sta
 const isType = (a: AgentRun, role: string) => new RegExp(`(^|:)${role}$`).test(a.type)
 const byStart = (x: { a: AgentRun }, y: { a: AgentRun }) => (x.a.startedAt ?? 0) - (y.a.startedAt ?? 0)
 
-/** The claims named `fix-<slug>` that name no plan of the repo, once each, in claim order. */
+/** The claims named `task-<slug>` or `fix-<slug>` that name no plan of the repo, once each, in claim order. */
 export function fixRunNames(repo: Pick<BoardRepo, 'model' | 'claims'>): string[] {
   const plans = new Set(repo.model.plans.map((p) => p.slug))
-  const names = repo.claims.map((c) => c.plan).filter((n) => n.startsWith(FIX_PREFIX) && n.length > FIX_PREFIX.length && !plans.has(n))
+  const names = repo.claims.map((c) => c.plan).filter((n) => oneOffKind(n) !== undefined && !plans.has(n))
   return [...new Set(names)]
 }
 
@@ -59,7 +80,7 @@ function clipActive(a: AgentRun, from: number, to: number): Pick<AgentRun, 'acti
 
 /**
  * The run's agents, one entry per turn, oldest first. Engineers by their dispatch branch;
- * reviewers by `kind: fix` plus the branch or the PR number. An engineer turn that started after
+ * reviewers by `kind: task` or `kind: fix` plus the branch or the PR number. An engineer turn that started after
  * the first review is a fix pass, whether a new agent or the same one resumed. A reviewer's first
  * turn takes its `round` field; else, and for a resumed turn, 2 when it started after a fix pass, else 1.
  */
@@ -85,11 +106,14 @@ export function fixRunAgents(repo: BoardRepo, name: string, _now: number): Agent
   return [...engineers, ...reviewers].sort((x, y) => (x.startedAt ?? 0) - (y.startedAt ?? 0))
 }
 
-/** Engineers by their dispatch branch; reviewers by `kind: fix` plus the branch or the PR number. */
+/**
+ * Engineers by their dispatch branch; reviewers by a one-off kind (`task` or `fix`, either one on either
+ * run, as the branch or PR already names the run) plus the branch or the PR number.
+ */
 function matchFixAgents(repo: BoardRepo, name: string): { engineers: AgentRun[]; reviewers: AgentRun[] } {
   const pr = fixPr(repo, name)?.number
   const isReviewer = (a: AgentRun) =>
-    isType(a, 'reviewer') && a.kind === 'fix' && (a.branch === name || (a.pr !== undefined && a.pr === pr))
+    isType(a, 'reviewer') && isOneOffReviewKind(a.kind) && (a.branch === name || (a.pr !== undefined && a.pr === pr))
   return {
     engineers: repo.agents.filter((a) => isType(a, 'engineer') && a.branch === name),
     reviewers: repo.agents.filter(isReviewer),
@@ -136,7 +160,7 @@ function summary(repo: BoardRepo, name: string, agents: FixAgent[]): FixRunSumma
             ? phase(agents.at(-1)!)
             : 'build'
   const state = running.length > 0 ? 'running' : pr?.state === 'open' && isReviewed(agents) ? 'needs-you' : 'idle'
-  const run: FixRunSummary = { plan: name, fix: name.slice(FIX_PREFIX.length), where, state }
+  const run: FixRunSummary = { plan: name, fix: slugOf(name), where, state }
   const portBase = repo.claims.find((c) => c.plan === name)?.portBase
   if (portBase !== undefined) run.portBase = portBase
   return run
@@ -213,7 +237,7 @@ export function buildFixPipeline(repo: BoardRepo, name: string, now: number): Fi
     if (x.state !== 'running' && x.a.lastAt !== undefined) row.endedAt = x.a.lastAt
     return row
   })
-  return { slug: name.slice(FIX_PREFIX.length), stages, log }
+  return { slug: slugOf(name), stages, log }
 }
 
 /**

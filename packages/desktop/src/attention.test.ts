@@ -179,6 +179,22 @@ describe('attention items', () => {
     expect(other.map((i) => i.id)).toEqual(['chess\nfix-merged:36'])
   })
 
+  test('a /pod:task run raises the same tray items as a fix run, under its task-<slug> name', () => {
+    const TASK = 'task-scroll'
+    const claims = [{ ...fixClaim, plan: TASK }]
+    const agents = [{ ...fixEngineer, branch: TASK }, { ...fixReviewer, kind: 'task', branch: TASK }]
+    const repoWith = (state: PrStatus['state'], mergedAt?: number) =>
+      chess([onlyQueue()], { claims, agents, prs: [gh(36, state, { branch: TASK, ...(mergedAt === undefined ? {} : { mergedAt }) })] })
+    // Open and reviewed: you merge.
+    expect(items(repoWith('open'))).toMatchObject([{ id: 'chess\npr:36', hash: `#/chess/${TASK}`, run: 'Scroll' }])
+    // Merged: Send continue, however old the merge, until a toggle sends it.
+    expect(items(repoWith('merged', NOW - 3 * 24 * 60 * MIN))).toMatchObject([{ id: 'chess\nfix-merged:36', hash: `#/chess/${TASK}` }])
+    const on = (lastKey?: string) => ({ autoContinue: [{ repoId: 'chess', run: TASK, ...(lastKey === undefined ? {} : { lastKey }) }] })
+    expect(attentionItems(boardOf([repoWith('merged', NOW - MIN)], on()), NOW)).toEqual([])
+    expect(attentionItems(boardOf([repoWith('merged', NOW - 45 * MIN)], on()), NOW).map((i) => i.id)).toEqual(['chess\nfix-merged:36'])
+    expect(attentionItems(boardOf([repoWith('merged', NOW - 45 * MIN)], on('fix-merged:36')), NOW)).toEqual([])
+  })
+
   test('a plan run reads its sent key as it always did: with no session to send to, it waits for you', () => {
     const noSession = chess([manual, pushed(78), onlyQueue()], { prs: [gh(78, 'merged')] })
     const on = { autoContinue: [{ repoId: 'chess', run: PLAN, lastKey: 'wave-merged:78' }] }

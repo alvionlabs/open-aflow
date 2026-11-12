@@ -513,6 +513,37 @@ describe('drive paths and fenced blocks, end to end', () => {
   })
 })
 
+// /pod:task dispatch shapes (pod 0.10.0+), as real ones write them (made-up values): the engineer's
+// `branch name` and the reviewer's `kind: task` and `branch` come after a long free-text `task` field.
+const TASK_ENGINEER = [
+  'Standalone /pod:task dispatch (no sprint slug).',
+  '',
+  "- **task:** Make the board read `/pod:task` runs. Today it knows only `fix-<slug>` claims and `kind: fix` reviewers.",
+  '- **branch name:** task-support-pod-task (off origin/main)',
+  '- **merge-target branch:** pod-staging',
+  '- **worktree path:** E:/r/.claude/worktrees/task-support-pod-task',
+].join('\n')
+const TASK_REVIEWER = [
+  '- **kind:** task',
+  '- **PR URL:** https://github.com/o/r/pull/104',
+  '- **merge-target:** main',
+  '- **task:**',
+  '  Add a 404 page. Human decisions: one heading, a link to /.',
+  '- **branch:** task-404-page',
+  '- **parent-repo path:** E:/r',
+  '- **round:** 1',
+].join('\n')
+
+describe('readDispatch reads a /pod:task engineer and reviewer', () => {
+  it('reads the engineer branch, and no plan', () => {
+    expect(readDispatch(TASK_ENGINEER, 'pod:engineer')).toMatchObject({ branch: 'task-support-pod-task', plan: undefined, sprint: undefined, slice: undefined })
+  })
+
+  it('reads the reviewer kind, PR number, branch, and round', () => {
+    expect(readDispatch(TASK_REVIEWER, 'pod:reviewer')).toMatchObject({ kind: 'task', pr: 104, branch: 'task-404-page', round: 1, plan: undefined })
+  })
+})
+
 // /pod:fix reviewer shapes, as real ones write them (made-up values).
 const FIX_REVIEWER_LINES = [
   'kind: fix',

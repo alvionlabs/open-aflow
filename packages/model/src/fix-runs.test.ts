@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentRun, Board, BoardRepo, Claim, PrStatus } from './board.ts'
-import { buildFixPipeline, fixRunAgents, fixRunNames, otherActivity, OTHER_CAP, OTHER_WINDOW_MS } from './fix-runs.ts'
+import { buildFixPipeline, fixRunAgents, fixRunNames, oneOffKind, otherActivity, OTHER_CAP, OTHER_WINDOW_MS } from './fix-runs.ts'
 import { roleOf } from './pipeline.ts'
 import { replySession, runReplies } from './replies.ts'
 import { buildRepoModel, type RepoFiles } from './run-model.ts'
@@ -496,5 +496,86 @@ describe('fixRunAgents', () => {
     expect(fixRunAgents(r, 'fix-scroll', NOW)[0]).toBe(cont)
     // No such run → none.
     expect(fixRunAgents(r, 'fix-nope', NOW)).toEqual([])
+  })
+})
+
+// pod 0.10.0 renamed /pod:fix to /pod:task: the claim, branch, and worktree are `task-<slug>`, and the
+// reviewer gets `kind: task`. Both forms are one-off runs; `fix-` stays for older pod versions.
+describe('task runs (/pod:task)', () => {
+  const T = 'task-scroll'
+  const taskEngineer = (from: number, to: number, over: Partial<AgentRun> = {}) => engineer(T, from, to, over)
+  const taskReviewer = (from: number, to: number, over: Partial<AgentRun> = {}) => reviewer(from, to, { kind: 'task', branch: T, ...over })
+  const taskPr = (number: number, state: PrStatus['state']) => pr(number, state, T)
+
+  it('a claim task-<slug> with its engineer and kind task reviewer is a run with the right agents, flow, and state', () => {
+    const agents = [taskEngineer(60, 40, { ended: true }), taskReviewer(39, 30, { ended: true })]
+    const r = repo({ claims: [claim(T, 3100)], agents, prs: [taskPr(36, 'open')] })
+    expect(listRuns(board(r), NOW)).toEqual([{ repoId: 'id-web', repo: 'web', plan: T, fix: 'scroll', where: 'PR', state: 'needs-you', portBase: 3100 }])
+    const p = buildFixPipeline(r, T, NOW)!
+    expect(p.slug).toBe('scroll')
+    expect(p.log.map((x) => [x.role, x.round])).toEqual([
+      ['engineer', undefined],
+      ['reviewer', 1],
+    ])
+    expect(p.stages.map((s) => [s.caption, s.steps.map((x) => [x.label, x.state, x.detail])])).toEqual([
+      ['Build', [['Engineer', 'done', '20 min'], ['Fix pass', 'wait', 'only if review fails']]],
+      ['Review', [['Round 1', 'done', '9 min'], ['Round 2', 'wait', 'only after a fix pass']]],
+      ['Ship', [['PR', 'you', 'PR #36 · you merge']]],
+    ])
+    expect(p.stages[2]!.steps[0]!.merge).toEqual({ number: 36 })
+  })
+
+  it('the run is tagged task; a fix run stays tagged fix', () => {
+    expect(oneOffKind(T)).toBe('task')
+    expect(oneOffKind('fix-scroll')).toBe('fix')
+    expect(oneOffKind('task-fix-toast')).toBe('task')
+    for (const name of ['task-', 'fix-', 'tasks-x', 'alpha', '']) expect(oneOffKind(name)).toBeUndefined()
+  })
+
+  it('a kind task reviewer joins by the PR number; other reviewers and engineers stay out', () => {
+    const agents = [
+      taskEngineer(60, 40, { ended: true }),
+      taskReviewer(39, 30, { ended: true, branch: undefined, pr: 36 }),
+      engineer('task-other', 50, 1),
+      taskReviewer(20, 1, { kind: 'plan' }),
+      taskReviewer(20, 1, { branch: 'task-other' }),
+    ]
+    expect(fixRunAgents(repo({ claims: [claim(T)], agents, prs: [taskPr(36, 'open')] }), T, NOW).map((a) => a.id)).toEqual([agents[0]!.id, agents[1]!.id])
+  })
+
+  it('a reviewer of either one-off kind joins either run by its branch', () => {
+    const r = repo({ claims: [claim(T), claim('fix-old')], agents: [taskReviewer(10, 1, { kind: 'fix' }), reviewer(10, 1, { kind: 'task', branch: 'fix-old' })] })
+    expect(fixRunAgents(r, T, NOW)).toHaveLength(1)
+    expect(fixRunAgents(r, 'fix-old', NOW)).toHaveLength(1)
+  })
+
+  it('task-<slug> and fix-<slug> claims are two runs; task- alone or a claim named like a plan is none', () => {
+    const r = repo({ claims: [claim('fix-a', 3100), claim('task-a', 3200), claim('task-', 3300), claim('task-alpha', 3400)] }, withPlan('task-alpha'))
+    expect(fixRunNames(r)).toEqual(['fix-a', 'task-a'])
+    expect(rows(r)).toEqual([
+      ['fix-a', 'a', 'build', 'idle'],
+      ['task-a', 'a', 'build', 'idle'],
+      ['task-alpha', undefined, 'one · not drafted', 'idle'],
+    ])
+  })
+
+  it('a kind task reviewer is never a plan’s review round, even with a plan field', () => {
+    const plan = buildRepoModel(withPlan('alpha')).plans[0]!
+    expect(roleOf(taskReviewer(10, 1, { plan: 'alpha' }), plan)).toEqual({ kind: 'other' })
+  })
+
+  it('its agents stay out of Other activity while its claim exists', () => {
+    const agents = [taskEngineer(10, 1), taskReviewer(5, 1)]
+    expect(otherActivity(repo({ agents, claims: [claim(T)] }), NOW)).toEqual([])
+    expect(otherActivity(repo({ agents }), NOW).map((x) => x.role).sort()).toEqual(['engineer', 'reviewer'])
+  })
+
+  it('a merged task PR gives Send continue, as a merged fix PR does', () => {
+    const agents = [taskEngineer(60, 40, { ended: true, session: 'sess-1' }), taskReviewer(39, 30, { ended: true, session: 'sess-1' })]
+    const r = repo({ claims: [claim(T)], agents, prs: [{ ...taskPr(36, 'merged'), mergedAt: NOW - MIN }] })
+    expect(runReplies(r, T, NOW)).toEqual([{ reply: 'continue', signal: 'fix-merged', why: 'PR #36 merged.', pr: 36, key: 'fix-merged:36' }])
+    expect(replySession(r, T, NOW)?.id).toBe('sess-1')
+    const open = repo({ claims: [claim(T)], agents, prs: [taskPr(36, 'open')] })
+    expect(runReplies(open, T, NOW).map((x) => x.signal)).toEqual(['fix-waiting'])
   })
 })
