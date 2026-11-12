@@ -6,7 +6,7 @@
 // pod-docs/feature-details/runs-and-pipeline.md.
 
 import type { AgentRun, AgentState, BoardRepo, PrStatus } from './board.ts'
-import { isPlanAgent, prByBranch, spend, type Stage, type Step, type StepState } from './pipeline.ts'
+import { isOneOffReviewKind, isPlanAgent, prByBranch, spend, type Stage, type Step, type StepState } from './pipeline.ts'
 import { formatTokens } from './pod-flow/model.ts'
 import { agentState } from './transcript.ts'
 
@@ -22,15 +22,11 @@ const ONE_OFF: readonly { prefix: string; kind: OneOffKind }[] = [
   { prefix: 'task-', kind: 'task' },
   { prefix: 'fix-', kind: 'fix' },
 ]
-const ONE_OFF_KINDS: ReadonlySet<string | undefined> = new Set(ONE_OFF.map((o) => o.kind))
 
 const oneOff = (name: string) => ONE_OFF.find((o) => name.startsWith(o.prefix) && name.length > o.prefix.length)
 
 /** The kind of a one-off run's claim name (`task-<slug>` or `fix-<slug>`); undefined for any other name. */
 export const oneOffKind = (name: string): OneOffKind | undefined => oneOff(name)?.kind
-
-/** A reviewer's `kind` field names a one-off run (`task` or `fix`), never a plan's review. */
-export const isOneOffReviewKind = (kind: string | undefined): boolean => ONE_OFF_KINDS.has(kind)
 
 /** The slug after the claim name's one-off prefix. */
 const slugOf = (name: string) => name.slice(oneOff(name)?.prefix.length ?? 0)

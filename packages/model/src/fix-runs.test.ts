@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentRun, Board, BoardRepo, Claim, PrStatus } from './board.ts'
 import { buildFixPipeline, fixRunAgents, fixRunNames, oneOffKind, otherActivity, OTHER_CAP, OTHER_WINDOW_MS } from './fix-runs.ts'
-import { roleOf } from './pipeline.ts'
+import { isPlanAgent, roleOf } from './pipeline.ts'
 import { replySession, runReplies } from './replies.ts'
 import { buildRepoModel, type RepoFiles } from './run-model.ts'
 import { activeRuns, listRuns } from './runs.ts'
@@ -562,6 +562,18 @@ describe('task runs (/pod:task)', () => {
   it('a kind task reviewer is never a plan’s review round, even with a plan field', () => {
     const plan = buildRepoModel(withPlan('alpha')).plans[0]!
     expect(roleOf(taskReviewer(10, 1, { plan: 'alpha' }), plan)).toEqual({ kind: 'other' })
+  })
+
+  it('a one-off reviewer is never a plan agent, even when its task text gives it the plan field', () => {
+    // A task block with `Plan: alpha has the same code.` reads as `plan: alpha`.
+    const files = withPlan('alpha')
+    const plan = buildRepoModel(files).plans[0]!
+    expect(isPlanAgent(taskReviewer(10, 1, { plan: 'alpha' }), plan)).toBe(false)
+    expect(isPlanAgent(reviewer(10, 1, { plan: 'alpha' }), plan)).toBe(false)
+    expect(isPlanAgent(reviewer(10, 1, { plan: 'alpha', kind: 'plan' }), plan)).toBe(true)
+    // The plan's own run stays as it was: not running because of the task reviewer.
+    const r = repo({ claims: [claim(T)], agents: [taskEngineer(10, 1), taskReviewer(5, 1, { plan: 'alpha' })] }, files)
+    expect(listRuns(board(r), NOW).find((x) => x.plan === 'alpha')?.state).not.toBe('running')
   })
 
   it('its agents stay out of Other activity while its claim exists', () => {
