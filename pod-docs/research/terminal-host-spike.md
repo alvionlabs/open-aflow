@@ -55,7 +55,7 @@ Real `claude` use: 10 short Haiku turns (9 typed prompts and one skill run), cou
 - It is a third-party beta. Options for the plan:
   - Use `@lydell/node-pty`. Pin it, and review each update.
   - Use `node-pty`, and build the Linux binary in our release workflow. Linux users then still get a prebuilt binary from us.
-  - Wait for `node-pty` 1.2.0, which is in beta now (`1.2.0-beta.18`). _Not checked:_ whether its prebuilds include Linux.
+  - Use upstream `node-pty@1.2.0-beta.18`. Checked after the spike (`npm pack --dry-run`): it ships prebuilds for `linux-x64` and `linux-arm64` too. The lydell fork repackages the same betas. _Not tested_ in Electron. **Chosen** (decision 12 in [terminal-host.md](terminal-host.md#decisions-after-the-spike-human-2026-11-11)).
 - pnpm: `pnpm-workspace.yaml` has an `allowBuilds` list, and pnpm skips any install script not in it. On this machine the Electron binary was missing after `pnpm install`. An `electron: true` entry and `pnpm rebuild electron` did not download it. Only `node node_modules/electron/install.js` (in `packages/desktop`) did. CI on Windows gets the binary today, so _not checked:_ why it differs here.
 - A native `.node` file can't load from inside an asar. The spike puts node-pty in `resources/native/node_modules/` and names that folder to the host in env. electron-builder's `asarUnpack` is the usual way.
 
@@ -188,7 +188,7 @@ These change [terminal-host.md](terminal-host.md). The same edits are in that fi
 3. **Session IDs.** Follow the live session through the plugin's `SessionStart` hook.
 4. **Folder trust.** The app never answers the trust prompt. The Terminal tab must show a run that waits on it.
 5. **Save screens on a timer** (10 s), not only at quit.
-6. **node-pty choice** is open: see [node-pty](#node-pty).
+6. **node-pty:** upstream `node-pty@1.2.0-beta.18`, decided after the spike: see [node-pty](#node-pty).
 
 ## Not tested
 
