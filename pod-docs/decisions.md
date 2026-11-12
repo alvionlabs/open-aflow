@@ -359,3 +359,8 @@ Consequences: the item has its own key, `failed:<key>`, so the first failure of 
 Context: queue entry 150. About 15 toasts arrived at once when repos were added, because only the app's first Board was the toast baseline. Each added repo came on its own Board with up to 3 items, so the summary rule never applied.
 Decision: the human's decision: a repo's first readable Board is its own baseline, and adding a repo sends no toast. A repo that leaves the Board and comes back is a fresh add. A repo whose id changes reads as a new repo, so its open items stay quiet.
 Consequences: the tray dot and the run cards still show a new repo's items. A real new item that arrives while a repo is off the Board sends no toast when it comes back. A read error isn't a leave, because the Board still lists the repo.
+
+## 2026-11-12 — /pod:task runs are one-off runs, as fix runs are
+Context: pod 0.10 renamed `/pod:fix` to `/pod:task`. Its claim and branch are `task-<slug>`, and its reviewer gets `kind: task`. OpenAFlow knew only `fix-<slug>` and `kind: fix`, so a `/pod:task` run showed nothing. This extends the 2026-10-20 "fix runs on the board" decision.
+Decision: a claim `task-<slug>` that names no plan is a one-off run, with the same rules as a `fix-<slug>` run, and a `task` tag. A reviewer of `kind: task` or `kind: fix` joins either kind of run, and is never a plan's agent. An engineer's `branch name` field comes before a `branch` field.
+Consequences: old `fix-<slug>` runs work as before. Reply keys stay `fix-merged:<pr>`, so saved auto-continue keys don't send again. A `Branch:` sentence in a reviewer's task text can still set its branch; the reviewer still joins its run by its PR number.
