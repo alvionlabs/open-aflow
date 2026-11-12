@@ -324,3 +324,28 @@ Consequences: terminal checks need a display (`xvfb` on Linux), so the smoke rec
 Context: the spike's pass bar asked for Linux and Windows 11. The spike ran on Linux. Windows needed a CI workflow or a run on a Windows machine. Results: [terminal-host-spike.md](research/terminal-host-spike.md).
 Decision: run the spike on Linux only for now. No CI workflow, and no Windows run.
 Consequences: the spike counts as done on Linux. Windows (ConPTY, Job Objects, packaging) stays untested; a plan that ships the terminal host on Windows must test it first.
+
+## 2026-11-11 — Terminal host: node-pty is upstream 1.2.0-beta.18, pinned (human decision, not in force until planned)
+Context: node-pty 1.1.0 has no Linux prebuilt binary; upstream 1.2.0-beta.18 has one. Research: [terminal-host-spike.md](research/terminal-host-spike.md).
+Decision: use upstream `node-pty@1.2.0-beta.18`, pinned. The first slice proves it in Electron 45. If it fails, use `@lydell/node-pty`. Move to 1.2.0 stable when it ships.
+Consequences: `allowBuilds` needs an entry for it.
+
+## 2026-11-11 — Automatic input: draft rule, two idle rules, one checked send path (human decision, not in force until planned)
+Context: in the spike, a send after the typing wait submitted a half-typed draft. A wrong automatic send can drift the whole workflow.
+Decision: a draft (input with no Enter after the newest submit) blocks every automatic send until the next submit. Idle needs both the 60 s transcript rule and the hook rule. All app-written input goes through one send path that logs each attempt and checks the next `UserPromptSubmit` prompt; on a mismatch, auto-continue turns off for that run and the app alerts you. Manual **Continue** skips only the typing wait, and when blocked shows why and offers **Open terminal**. Every automatic input is listed with its gate and tests in [automatic-input.md](research/automatic-input.md).
+Consequences: a PR that adds or changes an automatic input updates `automatic-input.md` and its tests. Gaps to test before shipping: question dialogs, plan approvals, the trust prompt, subagents after `Stop`.
+
+## 2026-11-11 — Run wrapper and stop command are text settings (human decision, not in force until planned)
+Context: a child that clears its env survives quit unless the run is in a systemd scope.
+Decision: two text settings, stored in the app's config folder only. Defaults on Linux: `systemd-run --user --scope --quiet --unit=openaflow-run-{runId}.scope` and `systemctl --user stop openaflow-run-{runId}.scope`. Placeholders `{runId}` and `{unit}`, a full-command preview, and **Reset to default**. No shell: the app splits the arguments. The default wrapper falls back silently (logged) when it can't start; a changed wrapper that fails stops the run with an error and **Open settings**. Shown on Linux and macOS (default on Linux only); hidden on Windows, which uses a Job Object. Changes apply to new runs.
+Consequences: the app's own tree, marker, and signal steps always run after the stop command.
+
+## 2026-11-11 — Quit ends runs with SIGHUP, SIGTERM, SIGKILL (human decision, not in force until planned)
+Context: real `claude` ended on SIGHUP in about 1 s; on SIGTERM it once ran past 3 s.
+Decision: all runs end in parallel: SIGHUP, up to 3 s, SIGTERM, up to 3 s, SIGKILL. The app shows "Ending N runs…".
+Consequences: a quit with live runs takes at most about 6 s after you confirm.
+
+## 2026-11-11 — Keep the browser build and the pod-docs/ fallback (human decision, not in force until planned)
+Context: both were open in [terminal-host.md](research/terminal-host.md).
+Decision: keep the browser build as the agents' test bench for the non-terminal UI, with no Terminal tab. Keep reading `pod-docs/`, watch-only, until OpenAFlow develops itself with its own plugin; then remove it in its own plan.
+Consequences: `CLAUDE.md` and the smoke recipe stay as they are.

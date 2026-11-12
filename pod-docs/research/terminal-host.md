@@ -26,6 +26,25 @@ These are the human's words. They are recorded in [decisions.md](../decisions.md
 10. **Scrollback: 5,000 lines per terminal by default, as a user setting.** The pty host keeps this much of each terminal's output for replay and for the last screen shown next to **Resume**.
 11. **Follow VS Code for the window link and for tests.** The window talks to the pty host through `MessagePort` only, with no WebSocket. Terminal checks run against the real Electron app with Playwright `_electron` and a small test hook that reads and writes the terminal as text. The browser build stays for the rest of the UI, with no Terminal tab.
 
+## Decisions after the spike (human, 2026-11-11)
+
+Settled in a grilling session after the [spike](terminal-host-spike.md). Recorded in [decisions.md](../decisions.md), and not in force until a plan takes them.
+
+12. **node-pty: upstream `node-pty@1.2.0-beta.18`, pinned.** It now has Linux prebuilds. The first slice proves it in Electron 45, packaged and unpackaged. If it fails there, use `@lydell/node-pty`. Move to 1.2.0 stable when it ships.
+13. **A draft blocks automatic sends.** Input with no Enter after the newest submit blocks every automatic send until the next submit.
+14. **Idle needs both rules:** the 60 s transcript rule and the hook rule. With no hook state, there is no automatic send.
+15. **Automatic input is sensitive.** A wrong send can drift the whole workflow. Every automatic input is listed, with its gate and its required tests, in [automatic-input.md](automatic-input.md). A PR that adds or changes one updates that doc and its tests.
+16. **One send path, checked after each send.** One module checks the gate, writes the word, presses Enter once, and logs every attempt. If the next `UserPromptSubmit` prompt is not exactly the word, it turns auto-continue off for that run and alerts you.
+17. **Manual Continue skips only the typing wait.** A draft or a dialog blocks it; it shows why and offers **Open terminal**.
+18. **Run wrapper and stop command are text settings.** Defaults on Linux: `systemd-run --user --scope --quiet --unit=openaflow-run-{runId}.scope` and `systemctl --user stop openaflow-run-{runId}.scope`. Placeholders `{runId}` and `{unit}`. The settings show a preview of the full command and **Reset to default**. An empty wrapper means none. The app's own steps (tree and marker, then SIGHUP, SIGTERM, SIGKILL) always run after the stop command.
+19. **The wrapper runs with no shell.** The app splits it into arguments (quotes allowed) and fills in placeholders per argument. `$VAR`, `&&`, and pipes don't work; point the wrapper at a script for those.
+20. **Wrapper failure.** The default wrapper falls back silently to no wrapper, and logs it. A wrapper you changed stops the run from starting, with the error in the Terminal tab and **Open settings**.
+21. **Wrapper platforms.** Shown on Linux and macOS; a default wrapper on Linux only. Hidden on Windows, which uses a Job Object.
+22. **Wrapper storage.** In the app's config folder only, never in a repo or `.openaflow/`. A change applies to new runs.
+23. **Kill timing at quit.** All runs end in parallel: SIGHUP, up to 3 s, SIGTERM, up to 3 s, SIGKILL. The app shows "Ending N runs…" meanwhile.
+24. **Keep the browser build** as the agents' test bench for the non-terminal UI, with no Terminal tab.
+25. **Keep the `pod-docs/` fallback,** watch-only, until OpenAFlow develops itself with its own plugin. Remove it in its own plan then.
+
 ## Proposals (not decided)
 
 Everything else in this doc is a proposal for the plan to confirm. The main ones:
@@ -63,10 +82,22 @@ Short notes on the options not chosen, so they can be weighed again later. Each 
 **Following the live session ID, from the spike**
 - **The newest transcript whose `cwd` is the repo.** Rejected: a guess that breaks with two terminals in one repo. The `SessionStart` hook names the session and the cause.
 
-**node-pty, from the spike (open)**
-- **`node-pty` 1.1.0:** no Linux prebuilt binary, so Linux needs our own build in CI.
-- **`@lydell/node-pty`:** prebuilt for all three, but a third-party beta.
-- **`node-pty` 1.2.0 when released:** _not checked_ for Linux prebuilds.
+**node-pty (decision 12)**
+- **`node-pty` 1.1.0 stable:** no Linux prebuilt binary, so Linux needs our own build in CI. Rejected: release work for no gain.
+- **`@lydell/node-pty`:** the fork the spike tested. Third-party; it repackages the same upstream betas. Kept as the fallback if upstream fails the first slice.
+
+**Ending a run: the wrapper setting (decisions 18-22)**
+- **A fixed on/off scope switch, or Auto / Off.** Rejected: the human wants the full command visible and editable.
+- **An "Always" value that refuses to start without systemd.** Rejected: it blocks runs and adds little.
+- **Run the wrapper through a shell.** Rejected: a repo path or session ID could inject a command. Use a script for shell features.
+- **Fall back silently for a changed wrapper too.** Rejected: it would hide your own mistake.
+- **Store the wrapper in the repo or `.openaflow/`.** Rejected: a cloned repo could then choose a command that runs on your machine.
+
+**Manual Continue (decision 17)**
+- **Send at once, no checks.** Rejected: the Terminal tab may be hidden, so you can't see a draft or a dialog, and Enter in a permission dialog approves it.
+
+**Checking a send (decision 16)**
+- **Log only, no check.** Rejected: a bad send would drift the workflow with no one noticing. The `UserPromptSubmit` prompt shows what Claude Code really got.
 
 **Resume (decision 5)**
 - **Resume on its own at start.** Fewer clicks after a reboot. Rejected: it starts long runs that use the plan quota with no action from you.
@@ -96,7 +127,7 @@ Short notes on the options not chosen, so they can be weighed again later. Each 
 **Window link and tests (decision 11)**
 - **B. WebSocket through the server, for both the app and the browser build.** One path that agents test in a browser. Rejected: a server crash stops the terminal view, it adds a WebSocket to guard, and VS Code shows that testing the real Electron app is normal.
 - **C. The host serves its own WebSocket.** One path, no server dependence. Rejected: the host gets a network port and its own security, against keeping the host small.
-- **Drop the browser build entirely.** One test target. Not chosen for now: it would change how every slice of the other UI is checked. Still open.
+- **Drop the browser build entirely.** One test target. Rejected (decision 24): every slice of the other UI would need Electron to check, and users gain nothing.
 
 ## Policy
 
@@ -221,8 +252,8 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 
 - Quit must leave no `claude`, and no child of it, running. This was the reason for decision 4.
 - Linux and macOS: closing the pty sends SIGHUP to the session. Children in another process group, such as a dev server an engineer started with `nohup` or `&`, can survive. Spike check 4 confirmed this.
-- Each run's env gets a marker, `OPENAFLOW_RUN=<run id>`. To end a run: take a snapshot of the process tree and of every process whose env holds the marker; send SIGTERM to the process group and to each process; wait; send SIGKILL to survivors; check for survivors.
-- The marker misses a child that clears its env (`env -i`) after it leaves the tree. On Linux with systemd, start each run in its own user scope (`systemd-run --user --scope --unit=openaflow-run-<id>.scope`) and end it with `systemctl --user stop`. The scope ended that child in the spike. macOS has no cgroups: there, the marker is the best way found.
+- Each run's env gets a marker, `OPENAFLOW_RUN=<run id>`. To end a run (decision 23): run the stop command (decision 18); take a snapshot of the process tree and of every process whose env holds the marker; send SIGHUP to the process group; wait up to 3 s; send SIGTERM to the group and to each process; wait up to 3 s; send SIGKILL to survivors; check for survivors. All runs end in parallel, and the app shows "Ending N runs…".
+- The marker misses a child that clears its env (`env -i`) after it leaves the tree. On Linux with systemd, the default run wrapper starts each run in its own user scope, and the default stop command ends it (decisions 18-22). The scope ended that child in the spike. macOS has no cgroups: there, the marker is the best way found, and the wrapper is empty by default.
 - Send SIGHUP first, as a closed terminal does. Real `claude` ended on SIGHUP in about 1 s. On SIGTERM it once ran past 3 s, so keep SIGKILL as the last step.
 - **After a host crash or an app crash,** the host, the server, and `claude` end by themselves, but a detached child survives (spike checks 6 and 7). When the host exits, main ends each leftover of the runs it marks `host crashed`. At the next start after an app crash, it ends each leftover of a run that had no stop reason. Both use the marker and the scope.
 - Windows: closing the ConPTY ends attached console processes. Children started detached, or with their own console, can survive. Use a Job Object with `KILL_ON_JOB_CLOSE` for each run, or end the tree by process ID.
@@ -231,12 +262,14 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 ### Input and auto-continue
 
 - You type into the terminal pane as in any terminal.
+- Every automatic input is listed in [automatic-input.md](automatic-input.md), with its gate and required tests (decision 15).
+- All app-written input goes through one send path (decision 16): gate, word, one Enter, a log entry. After the send, the next `UserPromptSubmit` prompt must be exactly the word. If not, auto-continue turns off for that run, and the app alerts you.
 - The app writes `continue` (or `go`) to the pty, with Enter, only when all of these are true:
-  - The run's toggle is on, or you pressed the button.
+  - The run's toggle is on, or you pressed **Continue**. A press skips only the typing wait; when another check blocks it, the button shows why and offers **Open terminal** (decision 17).
   - The model says the run waits for that word (the existing sendable rule).
   - The session is idle by the existing 60 s rule on the transcript and `subagents/` files. Keep it: the spike did not test subagents or background work after `Stop`.
-  - The session is idle by the plugin's hook events too (spike check 5): the newest of `SessionStart`, `Stop`, and `Notification` `idle_prompt`, with no `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, or `Notification` `permission_prompt` after it. A permission dialog fires `PermissionRequest` at once and nothing more while it stays open, so the gate stays closed. Enter in that dialog accepts the highlighted choice, **1. Yes**.
-  - The input box holds no draft. **This is required.** The host sees every byte you type. If you typed after the newest submit (`UserPromptSubmit` or `SessionStart`) and pressed no Enter, the box may hold text, and the send waits until your next submit. In spike check 5, a send with the typing wait only went into a half-typed box and submitted `half typedcontinue`.
+  - The session is idle by the plugin's hook events too (spike check 5; decision 14): the newest of `SessionStart`, `Stop`, and `Notification` `idle_prompt`, with no `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, or `Notification` `permission_prompt` after it. A permission dialog fires `PermissionRequest` at once and nothing more while it stays open, so the gate stays closed. Enter in that dialog accepts the highlighted choice, **1. Yes**.
+  - The input box holds no draft. **This is required** (decision 13). The host sees every byte you type. If you typed after the newest submit (`UserPromptSubmit` or `SessionStart`) and pressed no Enter, the box may hold text, and the send waits until your next submit. In spike check 5, a send with the typing wait only went into a half-typed box and submitted `half typedcontinue`.
   - You have not typed in that terminal for the typing wait: 30 s by default, a user setting (decision 9).
   - The terminal is live. A stopped run gets nothing (see [Resume](#resume)).
 - Write the word, then Enter once, after a short pause. Never send a second Enter "to be sure": it can land in a dialog that opened in between.
@@ -250,7 +283,7 @@ A terminal channel lets anyone who reaches it type commands on the machine. It n
 - **Proposal: the app ships the plugin and loads it per session.** The app starts `claude --plugin-dir <app>/plugin`. The `claude` CLI help says `--plugin-dir` loads "a plugin from a directory or .zip for this session only". The plugin updates with the app, with no marketplace and no install step. Spike check 11.
 - **Outside runs need the plugin too (decision 7).** Offer a normal install for your own terminal as well. Then a hosted session could load the plugin twice (installed and `--plugin-dir`), maybe at two versions. The spike must check what Claude Code does then; skip `--plugin-dir` when the installed version matches, if needed.
 - If you also install claude-pod globally, a hosted session loads both plugins. Their skills have different prefixes (`pod:` and the new one), but both may write docs. The plan must say whether the app warns about this.
-- **The `pod-docs/` fallback is open.** Runs with claude-pod (not OpenAFlow's plugin) write `pod-docs/`. Reading it watch-only costs little, since the parsers are the same, and keeps this repo's own development on the board while it moves over. Proposal: keep it until OpenAFlow develops itself with its own plugin.
+- **The `pod-docs/` fallback stays (decision 25).** Runs with claude-pod (not OpenAFlow's plugin) write `pod-docs/`. Reading it watch-only costs little, since the parsers are the same, and keeps this repo's own development on the board while it moves over. Remove it in its own plan once OpenAFlow develops itself with its own plugin.
 - The path is hard-coded in about 12 lines today: `packages/model/src/run-model.ts:68-149`, `packages/server/src/repo-files.ts:8-9`, `watcher.ts:73`, `queue-writer.ts:31`, `folder-list.ts:159`.
 - Other pod names to move behind the template: `pod:*` agent names in transcripts, `pod-ports` claim files, the `pod-staging` branch, and the reply words.
 
