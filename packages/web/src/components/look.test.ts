@@ -193,11 +193,15 @@ describe('modal and list look', () => {
     const pct = Number(tint![1])
     expect(pct).toBeGreaterThanOrEqual(10)
     expect(pct).toBeLessThanOrEqual(14)
-    // The icon is the status red; the message is --fg at the body size.
+    // The icon is the status red; the message is --fg at the modal's dense size.
     expect(declsOf(css, '.modal-alert svg')['stroke']).toBe('var(--blocked)')
     const text = declsOf(css, '.modal-alert-text')
     expect(text['color']).toBe('var(--fg)')
-    expect(text['font-size']).toBe('var(--size-body)')
+    expect(text['font-size']).toBe('var(--size-dense)')
+    // The 16 px icon sits centred on the first line of text: half the spare line height above it.
+    const line = /^(\d+)px$/.exec(text['line-height'] ?? '')
+    expect(line, `line-height: ${text['line-height']}`).not.toBeNull()
+    expect(declsOf(css, '.modal-alert svg')['margin-top']).toBe(`${(Number(line![1]) - 16) / 2}px`)
     for (const [theme, t] of [['light', light()], ['dark', dark()]] as const) {
       const ground = mix(t['--blocked']!, pct, t['--surface']!)
       const ratio = contrast(t['--fg']!, ground)
