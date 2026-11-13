@@ -437,6 +437,29 @@ describe('board service', () => {
     expect(model.listRuns(board, NOW).find((x) => x.fix === 'clock')).toMatchObject({ plan: 'fix-clock', where: 'review', state: 'running', portBase: 3200 })
   })
 
+  test('a /pod:task claim: refreshGh asks gh for its branch; the Board has its branch PR, its agents, and a task run', async () => {
+    const repo = copyFixture()
+    const path = normalizeRepoPath(repo, platform)
+    await claim(3200, repo, 'task-clock')
+    // pod 0.10.12's dispatch shapes: the engineer's `branch name`, the reviewer's `kind`, `PR URL`, and `branch` fields.
+    await transcript(repo, 'eng1', 'pod:engineer', 'Standalone /pod:task dispatch (no sprint slug).\n\n- **task:** make the clock test use fake timers.\n- **branch name:** task-clock\n- **merge-target branch:** main')
+    await transcript(repo, 'rev1', 'pod:reviewer', '- **kind:** task\n- **PR URL:** https://github.com/o/r/pull/95\n- **merge-target:** main\n- **task:**\n  make the clock test use fake timers.\n- **branch:** task-clock\n- **round:** 1')
+
+    const gh = fakeGh({}, 'ok', { 'task-clock': { number: 95, state: 'open', checks: 'none', checkedAt: NOW, branch: 'task-clock' } })
+    const service = createBoardService(deps(gh))
+    const board = await service.build()
+    await service.refreshGh(board)
+    expect(gh.refreshed).toEqual([{ repoPath: path, numbers: [], branches: ['task-clock'] }])
+    const r = board.repos[0]!
+    expect(r.prs).toEqual([{ number: 95, state: 'open', checks: 'none', checkedAt: NOW, branch: 'task-clock' }])
+    expect(r.agents.map((a) => [a.id, a.branch, a.kind, a.pr])).toEqual([
+      ['eng1', 'task-clock', undefined, undefined],
+      ['rev1', 'task-clock', 'task', 95],
+    ])
+    expect(model.listRuns(board, NOW).find((x) => x.fix === 'clock')).toMatchObject({ plan: 'task-clock', where: 'review', state: 'running', portBase: 3200 })
+    expect(model.oneOffKind('task-clock')).toBe('task')
+  })
+
   test("a claimed archived plan with no hand-back yet: refreshGh asks gh for the plan's branch; the Board has its final PR", async () => {
     // chess-web's ui-polish close-out before pod writes the hand-back: the final PR is open on `ui-polish`.
     const repo = copyFixture('chess-web', 'chess-web-ui-polish')

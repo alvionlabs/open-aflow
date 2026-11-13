@@ -193,10 +193,10 @@ const hasCode = (s: SprintModel, code: string) => s.waves.some((w) => w.slices.s
 
 /**
  * What an agent does for a plan: a review round, the fix pass, a wave's fix, a slice, or nothing of it.
- * A reviewer dispatched with `kind: fix` reviews a /pod:fix PR, never a plan's round.
+ * A reviewer dispatched with `kind: task` (or the older `kind: fix`) reviews a one-off PR, never a plan's round.
  */
 export function roleOf(a: AgentRun, plan: PlanModel): AgentRole {
-  if (isType(a, 'reviewer')) return a.plan === plan.slug && a.kind !== 'fix' ? { kind: 'review' } : { kind: 'other' }
+  if (isType(a, 'reviewer')) return a.plan === plan.slug && !isOneOffReviewKind(a.kind) ? { kind: 'review' } : { kind: 'other' }
   const branch = a.branch ?? ''
   if (isType(a, 'engineer')) {
     if (branch === `${plan.slug}-fix`) return { kind: 'fix-pass' }
@@ -211,9 +211,16 @@ export function roleOf(a: AgentRun, plan: PlanModel): AgentRole {
   return { kind: 'other' }
 }
 
-/** An agent belongs to a plan by its plan slug, one of its sprints, or a role in it. */
+/** A reviewer's `kind` field names a one-off run (`task`, or `fix` from pod before 0.10.0), never a plan's review. */
+export const isOneOffReviewKind = (kind: string | undefined): boolean => kind === 'task' || kind === 'fix'
+
+/**
+ * An agent belongs to a plan by its plan slug, one of its sprints, or a role in it. A one-off reviewer never does:
+ * its task text can hold a `Plan: <slug> …` sentence, which reads as its plan field.
+ */
 export const isPlanAgent = (a: AgentRun, plan: PlanModel) =>
-  a.plan === plan.slug || plan.sprints.some((s) => s.slug === a.sprint) || roleOf(a, plan).kind !== 'other'
+  !(isType(a, 'reviewer') && isOneOffReviewKind(a.kind)) &&
+  (a.plan === plan.slug || plan.sprints.some((s) => s.slug === a.sprint) || roleOf(a, plan).kind !== 'other')
 
 export const isRunning = (a: AgentRun, now: number) => agentState(a, now) === 'running'
 
@@ -616,7 +623,7 @@ function checkSteps(ctx: Ctx): Step[] {
   return [review, fix]
 }
 
-/** A PR gh found by its head branch: a fix run's `fix-<slug>`, or a plan's final PR on `<plan-slug>`. */
+/** A PR gh found by its head branch: a one-off run's `task-<slug>` or `fix-<slug>`, or a plan's final PR on `<plan-slug>`. */
 export const prByBranch = (repo: Pick<BoardRepo, 'prs'>, branch: string): PrStatus | undefined => repo.prs.find((p) => p.branch === branch)
 
 /**

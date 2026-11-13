@@ -58,7 +58,7 @@ export type PrStatus = {
   checks: 'pass' | 'fail' | 'pending' | 'none'
   url?: string
   checkedAt: number
-  /** The head branch, set when the PR was found by its branch (a fix run's `fix-<slug>`, or a plan's final PR on `<plan-slug>`). */
+  /** The head branch, set when the PR was found by its branch (a one-off run's `task-<slug>` or `fix-<slug>`, or a plan's final PR on `<plan-slug>`). */
   branch?: string
   /** The base branch gh reports (`baseRefName`), when it reports one. */
   base?: string

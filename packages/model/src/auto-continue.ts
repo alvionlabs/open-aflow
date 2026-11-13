@@ -44,7 +44,7 @@ export function sendableReply(repo: BoardRepo, run: string, word: 'continue' | '
   return sendableFrom(runReplies(repo, run, now), word)
 }
 
-/** How long after a fix PR's merge the board may still send `continue` by itself. */
+/** How long after a one-off run's PR merge (a task or fix PR) the board may still send `continue` by itself. */
 export const AUTO_MERGED_MS = 30 * 60 * 1000
 
 /**

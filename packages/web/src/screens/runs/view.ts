@@ -43,7 +43,7 @@ export const connectionStatus = (s: StreamState): Chip | undefined => (s === 'lo
 /** A runs list card's text: the run's name, and its repo as a muted line unless the name already is the repo. */
 export type RunCard = { name: string; repo?: string }
 
-/** A runs list card: the run header's own name (`runName`), so the two always agree; the `fix` tag is the card's, never in the name. */
+/** A runs list card: the run header's own name (`runName`), so the two always agree; the `task` or `fix` tag is the card's, never in the name. */
 export function runCard(r: RunSummary, repo: BoardRepo | undefined): RunCard {
   const name = runName(r, repo)
   return r.plan === undefined ? { name } : { name, repo: r.repo }

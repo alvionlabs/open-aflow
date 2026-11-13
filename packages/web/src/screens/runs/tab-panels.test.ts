@@ -230,6 +230,11 @@ describe('tab panels', () => {
     const none = renderToStaticMarkup(createElement(LogTab, { repo: idle, run: runOf(idle, 'fix-scroll'), fixPipeline: buildFixPipeline(idle, 'fix-scroll', NOW)!, now: NOW, actions: [] }))
     expect(none).toContain('No agent has started on this fix yet.')
     expect(at(none, 'Action log')).toBeGreaterThan(none.indexOf('No agent has started'))
+
+    // A /pod:task run with no agent yet: the note names a task.
+    const task = { ...idle, claims: [{ portBase: 3100, repoPath: '/r/web', plan: 'task-scroll' }] }
+    const taskNone = renderToStaticMarkup(createElement(LogTab, { repo: task, run: runOf(task, 'task-scroll'), fixPipeline: buildFixPipeline(task, 'task-scroll', NOW)!, now: NOW, actions: [] }))
+    expect(taskNone).toContain('No agent has started on this task yet.')
   })
 })
 
