@@ -118,6 +118,17 @@ describe('action log', () => {
     ])
   })
 
+  test('forget-run lines', async () => {
+    const forget = (result: string): Record<string, unknown> => ({ action: 'forget-run', repoId: 'id-r', repo: 'r', target: 'fix-scroll · port base 3100', result })
+    const file = join(root, 'forget.jsonl')
+    const lines = [{ at: 1, ...forget('removed') }, { at: 2, ...forget('merged') }, { at: 3, ...forget('forgotten') }, { at: 4, ...forget('failed'), message: 'EPERM' }]
+    await writeFile(file, lines.map((e) => JSON.stringify(e)).join('\n'))
+    expect(createActionLog({ file, now: () => 5 }).recent()).toEqual([
+      { at: 4, action: 'forget-run', repoId: 'id-r', repo: 'r', target: 'fix-scroll · port base 3100', result: 'failed', message: 'EPERM' },
+      { at: 1, action: 'forget-run', repoId: 'id-r', repo: 'r', target: 'fix-scroll · port base 3100', result: 'removed' },
+    ])
+  })
+
   test('reads resume entries', async () => {
     const resume = (result: 'started' | 'failed', auto: boolean, message?: string): NewActionEntry => ({
       action: 'resume',
