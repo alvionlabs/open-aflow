@@ -118,6 +118,18 @@ function contrast(a: string, b: string): number {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
 }
 
+/** An sRGB `color-mix` of two hex colours, `pct` percent of `a`, as hex. */
+function mix(a: string, pct: number, b: string): string {
+  const [x, y] = [rgb(a), rgb(b)]
+  return '#' + x.map((v, i) => Math.round((v * pct + y[i]! * (100 - pct)) / 100).toString(16).padStart(2, '0')).join('')
+}
+
+/** One rule's declarations, by selector, outside any media query. */
+function declsOf(css: string, selector: string): Record<string, string> {
+  const r = rules(css).find((x) => x.selectors.includes(selector))
+  return Object.fromEntries(r?.decls ?? [])
+}
+
 describe('modal and list look', () => {
   it('tokens only', () => {
     const tokens = new Set(Object.keys(light()))
@@ -168,5 +180,30 @@ describe('modal and list look', () => {
         expect(ratio, `${theme} --${text} on --${ground} = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5)
       }
     }
+  })
+
+  it('modal alert: a blocked border, a light blocked tint on the panel, --fg text at 4.5:1', () => {
+    const css = readCss('modal.css')
+    const box = declsOf(css, '.modal-alert')
+    expect(box['border']).toBe('1px solid var(--blocked)')
+    // Padding by DESIGN.md: multiples of 4, horizontal larger than vertical.
+    expect(box['padding']).toBe('12px 16px')
+    const tint = /^color-mix\(in srgb, var\(--blocked\) (\d+)%, var\(--surface\)\)$/.exec(box['background'] ?? '')
+    expect(tint, `background: ${box['background']}`).not.toBeNull()
+    const pct = Number(tint![1])
+    expect(pct).toBeGreaterThanOrEqual(10)
+    expect(pct).toBeLessThanOrEqual(14)
+    // The icon is the status red; the message is --fg at the body size.
+    expect(declsOf(css, '.modal-alert svg')['stroke']).toBe('var(--blocked)')
+    const text = declsOf(css, '.modal-alert-text')
+    expect(text['color']).toBe('var(--fg)')
+    expect(text['font-size']).toBe('var(--size-body)')
+    for (const [theme, t] of [['light', light()], ['dark', dark()]] as const) {
+      const ground = mix(t['--blocked']!, pct, t['--surface']!)
+      const ratio = contrast(t['--fg']!, ground)
+      expect(ratio, `${theme} --fg on ${ground} = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5)
+    }
+    // The old red dot is gone: every modal error is the alert box.
+    expect(css).not.toContain('.modal-error')
   })
 })
