@@ -139,13 +139,12 @@ describe('modal view', () => {
     expect(REMOVE_ITEM).toBe('Remove repo')
   })
 
-  it('has the heading, the detail, the path as a mono line, and the runs line', () => {
+  it('has the heading, the detail, and the path as a mono line', () => {
     const v = confirmView({ kind: 'confirm', seq: 1, target: A })!
     expect(v).toEqual({
       heading: 'Remove alpha-repo?',
       detail: 'The board stops watching this folder. No files change.',
       mono: [A.path],
-      notes: ['Its 2 runs leave the sidebar.'],
       confirmLabel: 'Remove',
       busy: false,
       returnFocusTo: 'run-menu-trigger',
@@ -153,8 +152,9 @@ describe('modal view', () => {
     expect(confirmView({ kind: 'idle', seq: 0 })).toBeUndefined()
   })
 
-  it('counts one run in the singular', () => {
-    expect(confirmView({ kind: 'confirm', seq: 1, target: B })!.notes).toEqual(['Its 1 run leaves the sidebar.'])
+  it('a repo that is only registered has no runs line, whatever its run count', () => {
+    expect(confirmView({ kind: 'confirm', seq: 1, target: B })!.notes).toBeUndefined()
+    expect(confirmView({ kind: 'confirm', seq: 1, target: { ...A, runs: 0 } })!.notes).toBeUndefined()
   })
 
   it('a repo a port claim also lists keeps its runs: the claim note, no run count', () => {
@@ -176,7 +176,7 @@ describe('modal view', () => {
     const html = renderToStaticMarkup(createElement(ConfirmModal, { ...confirmView({ kind: 'confirm', seq: 1, target: A })!, onConfirm: () => {}, onCancel: () => {} }))
     expect(html).toMatch(/^<dialog[^>]*class="modal confirm-modal"/)
     expect(html).toContain(`<p class="mono modal-mono">${A.path}</p>`)
-    expect(html).toContain('Its 2 runs leave the sidebar.')
+    expect(html).not.toMatch(/runs? leaves? the sidebar/)
     const buttons = [...html.matchAll(/<button class="([^"]*)"[^>]*>([^<]*)<\/button>/g)].map((m) => [m[2], m[1]])
     expect(buttons).toEqual([
       ['Cancel', 'btn quiet'],
