@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI rework — how it fits together</title>
+<style>
+  @font-face { font-family:"Geist"; font-weight:400; src:url("../../packages/web/public/fonts/geist-400.woff2") format("woff2"); }
+  @font-face { font-family:"Geist"; font-weight:600; src:url("../../packages/web/public/fonts/geist-600.woff2") format("woff2"); }
+  @font-face { font-family:"Geist Mono"; font-weight:400; src:url("../../packages/web/public/fonts/geist-mono-400.woff2") format("woff2"); }
+  :root { --bg:#fff; --fg:#171717; --muted:#666; --line:#e5e5e5; --surface:#fafafa; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0a0a0a; --fg:#ededed; --muted:#a1a1a1; --line:#262626; --surface:#111; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 "Geist","Segoe UI",system-ui,sans-serif; }
+  main { max-width:1120px; margin:0 auto; padding:32px 24px 64px; }
+  h1 { font-size:28px; margin:0 0 8px; }
+  h2 { font-size:20px; margin:32px 0 8px; }
+  p { max-width:80ch; }
+  .goal { padding:16px 20px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  th, td { text-align:left; padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  code, .mono { font-family:"Geist Mono",ui-monospace,monospace; font-size:13px; }
+  .tag { font:12px "Geist Mono",monospace; padding:1px 6px; border-radius:4px; border:1px solid var(--line); }
+  .mermaid { background:#fff; border-radius:12px; padding:16px; border:1px solid var(--line); }
+  ul { padding-left:20px; }
+  .ask { margin-top:32px; padding:16px 20px; border:2px solid #3ecf72; border-radius:12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>UI rework — how it fits together</h1>
+  <div class="goal">
+    <b>Goal:</b> make the run screen say what just happened and what comes next, so that Merge, then Continue, then pod running reads as one flow. Fix the install-test defects, use the Windows folder dialog for Add repo, and let a leftover run be removed. One sprint, before <code>v0.1.0</code>. Plan: <code>pod-docs/plans/ui-rework.md</code>. Picks: <code>ui-rework-choices.html</code>.
+  </div>
+
+  <h2>Parts</h2>
+  <table>
+    <tr><th>Part</th><th>Change</th><th>Where</th><th>Does</th></tr>
+    <tr><td>Run activity and order</td><td><span class="tag">changed</span></td><td class="mono">packages/model (runs)</td><td>Gives each run a last-activity time and sorts the runs list newest first</td></tr>
+    <tr><td>Merge for no-review PRs</td><td><span class="tag">changed</span></td><td class="mono">packages/model (fix runs, waiting PRs)</td><td>Offers Merge on a <code>--no-review</code> PR once its engineer has ended and no reviewer started (149)</td></tr>
+    <tr><td>Forget run route</td><td><span class="tag">new</span></td><td class="mono">packages/server (action routes, action log)</td><td>Deletes one run's port claim file after the Board check, and logs it</td></tr>
+    <tr><td>Folder route</td><td><span class="tag">removed</span></td><td class="mono">packages/server (folder list)</td><td>The folder-listing route goes away</td></tr>
+    <tr><td>Next step card</td><td><span class="tag">changed</span></td><td class="mono">packages/web screens/runs</td><td>Shows the “what happened” list, closes the merge panel on <i>merged</i>, and shows Sending… then the sent line</td></tr>
+    <tr><td>Sidebar run card</td><td><span class="tag">changed</span></td><td class="mono">packages/web screens/runs</td><td>Shows the <code>auto</code> tag and the newest-first order</td></tr>
+    <tr><td>Confirm modal</td><td><span class="tag">new</span></td><td class="mono">packages/web (shared component)</td><td>A centred modal with a focus trap, Escape, and click-outside, for Remove repo and Forget</td></tr>
+    <tr><td>Run ⋯ menu</td><td><span class="tag">changed</span></td><td class="mono">packages/web screens/runs</td><td>Adds Forget this run</td></tr>
+    <tr><td>Add repo</td><td><span class="tag">changed</span></td><td class="mono">packages/web screens/runs</td><td>Desktop: asks the bridge for a folder. Browser build: a path field. The folder browser is deleted</td></tr>
+    <tr><td>Folder bridge</td><td><span class="tag">new</span></td><td class="mono">packages/desktop (window, new preload)</td><td>One call, pick a folder, that opens Electron's folder dialog</td></tr>
+  </table>
+
+  <h2>How they connect</h2>
+  <pre class="mermaid">
+flowchart LR
+  Model[Run activity and order<br/>Merge for no-review PRs] -->|Board: runs, waiting PRs, auto-continue| Card[Next step card]
+  Model -->|Board: runs newest first| Side[Sidebar run card]
+  Menu[Run ⋯ menu] -->|open| Modal[Confirm modal]
+  Side -->|Remove repo| Modal
+  Modal -->|POST forget run| Forget[Forget run route]
+  Modal -->|POST remove repo| Remove[Remove repo route]
+  Add[Add repo] -->|pick folder| Bridge[Folder bridge]
+  Bridge -->|Electron dialog| OS[Windows Select Folder]
+  Add -->|POST add repo with path| AddRoute[Add repo route]
+  Forget -->|deletes one claim file| Ports[(port claims folder)]
+  </pre>
+
+  <h2>Main flow: you merge a PR, then press Continue</h2>
+  <pre class="mermaid">
+sequenceDiagram
+  actor You
+  participant Card as Next step card
+  participant Server
+  participant Pod as pod session
+  You->>Card: Merge, then confirm
+  Card->>Server: merge
+  Server-->>Card: merged
+  Card->>Card: merge panel closes, list shows "Merged PR #35;12 · 12:03", "Continue — now"
+  You->>Card: Continue
+  Card->>Card: button reads Sending…
+  Card->>Server: resume continue
+  Server->>Pod: continue
+  Server-->>Card: sent
+  Card->>Card: list adds "Sent continue · 12:04", "pod runs — now"
+  Server-->>Card: next Board: run reads running
+  </pre>
+
+  <h2>Data</h2>
+  <p>No new stored data. The “what happened” list lives in the card's state for the current stop. A run's last activity is computed when the Board is built, from the newest agent write, queue entry change, or PR event. Forget deletes one claim file and adds a <code>forget-run</code> line to <code>actions.jsonl</code>.</p>
+
+  <h2>Out of scope</h2>
+  <ul>
+    <li>Delete or Clean up a leftover run's worktree and branch</li>
+    <li>The full run-screen redesign, with the terminal host's Terminal tab</li>
+    <li>The other run-state known issues</li>
+    <li>Linux and macOS folder dialogs (not tested in this plan)</li>
+  </ul>
+
+  <div class="ask">Does this match what you want built? Reply with changes, or <b>ok</b>.</div>
+</main>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "default" });
+</script>
+</body>
+</html>

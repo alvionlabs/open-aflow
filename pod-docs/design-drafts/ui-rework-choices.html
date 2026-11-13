@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI rework — choices</title>
+<style>
+  @font-face { font-family:"Geist"; font-weight:400; src:url("../../packages/web/public/fonts/geist-400.woff2") format("woff2"); }
+  @font-face { font-family:"Geist"; font-weight:500; src:url("../../packages/web/public/fonts/geist-500.woff2") format("woff2"); }
+  @font-face { font-family:"Geist"; font-weight:600; src:url("../../packages/web/public/fonts/geist-600.woff2") format("woff2"); }
+  @font-face { font-family:"Geist Mono"; font-weight:400; src:url("../../packages/web/public/fonts/geist-mono-400.woff2") format("woff2"); }
+  @font-face { font-family:"Geist Mono"; font-weight:500; src:url("../../packages/web/public/fonts/geist-mono-500.woff2") format("woff2"); }
+
+  /* Page frame: follows the OS theme. */
+  :root { --pg-bg:#fff; --pg-fg:#171717; --pg-muted:#666; --pg-line:#e5e5e5; --tag-now:#666; --tag-rec:#1a8a45; }
+  @media (prefers-color-scheme: dark) { :root { --pg-bg:#111; --pg-fg:#ededed; --pg-muted:#a1a1a1; --pg-line:#2a2a2a; --tag-now:#a1a1a1; --tag-rec:#3ecf72; } }
+  body { margin:0; background:var(--pg-bg); color:var(--pg-fg); font:16px/1.5 "Geist","Segoe UI",system-ui,sans-serif; }
+  main { max-width:1640px; margin:0 auto; padding:24px 32px 64px; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .lead { color:var(--pg-muted); margin:0 0 8px; max-width:90ch; }
+  section.q { border-top:1px solid var(--pg-line); padding:24px 0 8px; }
+  section.q h2 { font-size:20px; margin:0 0 4px; }
+  section.q h2 small { color:var(--pg-muted); font-weight:400; font-size:14px; }
+  .decides { color:var(--pg-muted); margin:0 0 16px; max-width:90ch; }
+  .opts { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+  .opt { width:375px; flex:none; }
+  .opt-h { display:flex; align-items:baseline; gap:8px; margin-bottom:2px; flex-wrap:wrap; }
+  .opt-h b { font-size:16px; }
+  .opt-cap { font-size:14px; color:var(--pg-muted); margin:0 0 8px; min-height:42px; }
+  .tag { font:500 12px "Geist Mono",monospace; text-transform:uppercase; letter-spacing:.04em; padding:1px 6px; border-radius:4px; border:1px solid currentColor; }
+  .tag.now { color:var(--tag-now); }
+  .tag.rec { color:var(--tag-rec); }
+  .why { margin:12px 0 0; font-size:14px; }
+  .why b { color:var(--tag-rec); }
+  .reply { margin-top:32px; padding:16px 20px; border:2px solid var(--tag-rec); border-radius:12px; font:500 18px "Geist Mono",monospace; }
+  .notes { color:var(--pg-muted); font-size:14px; max-width:90ch; }
+  .themebtn { float:right; font:500 14px "Geist",sans-serif; padding:6px 12px; border-radius:6px; border:1px solid var(--pg-line); background:transparent; color:var(--pg-fg); cursor:pointer; }
+
+  /* ---------- Product: tokens.css values, dark by default ---------- */
+  .app {
+    --bg:#000; --surface:#0a0a0a; --hover:#1a1a1a; --border:#262626; --border-strong:#3a3a3a;
+    --fg:#ededed; --muted:#a1a1a1; --faint:#6e6e6e; --primary-bg:#ededed; --primary-fg:#0a0a0a;
+    --focus:#52a8ff; --blocked:#ff5f5f; --danger:#ff5f5f; --danger-fg:#0a0a0a; --needs-you:#f5a623;
+    --running:#52a8ff; --ready:#3ecf72; --idle:#8f8f8f;
+    --font:"Geist","Segoe UI",system-ui,sans-serif; --mono:"Geist Mono",ui-monospace,"Cascadia Code",Consolas,monospace;
+    background:var(--bg); color:var(--fg); font:400 16px/1.5 var(--font);
+    border-radius:12px; padding:16px; border:1px solid var(--pg-line);
+  }
+  body.light .app {
+    --bg:#fff; --surface:#fafafa; --hover:#f2f2f2; --border:#eaeaea; --border-strong:#d4d4d4;
+    --fg:#171717; --muted:#666; --faint:#8f8f8f; --primary-bg:#171717; --primary-fg:#fff;
+    --focus:#0068d6; --blocked:#d0262f; --danger:#b81d25; --danger-fg:#fff; --needs-you:#b25d00;
+    --running:#0068d6; --ready:#1a8a45; --idle:#7d7d7d;
+  }
+  .app * { box-sizing:border-box; }
+  .app p { margin:0; }
+  .card { display:grid; gap:8px; padding:20px 24px; background:var(--surface); border:1px solid var(--border); border-radius:12px; }
+  .eyebrow { font:500 12px/1 var(--mono); text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  .top { display:flex; justify-content:space-between; align-items:center; }
+  .status { display:inline-flex; align-items:center; gap:8px; font:500 13px/1.2 var(--font); color:var(--muted); white-space:nowrap; }
+  .status::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--dot,var(--idle)); }
+  .s-you { --dot:var(--needs-you); } .s-run { --dot:var(--running); } .s-ok { --dot:var(--ready); } .s-bad { --dot:var(--blocked); }
+  .title { font:600 18px/1.3 var(--font); margin:0; }
+  .detail { font-size:14px; color:var(--muted); }
+  .mono { font-family:var(--mono); font-size:13px; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:40px; padding:0 20px; font:500 14px/1 var(--font); border-radius:6px; border:1px solid var(--border-strong); background:var(--bg); color:var(--fg); white-space:nowrap; }
+  .btn.sm { height:32px; padding:0 12px; }
+  .btn.primary { background:var(--primary-bg); border-color:var(--primary-bg); color:var(--primary-fg); }
+  .btn.danger { background:var(--danger); border-color:var(--danger); color:var(--danger-fg); }
+  .btn.quiet { border-color:transparent; background:transparent; color:var(--muted); }
+  .btn.off { opacity:.5; }
+  .acts { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:4px; }
+  .sub { display:grid; gap:8px; margin-top:12px; padding:16px 20px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+  .done-line { display:flex; align-items:center; gap:8px; font:500 14px var(--font); color:var(--fg); }
+  .done-line svg { color:var(--ready); }
+  .run-line svg { color:var(--running); }
+  svg.i { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  .bad-mark { outline:2px dashed var(--blocked); outline-offset:2px; border-radius:4px; }
+  .legend { font-size:12px; color:var(--pg-muted); margin:6px 0 0; }
+  .legend span { outline:2px dashed #ff5f5f; outline-offset:1px; border-radius:2px; padding:0 4px; }
+
+  .strip { display:flex; gap:4px; font-size:13px; }
+  .strip span { flex:1; padding:6px 0 0; border-top:2px solid var(--border-strong); color:var(--muted); }
+  .strip .done { border-color:var(--ready); color:var(--fg); }
+  .strip .now { border-color:var(--needs-you); color:var(--fg); font-weight:600; }
+  .strip .go { border-color:var(--running); color:var(--fg); font-weight:600; }
+  ol.tl { list-style:none; margin:0; padding:0 0 0 4px; border-left:1px solid var(--border-strong); }
+  ol.tl li { position:relative; padding:0 0 8px 16px; font-size:14px; }
+  ol.tl li::before { content:""; position:absolute; left:-5px; top:7px; width:9px; height:9px; border-radius:50%; background:var(--bg); border:2px solid var(--ready); box-sizing:border-box; }
+  ol.tl li.now::before { border-color:var(--needs-you); background:var(--needs-you); }
+
+  .toast { margin-top:12px; padding:12px 16px; border-radius:8px; background:#2b2b2b; color:#eee; font:13px "Segoe UI",system-ui,sans-serif; border:1px solid #444; }
+  .toast b { display:block; font-size:13px; }
+
+  .side { display:flex; flex-direction:column; gap:6px; }
+  .side .lbl { display:flex; justify-content:space-between; font:500 12px var(--mono); text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:0 4px 4px; }
+  .rc { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:8px 12px; display:grid; gap:4px; }
+  .rc.sel { background:var(--hover); border-color:var(--border-strong); }
+  .rc .n { font:500 14px var(--font); display:flex; align-items:center; gap:6px; }
+  .rc .m { display:flex; align-items:center; gap:8px; justify-content:space-between; }
+  .when { font-size:12px; color:var(--muted); }
+  .autotag { font:500 12px var(--mono); padding:0 6px; border-radius:6px; border:1px solid var(--border-strong); color:var(--muted); }
+  .autoicon { color:var(--running); display:inline-flex; }
+  .edge { box-shadow:inset 3px 0 0 var(--running); }
+  .grp { font:500 12px var(--mono); color:var(--faint); padding:4px 4px 0; text-transform:uppercase; letter-spacing:.06em; }
+
+  .stage { position:relative; height:260px; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--bg); }
+  .stage .bgfake { position:absolute; inset:0; padding:16px; }
+  .stage .bgfake div { height:12px; background:var(--hover); border-radius:4px; margin:10px 0; }
+  .backdrop { position:absolute; inset:0; background:rgb(0 0 0 / .6); display:flex; align-items:center; justify-content:center; padding:16px; }
+  body.light .backdrop { background:rgb(0 0 0 / .3); }
+  .modal { display:grid; gap:8px; width:100%; background:var(--surface); border:1px solid var(--border-strong); border-radius:12px; padding:20px 24px; }
+  .modal .acts { justify-content:flex-end; margin-top:12px; }
+  .modal dl { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:4px 0 0; font-size:13px; }
+  .modal dt { color:var(--muted); } .modal dd { margin:0; font-family:var(--mono); }
+  .inline-confirm { display:grid; gap:6px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px; font-size:13px; color:var(--muted); width:260px; }
+  .inline-confirm b { color:var(--fg); font-size:14px; }
+  .menu { width:220px; background:var(--surface); border:1px solid var(--border-strong); border-radius:8px; padding:4px; font-size:14px; }
+  .menu div { padding:6px 10px; border-radius:6px; }
+  .menu .dang { color:var(--danger); background:color-mix(in srgb, var(--danger) 14%, transparent); }
+  .input { width:100%; height:40px; font:13px var(--mono); padding:0 12px; border:1px solid var(--border-strong); border-radius:6px; background:var(--bg); color:var(--fg); }
+  .tree { font:13px var(--mono); color:var(--muted); line-height:1.9; }
+  .win { border:1px solid #555; border-radius:8px; overflow:hidden; font:13px "Segoe UI",system-ui,sans-serif; background:#202020; color:#ddd; }
+  .win .bar { padding:6px 10px; background:#2c2c2c; }
+  .win .body { display:grid; grid-template-columns:110px 1fr; min-height:110px; }
+  .win .nav { border-right:1px solid #3a3a3a; padding:6px 10px; line-height:1.9; }
+  .win .files { padding:6px 10px; line-height:1.9; }
+  .win .pick { background:rgb(76 194 255 / .3); border-radius:4px; padding:0 4px; }
+  .win .foot { display:flex; justify-content:flex-end; gap:6px; padding:8px 10px; border-top:1px solid #3a3a3a; }
+  .win .foot span { border:1px solid #666; border-radius:4px; padding:2px 12px; }
+  .win .foot span.p { background:#4cc2ff; color:#000; border-color:#4cc2ff; }
+  .cap2 { font-size:12px; color:var(--pg-muted); margin:6px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <button class="themebtn" onclick="document.body.classList.toggle('light')">App: dark / light</button>
+  <h1>UI rework — choices</h1>
+  <p class="lead">Each section is one decision for the <code>ui-rework</code> plan. The app parts are drawn with the app's own tokens, fonts, and sizes at 375 px. <span class="tag now">now</span> is what the app does today; <span class="tag rec">recommended</span> is my pick, with the reason below the options. Red dashed outlines mark today's defects.</p>
+  <p class="legend"><span>dashed red</span> = a defect in today's app</p>
+
+  <!-- 1 -->
+  <section class="q">
+    <h2>1 · After a Merge <small>(Q4)</small></h2>
+    <p class="decides">What the screen shows once the PR you merged reads <i>merged</i>. Pod still waits for your <code>continue</code>.</p>
+    <div class="opts">
+      <div class="opt"><div class="opt-h"><b>a · Panel stays</b><span class="tag now">now</span></div><p class="opt-cap">The merge panel stays under the card until you close it.</p>
+        <div class="app">
+          <div class="card"><div class="top"><span class="eyebrow">Next step</span><span class="status s-you">needs you</span></div>
+            <p class="title">Reply pod waits for</p>
+            <div class="acts"><code class="mono">continue</code><span class="btn sm quiet">Copy</span><span class="btn sm primary">Continue</span></div></div>
+          <div class="sub"><div><span class="eyebrow bad-mark">PR #12</span> <b class="bad-mark">PR #12</b> <span class="detail">fix: README typo</span></div>
+            <div class="done-line"><span class="status s-ok bad-mark">merged</span><span class="bad-mark">Merged</span></div>
+            <div class="acts"><span class="btn sm quiet">Close</span></div></div>
+        </div></div>
+      <div class="opt"><div class="opt-h"><b>b · Panel closes, card moves on</b><span class="tag rec">recommended</span></div><p class="opt-cap">The panel closes. One line on the card says why it changed.</p>
+        <div class="app">
+          <div class="card"><div class="top"><span class="eyebrow">Next step</span><span class="status s-you">needs you</span></div>
+            <p class="done-line"><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>PR #12 merged · 12:03</p>
+            <p class="title">Continue so pod goes on</p>
+            <div class="acts"><span class="btn primary">Continue</span><span class="btn quiet">Copy reply</span></div></div>
+        </div></div>
+      <div class="opt"><div class="opt-h"><b>c · Panel shrinks</b></div><p class="opt-cap">The panel stays, cut to one line, with Close.</p>
+        <div class="app">
+          <div class="card"><div class="top"><span class="eyebrow">Next step</span><span class="status s-you">needs you</span></div>
+            <p class="title">Continue so pod goes on</p>
+            <div class="acts"><span class="btn primary">Continue</span><span class="btn quiet">Copy reply</span></div></div>
+          <div class="sub"><div class="acts" style="margin:0;justify-content:space-between"><span class="done-line"><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>PR #12 merged</span><span class="btn sm quiet">Close</span></div></div>
+        </div></div>
+    </div>
+    <p class="why"><b>Why b:</b> the panel's job is done, so it goes away; the one line keeps the merge visible without a second thing to close.</p>
+  </section>
+
+  <!-- 2 -->
+  <section class="q">
+    <h2>2 · You press Continue <small>(Q5)</small></h2>
+    <p class="decides">What you see right after the press. Today the card changes only when the next Board read arrives, often a few seconds later.</p>
+    <div class="opts">
+      <div class="opt"><div class="opt-h"><b>a · No sign</b><span class="tag now">now</span></div><p class="opt-cap">The card looks the same until the Board updates.</p>
+        <div class="app"><div class="card"><div class="top"><span class="eyebrow">Next step</span><span class="status s-you">needs you</span></div>
+          <p class="title">Reply pod waits for</p>
+          <div class="acts"><code class="mono">continue</code><span class="btn sm quiet">Copy</span><span class="btn sm primary bad-mark">Continue</span></div></div></div></div>
+      <div class="opt"><div class="opt-h"><b>b · Result in place</b><span class="tag rec">recommended</span></div><p class="opt-cap">The button reads “Sending…”, then a line takes its place until the run state changes.</p>
+        <div class="app"><div class="card"><div class="top"><span class="eyebrow">Next step</span><span class="status s-run">running</span></div>
+          <p class="title">Continue so pod goes on</p>
+          <div class="acts"><span class="btn primary off">Sending…</span></div>
+          <p class="done-line run-line"><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>Sent <code class="mono">continue</code> · 12:04 — pod is running</p></div>
+          <p class="cap2">Drawn together here; in the app the line replaces the button.</p></div></div>
+      <div class="opt"><div class="opt-h"><b>c · Result in place + toast</b></div><p class="opt-cap">As b, plus a Windows toast.</p>
+        <div class="app"><div class="card"><div class="top"><span class="eyebrow">Next step</span><span class="status s-run">running</span></div>
+          <p class="title">Continue so pod goes on</p>
+          <p class="done-line run-line"><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>Sent <code class="mono">continue</code> · 12:04 — pod is running</p></div>
+          <div class="toast"><b>OpenAFlow</b>run-test · readme: sent continue</div></div></div>
+    </div>
+    <p class="why"><b>Why b:</b> you are looking at the card when you press; a toast for your own click is noise.</p>
+  </section>
+
+  <!-- 3 -->
+  <section class="q">
+    <h2>3 · How the card explains the flow</h2>
+    <p class="decides">The human asked what the steps after a merge are. This decides how the card shows that Merge, then Continue, then pod runs. Drawn right after a merge (1 b).</p>
+    <div class="opts">
+      <div class="opt"><div class="opt-h"><b>a · One line</b></div><p class="opt-cap">Only the last thing that happened, as one line.</p>
+        <div class="app"><div class="card"><div class="top"><span class="eyebrow">Next step</span><span class="status s-you">needs you</span></div>
+          <p class="done-line"><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>PR #12 merged · 12:03</p>
+          <p class="title">Continue so pod goes on</p>
+          <div class="acts"><span class="btn primary">Continue</span><span class="btn quiet">Copy reply</span></div></div></div></div>
+      <div class="opt"><div class="opt-h"><b>b · Step strip</b><span class="tag rec">recommended</span></div><p class="opt-cap">Three steps across the top; done, now, next.</p>
+        <div class="app"><div class="card"><div class="top"><span class="eyebrow">Next step</span><span class="status s-you">needs you</span></div>
+          <div class="strip"><span class="done">✓ Merged #12</span><span class="now">2 Continue</span><span>3 pod runs</span></div>
+          <p class="title">Continue so pod goes on</p>
+          <div class="acts"><span class="btn primary">Continue</span><span class="btn quiet">Copy reply</span></div></div></div></div>
+      <div class="opt"><div class="opt-h"><b>c · What happened list</b></div><p class="opt-cap">A short list of your actions on this stop, with times.</p>
+        <div class="app"><div class="card"><div class="top"><span class="eyebrow">Next step</span><span class="status s-you">needs you</span></div>
+          <p class="title">Continue so pod goes on</p>
+          <ol class="tl"><li>Merged PR #12 <span class="when">· 12:03</span></li><li class="now">Continue <span class="when">— now</span></li></ol>
+          <div class="acts"><span class="btn primary">Continue</span><span class="btn quiet">Copy reply</span></div></div></div></div>
+    </div>
+    <p class="why"><b>Why b:</b> it shows the next step before you reach it, which is the question you asked; a and c only show what already happened.</p>
+  </section>
+
+  <!-- 4 -->
+  <section class="q">
+    <h2>4 · Auto-continue sign</h2>
+    <p class="decides">How a sidebar run card shows that the board sends <code>continue</code> for this run by itself. Today only the run's ⋯ menu shows it.</p>
+    <div class="opts">
+      <div class="opt" style="width:280px"><div class="opt-h"><b>a · Menu only</b><span class="tag now">now</span></div><p class="opt-cap">No sign on the card.</p>
+        <div class="app"><div class="side"><div class="rc sel"><div class="n">run-test · readme</div><div class="m"><span class="status s-you">needs you</span></div></div></div></div></div>
+      <div class="opt" style="width:280px"><div class="opt-h"><b>b · <code>auto</code> tag</b><span class="tag rec">recommended</span></div><p class="opt-cap">A small tag after the state.</p>
+        <div class="app"><div class="side"><div class="rc sel"><div class="n">run-test · readme</div><div class="m"><span class="status s-you">needs you</span><span class="autotag">auto</span></div></div></div></div></div>
+      <div class="opt" style="width:280px"><div class="opt-h"><b>c · Loop icon</b></div><p class="opt-cap">A blue loop icon after the name.</p>
+        <div class="app"><div class="side"><div class="rc sel"><div class="n">run-test · readme <span class="autoicon"><svg class="i" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4"/></svg></span></div><div class="m"><span class="status s-you">needs you</span></div></div></div></div></div>
+      <div class="opt" style="width:280px"><div class="opt-h"><b>d · Words + edge</b></div><p class="opt-cap">“auto-continue” in the state line, and a blue left edge.</p>
+        <div class="app"><div class="side"><div class="rc sel edge"><div class="n">run-test · readme</div><div class="m"><span class="status s-you">needs you · auto-continue</span></div></div></div></div></div>
+    </div>
+    <p class="why"><b>Why b:</b> DESIGN.md puts attributes as tags after the status, and an icon alone needs a hover to explain itself.</p>
+  </section>
+
+  <!-- 5 -->
+  <section class="q">
+    <h2>5 · Order of the runs list</h2>
+    <p class="decides">Which run is on top of the sidebar. Activity is the newest agent write, queue change, or PR event (Q11, asked in chat).</p>
+    <div class="opts">
+      <div class="opt" style="width:280px"><div class="opt-h"><b>a · By state</b><span class="tag now">now</span></div><p class="opt-cap">Blocked first, then needs you, then repo name.</p>
+        <div class="app"><div class="side"><div class="lbl"><span>Runs</span></div>
+          <div class="rc"><div class="n">chess-web</div><div class="m"><span class="status s-bad">blocked</span><span class="when">3 h ago</span></div></div>
+          <div class="rc"><div class="n">ytb-feed</div><div class="m"><span class="status s-bad">blocked</span><span class="when">yesterday</span></div></div>
+          <div class="rc sel bad-mark"><div class="n">run-test · readme</div><div class="m"><span class="status s-you">needs you</span><span class="when">2 min ago</span></div></div></div></div></div>
+      <div class="opt" style="width:280px"><div class="opt-h"><b>b · Newest first</b><span class="tag rec">recommended</span></div><p class="opt-cap">The run with the newest activity on top.</p>
+        <div class="app"><div class="side"><div class="lbl"><span>Runs</span><span>newest first</span></div>
+          <div class="rc sel"><div class="n">run-test · readme</div><div class="m"><span class="status s-you">needs you</span><span class="when">2 min ago</span></div></div>
+          <div class="rc"><div class="n">chess-web</div><div class="m"><span class="status s-bad">blocked</span><span class="when">3 h ago</span></div></div>
+          <div class="rc"><div class="n">ytb-feed</div><div class="m"><span class="status s-bad">blocked</span><span class="when">yesterday</span></div></div></div></div></div>
+      <div class="opt" style="width:280px"><div class="opt-h"><b>c · State groups, newest inside</b></div><p class="opt-cap">Blocked group first; newest first inside each group.</p>
+        <div class="app"><div class="side"><div class="lbl"><span>Runs</span></div>
+          <div class="grp">Blocked</div>
+          <div class="rc"><div class="n">chess-web</div><div class="m"><span class="status s-bad">blocked</span><span class="when">3 h ago</span></div></div>
+          <div class="rc"><div class="n">ytb-feed</div><div class="m"><span class="status s-bad">blocked</span><span class="when">yesterday</span></div></div>
+          <div class="grp">Needs you</div>
+          <div class="rc sel"><div class="n">run-test · readme</div><div class="m"><span class="status s-you">needs you</span><span class="when">2 min ago</span></div></div></div></div></div>
+    </div>
+    <p class="why"><b>Why b:</b> it puts the run you work on at the top, as you expected on 2026-11-12; the urgent banner still raises blocked runs from anywhere.</p>
+  </section>
+
+  <!-- 6 -->
+  <section class="q">
+    <h2>6 · Remove repo confirm <small>(Q8)</small></h2>
+    <p class="decides">How the board asks before it stops watching a repo folder. A modal is a box over the page that you must answer before you go on.</p>
+    <div class="opts">
+      <div class="opt" style="width:300px"><div class="opt-h"><b>a · Inline in the sidebar</b><span class="tag now">now</span></div><p class="opt-cap">Opens inside the narrow sidebar card.</p>
+        <div class="app"><div class="inline-confirm bad-mark"><b>Remove chess-web?</b><span class="mono">E:\code\chess-web</span><span>Only the board's list changes; its files aren't touched.</span><span>Its 1 run leaves the sidebar.</span><span class="btn danger" style="width:100%">Remove</span><span class="btn quiet" style="width:100%">Cancel</span></div></div></div>
+      <div class="opt"><div class="opt-h"><b>b · Modal, short</b></div><p class="opt-cap">Title, one line, two buttons.</p>
+        <div class="app"><div class="stage"><div class="bgfake"><div></div><div style="width:70%"></div><div style="width:50%"></div></div><div class="backdrop"><div class="modal">
+          <p class="title">Remove chess-web?</p><p class="detail">The board stops watching this folder. No files change.</p>
+          <div class="acts"><span class="btn">Cancel</span><span class="btn danger">Remove</span></div></div></div></div></div></div>
+      <div class="opt"><div class="opt-h"><b>c · Modal with the path</b><span class="tag rec">recommended</span></div><p class="opt-cap">As b, plus the folder's full path.</p>
+        <div class="app"><div class="stage"><div class="bgfake"><div></div><div style="width:70%"></div><div style="width:50%"></div></div><div class="backdrop"><div class="modal">
+          <p class="title">Remove chess-web?</p><p class="detail">The board stops watching this folder. No files change.</p><p class="mono">E:\code\chess-web</p>
+          <div class="acts"><span class="btn">Cancel</span><span class="btn danger">Remove</span></div></div></div></div></div></div>
+      <div class="opt"><div class="opt-h"><b>d · Modal with facts</b></div><p class="opt-cap">As b, plus a folder and runs table.</p>
+        <div class="app"><div class="stage"><div class="bgfake"><div></div><div style="width:70%"></div><div style="width:50%"></div></div><div class="backdrop"><div class="modal">
+          <p class="title">Remove chess-web?</p><p class="detail">The board stops watching this folder. No files change.</p>
+          <dl><dt>Folder</dt><dd>E:\code\chess-web</dd><dt>Runs</dt><dd>1 leaves the sidebar</dd></dl>
+          <div class="acts"><span class="btn">Cancel</span><span class="btn danger">Remove</span></div></div></div></div></div></div>
+    </div>
+    <p class="why"><b>Why c:</b> two repos can share a name (<code>chess-web</code> and <code>chess_web</code> did), so the path shows which one goes.</p>
+  </section>
+
+  <!-- 7 -->
+  <section class="q">
+    <h2>7 · Forget a leftover run <small>(Q7)</small></h2>
+    <p class="decides">A new ⋯ menu item, “Forget this run”, removes a run whose session ended before its cleanup. Today you delete its claim file by hand. This decides whether it asks first.</p>
+    <div class="opts">
+      <div class="opt" style="width:280px"><div class="opt-h"><b>a · Not possible</b><span class="tag now">now</span></div><p class="opt-cap">The run stays listed for good.</p>
+        <div class="app"><div class="menu"><div>Auto-continue</div><div>Copy port base</div></div></div></div>
+      <div class="opt"><div class="opt-h"><b>b · Ask in a modal</b><span class="tag rec">recommended</span></div><p class="opt-cap">The same modal as Remove repo.</p>
+        <div class="app"><div class="stage"><div class="bgfake"><div></div><div style="width:70%"></div></div><div class="backdrop"><div class="modal">
+          <p class="title">Forget run-test · readme?</p><p class="detail">The board stops listing this run. Its worktree and branch stay.</p><p class="mono">port base 3400</p>
+          <div class="acts"><span class="btn">Cancel</span><span class="btn danger">Forget</span></div></div></div></div></div></div>
+      <div class="opt" style="width:280px"><div class="opt-h"><b>c · Act at once</b></div><p class="opt-cap">The menu item removes the run with no question.</p>
+        <div class="app"><div class="menu"><div>Auto-continue</div><div>Copy port base</div><div class="dang">Forget this run</div></div></div></div>
+    </div>
+    <p class="why"><b>Why b:</b> the app can't undo it, and one shared modal is less code than two confirm styles.</p>
+  </section>
+
+  <!-- 8 -->
+  <section class="q">
+    <h2>8 · Add repo <small>(Q12)</small></h2>
+    <p class="decides">How you choose a repo folder. The desktop app can open the Windows “Select Folder” dialog. The browser build (the agents' test bench) can't, so it needs its own way.</p>
+    <div class="opts">
+      <div class="opt"><div class="opt-h"><b>a · Our folder browser</b><span class="tag now">now</span></div><p class="opt-cap">In both builds: type a path, browse folders in the page.</p>
+        <div class="app"><div class="card"><span class="eyebrow">Add repo</span><input class="input" value="E:\code\ch" readonly><div class="tree">▸ chess-web<br>▸ chess_web<br>▸ chores</div><div class="acts"><span class="btn quiet">Cancel</span><span class="btn primary">Add</span></div></div></div></div>
+      <div class="opt"><div class="opt-h"><b>b · Native dialog + path field</b><span class="tag rec">recommended</span></div><p class="opt-cap">Desktop: the Windows dialog. Browser build: a plain path field. Our browser is deleted.</p>
+        <div class="app"><div class="win"><div class="bar">Select a repo folder</div><div class="body"><div class="nav">Home<br>Desktop<br>E: (Data)</div><div class="files">code<br>&nbsp;&nbsp;<span class="pick">chess-web</span><br>&nbsp;&nbsp;ytb-feed</div></div><div class="foot"><span class="p">Select Folder</span><span>Cancel</span></div></div>
+          <p class="cap2">Browser build:</p>
+          <div class="card" style="margin-top:6px"><span class="eyebrow">Add repo</span><input class="input" value="E:\code\chess-web" readonly><div class="acts"><span class="btn quiet">Cancel</span><span class="btn primary">Add</span></div></div></div></div>
+      <div class="opt"><div class="opt-h"><b>c · Native dialog + our browser</b></div><p class="opt-cap">Desktop: the Windows dialog. Browser build keeps our folder browser.</p>
+        <div class="app"><div class="win"><div class="bar">Select a repo folder</div><div class="body"><div class="nav">Home<br>Desktop<br>E: (Data)</div><div class="files">code<br>&nbsp;&nbsp;<span class="pick">chess-web</span><br>&nbsp;&nbsp;ytb-feed</div></div><div class="foot"><span class="p">Select Folder</span><span>Cancel</span></div></div>
+          <p class="cap2">Browser build:</p>
+          <div class="card" style="margin-top:6px"><span class="eyebrow">Add repo</span><input class="input" value="E:\code\ch" readonly><div class="tree">▸ chess-web<br>▸ chess_web</div><div class="acts"><span class="btn quiet">Cancel</span><span class="btn primary">Add</span></div></div></div></div>
+    </div>
+    <p class="why"><b>Why b:</b> you asked to stop maintaining our picker; c keeps all of it for agents who can type a path. The folder-listing route goes too.</p>
+  </section>
+
+  <section class="q">
+    <h2>Not on this page</h2>
+    <p class="notes">These have no picture; answer them in chat. Q6 (149): Merge shows on a <code>--no-review</code> task PR once the engineer has ended and no reviewer started. Q11: activity = newest agent write, queue change, or PR event. Q1 no web research, Q2 fast path, Q10 one sprint.</p>
+  </section>
+
+  <div class="reply">Reply: 1 b, 2 b, 3 b, 4 b, 5 b, 6 c, 7 b, 8 b</div>
+</main>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # Idea: Sort the runs list by most recent activity
 
-Status: parked
+Status: planned — pod-docs/plans/ui-rework.md
 
 ## The idea
 

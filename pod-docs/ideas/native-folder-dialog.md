@@ -1,6 +1,6 @@
 # Idea: Native folder dialog
 
-Status: parked
+Status: planned — pod-docs/plans/ui-rework.md
 
 ## The idea
 A "Browse…" button next to the in-page folder picker. The board's server opens the OS "Select folder" dialog (on Windows, a PowerShell `FolderBrowserDialog` with a TopMost owner form) and returns the chosen path. On error or timeout, it falls back to the in-page picker. Allow only one dialog at a time.

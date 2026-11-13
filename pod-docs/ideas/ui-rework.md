@@ -1,6 +1,6 @@
 # Idea: Rework the run screen's UI
 
-Status: parked
+Status: planned in part — pod-docs/plans/ui-rework.md fixes the listed defects; the full run-screen redesign waits for the terminal host
 
 ## The idea
 Rework the run screen so each card has one clear job and goes away when its job is done. The human, on 2026-11-05: "This UI is so bad, we need to rework on this." Problems seen on the installed app during the windows-app test:
