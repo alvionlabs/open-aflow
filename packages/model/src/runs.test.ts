@@ -333,6 +333,11 @@ describe('runActivity and the order', () => {
       prs: [prAt(12, { openedAt: NOW - 40 * MIN }), prAt(99, { openedAt: NOW }), prAt(13, { branch: 'alpha', openedAt: NOW - 30 * MIN })],
     })
     expect(act(final)).toBe(NOW - 30 * MIN)
+    // The hand-back PR alone, as the newest source.
+    const handNewest = repo('r', planFiles({ queue: [handBack] }), {
+      prs: [prAt(12, { openedAt: NOW - 10 * MIN }), prAt(13, { branch: 'alpha', openedAt: NOW - 30 * MIN })],
+    })
+    expect(act(handNewest)).toBe(NOW - 10 * MIN)
     // A slice PR in a later sprint counts: every sprint of the plan.
     const twoSprints = planFiles({ sprints: [['one', 'done'], ['two', 'active']], board: DONE_BOARD })
     expect(act(repo('r', twoSprints, { prs: [prAt(3, { state: 'merged', mergedAt: NOW - 5 * MIN })] }))).toBe(NOW - 5 * MIN)
