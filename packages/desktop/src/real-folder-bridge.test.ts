@@ -111,8 +111,8 @@ describe.runIf(process.env.OPENAFLOW_REAL_ELECTRON === '1' && process.platform =
         OPENAFLOW_PROBE_QUIT: join(tmp, 'quit'),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
-      // Not hidden: SW_HIDE would swallow the window's first show.
-      windowsHide: false,
+      // Hidden like every other real test: an unhidden start can open a console. The page still loads.
+      windowsHide: true,
     })
     shell.stdout!.on('data', (d) => (text += String(d)))
     shell.stderr!.on('data', (d) => (text += String(d)))
