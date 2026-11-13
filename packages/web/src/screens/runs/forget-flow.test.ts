@@ -161,6 +161,16 @@ describe('one request per confirm', () => {
     expect(t.done).toEqual([])
   })
 
+  it('a refusal after cancel is dropped too: no error opens with no target', async () => {
+    const t = setup()
+    t.flow.open(T)
+    t.flow.forget('#/ra/x')
+    t.flow.cancel()
+    await t.answer(0, refused('no claim'))
+    expect(t.flow.state()).toEqual({ kind: 'idle', seq: 1 })
+    expect(t.done).toEqual([])
+  })
+
   it('an old reply is dropped after the modal opened again and sent again', async () => {
     const t = setup()
     t.flow.open(T)
