@@ -1,6 +1,9 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { UNREACHABLE } from '../../actions-client.ts'
 import type { AddResult } from '../../add-repo.ts'
+import { AddRepoForm } from './AddRepoDialog.tsx'
 import { BRIDGE_FAILED, canAdd, createAddRepoFlow, pathHint, type AddRepoState } from './add-repo-flow.ts'
 
 /** A promise the test settles by hand. */
@@ -327,5 +330,46 @@ describe('the path hint', () => {
     expect(pathHint('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36')).toBe('/Users/you/code/my-repo')
     expect(pathHint('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36')).toBe('/home/you/code/my-repo')
     expect(pathHint('')).toBe('/home/you/code/my-repo')
+  })
+})
+
+describe('the Add repo modal', () => {
+  type Form = Extract<AddRepoState, { kind: 'form' }>
+  const render = (state: Form) => {
+    const { flow } = setup({ bridge: state.canChoose })
+    return renderToStaticMarkup(createElement(AddRepoForm, { state, flow }))
+  }
+  const buttons = (html: string) => [...html.matchAll(/<button([^>]*)>([^<]*)<\/button>/g)].map((m) => ({ label: m[2]!, attrs: m[1]! }))
+
+  it('field, Choose folder… below it, the alert, then Cancel and Add', () => {
+    const html = render({ kind: 'form', path: 'E:\\code\\chess-web', busy: false, canChoose: true, error: 'Already registered.' })
+    const order = ['<label', '<input', '>Choose folder…<', 'class="modal-alert"', '>Cancel<', '>Add<']
+    const at = order.map((s) => html.indexOf(s))
+    expect(at.every((i) => i >= 0), JSON.stringify(at)).toBe(true)
+    expect([...at].sort((a, b) => a - b)).toEqual(at)
+    // Choose folder… is its own row under the field, not in the action row.
+    const actions = html.slice(html.indexOf('class="modal-actions"'))
+    expect(actions).not.toContain('Choose folder…')
+    expect(buttons(actions).map((b) => b.label)).toEqual(['Cancel', 'Add'])
+    expect(html).toMatch(/<div class="add-repo-choose"><button class="btn" type="button">Choose folder…<\/button><\/div>/)
+    // The alert is the shared one, named by the field; Add is off while it shows.
+    expect(html).toMatch(/<div id="[^"]+" class="modal-alert" role="alert">/)
+    const errorId = /<div id="([^"]+)" class="modal-alert"/.exec(html)?.[1]
+    expect(html).toMatch(new RegExp(`<input[^>]*aria-describedby="${errorId}"`))
+    expect(html).toMatch(/<input[^>]*aria-invalid="true"/)
+    expect(html).toContain('>Already registered.</p>')
+    expect(html).not.toContain('modal-error')
+    const add = buttons(html).find((b) => b.label === 'Add')!
+    expect(add.attrs).toMatch(/disabled=""/)
+  })
+
+  it('no Choose folder… without the bridge, no alert without an error, and Add on for a path', () => {
+    const html = render({ kind: 'form', path: '/home/me/repo', busy: false, canChoose: false })
+    expect(html).not.toContain('Choose folder…')
+    expect(html).not.toContain('add-repo-choose')
+    expect(html).not.toContain('role="alert"')
+    expect(html).not.toContain('aria-describedby')
+    expect(buttons(html).map((b) => b.label)).toEqual(['Cancel', 'Add'])
+    expect(buttons(html).find((b) => b.label === 'Add')!.attrs).not.toMatch(/disabled/)
   })
 })

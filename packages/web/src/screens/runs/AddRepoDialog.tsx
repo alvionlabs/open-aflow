@@ -4,6 +4,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { postRepo } from '../../add-repo.ts'
 import { Modal } from '../../components/Modal.tsx'
+import { ModalAlert } from '../../components/ModalAlert.tsx'
 import { folderBridge } from '../../desktop-bridge.ts'
 import { canAdd, createAddRepoFlow, pathHint, type AddRepoFlow, type AddRepoState } from './add-repo-flow.ts'
 
@@ -28,7 +29,10 @@ export function AddRepoDialog({ onClose }: Props) {
 
 type FormProps = { state: Extract<AddRepoState, { kind: 'form' }>; flow: AddRepoFlow }
 
-/** The modal: the path field, the error, then Choose folder… (desktop only), Cancel, and Add. */
+/**
+ * The modal, top to bottom: the label, the path field, Choose folder… (desktop only) under the field, the error in
+ * the shared alert box, then Cancel and Add. Add is off while the error shows (`canAdd`).
+ */
 export function AddRepoForm({ state, flow }: FormProps) {
   const headingId = useId()
   const fieldId = useId()
@@ -64,17 +68,16 @@ export function AddRepoForm({ state, flow }: FormProps) {
           void flow.add()
         }}
       />
-      {state.error && (
-        <p id={errorId} className="modal-error" role="alert">
-          {state.error}
-        </p>
-      )}
-      <div className="modal-actions">
-        {state.canChoose && (
+      {state.canChoose && (
+        // A block row, so the button keeps its own width in the panel's grid.
+        <div className="add-repo-choose">
           <button className="btn" type="button" disabled={state.busy} onClick={flow.choose}>
             Choose folder…
           </button>
-        )}
+        </div>
+      )}
+      {state.error && <ModalAlert id={errorId} message={state.error} />}
+      <div className="modal-actions">
         <button className="btn quiet" type="button" disabled={state.busy} onClick={flow.cancel}>
           Cancel
         </button>
