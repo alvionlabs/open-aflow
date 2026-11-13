@@ -19,6 +19,7 @@ Constraints:
 **In scope:**
 - A pty host: a second Electron `utilityProcess` with `node-pty@1.2.0-beta.18` (pinned) and a headless xterm buffer per session. Start, write, resize, kill, list, replay, heartbeat. The window talks to it through `MessagePort` only.
 - Packaging node-pty outside the asar, proved on Windows and Linux, packaged and unpackaged.
+- The desktop app starts on Linux. Today it doesn't: `startNotifier` calls `Notification.handleActivation`, a Windows-only API, which throws in `app.whenReady`, so the updater and the server never start (seen 2026-11-13, `pnpm desktop` on Fedora). Guard each Windows-only call by platform, and test the start on Linux.
 - A Linux package: an AppImage for x64 from `pnpm package` on Linux, with `latest-linux.yml` for the updater, beside today's Windows NSIS installer. The release workflow builds it on `ubuntu-latest`. Today `packages/desktop/scripts/package.ts` builds the Windows installer only.
 - A small OpenAFlow hooks plugin, no skills, loaded with `--plugin-dir`. Its hooks write the live session ID (with its cause) and hook state to a file in the app's config folder, keyed by the run's `OPENAFLOW_RUN` marker.
 - **New session:** a dropdown of pod skills (`/pod:plan`, `/pod:ship`, `/pod:task`, `/pod:research`, `/pod:idea`, and Plain session) plus one text field. The app starts `claude --session-id <uuid> "/pod:<skill> <text>"` in the repo.
