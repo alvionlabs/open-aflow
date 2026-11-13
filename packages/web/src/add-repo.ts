@@ -35,10 +35,25 @@ export async function postRepo(path: string, deps: PostRepoDeps = {}): Promise<A
   return typeof error === 'string' && error.length > 0 ? { status: res.status, error } : { status: res.status }
 }
 
-/** `already registered` → `Already registered.` With no error word, says the HTTP status. */
-export function errorSentence(r: AddResult): string {
+export const ADD_ALREADY = 'This repo is already added.'
+export const ADD_BAD_PATH = "This path isn't a folder on this computer."
+export const ADD_FAILED = "Couldn't add the repo. Try again."
+export const ADD_RELOAD = 'The app restarted. Reload the page.'
+
+/** What the modal says after a refused add. `pathError`: the same path would fail again, so Add waits for a change. */
+export type AddError = { message: string; pathError: boolean }
+
+const BAD_PATH = new Set(['not absolute', 'not a local path', 'not a directory'])
+
+/**
+ * Three messages, by what you can do next: change the path, reload, or try again. The exact cause goes to the
+ * console, so a bug report can still name it.
+ */
+export function addError(r: AddResult): AddError {
   const word = r.error?.trim()
-  if (!word) return `The server refused the request (HTTP ${r.status}).`
-  const s = word[0]!.toUpperCase() + word.slice(1)
-  return /[.!?]$/.test(s) ? s : `${s}.`
+  if (word === 'already registered') return { message: ADD_ALREADY, pathError: true }
+  if (word !== undefined && BAD_PATH.has(word)) return { message: ADD_BAD_PATH, pathError: true }
+  if (word === RESTARTED || word === NEED_RELOAD) return { message: ADD_RELOAD, pathError: false }
+  console.warn(`openaflow: add repo failed (HTTP ${r.status}${word ? `: ${word}` : ''})`)
+  return { message: ADD_FAILED, pathError: false }
 }

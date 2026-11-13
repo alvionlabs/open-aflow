@@ -5,13 +5,14 @@
 // and Choose folder… (the dialog again). A dialog that can't open opens the modal and asks for a typed path.
 // With no bridge (the browser build), the modal opens with an empty path field.
 //
-// Add is off while the modal shows an error; a change to the path clears the error.
+// Add is off while the modal shows a path error (already added, or not a folder); a change to the path clears
+// it. After any other error, Add stays on, so the same path can be tried again.
 //
 // The modal is busy while a post or a dialog is out: Add, Choose folder…, and Cancel then do nothing, so one
 // post runs at a time. After close, nothing more happens, and a late answer is dropped.
 
 import { UNREACHABLE } from '../../actions-client.ts'
-import { errorSentence, type AddResult } from '../../add-repo.ts'
+import { addError, type AddResult } from '../../add-repo.ts'
 import type { PickFolder } from '../../desktop-bridge.ts'
 
 export const BRIDGE_FAILED = "Couldn't open the folder dialog. Type the path instead."
@@ -27,7 +28,7 @@ export type AddRepoState =
   /** The folder dialog is up, or its folder is posting: no modal. */
   | { kind: 'picking' }
   /** The modal. `path` is the field as typed; `canChoose` shows Choose folder…. */
-  | { kind: 'form'; path: string; busy: boolean; canChoose: boolean; error?: string }
+  | { kind: 'form'; path: string; busy: boolean; canChoose: boolean; error?: string; pathError?: boolean }
   | { kind: 'closed' }
 
 export type AddRepoDeps = {
@@ -37,9 +38,9 @@ export type AddRepoDeps = {
   onClose: () => void
 }
 
-/** Add is on in an idle modal whose path isn't blank and that shows no error. Typing clears the error. */
+/** Add is on in an idle modal whose path isn't blank and that shows no path error. Typing clears the error. */
 export function canAdd(s: AddRepoState): boolean {
-  return s.kind === 'form' && !s.busy && !s.error && s.path.trim() !== ''
+  return s.kind === 'form' && !s.busy && !(s.error && s.pathError) && s.path.trim() !== ''
 }
 
 export type AddRepoFlow = ReturnType<typeof createAddRepoFlow>
@@ -60,10 +61,11 @@ export function createAddRepoFlow(deps: AddRepoDeps, onChange: (s: AddRepoState)
     deps.onClose()
   }
   /** The modal, keeping what isn't given. */
-  const showForm = (patch: { path?: string; busy: boolean; error?: string | undefined }) => {
+  const showForm = (patch: { path?: string; busy: boolean; error?: string | undefined; pathError?: boolean | undefined }) => {
     const path = patch.path ?? (state.kind === 'form' ? state.path : '')
     const next: AddRepoState = { kind: 'form', path, busy: patch.busy, canChoose: pick !== undefined }
     if (patch.error !== undefined) next.error = patch.error
+    if (patch.error !== undefined && patch.pathError) next.pathError = true
     set(next)
   }
 
@@ -77,7 +79,10 @@ export function createAddRepoFlow(deps: AddRepoDeps, onChange: (s: AddRepoState)
     }
     if (state.kind === 'closed') return
     if (result.status === 201) close()
-    else showForm({ path: shown, busy: false, error: errorSentence(result) })
+    else {
+      const e = addError(result)
+      showForm({ path: shown, busy: false, error: e.message, pathError: e.pathError })
+    }
   }
 
   /** Opens the folder dialog; `onCancel` runs on cancel, `onFail` on a rejection. A folder posts at once. */
@@ -119,7 +124,7 @@ export function createAddRepoFlow(deps: AddRepoDeps, onChange: (s: AddRepoState)
     choose() {
       if (!pick || state.kind !== 'form' || state.busy) return
       const before = state
-      showForm({ busy: true, error: before.error })
+      showForm({ busy: true, error: before.error, pathError: before.pathError })
       void runPick(() => set(before))
     },
     cancel() {

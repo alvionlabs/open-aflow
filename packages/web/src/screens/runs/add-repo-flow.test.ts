@@ -1,8 +1,8 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { UNREACHABLE } from '../../actions-client.ts'
-import { ADD_ALREADY, ADD_BAD_PATH, ADD_FAILED, type AddResult } from '../../add-repo.ts'
+import { RESTARTED, UNREACHABLE } from '../../actions-client.ts'
+import { ADD_ALREADY, ADD_BAD_PATH, ADD_FAILED, ADD_RELOAD, type AddResult } from '../../add-repo.ts'
 import { AddRepoForm } from './AddRepoDialog.tsx'
 import { BRIDGE_FAILED, canAdd, createAddRepoFlow, pathHint, type AddRepoState } from './add-repo-flow.ts'
 
@@ -125,14 +125,21 @@ describe('desktop add error', () => {
     expect(t.onClose).not.toHaveBeenCalled()
   })
 
-  it('a post that throws shows that the board is out of reach', async () => {
+  it('a post that throws (board out of reach) says to try again, with Add on', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const t = setup({ bridge: true })
     t.flow.start()
     t.picks[0]!.resolve('E:\\code\\chess-web')
     await tick()
     t.posts[0]!.reject(new TypeError('Failed to fetch'))
     await tick()
-    expect(form(t.flow.state())).toMatchObject({ path: 'E:\\code\\chess-web', error: UNREACHABLE })
+    const s = form(t.flow.state())
+    expect(s).toMatchObject({ path: 'E:\\code\\chess-web', error: ADD_FAILED, busy: false })
+    expect(s.pathError).toBeUndefined()
+    expect(canAdd(s)).toBe(true)
+    // The exact cause is in the console.
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(UNREACHABLE))
+    warn.mockRestore()
   })
 
   it('Choose folder… opens the dialog again; while it is up the modal is busy; a path posts', async () => {
@@ -189,8 +196,11 @@ describe('desktop add error', () => {
     t.flow.choose()
     t.picks[1]!.reject(new Error('dialog failed'))
     await tick()
-    expect(form(t.flow.state())).toMatchObject({ path: 'E:\\code\\chess-web', busy: false, error: BRIDGE_FAILED })
-    expect(canAdd(t.flow.state())).toBe(false)
+    const s = form(t.flow.state())
+    expect(s).toMatchObject({ path: 'E:\\code\\chess-web', busy: false, error: BRIDGE_FAILED })
+    // The dialog failure replaces the path error, so Add follows the path: here it isn't blank, so Add is on.
+    expect(s.pathError).toBeUndefined()
+    expect(canAdd(s)).toBe(true)
   })
 })
 
@@ -344,7 +354,7 @@ describe('the Add repo modal', () => {
   const buttons = (html: string) => [...html.matchAll(/<button([^>]*)>([^<]*)<\/button>/g)].map((m) => ({ label: m[2]!, attrs: m[1]! }))
 
   it('field, Choose folder… below it, the alert, then Cancel and Add', () => {
-    const html = render({ kind: 'form', path: 'E:\\code\\chess-web', busy: false, canChoose: true, error: ADD_ALREADY })
+    const html = render({ kind: 'form', path: 'E:\\code\\chess-web', busy: false, canChoose: true, error: ADD_ALREADY, pathError: true })
     const order = ['<label', '<input', '>Choose folder…<', 'class="modal-alert"', '>Cancel<', '>Add<']
     const at = order.map((s) => html.indexOf(s))
     expect(at.every((i) => i >= 0), JSON.stringify(at)).toBe(true)
@@ -354,7 +364,7 @@ describe('the Add repo modal', () => {
     expect(actions).not.toContain('Choose folder…')
     expect(buttons(actions).map((b) => b.label)).toEqual(['Cancel', 'Add'])
     expect(html).toMatch(/<div class="add-repo-choose"><button class="btn" type="button">Choose folder…<\/button><\/div>/)
-    // The alert is the shared one, named by the field; Add is off while it shows.
+    // The alert is the shared one, named by the field; Add is off while a path error shows.
     expect(html).toMatch(/<div id="[^"]+" class="modal-alert" role="alert">/)
     const errorId = /<div id="([^"]+)" class="modal-alert"/.exec(html)?.[1]
     expect(html).toMatch(new RegExp(`<input[^>]*aria-describedby="${errorId}"`))
@@ -363,6 +373,17 @@ describe('the Add repo modal', () => {
     expect(html).not.toContain('modal-error')
     const add = buttons(html).find((b) => b.label === 'Add')!
     expect(add.attrs).toMatch(/disabled=""/)
+  })
+
+  it('an error that is not about the path: the alert names the field, the field is not invalid, Add is on', () => {
+    const html = render({ kind: 'form', path: '/home/me/repo', busy: false, canChoose: false, error: ADD_FAILED })
+    const errorId = /<div id="([^"]+)" class="modal-alert"/.exec(html)?.[1]
+    expect(errorId).toBeDefined()
+    expect(html).toMatch(new RegExp(`<input[^>]*aria-describedby="${errorId}"`))
+    expect(html).not.toContain('aria-invalid')
+    // React escapes the apostrophe.
+    expect(html).toContain(`>${ADD_FAILED.replace("'", '&#x27;')}</p>`)
+    expect(buttons(html).find((b) => b.label === 'Add')!.attrs).not.toMatch(/disabled/)
   })
 
   it('no Choose folder… without the bridge, no alert without an error, and Add on for a path', () => {
@@ -384,6 +405,23 @@ describe('an error that is not about the path', () => {
     t.posts[0]!.resolve({ status: 500, error: 'config unreadable' })
     await added
     expect(form(t.flow.state())).toMatchObject({ path: '/home/me/repo', error: ADD_FAILED })
+    expect(canAdd(t.flow.state())).toBe(true)
+    // Add again with the same path: it posts, and a 201 closes the modal.
+    const again = t.flow.add()
+    expect(t.post).toHaveBeenCalledTimes(2)
+    expect(t.post).toHaveBeenLastCalledWith('/home/me/repo')
+    t.posts[1]!.resolve({ status: 201 })
+    await again
+    expect(t.onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('a reload message keeps Add on too', async () => {
+    const t = setup({ bridge: false })
+    t.flow.type('/home/me/repo')
+    const added = t.flow.add()
+    t.posts[0]!.resolve({ status: 403, error: RESTARTED })
+    await added
+    expect(form(t.flow.state())).toMatchObject({ error: ADD_RELOAD })
     expect(canAdd(t.flow.state())).toBe(true)
   })
 })

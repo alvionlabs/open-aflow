@@ -58,4 +58,18 @@ describe('the three messages and the path rule', () => {
     }
     expect(addError({ status: 0, error: NEED_RELOAD })).toEqual({ message: ADD_RELOAD, pathError: false })
   })
+
+  it('the exact cause goes to the console for a failed add, and only then', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    addError({ status: 500, error: 'config unreadable' })
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/HTTP 500.*config unreadable/))
+    addError({ status: 502 })
+    expect(warn).toHaveBeenLastCalledWith(expect.stringContaining('HTTP 502'))
+    warn.mockClear()
+    addError({ status: 409, error: 'already registered' })
+    addError({ status: 400, error: 'not a directory' })
+    addError({ status: 403, error: RESTARTED })
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
 })

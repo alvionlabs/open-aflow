@@ -31,7 +31,8 @@ type FormProps = { state: Extract<AddRepoState, { kind: 'form' }>; flow: AddRepo
 
 /**
  * The modal, top to bottom: the label, the path field, Choose folder… (desktop only) under the field, the error in
- * the shared alert box, then Cancel and Add. Add is off while the error shows (`canAdd`).
+ * the shared alert box, then Cancel and Add. Add is off while a path error shows (`canAdd`); the field is then
+ * marked invalid.
  */
 export function AddRepoForm({ state, flow }: FormProps) {
   const headingId = useId()
@@ -59,7 +60,7 @@ export function AddRepoForm({ state, flow }: FormProps) {
         placeholder={pathHint(typeof navigator === 'undefined' ? '' : navigator.userAgent)}
         value={state.path}
         readOnly={state.busy}
-        aria-invalid={state.error ? 'true' : undefined}
+        aria-invalid={state.error && state.pathError ? 'true' : undefined}
         aria-describedby={state.error ? errorId : undefined}
         onChange={(e) => flow.type(e.target.value)}
         onKeyDown={(e) => {
