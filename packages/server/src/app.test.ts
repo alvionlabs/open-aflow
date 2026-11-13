@@ -1,12 +1,12 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, isAbsolute, join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { AgentTimeline, Board } from '@openaflow/model'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createApp, type AppDeps, type BoardSource } from './app.ts'
 import { createBoardService } from './board-service.ts'
-import { listFolders, nodeFolderFs, type FolderFs } from './folder-list.ts'
 import { createSessionToken } from './session-token.ts'
 import { createWebApp } from './web-app.ts'
 import type { GhReader } from './gh.ts'
@@ -56,11 +56,10 @@ const TIMELINE: AgentTimeline = {
 type TimelineFn = AppDeps['timeline']
 const noTimeline: TimelineFn = async () => undefined
 
-function fakeApp(opts: { pingMs?: number; source?: BoardSource; timeline?: TimelineFn; actions?: Hono; folders?: AppDeps['folders']; web?: Hono } = {}): Hono {
+function fakeApp(opts: { pingMs?: number; source?: BoardSource; timeline?: TimelineFn; actions?: Hono; web?: Hono } = {}): Hono {
   return createApp({
     ports: [API, WEB],
     token: TOKEN,
-    ...(opts.folders === undefined ? {} : { folders: opts.folders }),
     ...(opts.actions === undefined ? {} : { actions: opts.actions }),
     ...(opts.web === undefined ? {} : { web: opts.web }),
     source: opts.source ?? fakeSource().source,
@@ -513,103 +512,69 @@ describe('action routes', () => {
   })
 })
 
-describe('folder listing route', () => {
+describe('folder route is gone', () => {
   const READ = { ...HOST, 'x-openaflow-token': TOKEN }
-  let root: string
-  let seen: (string | undefined)[]
-  let app: Hono
-  const url = (dir?: string) => (dir === undefined ? '/api/fs/folders' : `/api/fs/folders?${new URLSearchParams({ path: dir })}`)
+  const urls = ['/api/fs/folders', `/api/fs/folders?${new URLSearchParams({ path: tmpdir() })}`, '/api/fs']
 
-  beforeEach(async () => {
-    root = await realpath(await mkdtemp(join(tmpdir(), 'openaflow-folders-')))
-    await mkdir(join(root, 'b-repo', 'pod-docs'), { recursive: true })
-    await mkdir(join(root, 'A plus+space'))
-    await writeFile(join(root, 'f.txt'), 'secret')
-    seen = []
-    app = fakeApp({
-      folders: (dir) => {
-        seen.push(dir)
-        return listFolders(dir, { fs: nodeFolderFs, platform, home: root })
-      },
-    })
-  })
-  afterEach(async () => {
-    await rm(root, { recursive: true, force: true })
-  })
-
-  test('200 with the subfolders of a real folder', async () => {
-    const res = await app.request(url(root), { headers: READ })
-    expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({
-      path: root,
-      parent: dirname(root),
-      locked: false,
-      truncated: false,
-      folders: [
-        { name: 'A plus+space', path: join(root, 'A plus+space'), podDocs: false },
-        { name: 'b-repo', path: join(root, 'b-repo'), podDocs: true },
-      ],
-    })
-    noCorsHeaders(res)
-  })
-
-  test('200 with the roots when no path is given', async () => {
-    const res = await app.request(url(), { headers: READ })
-    expect(res.status).toBe(200)
-    const body = (await res.json()) as { path: unknown; parent: unknown; folders: { path: string }[] }
-    expect([body.path, body.parent]).toEqual([null, null])
-    expect(body.folders.length).toBeGreaterThan(0)
-    for (const f of body.folders) expect(isAbsolute(f.path), f.path).toBe(true)
-    expect(seen).toEqual([undefined])
-  })
-
-  test('every error code and body', async () => {
-    const cases: [string, Record<string, string>, string, number, string][] = [
-      ['no token', HOST, url(root), 403, 'bad token'],
-      ['wrong token', { ...HOST, 'x-openaflow-token': 'k'.repeat(43) }, url(root), 403, 'bad token'],
-      ['token in the URL', HOST, `${url(root)}&token=${TOKEN}`, 403, 'bad token'],
-      ['foreign host', { ...READ, host: `evil.example:${API}` }, url(root), 403, 'forbidden host'],
-      ['relative', READ, url('some/folder'), 400, 'not absolute'],
-      ['empty', READ, url(''), 400, 'not absolute'],
-      ['NUL', READ, url(`${root}\0x`), 400, 'bad request'],
-      ['missing', READ, url(join(root, 'nope')), 404, 'not a directory'],
-      ['a file', READ, url(join(root, 'f.txt')), 404, 'not a directory'],
-    ]
-    for (const [name, headers, target, status, error] of cases) {
-      const res = await app.request(target, { headers })
-      expect(res.status, name).toBe(status)
-      expect(await res.json(), name).toEqual({ error })
-      noCorsHeaders(res)
+  /** Every folder URL, with and without the token, is a 404 with a JSON body. */
+  async function allGone(app: Hono) {
+    for (const url of urls) {
+      for (const [name, headers] of [['token', READ], ['no token', HOST]] as const) {
+        const res = await app.request(url, { headers })
+        expect(res.status, `${url} ${name}`).toBe(404)
+        expect(res.headers.get('content-type') ?? '', `${url} ${name}`).toMatch(/^application\/json/)
+        expect(await res.json(), `${url} ${name}`).toEqual({ error: 'not found' })
+        noCorsHeaders(res)
+      }
     }
-    // The guard's refusals never reached the listing.
-    expect(seen).toEqual(['some/folder', '', `${root}\0x`, join(root, 'nope'), join(root, 'f.txt')])
+  }
+
+  test('GET /api/fs/folders is 404 JSON in dev, with and without the token', async () => {
+    await allGone(fakeApp())
   })
 
-  test('a network path is refused before any file system call', async () => {
-    const calls: string[] = []
-    const record = (op: string) => async (p: string) => {
-      calls.push(`${op} ${p}`)
-      throw new Error('no file system in this test')
+  test('GET /api/fs/folders is 404 JSON with the web app mounted, with and without the token', async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'openaflow-app-web-')))
+    try {
+      await writeFile(join(root, 'index.html'), '<html><head></head><body>page</body></html>')
+      await allGone(fakeApp({ web: await createWebApp({ dir: root, token: TOKEN }) }))
+    } finally {
+      await rm(root, { recursive: true, force: true })
     }
-    const fs: FolderFs = { readdir: record('readdir'), stat: record('stat'), lstat: record('lstat'), readlink: record('readlink') }
-    const win = fakeApp({ folders: (dir) => listFolders(dir, { fs, platform: 'win32', home: 'C:\\Users\\u' }) })
-    for (const dir of ['\\\\host\\share', '//host/share', '\\\\?\\C:\\x', '\\\\.\\C:']) {
-      const res = await win.request(url(dir), { headers: READ })
-      expect(res.status, dir).toBe(400)
-      expect(await res.json()).toEqual({ error: 'not a local path' })
+  })
+})
+
+describe('picker code is gone', () => {
+  const packagesDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+  const GONE = /(?:\bfrom\s*|\bimport\s*\(?\s*)['"][^'"]*\/(?:folder-list|FolderPicker|folder-picker)(?:\.tsx?)?['"]/
+
+  /** Every source file under packages/<name>/{src,scripts,test}, never node_modules or a build. */
+  async function sources(): Promise<string[]> {
+    const out: string[] = []
+    for (const pkg of await readdir(packagesDir)) {
+      for (const sub of ['src', 'scripts', 'test']) {
+        const dir = join(packagesDir, pkg, sub)
+        const entries = await readdir(dir, { recursive: true }).catch(() => [] as string[])
+        for (const e of entries) {
+          if (/(^|[\\/])(node_modules|dist)([\\/]|$)/.test(e)) continue
+          if (/\.(ts|tsx|mts|mjs|js)$/.test(e)) out.push(join(dir, e))
+        }
+      }
     }
-    const res = await win.request(url('C:x'), { headers: READ })
-    expect([res.status, await res.json()]).toEqual([400, { error: 'not absolute' }])
-    expect(calls).toEqual([])
+    return out
+  }
+
+  test('no source imports folder-list, FolderPicker, or folder-picker', async () => {
+    const files = await sources()
+    expect(files.length).toBeGreaterThan(100)
+    const importers: string[] = []
+    for (const f of files) if (GONE.test(await readFile(f, 'utf8'))) importers.push(f)
+    expect(importers).toEqual([])
   })
 
-  test('only GET answers, and with no listing the route gets 404 behind the guard', async () => {
-    expect((await app.request(url(root), { method: 'POST', headers: { ...ACTION_HEADERS }, body: '{}' })).status).toBe(404)
-    const bare = fakeApp()
-    expect((await bare.request(url(root), { headers: READ })).status).toBe(404)
-    const refused = await bare.request(url(root), { headers: HOST })
-    expect(refused.status).toBe(403)
-    expect(await refused.json()).toEqual({ error: 'bad token' })
+  test('the files are deleted', async () => {
+    const gone = ['server/src/folder-list.ts', 'web/src/screens/runs/FolderPicker.tsx', 'web/src/screens/runs/folder-picker.ts', 'web/src/screens/runs/picker.css']
+    for (const f of gone) await expect(readFile(join(packagesDir, f)), f).rejects.toThrow()
   })
 })
 
@@ -660,15 +625,12 @@ describe('web seam', () => {
       web: catchAll(),
       actions: seen,
       timeline: async () => TIMELINE,
-      folders: async () => ({ path: null, parent: null, locked: false, truncated: false, folders: [] }),
     })
     const get = (path: string, headers: Record<string, string> = HOST) => app.request(path, { headers })
 
     expect(await (await get('/api/health')).json()).toEqual({ ok: true })
     expect(await (await get('/api/board')).json()).toEqual(BOARD)
     expect(await (await get('/api/agents/r/a1/timeline')).json()).toEqual(TIMELINE)
-    expect((await get('/api/fs/folders', { ...HOST, 'x-openaflow-token': TOKEN })).status).toBe(200)
-    expect((await get('/api/fs/folders')).status).toBe(403)
     const merged = await app.request('/api/actions/merge', { method: 'POST', headers: ACTION_HEADERS, body: '{}' })
     expect(await merged.json()).toEqual({ merged: true })
     // A guard refuses before the web app can answer.

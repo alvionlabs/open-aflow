@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { buildRepoModel, listRuns, type Board, type BoardRepo, type Claim, type PrStatus, type RunSummary } from '@openaflow/model'
 import { createElement } from 'react'
@@ -5,6 +6,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { loadFixture } from '../../../../model/test/load-fixture.ts'
 import type { StreamState } from '../../board-stream.ts'
 import { hashFor, type View } from '../../selection.ts'
+import { MENU_TRIGGER_ID } from './BarMenu.tsx'
+import { confirmView, moreButtonId, removeTarget } from './remove-flow.ts'
+import { RunsList } from './RunsList.tsx'
 import { RunsScreen } from './RunsScreen.tsx'
 import type { TabStorage } from './tab-memory.ts'
 
@@ -573,5 +577,33 @@ describe('urgent banner', () => {
     const agent = render({ repo: chess([onlyQueue(), manual], { claims: [claim] }), others: [other(HALT)], plan: name, view: 'agent', agent: 'f1' }).html
     expect(mainOf(agent)).toMatch(/^<div class="urgent-slot" role="status"><div class="urgent">/)
     expect(text(slotOf(agent)?.[0] ?? '')).toMatch(/other-web/)
+  })
+})
+
+describe('one remove modal', () => {
+  const repo = chess([onlyQueue()])
+  const runs = listRuns(boardOf(repo), NOW)
+  const run = runs.find((r) => r.plan === PLAN)!
+
+  it('the header and sidebar ⋯ open the same modal, which differs only in where focus goes back', () => {
+    const open = (returnTo: string) => confirmView({ kind: 'confirm', seq: 1, target: removeTarget(repo, { repos: [repo], runs, returnTo })! })!
+    const header = open(MENU_TRIGGER_ID)
+    const side = open(moreButtonId(run))
+    expect(header.returnFocusTo).toBe(MENU_TRIGGER_ID)
+    expect(side.returnFocusTo).toBe(moreButtonId(run))
+    expect({ ...side, returnFocusTo: '' }).toEqual({ ...header, returnFocusTo: '' })
+    expect(header.mono).toEqual(['/c'])
+  })
+
+  it('leaves no in-place remove panel: one ConfirmModal on the screen, no panel slot under a card', () => {
+    const src = readFileSync(new URL('./RunsScreen.tsx', import.meta.url), 'utf8')
+    expect(count(src, /<ConfirmModal\b/)).toBe(1)
+    expect(src).not.toMatch(/RemoveConfirm|panelFor|panelAt/)
+    expect(existsSync(new URL('./RemoveConfirm.tsx', import.meta.url))).toBe(false)
+    expect(readFileSync(new URL('./runs.css', import.meta.url), 'utf8')).not.toMatch(/remove-confirm|remove-path|remove-body/)
+    const list = renderToStaticMarkup(createElement(RunsList, { runs, selected: run, repos: [repo], removable: () => true, onRemove: () => {}, panelFor: () => 'PANEL' } as never))
+    expect(list).not.toContain('PANEL')
+    // Nothing is open at start.
+    expect(render({ repo }).html).not.toMatch(/<dialog|remove-confirm/)
   })
 })

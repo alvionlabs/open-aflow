@@ -72,3 +72,18 @@ describe('Remove repo item', () => {
     expect(render({ open: false })).toMatch(/<button[^>]*id="run-menu-trigger"/)
   })
 })
+
+describe('Forget item', () => {
+  it('shows only with forget, as a danger item that reads Forget this run, right above Remove repo', () => {
+    expect(render({ remove: { onPick: noop } })).not.toContain('Forget this run')
+    const html = render({ forget: { onPick: noop }, remove: { onPick: noop }, portBase: 3400 })
+    expect(html).toMatch(/<button type="button" class="mi mi-action mi-danger">Forget this run<\/button><button type="button" class="mi mi-action mi-danger">Remove repo<\/button>/)
+    expect(html.indexOf('Ports')).toBeLessThan(html.indexOf('Forget this run'))
+  })
+
+  it('shows alone, after a rule, for a repo only its claim lists (no Remove repo)', () => {
+    const html = render({ forget: { onPick: noop }, portBase: 3400 })
+    expect(html).toMatch(/<hr\/><button type="button" class="mi mi-action mi-danger">Forget this run<\/button><\/div>/)
+    expect(html).not.toContain('Remove repo')
+  })
+})

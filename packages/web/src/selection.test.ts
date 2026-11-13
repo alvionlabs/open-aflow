@@ -48,6 +48,22 @@ describe('selected run', () => {
   })
 })
 
+describe('selection follows the hash', () => {
+  it('a selected run that moves in the list stays selected', () => {
+    const hash = hashFor(runs[1]!)
+    const moved = [runs[2]!, runs[1]!, runs[0]!]
+    expect(resolveSelection(moved, hash).run).toBe(runs[1])
+    expect(resolveSelection(moved, hash).hash).toBe(hash)
+    const front = [runs[1]!, runs[0]!, runs[2]!]
+    expect(resolveSelection(front, hash).run).toBe(runs[1])
+  })
+
+  it('a hash that picks nothing falls to the new first run, not the old one', () => {
+    const moved = [runs[2]!, runs[0]!, runs[1]!]
+    expect(resolveSelection(moved, '').run).toBe(runs[2])
+  })
+})
+
 describe('routes', () => {
   const slicesOf = (r: RunSummary) => (r.plan === 'alpha' ? ['L1', 'H 1'] : [])
 

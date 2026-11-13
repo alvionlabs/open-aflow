@@ -9,11 +9,13 @@ import {
   reduceResume,
   reduceToggle,
   resumeView,
+  sendLabel,
   startedText,
   switchView,
   toggleView,
   type Post,
   type ResumeState,
+  type ResumeWord,
   type RunTarget,
   type ToggleState,
 } from './resume-flow.ts'
@@ -237,5 +239,51 @@ describe('Continue and Go', () => {
       const v = await send(fail(status, message))
       expect(v, message).toEqual({ busy: false, word: 'continue', error: message })
     }
+  })
+
+  it('Sending label', async () => {
+    const { flow, calls } = setup()
+    const labels = () => {
+      const v = resumeView(flow.state(), RESUME)
+      return { busy: v.busy, continue: sendLabel(v, 'continue'), go: sendLabel(v, 'go') }
+    }
+    expect(labels()).toEqual({ busy: false, continue: 'Continue', go: 'Go' })
+    // In flight: the pressed row reads Sending…, the other keeps its word, and every send button is off.
+    flow.press('continue')
+    expect(labels()).toEqual({ busy: true, continue: 'Sending…', go: 'Go' })
+    calls[0]!.resolve(ok(started()))
+    await tick()
+    expect(labels()).toEqual({ busy: false, continue: 'Continue', go: 'Go' })
+    flow.press('go')
+    expect(labels()).toEqual({ busy: true, continue: 'Continue', go: 'Sending…' })
+    // An error gives the word back.
+    calls[1]!.resolve(fail(409, 'session is busy'))
+    await tick()
+    expect(labels()).toEqual({ busy: false, continue: 'Continue', go: 'Go' })
+  })
+
+  it('onSent takes the result; a started one leaves no result block', async () => {
+    const p = fakePost()
+    const sent: [ResumeWord, number, ResumeResult][] = []
+    const flow = createResumeFlow(T, () => {}, p.post, { onSent: (w, at, r) => sent.push([w, at, r]), now: () => 42 })
+    flow.press('continue')
+    p.calls[0]!.resolve(ok(started({ logged: false })))
+    await tick()
+    expect(sent).toEqual([['continue', 42, { outcome: 'started', logged: false }]])
+    // No result to show, and no word left: an empty slot draws nothing after the Board drops the reply.
+    expect(flow.state().kind).toBe('idle')
+    expect(resumeView(flow.state(), RESUME)).toEqual({ busy: false })
+    // A failed start is passed on too, and keeps its result block, with Close.
+    flow.press('go')
+    p.calls[1]!.resolve(ok({ outcome: 'failed', message: 'claude not found', logged: true }))
+    await tick()
+    expect(sent[1]).toEqual(['go', 42, { outcome: 'failed', message: 'claude not found', logged: true }])
+    expect(resumeView(flow.state(), RESUME)).toMatchObject({ word: 'go', result: { words: 'claude not found' } })
+    // A refused request isn't a result: no call, and its error stays.
+    flow.press('continue')
+    p.calls[2]!.resolve(fail(404, 'no session'))
+    await tick()
+    expect(sent).toHaveLength(2)
+    expect(resumeView(flow.state(), RESUME)).toMatchObject({ error: 'no session' })
   })
 })

@@ -293,6 +293,29 @@ describe('elsewhere', () => {
   })
 })
 
+describe('sidebar order tie', () => {
+  // The sidebar is `listRuns` order: newest activity first, so an equal-date tie goes to the run active last.
+  const active = (id: string, minutesAgo: number) =>
+    repoOf(id, [onlyQueue(blocked('2026-10-19')), manual], {
+      agents: [{ id: `a-${id}`, session: 's', type: 'pod:engineer', plan: PLAN, tokens: 0, ended: true, lastAt: NOW - minutesAgo * 60_000 }],
+    })
+
+  it('the banner tie picks the earlier run in the sidebar', () => {
+    const idle = RECIPE.nothing('idle')
+    // Alphabetically `aaa` is first, but `zzz` was active last, so it is first in the sidebar.
+    const aaa = active('aaa', 90)
+    const zzz = active('zzz', 5)
+    const b = boardOf(idle, aaa, zzz)
+    const runs = listRuns(b, NOW)
+    expect(runs.map((r) => r.repoId)).toEqual(['zzz', 'aaa', 'idle'])
+    expect(elsewhere(runs, b, runs[2], NOW)?.run.repoId).toBe('zzz')
+    // Moving the activity moves the tie.
+    const b2 = boardOf(idle, active('aaa', 1), active('zzz', 5))
+    const runs2 = listRuns(b2, NOW)
+    expect(elsewhere(runs2, b2, runs2[2], NOW)?.run.repoId).toBe('aaa')
+  })
+})
+
 describe('elsewhere after Remove repo', () => {
   const selected = RECIPE.nothing('a')
   const gone = RECIPE.blocked('b')

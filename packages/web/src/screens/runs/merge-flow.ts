@@ -76,13 +76,29 @@ export type MergeFlow = {
   key(key: string): void
 }
 
+/**
+ * `onMerged`: the panel closes on `merged`. The flow goes straight to idle and calls it once with the PR's number and
+ * the time, so the owner shows the merge itself (the Next step card's list). Every other outcome keeps the panel.
+ * `now` is for tests.
+ */
+export type MergeHooks = { onMerged?: (number: number, at: number) => void; now?: () => number }
+
 /** Runs the reducer and sends `merge-preview` and `merge` as it moves to loading and merging. */
-export function createMergeFlow(onChange: (s: MergeState) => void, post: Post = (path, body) => postAction(path, body)): MergeFlow {
+export function createMergeFlow(
+  onChange: (s: MergeState) => void,
+  post: Post = (path, body) => postAction(path, body),
+  { onMerged, now = Date.now }: MergeHooks = {},
+): MergeFlow {
   let state = INITIAL
   const dispatch = (e: MergeEvent) => {
     const prev = state
     state = reduce(state, e)
     if (state === prev) return
+    const done = state.kind === 'result' && state.result.outcome === 'merged' ? state.target.number : undefined
+    if (onMerged && done !== undefined) {
+      state = { kind: 'idle', seq: state.seq }
+      onMerged(done, now())
+    }
     onChange(state)
     const s = state
     if (s.kind === 'loading') {

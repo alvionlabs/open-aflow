@@ -147,28 +147,6 @@
   padding-right: 17px;
 }
 
-/* The Add repo dialog: a sizing box; the picker inside keeps its own frame. */
-.add-dialog {
-  width: min(720px, calc(100vw - 32px));
-  max-width: none;
-  max-height: calc(100dvh - 32px);
-  margin: auto;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fg);
-  overflow: auto;
-}
-
-.add-dialog::backdrop {
-  background: var(--bg);
-  opacity: 0.72;
-}
-
-.add-dialog .picker {
-  max-width: none;
-}
-
 .banners {
   margin-bottom: 24px;
 }
@@ -298,6 +276,20 @@
 }
 
 /*
+ * The auto tag: right after the status when the board sends `continue` for the run by itself. In two columns it sits
+ * under the status, in the status column, and the name spans both rows, so the tag never pushes the repo line down.
+ */
+.run-body > .chip.tag {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.run-body:has(> .chip.tag) > b {
+  grid-row: span 2;
+}
+
+/*
  * Stacked by default: name at full width, status, then the repo line. At 256 px of content or less (a card of
  * 290 px, a sidebar of 323 px, so the default 260 px too) a two-column name is under 156 px, and a long word such
  * as `open_aflow_long_repo` would break. Above that, a word with a hyphen or an underscore breaks only there. A
@@ -316,6 +308,23 @@
 
   .run-wrap:has(> .run-more-wrap) .run-line:empty {
     display: none;
+  }
+
+  /* Stacked, the auto tag shares the status line, 8 px after the status. */
+  .run-body:has(> .chip.tag) {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 8px;
+  }
+
+  .run-body:has(> .chip.tag) > b {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  .run-body > .chip.tag {
+    grid-column: 2;
+    align-self: center;
+    margin-top: 0;
   }
 }
 
@@ -355,13 +364,6 @@
 .run-wrap:focus-within .run-more,
 .run-more[aria-expanded="true"] {
   opacity: 1;
-}
-
-/* The sidebar's confirm sits right under its card, at the sidebar's dense size. */
-.run-item > .remove-confirm {
-  margin: 8px 0 0;
-  padding: 12px;
-  font-size: var(--size-dense);
 }
 
 /* base.css makes every icon button 44 px on a phone; this one keeps its 24 px box, and touch gets the target below. */
@@ -1299,11 +1301,6 @@
     padding: 20px 16px 40px;
   }
 
-  .add-dialog {
-    width: calc(100vw - 16px);
-    max-height: calc(100dvh - 16px);
-  }
-
   .runs-head {
     display: none;
   }
@@ -1597,28 +1594,4 @@
   .wait-more {
     min-height: 44px;
   }
-}
-
-/* Remove from the board: in place under the run header, like the merge confirm. Its text stays near 72ch. */
-.remove-confirm {
-  margin: 16px 0 32px;
-  max-width: 640px;
-}
-
-.remove-confirm:focus {
-  outline: none;
-}
-
-.remove-confirm:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.remove-path {
-  overflow-wrap: anywhere;
-}
-
-.remove-body {
-  margin: 0;
-  max-width: 72ch;
 }

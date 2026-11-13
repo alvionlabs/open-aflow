@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { buildFixPipeline, buildFlow, buildPipeline, type Board, type RunSummary } from '@openaflow/model'
 import type { StreamState } from '../../board-stream.ts'
 import { hashFor, type View } from '../../selection.ts'
+import { ConfirmModal } from '../../components/ConfirmModal.tsx'
+import { returnFocus } from '../../components/modal.ts'
 import { Icon } from '../../theme/icons.tsx'
 import { BoardScreen } from '../board/BoardScreen.tsx'
 import { AddRepoDialog } from './AddRepoDialog.tsx'
@@ -12,13 +14,20 @@ import { elsewhere } from './elsewhere.ts'
 import { LogTab } from './LogTab.tsx'
 import { NextStepCard } from './NextStepCard.tsx'
 import { focusOnArrival } from './open-focus.ts'
+import {
+  INITIAL as FORGET_IDLE,
+  createForgetFlow,
+  forgetTarget,
+  forgetView,
+  hashAfterForget,
+  navigateAfterForget,
+  type ForgetState,
+} from './forget-flow.ts'
 import { nextSteps } from './next-step.ts'
 import { runHeader } from './plan-view.ts'
 import { switchView } from './resume-flow.ts'
-import { RemoveConfirm } from './RemoveConfirm.tsx'
 import { MENU_TRIGGER_ID } from './BarMenu.tsx'
 import {
-  HEADER_PLACE,
   INITIAL as REMOVE_IDLE,
   confirmView as removeView,
   createRemoveFlow,
@@ -102,8 +111,8 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   // A plan's full flow (Think → You → sprints → Check → Ship); a fix run's Build, Review, Ship.
   const stages = fixPipeline?.stages ?? (repo && pipeline && selected?.plan !== undefined ? (buildFlow(repo, selected.plan, now) ?? []) : [])
 
-  // Remove repo, from the header's ⋯ or a sidebar card's ⋯: the confirm opens under the one it came from;
-  // after a removal the page moves on when the open run's repo left.
+  // Remove repo, from the header's ⋯ or a sidebar card's ⋯: both open the one confirm modal.
+  // After a removal the page moves on when the open run's repo left.
   const [removeState, setRemoveState] = useState<RemoveState>(REMOVE_IDLE)
   const latest = useRef({ planFallback, navigate, selected })
   latest.current = { planFallback, navigate, selected }
@@ -131,21 +140,48 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
     removeFlow.remove(after)
   }
   const repos = board?.repos ?? []
-  const toRemove = removeTarget(repo, { repos, runs, place: HEADER_PLACE, returnTo: MENU_TRIGGER_ID })
-  const sideTarget = (run: RunSummary) => removeTarget(repoOfRun(repos, run), { repos, runs, place: hashFor(run), returnTo: moreButtonId(run) })
+  const toRemove = removeTarget(repo, { repos, runs, returnTo: MENU_TRIGGER_ID })
+  const sideTarget = (run: RunSummary) => removeTarget(repoOfRun(repos, run), { repos, runs, returnTo: moreButtonId(run) })
+
+  // Forget this run, from the header's ⋯ only, when forgetCheck allows it. The modal keeps the target taken at open.
+  const [forgetState, setForgetState] = useState<ForgetState>(FORGET_IDLE)
+  const forgetFlow = useMemo(
+    () =>
+      createForgetFlow(setForgetState, (target, after) => {
+        const go = navigateAfterForget(latest.current.selected, target, after)
+        if (go !== undefined) latest.current.navigate?.(go)
+        latest.current.planFallback?.(undefined)
+      }),
+    [],
+  )
+  // A run change cancels: when the new Board comes first, the page has already moved to the planned run.
+  useEffect(() => forgetFlow.cancel(), [runKey, forgetFlow])
+  useEffect(() => {
+    if (forgetState.kind !== 'forgetting') latest.current.planFallback?.(undefined)
+  }, [forgetState.kind])
+  const pressForget = () => {
+    if (forgetState.kind !== 'confirm' && forgetState.kind !== 'error') return
+    const after = hashAfterForget(runs, selected, forgetState.target)
+    planFallback?.(after)
+    forgetFlow.forget(after)
+  }
+  const toForget = header ? forgetTarget(repo, selected, header.title, now) : undefined
+
+  // One confirm modal on the screen: at most one of the two is open, since the modal makes the page inert.
   const removing = removeView(removeState)
-  const panelAt = (place: string) =>
-    removing && removeState.kind !== 'idle' && removeState.target.place === place ? (
-      <RemoveConfirm
-        key={place}
-        view={removing}
-        returnTo={removeState.target.returnTo}
-        onRemove={pressRemove}
-        onCancel={() => removeFlow.cancel()}
-        onKey={(k) => removeFlow.key(k)}
-      />
-    ) : null
-  const removePanel = removeState.kind !== 'idle' && removeState.target.path === repo?.path ? panelAt(HEADER_PLACE) : null
+  const forgetting = forgetView(forgetState)
+  const modal = removing
+    ? { key: 'remove', view: removing, onConfirm: pressRemove, onCancel: () => removeFlow.cancel() }
+    : forgetting
+      ? { key: 'forget', view: forgetting, onConfirm: pressForget, onCancel: () => forgetFlow.cancel() }
+      : undefined
+  // The modal sends focus to its ⋯ button; when that left with its card, focus falls to the header's ⋯.
+  const modalOpen = modal !== undefined
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (wasOpen.current && !modalOpen) setTimeout(() => returnFocus(MENU_TRIGGER_ID, document), 0)
+    wasOpen.current = modalOpen
+  }, [modalOpen])
 
   const press = (t: Tab) => {
     const next = tabPress(shown, t, view)
@@ -167,6 +203,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
       key={runKey}
       autoContinue={selected?.plan !== undefined && autoSwitch ? { target: { repoId: selected.repoId, run: selected.plan }, on: autoSwitch.on } : undefined}
       portBase={selected?.portBase}
+      {...(toForget ? { forget: { onPick: () => forgetFlow.open(toForget) } } : {})}
       {...(toRemove ? { remove: { onPick: () => removeFlow.open(toRemove) } } : {})}
     />
   )
@@ -195,7 +232,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
               const t = sideTarget(r)
               if (t) removeFlow.open(t)
             }}
-            panelFor={(r) => panelAt(hashFor(r))}
+            auto={(r) => switchView(r, board)?.on === true}
           />
           <div className="side-foot">
             <button ref={repoButton} className="btn lead add-repo" type="button" aria-haspopup="dialog" onClick={() => setPicking(true)}>
@@ -235,7 +272,6 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
           ) : view === 'board' && pipeline && selected.plan !== undefined ? (
             <>
               {header && <RunHeader header={header} actions={menu} />}
-              {removePanel}
               <p className="back">
                 <a href={hashFor(selected)}>Back to the run</a>
               </p>
@@ -260,7 +296,6 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
                   }
                 />
               )}
-              {removePanel}
               <Flow key={`flow:${runKey}`} stages={stages} />
               {steps && <NextStepCard key={runKey} repo={repo} run={selected} card={steps.card} />}
               <div className="tabs" role="group" aria-label="More about this run">
@@ -291,6 +326,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
           )}
         </main>
       </div>
+      {modal && <ConfirmModal key={modal.key} {...modal.view} onConfirm={modal.onConfirm} onCancel={modal.onCancel} />}
       {picking && <AddRepoDialog repoPaths={board?.repos.map((r) => r.path) ?? []} onClose={closePicker} />}
     </div>
   )

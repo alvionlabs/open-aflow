@@ -1,52 +1,87 @@
-// The Add repo dialog: the folder picker in a native modal <dialog>. The browser
-// traps focus (the page behind is inert) and sends Escape as `cancel`. The logic
-// is in add-dialog.ts; this file only wires it.
-import { useLayoutEffect, useRef } from 'react'
-import { backdropClose } from './add-dialog.ts'
-import { FolderPicker } from './FolderPicker.tsx'
+// Add repo: the desktop shell's folder dialog, or a path field in the shared modal. The rules are in
+// add-repo-flow.ts; this file only wires them. The opener (screen 1's sidebar) puts focus back on its button
+// after `onClose`, so `onClose` runs only once the modal has left the page and the page is no longer inert.
+import { useEffect, useId, useRef, useState } from 'react'
+import { postRepo } from '../../add-repo.ts'
+import { Modal } from '../../components/Modal.tsx'
+import { folderBridge } from '../../desktop-bridge.ts'
+import { canAdd, createAddRepoFlow, type AddRepoFlow, type AddRepoState } from './add-repo-flow.ts'
 
+/** `repoPaths` is kept for the opener; the folder dialog and the path field don't use it. */
 type Props = { repoPaths: string[]; onClose: () => void }
 
-export function AddRepoDialog({ repoPaths, onClose }: Props) {
-  const ref = useRef<HTMLDialogElement>(null)
-  const downOnDialog = useRef(false)
-  const upOnDialog = useRef(false)
+export function AddRepoDialog({ onClose }: Props) {
+  const [state, setState] = useState<AddRepoState | undefined>(undefined)
+  // Closing is read from the state, so the parent hears of it after the modal is gone.
+  const [flow] = useState(() => createAddRepoFlow({ pick: folderBridge(), post: (p) => postRepo(p), onClose: () => {} }, setState))
+  const close = useRef(onClose)
+  close.current = onClose
+  const view = state ?? flow.state()
 
-  // Before the picker's own effect focuses its path box: a closed dialog can't take focus.
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (el && !el.open) el.showModal()
-    return () => {
-      if (el?.open) el.close()
-    }
-  }, [])
+  useEffect(() => flow.start(), [flow])
+  useEffect(() => {
+    if (view.kind === 'closed') close.current()
+  }, [view.kind])
 
-  // Close the modal first, so the opener is no longer inert when it takes focus back.
-  const close = () => {
-    if (ref.current?.open) ref.current.close()
-    onClose()
-  }
+  return view.kind === 'form' ? <AddRepoForm state={view} flow={flow} /> : null
+}
+
+type FormProps = { state: Extract<AddRepoState, { kind: 'form' }>; flow: AddRepoFlow }
+
+/** The modal: the path field, the error, then Choose folder… (desktop only), Cancel, and Add. */
+export function AddRepoForm({ state, flow }: FormProps) {
+  const headingId = useId()
+  const fieldId = useId()
+  const errorId = useId()
+  const field = useRef<HTMLInputElement>(null)
+  // After the modal's showModal(): a closed dialog can't take focus.
+  useEffect(() => field.current?.focus(), [])
 
   return (
-    <dialog
-      ref={ref}
-      className="add-dialog"
-      aria-labelledby="add-dialog-title"
-      onCancel={(e) => {
-        e.preventDefault()
-        close()
-      }}
-      onPointerDown={(e) => {
-        downOnDialog.current = e.target === e.currentTarget
-      }}
-      onPointerUp={(e) => {
-        upOnDialog.current = e.target === e.currentTarget
-      }}
-      onClick={(e) => {
-        if (backdropClose(downOnDialog.current, e.target === e.currentTarget, upOnDialog.current)) close()
-      }}
-    >
-      <FolderPicker repoPaths={repoPaths} onClose={close} />
-    </dialog>
+    <Modal labelledBy={headingId} busy={state.busy} onClose={flow.cancel} className="add-repo-modal">
+      <h2 id={headingId} className="modal-heading">
+        Add repo
+      </h2>
+      <label className="modal-detail" htmlFor={fieldId}>
+        The repo folder's full path
+      </label>
+      <input
+        ref={field}
+        id={fieldId}
+        className="input mono"
+        type="text"
+        autoComplete="off"
+        spellCheck={false}
+        placeholder="C:\code\my-repo"
+        value={state.path}
+        readOnly={state.busy}
+        aria-invalid={state.error ? 'true' : undefined}
+        aria-describedby={state.error ? errorId : undefined}
+        onChange={(e) => flow.type(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return
+          e.preventDefault()
+          void flow.add()
+        }}
+      />
+      {state.error && (
+        <p id={errorId} className="modal-error" role="alert">
+          {state.error}
+        </p>
+      )}
+      <div className="modal-actions">
+        {state.canChoose && (
+          <button className="btn" type="button" disabled={state.busy} onClick={flow.choose}>
+            Choose folder…
+          </button>
+        )}
+        <button className="btn quiet" type="button" disabled={state.busy} onClick={flow.cancel}>
+          Cancel
+        </button>
+        <button className="btn primary" type="button" disabled={!canAdd(state)} onClick={() => void flow.add()}>
+          Add
+        </button>
+      </div>
+    </Modal>
   )
 }
