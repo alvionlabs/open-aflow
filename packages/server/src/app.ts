@@ -4,7 +4,6 @@ import { bodyLimit } from 'hono/body-limit'
 import { streamSSE } from 'hono/streaming'
 import { AGENT_ID } from './agent-timeline.ts'
 import { actionGuard, readGuard, requestGuard } from './guard.ts'
-import type { FolderListError, FolderListing } from './folder-list.ts'
 import type { AddRepoError } from './repos-config.ts'
 import { createToolRoutes, type ToolRoutesDeps } from './tool-routes.ts'
 
@@ -31,15 +30,11 @@ export type AppDeps = {
   token: string
   /** The action routes, mounted at /api/actions behind the action guard. */
   actions?: Hono
-  /** Lists a folder's subfolders, or the roots with no path, for `GET /api/fs/folders`. With none, that route gets 404. */
-  folders?: (dir: string | undefined) => Promise<FolderListing | { error: FolderListError }>
   /** The built web app (production), mounted after every API route and behind the request guard. With none, a page route gets 404. */
   web?: Hono | undefined
   /** The tool finder (production), for `GET /api/tools` and `POST /api/actions/tool-path`. With none, neither route exists: 404. */
   tools?: ToolRoutesDeps | undefined
 }
-
-const FOLDER_STATUS = { 'not a local path': 400, 'not absolute': 400, 'bad request': 400, 'not a directory': 404 } as const
 
 const ADD_REPO_STATUS = { 'not absolute': 400, 'not a local path': 400, 'not a directory': 400, 'already registered': 409, 'config unreadable': 500 } as const
 
@@ -48,8 +43,8 @@ const ADD_REPO_STATUS = { 'not absolute': 400, 'not a local path': 400, 'not a d
  * route sits behind the request guard, and `actions` (mounted at /api/actions)
  * and `POST /api/repos` also behind a 64 KB body limit (413) and the action
  * guard (a POST of a JSON object with the session token). With no `actions`,
- * a request past it gets 404. Routes under /api/fs/ sit behind the read guard
- * (the session token in its header); with no `folders`, they get 404 too.
+ * a request past it gets 404. Any other path is a 404 with a JSON body; with
+ * `web`, the web app answers it.
  */
 export function createApp(deps: AppDeps): Hono {
   const pingMs = deps.pingMs ?? PING_MS
@@ -67,16 +62,6 @@ export function createApp(deps: AppDeps): Hono {
     app.use('/api/tools', readGuard({ ports: deps.ports, token: deps.token }))
     app.route('/', createToolRoutes(deps.tools))
   }
-  app.use('/api/fs/*', readGuard({ ports: deps.ports, token: deps.token }))
-
-  const folders = deps.folders
-  if (folders) {
-    app.get('/api/fs/folders', async (c) => {
-      const result = await folders(c.req.query('path'))
-      return 'error' in result ? c.json({ error: result.error }, FOLDER_STATUS[result.error]) : c.json(result)
-    })
-  }
-
   app.get('/api/health', (c) => c.json({ ok: true }))
 
   app.get('/api/board', (c) => c.json(deps.source.board()))
@@ -132,6 +117,8 @@ export function createApp(deps: AppDeps): Hono {
   })
 
   if (deps.web) app.route('/', deps.web)
+  // In dev no web app is mounted: an unknown path is JSON, as web-app.ts answers /api/* in production.
+  app.notFound((c) => c.json({ error: 'not found' }, 404))
 
   return app
 }

@@ -344,55 +344,6 @@ describe('runs.css run cards and Add repo', () => {
   })
 })
 
-describe('picker.css crumbs', () => {
-  const pickerRules = () => rules(stripComments(readFileSync(join(here, 'picker.css'), 'utf8')))
-  const at = (sel: string, media?: RegExp) =>
-    Object.assign({}, ...pickerRules().filter((r) => (media ? !!r.media && media.test(r.media) : !r.media) && r.selectors.includes(sel)).map((r) => decls(r.body)))
-
-  it('stays on one line; a long name ends in an ellipsis rather than scrolling sideways', () => {
-    const row = at('.picker-crumbs')
-    expect(row['display']).toBe('flex')
-    expect(row['flex-wrap']).toBe('nowrap')
-    expect(row['min-width']).toBe('0')
-    const crumb = at('.picker-crumb')
-    expect(crumb['min-width']).toBe('0')
-    expect(crumb['overflow']).toBe('hidden')
-    expect(crumb['text-overflow']).toBe('ellipsis')
-    expect(crumb['white-space']).toBe('nowrap')
-    // The root and the fold never shrink; the folder names do.
-    expect(at('.picker-fold')['flex']).toMatch(/^none$|^0 0/)
-    // The parent gives way before the current folder, but keeps a few letters.
-    const shrink = (d: Record<string, string>) => Number(d['flex-shrink'] ?? /^\S+\s+(\S+)/.exec(d['flex'] ?? '')?.[1] ?? 1)
-    // Any shrink share at all would cut the current name by a fraction of a pixel, so it doesn't shrink;
-    // a cap leaves the other crumbs their room, and only a longer name ends in an ellipsis.
-    expect(shrink(at('.picker-crumb[aria-current="location"]'))).toBe(0)
-    expect(at('.picker-crumb[aria-current="location"]')['max-width']).toMatch(/^calc\(100% - \d+(\.\d+)?rem\)$/)
-    expect(shrink(at('button.picker-crumb'))).toBeGreaterThan(0)
-    // Crumbs size to their text: no min-width box around a short name such as E:.
-    expect(at('button.picker-crumb')['min-width'] ?? '0').toBe('0')
-    expect(at('.picker-crumb')['padding']).toBe('2px 6px')
-    expect(at('.picker-crumbs')['gap']).toBe('4px')
-  })
-
-  it('crumbs are muted 14 px Geist, the text colour on hover', () => {
-    const crumb = at('.picker-crumb')
-    expect(crumb['color']).toBe('var(--muted)')
-    expect(crumb['font']).toMatch(/var\(--size-dense\)[\s\S]*var\(--font\)/)
-    expect(at('button.picker-crumb:hover')['color']).toBe('var(--fg)')
-    expect(at('.picker-crumb[aria-current="location"]')['color']).toBe('var(--fg)')
-  })
-
-  it('keeps the crumbs 44 px tall to touch on phones', () => {
-    expect(at('button.picker-crumb', /max-width:\s*480px/)['min-height']).toBe('44px')
-    // Taller to touch, never wider: the gaps around the arrows stay even.
-    expect(at('button.picker-crumb', /max-width:\s*480px/)['min-width']).toBeUndefined()
-    expect(at('button.picker-crumb', /max-width:\s*480px/)['padding']).toBeUndefined()
-    expect(at('.picker-fold', /max-width:\s*480px/)['min-height']).toBe('44px')
-    expect(at('.picker-fold', /max-width:\s*480px/)['min-width']).toBe('44px')
-    expect(at('.picker-fold-item', /max-width:\s*480px/)['min-height']).toBe('44px')
-  })
-})
-
 describe('runs.css Add repo size', () => {
   it('is the regular size, not small', () => {
     // .btn is 40 px; .btn.sm would make it 32 px.
@@ -650,7 +601,7 @@ describe('runs.css log tab', () => {
 
 /**
  * The DESIGN.md Spacing rules on screen 1 and the sidebar: runs.css, the tabs and the ⋯ menu, and the
- * shared controls in base.css. The Add repo dialog's picker (picker.css) and screens 2 and 3 have their own files.
+ * shared controls in base.css. Screens 2 and 3 have their own files.
  */
 describe('spacing scale', () => {
   const SCREEN_ONE = ['runs.css', 'tabs.css', 'menu.css', 'urgent-banner.css', '../../theme/base.css']
