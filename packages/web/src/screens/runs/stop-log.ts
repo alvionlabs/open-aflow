@@ -10,10 +10,10 @@ import type { ReplyPanelView, ReplyRowView } from './reply-view.ts'
 import { NOT_LOGGED, SEND_LABEL, startedText, type ResumeWord } from './resume-flow.ts'
 
 /**
- * `merged`: the PR the item merged, so a card that still names it waits for the Board. `sent`: a Continue or Go that
- * is still pod's turn, so the current item reads `pod runs`.
+ * `merged`: the PR the item merged, so a card that still names it waits for the Board. `sent`: the word of a Continue
+ * or Go, so the current item reads `pod runs`. `back`: its button came back with the run out of running.
  */
-export type StopDone = { key: string; label: string; time: string; note?: string; merged?: number; sent?: true }
+export type StopDone = { key: string; label: string; time: string; note?: string; merged?: number; sent?: ResumeWord; back?: true }
 /**
  * A started send's button stays hidden (pick 2 b: the sent line replaces it) while the run reads the state it had at
  * the send, the card keeps its key and the row its words, and for SEND_HOLD_MS at most. `item`: the sent item's key.
@@ -46,7 +46,7 @@ export function logMerged(log: StopLog, number: number, at: number): StopLog {
 export function logSent(log: StopLog, word: ResumeWord, at: number, result: ResumeResult, resume?: string, from?: { state: RunState; card: NextItem }): StopLog {
   if (result.outcome !== 'started') return log
   const note = result.logged ? startedText(resume) : `${startedText(resume)} ${NOT_LOGGED}`
-  const next = add(log, { label: `Sent ${word}`, time: clock(at), note, sent: true })
+  const next = add(log, { label: `Sent ${word}`, time: clock(at), note, sent: word })
   if (!from) return next
   return { ...next, hold: { word, at, state: from.state, card: from.card.key, why: sendRow(from.card, word)?.why, item: `done-${log.n}` } }
 }
@@ -56,16 +56,12 @@ function sendRow(card: NextItem, word: ResumeWord): ReplyRowView | undefined {
   return card.action.kind === 'reply' ? card.action.panel.rows.find((r) => r.send === word) : undefined
 }
 
-/** The button comes back. Out of running, the send is no longer pod's turn: the current item names the button again. */
+/** The button comes back. Out of running, the sent item is marked, so a card that shows the button again names it. */
 function release(log: StopLog): StopLog {
   const { hold, ...rest } = log
   if (!hold) return log
   if (rest.running) return rest
-  return { ...rest, done: rest.done.map((d) => (d.key === hold.item ? withoutSent(d) : d)) }
-}
-
-function withoutSent({ sent: _sent, ...d }: StopDone): StopDone {
-  return d
+  return { ...rest, done: rest.done.map((d): StopDone => (d.key === hold.item ? { ...d, back: true } : d)) }
 }
 
 /**
@@ -112,7 +108,7 @@ function nextAction(card: NextItem): string {
 
 /**
  * The list to draw, and whether the card's Merge hides. No done item: no list. The current item is `pod runs` after
- * a send; `Updating…` while the card still names a PR the list shows merged (and that Merge hides); else the card's
+ * a send, until its button is back on the card; `Updating…` while the card still names a PR the list shows merged (and that Merge hides); else the card's
  * next action.
  */
 export function stopView(log: StopLog, card: NextItem): StopView {
@@ -120,7 +116,9 @@ export function stopView(log: StopLog, card: NextItem): StopView {
   const hideMerge = a.kind === 'merge' && log.done.some((d) => d.merged === a.number)
   if (log.done.length === 0) return { items: [], hideMerge }
   const last = log.done[log.done.length - 1]!
-  const label = last.sent ? 'pod runs' : hideMerge ? 'Updating…' : nextAction(card)
+  // After a send, pod's turn, until its button is back on the card.
+  const podTurn = last.sent !== undefined && !(last.back && sendRow(card, last.sent))
+  const label = podTurn ? 'pod runs' : hideMerge ? 'Updating…' : nextAction(card)
   const done = log.done.map(({ key, label, time, note }): StopItem => ({ key, label, time, state: 'done', ...(note ? { note } : {}) }))
   return { items: [...done, { key: 'now', label, time: '', state: 'current' }], hideMerge }
 }

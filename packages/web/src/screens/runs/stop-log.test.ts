@@ -254,6 +254,10 @@ describe('stop log', () => {
     expect(sendOf(logCard(sent, other), card)).toBe('continue')
     expect(logCard(sent, card)).toBe(sent)
     expect(sendOf(logCard(sent, { ...card, key: 'reply:beta' }))).toBe('continue')
+    // The Board drops the reply with no state change: no button came back, so it is still pod's turn.
+    expect(shown(logCard(sent, answerCard), answerCard).at(-1)?.label).toBe('pod runs')
+    expect(shown(logRunState(sent, 'blocked'), answerCard).at(-1)?.label).toBe('pod runs')
+    expect(shown(logHoldEnd(sent, AT_1205), answerCard).at(-1)?.label).toBe('pod runs')
   })
 
   it('a send that never reads running gets its button back after 60 s', () => {
