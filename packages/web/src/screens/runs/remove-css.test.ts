@@ -269,3 +269,23 @@ describe('the ⋯ offsets and the word limit', () => {
   })
 })
 const WIDTH_BEFORE_THE_BREAK = 134
+
+describe('the auto tag on a sidebar card', () => {
+  const TAG = '.run-body > .chip.tag'
+  const HAS = '.run-body:has(> .chip.tag)'
+  const stacked = () => rules(/@container run-card \(max-width: \d+px\) \{([\s\S]*?)\n\}/.exec(runs())![1]!)
+  const inStacked = (sel: string) => Object.assign({}, ...stacked().filter((r) => r.selectors.includes(sel)).map((r) => decls(r.body))) as Record<string, string>
+
+  it('in two columns, sits in the status column under the status, and the name spans both rows', () => {
+    expect(style(runs(), TAG)['grid-column']).toBe('2')
+    expect(style(runs(), TAG)['justify-self']).toBe('start')
+    expect(style(runs(), `${HAS} > b`)['grid-row']).toBe('span 2')
+  })
+
+  it('stacked, sits on the status line right after the status, and the name and repo line keep the full width', () => {
+    expect(inStacked(HAS)['grid-template-columns']).toBe('auto minmax(0, 1fr)')
+    expect(inStacked(TAG)['grid-column']).toBe('2')
+    expect(inStacked(`${HAS} > b`)['grid-column']).toBe('1 / -1')
+    expect(inStacked(`${HAS} > b`)['grid-row']).toBe('auto')
+  })
+})
