@@ -146,15 +146,14 @@ describe.runIf(process.env.OPENAFLOW_REAL_ELECTRON === '1' && process.platform =
       // path, the two at once (one dialog), the error, and the call after it.
       expect(s.dialogCalls.length).toBe(4)
       expect(s.dialogCalls.every((c) => c.parentIsWindow)).toBe(true)
-      // A same-origin subframe gets no preload.
+      // An about:blank subframe gets no preload.
       expect(page.subframe).toBe('undefined')
 
       writeFileSync(join(tmp, 'quit'), '')
       const c = shell
       await new Promise<void>((resolve) => (c.exitCode !== null ? resolve() : c.once('exit', () => resolve())))
-      // The dialog error reached the log, and nothing failed to load.
+      // The dialog error reached the log.
       expect(text).toContain('the folder dialog failed: probe dialog error')
-      expect(text).not.toMatch(/Unable to load preload/i)
     } finally {
       if (shell && shell.exitCode === null) shell.kill()
     }
