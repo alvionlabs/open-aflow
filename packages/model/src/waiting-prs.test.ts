@@ -121,8 +121,11 @@ describe('waitingPrs', () => {
     const eng = ended({ branch: name, startedAt: NOW - 90 * MIN, lastAt: NOW - 60 * MIN })
     const task = (extra: Partial<BoardRepo>) => waitingPrs({ ...repo({}), ...base, ...extra }, NOW)
     const noReview = gh(36, 'open', { branch: name, reviewSkipped: true })
-    // The body's `skipped (--no-review)` and an ended engineer with no reviewer → yours to merge.
-    expect(task({ agents: [eng], prs: [noReview] })).toEqual([{ kind: 'task', number: 36, url: 'https://github.com/o/r/pull/36', run: name }])
+    // The body's `skipped (--no-review)` and an ended engineer with no reviewer → yours to merge, flagged.
+    expect(task({ agents: [eng], prs: [noReview] })).toEqual([{ kind: 'task', number: 36, url: 'https://github.com/o/r/pull/36', run: name, reviewSkipped: true }])
+    // A reviewer joined after all and ended: waiting as reviewed, with no flag.
+    const rev = ended({ type: 'pod:reviewer', kind: 'task', branch: name, startedAt: NOW - 50 * MIN, lastAt: NOW - 40 * MIN })
+    expect(task({ agents: [eng, rev], prs: [noReview] })).toEqual([{ kind: 'task', number: 36, url: 'https://github.com/o/r/pull/36', run: name }])
     // Its engineer still at work, or no flag → not yet.
     expect(task({ agents: [running({ branch: name })], prs: [noReview] })).toEqual([])
     expect(task({ agents: [eng], prs: [gh(36, 'open', { branch: name })] })).toEqual([])

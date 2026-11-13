@@ -5,11 +5,14 @@
 // Pure. The rules and why are in pod-docs/feature-details/runs-and-pipeline.md.
 
 import type { BoardRepo } from './board.ts'
-import { fixRunNames, fixWaitingPr, oneOffKind } from './fix-runs.ts'
+import { fixRunAgents, fixRunNames, fixWaitingPr, oneOffKind } from './fix-runs.ts'
 import { finalWaitingPr, isRun, stagingWaitingPr, waveWaitingPr } from './pipeline.ts'
 
-/** `run` is the plan slug, or a one-off run's claim name (`task-<slug>` or `fix-<slug>`); `kind` is then that run's kind. */
-export type WaitingPr = { kind: 'wave' | 'fix' | 'task' | 'final' | 'staging'; number: number; url?: string; run: string; sprint?: string; wave?: number }
+/**
+ * `run` is the plan slug, or a one-off run's claim name (`task-<slug>` or `fix-<slug>`); `kind` is then that run's kind.
+ * `reviewSkipped` only on a one-off PR that waits with no review: `--no-review`, and no reviewer joined.
+ */
+export type WaitingPr = { kind: 'wave' | 'fix' | 'task' | 'final' | 'staging'; number: number; url?: string; run: string; sprint?: string; wave?: number; reviewSkipped?: true }
 
 /**
  * Every PR of the repo waiting on you to merge: for each listed plan in model order, its current
@@ -37,7 +40,10 @@ export function waitingPrs(repo: BoardRepo, now: number): WaitingPr[] {
   }
   for (const name of fixRunNames(repo)) {
     const pr = fixWaitingPr(repo, name, now)
-    if (pr) add({ kind: oneOffKind(name) ?? 'fix', number: pr.number, run: name })
+    if (!pr) continue
+    // Any reviewer brings back the reviewed rule (fix-runs.ts), so the flag alone isn't enough.
+    const skipped = pr.reviewSkipped === true && !fixRunAgents(repo, name, now).some((a) => /(^|:)reviewer$/.test(a.type))
+    add({ kind: oneOffKind(name) ?? 'fix', number: pr.number, run: name, ...(skipped ? { reviewSkipped: true as const } : {}) })
   }
   return out
 }
