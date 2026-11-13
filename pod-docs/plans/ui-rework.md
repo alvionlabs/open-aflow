@@ -4,7 +4,6 @@ _Generated: 2026-11-12 · Status: active · Grilled-with: pod (fast)_
 
 Port base: 3000
 
-<!-- autopilot-run: started=2026-11-12T21:22:21-08:00 sprints=0 waves=0 -->
 
 ## Goal
 Make the run screen say what just happened and what comes next, so that Merge, then Continue, then pod running reads as one flow. Fix the defects seen during the windows-app install test. Replace the board's own folder browser with the Windows folder dialog. Let a leftover run be removed from the app.
@@ -92,7 +91,7 @@ sequenceDiagram
 
 | Sprint | Goal | Status | Depends on |
 |--------|------|--------|------------|
-| ui-rework | Ship every in-scope item above | planned | — |
+| ui-rework | Ship every in-scope item above | active | — |
 
 ## Look
 Same look as the app: [calm-dashboard Look](calm-dashboard.md#look), `packages/web/src/theme/tokens.css`, and `DESIGN.md`. The human picked each change from drawn options:
