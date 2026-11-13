@@ -14,6 +14,15 @@ import { elsewhere } from './elsewhere.ts'
 import { LogTab } from './LogTab.tsx'
 import { NextStepCard } from './NextStepCard.tsx'
 import { focusOnArrival } from './open-focus.ts'
+import {
+  INITIAL as FORGET_IDLE,
+  createForgetFlow,
+  forgetTarget,
+  forgetView,
+  hashAfterForget,
+  navigateAfterForget,
+  type ForgetState,
+} from './forget-flow.ts'
 import { nextSteps } from './next-step.ts'
 import { runHeader } from './plan-view.ts'
 import { switchView } from './resume-flow.ts'
@@ -133,8 +142,39 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   const repos = board?.repos ?? []
   const toRemove = removeTarget(repo, { repos, runs, returnTo: MENU_TRIGGER_ID })
   const sideTarget = (run: RunSummary) => removeTarget(repoOfRun(repos, run), { repos, runs, returnTo: moreButtonId(run) })
+
+  // Forget this run, from the header's ⋯ only, when forgetCheck allows it. The modal keeps the target taken at open.
+  const [forgetState, setForgetState] = useState<ForgetState>(FORGET_IDLE)
+  const forgetFlow = useMemo(
+    () =>
+      createForgetFlow(setForgetState, (target, after) => {
+        const go = navigateAfterForget(latest.current.selected, target, after)
+        if (go !== undefined) latest.current.navigate?.(go)
+        latest.current.planFallback?.(undefined)
+      }),
+    [],
+  )
+  // A run change cancels: when the new Board comes first, the page has already moved to the planned run.
+  useEffect(() => forgetFlow.cancel(), [runKey, forgetFlow])
+  useEffect(() => {
+    if (forgetState.kind !== 'forgetting') latest.current.planFallback?.(undefined)
+  }, [forgetState.kind])
+  const pressForget = () => {
+    if (forgetState.kind !== 'confirm' && forgetState.kind !== 'error') return
+    const after = hashAfterForget(runs, selected, forgetState.target)
+    planFallback?.(after)
+    forgetFlow.forget(after)
+  }
+  const toForget = header ? forgetTarget(repo, selected, header.title, now) : undefined
+
+  // One confirm modal on the screen: at most one of the two is open, since the modal makes the page inert.
   const removing = removeView(removeState)
-  const modal = removing ? { key: 'remove', view: removing, onConfirm: pressRemove, onCancel: () => removeFlow.cancel() } : undefined
+  const forgetting = forgetView(forgetState)
+  const modal = removing
+    ? { key: 'remove', view: removing, onConfirm: pressRemove, onCancel: () => removeFlow.cancel() }
+    : forgetting
+      ? { key: 'forget', view: forgetting, onConfirm: pressForget, onCancel: () => forgetFlow.cancel() }
+      : undefined
   // The modal sends focus to its ⋯ button; when that left with its card, focus falls to the header's ⋯.
   const modalOpen = modal !== undefined
   const wasOpen = useRef(false)
@@ -163,6 +203,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
       key={runKey}
       autoContinue={selected?.plan !== undefined && autoSwitch ? { target: { repoId: selected.repoId, run: selected.plan }, on: autoSwitch.on } : undefined}
       portBase={selected?.portBase}
+      {...(toForget ? { forget: { onPick: () => forgetFlow.open(toForget) } } : {})}
       {...(toRemove ? { remove: { onPick: () => removeFlow.open(toRemove) } } : {})}
     />
   )
