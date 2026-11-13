@@ -9,3 +9,5 @@ allowBuilds:
   # Spike only: the Electron binary and node-pty's prebuilt binary.
   electron: true
   node-pty: false
+  # Spike only (Windows Job Objects): koffi ships prebuilt binaries; its install script only checks them.
+  koffi: false

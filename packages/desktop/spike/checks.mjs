@@ -13,12 +13,15 @@ import { _electron } from 'playwright'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const DESKTOP = join(here, '..')
-const ELECTRON = process.env.SPIKE_ELECTRON ?? join(DESKTOP, 'node_modules', 'electron', 'dist', 'electron')
+const WIN = process.platform === 'win32'
+const ELECTRON = process.env.SPIKE_ELECTRON ?? join(DESKTOP, 'node_modules', 'electron', 'dist', WIN ? 'electron.exe' : 'electron')
 const MAIN = process.env.SPIKE_MAIN ?? join(DESKTOP, 'dist-spike', 'spike-main.cjs')
 const PACKAGED = process.env.SPIKE_PACKAGED === '1'
 const ROOT = process.env.SPIKE_TMP ?? tmpdir()
 const OUT = process.env.SPIKE_OUT ?? mkdtempSync(join(ROOT, 'spike-out-'))
-const REAL_CLAUDE = process.env.SPIKE_REAL_CLAUDE ?? join(homedir(), '.local', 'bin', 'claude')
+const REAL_CLAUDE = process.env.SPIKE_REAL_CLAUDE ?? join(homedir(), '.local', 'bin', WIN ? 'claude.exe' : 'claude')
+// Ports for the app's own server, from the task: 3300 (API) and 3301 (web, unused by the desktop build).
+const API_PORT = process.env.SPIKE_API_PORT ?? '3300'
 const REAL_ARGS = JSON.parse(process.env.SPIKE_REAL_ARGS ?? '["--model","haiku"]')
 const PLUGIN = join(here, 'plugin')
 mkdirSync(OUT, { recursive: true })
@@ -52,17 +55,29 @@ const kill = (pid, sig = 'SIGKILL') => {
     process.kill(pid, sig)
   } catch {}
 }
+/** Every process: pid, parent, name, command line. Windows only. The marker is matched here, not in the query, so
+ * the query's own command line can't match it. */
+const winProcs = () => {
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress'], { encoding: 'utf8', windowsHide: true, maxBuffer: 64 << 20 })
+  return JSON.parse(r.stdout || '[]').map((p) => ({ pid: p.ProcessId, ppid: p.ParentProcessId, name: p.Name, cmd: p.CommandLine ?? '' }))
+}
 const pgrep = (marker) => {
+  if (WIN) return winProcs().filter((p) => p.cmd.includes(marker) && p.name === 'node.exe').map((p) => p.pid)
   const r = spawnSync('pgrep', ['-f', marker], { encoding: 'utf8' })
   return r.stdout.split('\n').filter(Boolean).map(Number)
 }
+/** Console hosts now: a new console window lands in Windows Terminal on this machine, so count them around each check. */
+const consoles = () => (WIN ? winProcs().filter((p) => /^(conhost|OpenConsole)\.exe$/i.test(p.name)).length : 0)
 const portOpen = (port) =>
   new Promise((r) => {
     const s = createConnection({ port, host: '127.0.0.1' })
     s.once('connect', () => (s.destroy(), r(true)))
     s.once('error', () => r(false))
   })
-const ssListening = (port) => spawnSync('ss', ['-ltnp'], { encoding: 'utf8' }).stdout.split('\n').filter((l) => l.includes(`:${port} `))
+const ssListening = (port) =>
+  WIN
+    ? spawnSync('netstat', ['-ano', '-p', 'tcp'], { encoding: 'utf8', windowsHide: true }).stdout.split('\n').filter((l) => l.includes(`:${port} `) && /LISTENING/.test(l)).map((l) => l.trim())
+    : spawnSync('ss', ['-ltnp'], { encoding: 'utf8' }).stdout.split('\n').filter((l) => l.includes(`:${port} `))
 const waitFor = async (fn, ms, step = 250) => {
   const end = Date.now() + ms
   while (Date.now() < end) {
@@ -83,9 +98,10 @@ function world(name, o = {}) {
     mkdirSync(repo, { recursive: true })
     execFileSync('git', ['init', '-q', repo])
   }
-  const fake = join(T, 'bin', 'claude')
-  writeFileSync(fake, `#!/bin/sh\nexec '${process.execPath}' '${join(here, 'fake-claude.mjs')}' "$@"\n`, { mode: 0o755 })
-  return { T, repo, fake, record: join(T, 'fake-record.jsonl'), hooks: join(T, 'hooks') }
+  // Windows: node.exe plus the script (OPENAFLOW_SPIKE_CLAUDE_PREFIX), as a #!/bin/sh wrapper can't run there.
+  const fake = WIN ? process.execPath : join(T, 'bin', 'claude')
+  if (!WIN) writeFileSync(fake, `#!/bin/sh\nexec '${process.execPath}' '${join(here, 'fake-claude.mjs')}' "$@"\n`, { mode: 0o755 })
+  return { T, repo, fake, prefix: WIN ? JSON.stringify([join(here, 'fake-claude.mjs')]) : '[]', record: join(T, 'fake-record.jsonl'), hooks: join(T, 'hooks') }
 }
 
 const baseEnv = () => {
@@ -104,15 +120,23 @@ async function launch(w, extra = {}) {
     OPENAFLOW_CLAUDE_DIR: join(w.T, 'claude'),
     OPENAFLOW_SPIKE_REPO: w.repo,
     OPENAFLOW_SPIKE_CLAUDE: w.fake,
+    OPENAFLOW_SPIKE_CLAUDE_PREFIX: w.prefix,
+    OPENAFLOW_API_PORT: API_PORT,
+    OPENAFLOW_WEB_PORT: '3301',
     OPENAFLOW_SPIKE_HOOKLOG: w.hooks,
     FAKE_RECORD: w.record,
     ...extra,
+    // Extra app env for a whole run of checks, such as {"OPENAFLOW_SPIKE_JOB":"0"}.
+    ...JSON.parse(process.env.SPIKE_APP_ENV ?? '{}'),
   }
   const app = await _electron.launch({ executablePath: ELECTRON, args: PACKAGED ? [] : [MAIN], env, timeout: 60_000 })
   const page = await app.firstWindow({ timeout: 30_000 })
   await page.waitForLoadState('domcontentloaded')
-  const pid = app.process().pid
+  // Electron main's own pid. On Windows, Playwright's child process is not main: killing it left main running.
+  const pid = await app.evaluate(() => process.pid)
+  const launcherPid = app.process().pid
   const exited = new Promise((r) => app.process().once('exit', (code, sig) => r({ code, sig })))
+  if (pid !== launcherPid) note('launch', 'main pid differs from the launched pid', { main: pid, launched: launcherPid })
   return { app, page, pid, exited }
 }
 const sp = (a, name, ...args) => a.app.evaluate(async (_e, [n, xs]) => await globalThis.__spike[n](...xs), [name, args])
@@ -219,6 +243,7 @@ async function quitCase(mode, extra = {}) {
     const st = await sp(a, 'status')
     const fakePid = st.runs[0].pid
     r.childPids = pgrep(marker)
+    if (WIN) r.job = await sp(a, 'job', run.termId)
     // Cancel first: the app and the run must live.
     await a.app.evaluate(({ dialog }) => {
       globalThis.__dialogCalls = []
@@ -245,7 +270,8 @@ async function quitCase(mode, extra = {}) {
     r.stopReason = store.runs[0].stopReason
     r.mainLog = readFileSync(join(w.T, 'config', 'spike', 'main.log'), 'utf8').split('\n').filter((l) => l.includes('killAll'))
     const cancelOk = r.afterCancel.appAlive && r.afterCancel.fakeAlive && r.afterCancel.childUp && r.afterCancel.runLive
-    const quitOk = !r.afterQuit.appAlive && !r.afterQuit.fakeAlive && r.afterQuit.pgrep.length === 0 && r.afterQuit.ss.length === 0
+    // A child that never started would pass the quit side, so it must have been up and found first.
+    const quitOk = r.childUp && r.childPids.length > 0 && !r.afterQuit.appAlive && !r.afterQuit.fakeAlive && r.afterQuit.pgrep.length === 0 && r.afterQuit.ss.length === 0 && !r.afterQuit.childUp
     r.pass = cancelOk && quitOk
     return r
   } finally {
@@ -256,6 +282,35 @@ async function quitCase(mode, extra = {}) {
 
 checks['4-clean-quit'] = async () => {
   const c = '4-clean-quit'
+  if (WIN) {
+    // What each way catches: ConPTY close alone, plus the tree by process ID, plus the Job Object.
+    const only = process.env.SPIKE_CASES ? new Set(process.env.SPIKE_CASES.split(',')) : null
+    const cases = [
+      ['pty only: detached', 'detached', { OPENAFLOW_SPIKE_JOB: '0', OPENAFLOW_SPIKE_TREE: '0' }],
+      ['pty only: orphan', 'orphan', { OPENAFLOW_SPIKE_JOB: '0', OPENAFLOW_SPIKE_TREE: '0' }],
+      ['tree: detached', 'detached', { OPENAFLOW_SPIKE_JOB: '0' }],
+      ['tree: orphan', 'orphan', { OPENAFLOW_SPIKE_JOB: '0' }],
+      ['tree: new-console', 'new-console', { OPENAFLOW_SPIKE_JOB: '0' }],
+      ['job only: detached', 'detached', { OPENAFLOW_SPIKE_TREE: '0' }],
+      ['job only: orphan', 'orphan', { OPENAFLOW_SPIKE_TREE: '0' }],
+      ['job only: new-console', 'new-console', { OPENAFLOW_SPIKE_TREE: '0' }],
+      ['job + tree: detached', 'detached', {}],
+      ['job + tree: orphan', 'orphan', {}],
+      ['job + tree: new-console', 'new-console', {}],
+      ['job + tree: wmi', 'wmi', {}],
+    ].filter(([n]) => !only || only.has(n))
+    const out = {}
+    const c0 = consoles()
+    for (const [name, mode, extra] of cases) {
+      out[name] = await quitCase(mode, extra)
+      note(c, name, out[name])
+    }
+    note(c, 'console hosts before and after', { before: c0, after: consoles() })
+    const sum = Object.entries(out).map(([k, v]) => `${k}: ${v.pass ? 'clean' : 'LEFT'}`).join('; ')
+    const ok = ['job + tree: detached', 'job + tree: orphan', 'job + tree: new-console'].every((k) => !out[k] || out[k].pass)
+    verdict(c, ok, sum)
+    return
+  }
   const out = {}
   for (const mode of ['detached', 'orphan', 'orphan-clean-env']) {
     out[mode] = await quitCase(mode)
@@ -265,6 +320,53 @@ checks['4-clean-quit'] = async () => {
   note(c, 'orphan-clean-env with a systemd scope', out.scoped)
   const ok = out.detached.pass && out.orphan.pass
   verdict(c, ok, `scope fix for the cleared env: ${out.scoped.pass ? 'clean' : 'LEFT'}; ` + `detached: ${out.detached.pass ? 'clean' : 'LEFT'}; orphan: ${out.orphan.pass ? 'clean' : 'LEFT'}; orphan with env cleared: ${out['orphan-clean-env'].pass ? 'clean' : 'LEFT (known gap)'}`)
+}
+
+checks['10-echo'] = async () => {
+  // A real shell in the ConPTY: `cmd /d /k rem <run args>` ignores the run's args and stays at its prompt.
+  const c = '10-echo'
+  const w = world('c10')
+  const shell = WIN ? { OPENAFLOW_SPIKE_CLAUDE: 'cmd.exe', OPENAFLOW_SPIKE_CLAUDE_PREFIX: JSON.stringify(['/d', '/k', 'rem']) } : { OPENAFLOW_SPIKE_CLAUDE: '/bin/sh', OPENAFLOW_SPIKE_CLAUDE_PREFIX: JSON.stringify(['-c', 'exec sh -i', 'sh']) }
+  const a = await launch(w, shell)
+  try {
+    const run = await sp(a, 'startRun')
+    await sleep(1500)
+    await sp(a, 'write', run.termId, 'echo ready\r')
+    const isReady = (lines) => (lines ?? []).some((l) => l.trim() === 'ready')
+    const host = await waitFor(async () => isReady(await sp(a, 'hostBuffer', run.termId)), 10_000)
+    const page = await waitFor(async () => isReady(await pageLines(a.page)), 5000)
+    note(c, 'buffers', { host, page, tail: (await pageLines(a.page)).slice(-4) })
+    verdict(c, host && page, `wrote "echo ready" through the test hook; "ready" in the host buffer: ${host}, in the window's xterm: ${page}`)
+  } finally {
+    await close(a)
+  }
+}
+
+checks['4b-session-end'] = async () => {
+  // Windows OS shutdown or log off. Simulated: the test emits app 'session-end'. No real log off was done.
+  const c = '4b-session-end'
+  const w = world('c4b')
+  const port = portSeq++
+  const marker = `openaflow-spike-child-sessionend-${port}`
+  const a = await launch(w, { FAKE_CHILD_PORT: String(port), FAKE_CHILD_MODE: 'detached', FAKE_MARKER: marker })
+  try {
+    const run = await sp(a, 'startRun')
+    const childUp = await waitFor(() => portOpen(port), 10_000)
+    const s0 = await sp(a, 'status')
+    const fakePid = s0.runs[0].pid
+    const t0 = Date.now()
+    await sp(a, 'emitSessionEnd')
+    const allGone = await waitFor(async () => !alive(fakePid) && !alive(s0.hostPid) && pgrep(marker).length === 0, 10_000, 100)
+    const ms = Date.now() - t0
+    const store = JSON.parse(readFileSync(join(w.T, 'config', 'spike', 'runs.json'), 'utf8'))
+    const r = { childUp, allGoneWithinMs: allGone ? ms : null, host: alive(s0.hostPid), fake: alive(fakePid), child: pgrep(marker), childPort: await portOpen(port), stopReason: store.runs[0].stopReason }
+    note(c, 'after session-end', r)
+    const ok = childUp && allGone && r.stopReason === 'session end' && !r.childPort
+    verdict(c, ok, ok ? `store saved as "session end"; host, claude, and its detached child ended in ${ms} ms (simulated event)` : 'see notes')
+  } finally {
+    await close(a)
+    for (const pid of pgrep(marker)) kill(pid)
+  }
 }
 
 checks['6-host-crash'] = async () => {
@@ -278,6 +380,7 @@ checks['6-host-crash'] = async () => {
     await sleep(11_500) // one screen save
     const s0 = await sp(a, 'status')
     const fakePid = s0.runs[0].pid
+    if (WIN) note(c, 'job before', await sp(a, 'job', run.termId))
     kill(s0.hostPid)
     const s1 = await waitFor(async () => {
       const s = await sp(a, 'status')
@@ -319,13 +422,34 @@ checks['7-app-crash'] = async () => {
     await sleep(11_500)
     const s0 = await sp(a, 'status')
     const fakePid = s0.runs[0].pid
-    kill(a.pid) // SIGKILL the Electron main process
-    await Promise.race([a.exited, sleep(5000)])
+    if (WIN) note(c, 'job before', await sp(a, 'job', run.termId))
+    kill(a.pid) // SIGKILL the Electron main process (TerminateProcess on Windows)
+    await Promise.race([a.exited, waitFor(() => !alive(a.pid), 5000)])
     await sleep(3000)
     const leftAfterCrash = { host: alive(s0.hostPid), server: alive(s0.serverPids.at(-1)), fake: alive(fakePid), child: pgrep(marker) }
     note(c, 'left 3 s after SIGKILL of main', leftAfterCrash)
+    if (WIN) {
+      // Windows: how long does each one outlive main? Every Electron process of this app (renderer, GPU, utilities)
+      // carries the test's data dir or main script in its command line.
+      const ours = () => winProcs().filter((p) => p.name === 'electron.exe' && (p.cmd.includes(w.T) || p.cmd.includes('spike-main.cjs') || [s0.hostPid, ...s0.serverPids].includes(p.pid)))
+      note(c, 'electron processes 3 s after', ours().map((p) => ({ pid: p.pid, type: /--type=(\S+)/.exec(p.cmd)?.[1] ?? 'main', service: /--utility-sub-type=(\S+)/.exec(p.cmd)?.[1] })))
+      const gone = {}
+      const t0 = Date.now()
+      const watch = { host: s0.hostPid, server: s0.serverPids.at(-1), fake: fakePid }
+      await waitFor(() => {
+        for (const [k, pid] of Object.entries(watch)) if (gone[k] === undefined && !alive(pid)) gone[k] = Date.now() - t0 + 3000
+        if (gone.child === undefined && pgrep(marker).length === 0) gone.child = Date.now() - t0 + 3000
+        return Object.keys(gone).length === 4
+      }, 60_000, 500)
+      note(c, 'ms after the main kill until each ended (60 s cap)', { ...gone, stillAlive: Object.keys(watch).concat('child').filter((k) => gone[k] === undefined), electronLeft: ours().map((p) => p.pid) })
+    }
     const recBefore = readFileSync(w.record, 'utf8').trim().split('\n').length
-    a = await launch(w, { FAKE_INTERVAL_MS: '500' })
+    try {
+      a = await launch(w, { FAKE_INTERVAL_MS: '500' })
+    } catch (e) {
+      note(c, 'relaunch failed', { error: String(e).split('\n')[0], mainLogTail: readFileSync(join(w.T, 'config', 'spike', 'main.log'), 'utf8').split('\n').slice(-6) })
+      throw e
+    }
     await sleep(4000)
     const s1 = await sp(a, 'status')
     const lines = await pageLines(a.page)
@@ -392,11 +516,11 @@ const userTurns = (file) => {
     return []
   }
 }
-const REAL_REPO = join(ROOT, 'spike-real-repo')
+const REAL_REPO = process.env.SPIKE_REAL_REPO ?? join(ROOT, 'spike-real-repo')
 
 async function realLaunch(name, extra = {}) {
   const w = world(name, { repo: REAL_REPO })
-  const a = await launch(w, { OPENAFLOW_SPIKE_CLAUDE: REAL_CLAUDE, ...extra })
+  const a = await launch(w, { OPENAFLOW_SPIKE_CLAUDE: REAL_CLAUDE, OPENAFLOW_SPIKE_CLAUDE_PREFIX: '[]', ...extra })
   return { w, a }
 }
 const screenText = async (a, termId) => ((await sp(a, 'hostBuffer', termId)) ?? []).join('\n')
@@ -488,7 +612,7 @@ checks['5-auto-continue'] = async () => {
     await sleep(1000)
     // c) A permission dialog, left open more than 60 s.
     const evStart = (await sp(a, 'hookEvents')).length
-    await typeLine(a, run.termId, 'Use the Bash tool to run exactly: touch spike-permission-test.txt')
+    await typeLine(a, run.termId, 'Use the Bash tool to run exactly: touch spike-permission-test.txt', false) // no retry Enter: it approved the dialog on Linux
     const dlg = await waitFor(async () => /Do you want|proceed\?|Yes, and don't ask/i.test(await screenText(a, run.termId)), 90_000, 1000)
     note(c, 'c) permission dialog on screen', dlg)
     await sp(a, 'requestSend', run.runId)
@@ -655,6 +779,55 @@ checks['12-real-kill'] = async () => {
   verdict(c, ok, `real claude left after: host crash ${out.hostCrash.left.length}, quit ${out.quit.left.length}, app crash ${out.appCrash.left.length} (before sweeps: see notes)`)
 }
 
+/** Windows, test-side: a process and its descendants by parent ID. */
+function winTree(root) {
+  const ps = winProcs()
+  const out = []
+  const queue = [root]
+  while (queue.length) {
+    const p = queue.shift()
+    for (const k of ps.filter((x) => x.ppid === p && !out.some((o) => o.pid === x.pid))) out.push({ pid: k.pid, name: k.name }), queue.push(k.pid)
+  }
+  const self = ps.find((x) => x.pid === root)
+  return self ? [{ pid: root, name: self.name }, ...out] : out
+}
+
+checks['12w-real-kill'] = async () => {
+  // Windows. Real claude at its prompt, no prompt typed, so no turn. What ends it, and how fast?
+  const c = '12w-real-kill'
+  const out = {}
+  const cases = [
+    ['a) quit, ConPTY close only (no job, no tree)', { OPENAFLOW_SPIKE_JOB: '0', OPENAFLOW_SPIKE_TREE: '0' }, 'quit'],
+    ['b) host crash, no job', { OPENAFLOW_SPIKE_JOB: '0', OPENAFLOW_SPIKE_TREE: '0' }, 'host'],
+    ['c) quit, job + tree', {}, 'quit'],
+    ['d) app crash, job + tree', {}, 'app'],
+  ]
+  for (const [name, extra, how] of cases) {
+    const r = await realLaunch('c12w', extra)
+    try {
+      const run = await sp(r.a, 'startRun', { extraArgs: REAL_ARGS })
+      await waitReady(r.a, run.termId, c)
+      await sleep(3000)
+      const st = await sp(r.a, 'status')
+      const before = winTree(st.runs.at(-1).pid)
+      const job = await sp(r.a, 'job', run.termId)
+      const t0 = Date.now()
+      if (how === 'quit') await close(r.a)
+      else if (how === 'host') kill(st.hostPid)
+      else kill(r.a.pid)
+      const gone = await waitFor(() => before.every((p) => !alive(p.pid)), 10_000, 100)
+      const killAll = readFileSync(join(r.w.T, 'config', 'spike', 'main.log'), 'utf8').split('\n').filter((l) => l.includes('killAll')).map((l) => JSON.parse(l.slice(l.indexOf('['))))[0]
+      out[name] = { before, jobPids: job?.pids, assign: job?.assign, allGoneWithinMs: gone ? Date.now() - t0 : null, left: before.filter((p) => alive(p.pid)), killAll }
+      note(c, name, out[name])
+      for (const p of out[name].left) kill(p.pid)
+    } finally {
+      if (alive(r.a.pid)) await close(r.a)
+    }
+  }
+  const ok = Object.values(out).every((v) => v.left.length === 0)
+  verdict(c, ok, Object.entries(out).map(([k, v]) => `${k}: ${v.left.length ? `${v.left.length} left` : `gone in ${v.allGoneWithinMs} ms`}`).join('; '))
+}
+
 checks['12b-real-kill-variants'] = async () => {
   // Real claude, no turns. a) host crash with no sweep: does SIGHUP alone end it? b) quit, SIGTERM, 15 s wait. c) quit, SIGHUP first.
   const c = '12b-real-kill-variants'
@@ -701,7 +874,7 @@ checks['11-plugin'] = async () => {
     await close(a)
   }
   // Outside: plain claude in a pty of our own, same repo. No model turn: an unknown slash command answers locally.
-  const pty = (await import('@lydell/node-pty')).default ?? (await import('@lydell/node-pty'))
+  const pty = (await import('node-pty')).default ?? (await import('node-pty'))
   const env = baseEnv()
   const p = pty.spawn(REAL_CLAUDE, REAL_ARGS, { cwd: REAL_REPO, cols: 120, rows: 32, env, name: 'xterm-256color' })
   let out = ''
@@ -723,7 +896,7 @@ checks['11-plugin'] = async () => {
 // ---------------------------------------------------------------- main
 
 const wanted = process.argv.slice(2)
-for (const name of wanted.length ? wanted : ['2-window-life', '3-server-life', '4-clean-quit', '6-host-crash', '7-app-crash', '8-memory']) {
+for (const name of wanted.length ? wanted : ['2-window-life', '3-server-life', '4-clean-quit', '4b-session-end', '6-host-crash', '7-app-crash', '8-memory', '10-echo']) {
   if (!checks[name]) {
     console.log(`unknown check ${name}`)
     continue

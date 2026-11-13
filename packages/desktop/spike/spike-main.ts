@@ -107,7 +107,10 @@ const hostEntry = join(__dirname, 'pty-host.cjs')
 function startHost() {
   hostStarts++
   const hostEnv = serverEnv(env, process.pid)
-  if (app.isPackaged) hostEnv.OPENAFLOW_PTY_PATH = join(process.resourcesPath, 'native', 'node_modules', '@lydell', 'node-pty')
+  if (app.isPackaged) {
+    hostEnv.OPENAFLOW_PTY_PATH = join(process.resourcesPath, 'native', 'node_modules', 'node-pty')
+    hostEnv.OPENAFLOW_KOFFI_PATH = join(process.resourcesPath, 'native', 'node_modules', 'koffi')
+  }
   const child = utilityProcess.fork(hostEntry, [], { stdio: 'pipe', serviceName: 'OpenAFlow pty host', env: hostEnv })
   host = child
   child.stdout?.on('data', (d) => log('[host]', String(d).trimEnd()))
@@ -134,6 +137,7 @@ function startHost() {
         r.pid = m.pid
         const t = r.terms.find((x) => x.id === m.id)
         if (t) t.pid = m.pid
+        if (m.jobAssign) log('job assign', m.id, m.jobAssign)
         saveStore()
       }
     } else if (m.op === 'input') {
@@ -202,6 +206,8 @@ setInterval(() => {
 // ---- runs ----
 
 const claudeBin = () => env.OPENAFLOW_SPIKE_CLAUDE ?? 'claude'
+// Windows: the fake `claude` is node.exe plus the script, as a #!/bin/sh wrapper can't run there.
+const claudePrefix = (): string[] => JSON.parse(env.OPENAFLOW_SPIKE_CLAUDE_PREFIX ?? '[]')
 const KEPT = new Set(['CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_GIT_BASH_PATH', 'CLAUDE_CODE_MAX_OUTPUT_TOKENS'])
 function runEnv(runId: string): Record<string, string> {
   const out: Record<string, string> = {}
@@ -222,7 +228,7 @@ function openTerm(r: Run, args: string[]) {
   r.stopReason = null
   r.terms.push({ id: termId, args, pid: null, startedAt: new Date().toISOString() })
   saveStore()
-  host?.postMessage({ op: 'create', id: termId, runId: r.id, file: claudeBin(), args, cwd: r.repo, env: runEnv(r.id), cols: COLS, rows: ROWS })
+  host?.postMessage({ op: 'create', id: termId, runId: r.id, file: claudeBin(), args: [...claudePrefix(), ...args], cwd: r.repo, env: runEnv(r.id), cols: COLS, rows: ROWS })
   return termId
 }
 
@@ -417,6 +423,22 @@ app.on('before-quit', (e) => {
   })()
 })
 
+// OS shutdown or log off (Windows): there may be no time and no dialog. Save the store at once and end every job.
+// Ending the host would do it too: its job handles close, and KILL_ON_JOB_CLOSE ends each run.
+const sessionEnd = () => {
+  log('session-end', live().map((r) => r.id))
+  quitting = true
+  host?.postMessage({ op: 'terminateAll', reqId: -1 })
+  for (const r of live()) {
+    r.stopReason = 'session end'
+    r.termId = null
+  }
+  writeFileSync(storeFile, JSON.stringify({ runs }, null, 2))
+  host?.kill()
+  quitDone = true // the OS ends the app next; a later quit needs no dialog
+}
+app.on('session-end', sessionEnd)
+
 // ---- start ----
 
 app.on('window-all-closed', () => {})
@@ -443,6 +465,8 @@ if (TEST) {
     hostStats: () => hostCall({ op: 'stats' }),
     hostList: () => hostCall({ op: 'list' }),
     markers: (runId: string) => hostCall({ op: 'markers', runId }),
+    job: (termId: string) => hostCall({ op: 'job', id: termId }),
+    emitSessionEnd: () => app.emit('session-end'),
     write: (termId: string, text: string) => {
       host?.postMessage({ op: 'write', id: termId, data: text })
       lastInput.set(termId, Date.now())

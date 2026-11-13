@@ -1,0 +1,109 @@
+{
+  "launch": {
+    "pass": null,
+    "notes": {
+      "main pid differs from the launched pid": {
+        "main": 10996,
+        "launched": 30768
+      }
+    }
+  },
+  "6-host-crash": {
+    "pass": false,
+    "notes": {
+      "job before": {
+        "pids": [],
+        "assign": null,
+        "selfInJob": false,
+        "tree": [
+          14228
+        ]
+      },
+      "after kill": {
+        "oldHost": 29336,
+        "newHost": 3964,
+        "hostStarts": 2,
+        "stopReason": "host crashed",
+        "fakeAlive": false,
+        "childLeft": [
+          14228
+        ],
+        "sweep": [
+          {
+            "runId": "47a824b8",
+            "markerPids": []
+          }
+        ],
+        "childPort": true
+      },
+      "stopped screen tail": [
+        "line 17",
+        "line 18"
+      ],
+      "resume": {
+        "argv": [
+          "--resume",
+          "eebb4fc0-5aba-4c01-8023-fdfc455cc7db"
+        ],
+        "noAutoStart": true,
+        "liveAfterResume": {
+          "count": 3,
+          "max": 3,
+          "ok": true,
+          "bad": []
+        }
+      },
+      "seconds": 20
+    },
+    "why": "see notes"
+  },
+  "7-app-crash": {
+    "pass": false,
+    "notes": {
+      "job before": {
+        "pids": [],
+        "assign": null,
+        "selfInJob": false,
+        "tree": [
+          28364
+        ]
+      },
+      "left 3 s after SIGKILL of main": {
+        "host": false,
+        "server": false,
+        "fake": false,
+        "child": [
+          28364
+        ]
+      },
+      "electron processes 3 s after": [],
+      "ms after the main kill until each ended (60 s cap)": {
+        "host": 3000,
+        "server": 3000,
+        "fake": 3000,
+        "stillAlive": [
+          "child"
+        ],
+        "electronLeft": []
+      },
+      "next start": {
+        "stopReason": "app closed",
+        "startupLeftovers": [
+          {
+            "runId": "7a9a938b",
+            "markerPids": []
+          }
+        ],
+        "savedScreenRows": 20,
+        "lastRow": "line 18",
+        "fakeAlive": false,
+        "child": [
+          28364
+        ],
+        "newClaudeStarted": false
+      },
+      "seconds": 83
+    },
+    "why": "see notes"
+  }
+}

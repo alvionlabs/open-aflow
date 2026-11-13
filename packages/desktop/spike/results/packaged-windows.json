@@ -1,0 +1,155 @@
+{
+  "launch": {
+    "pass": null,
+    "notes": {
+      "main pid differs from the launched pid": {
+        "main": 7700,
+        "launched": 10760
+      }
+    }
+  },
+  "8-package": {
+    "pass": true,
+    "notes": {
+      "packaged start": {
+        "rows": 9,
+        "first": "fake-claude pid=16912 argv=[\"--session-id\",\"c0e7f350-c8e8-4951-8a86-dcda883e1638\"]",
+        "ptyHostOk": true
+      },
+      "packaged quit": {
+        "childUp": true,
+        "childPids": [
+          30196
+        ],
+        "job": {
+          "pids": [
+            26328,
+            30196
+          ],
+          "assign": {
+            "ok": true,
+            "inJob": true,
+            "ms": 49,
+            "polls": 875
+          },
+          "selfInJob": false,
+          "tree": [
+            30196
+          ]
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:44:25.679Z killAll [{\"pid\":26328,\"useJob\":true,\"useTree\":true,\"byJob\":[26328,30196],\"byTree\":[30196],\"closeMs\":3077,\"afterClose\":[30196],\"jobLeftAfterClose\":[30196],\"terminatedJob\":true,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "seconds": 13
+    },
+    "why": "node-pty loaded in the packaged app and the window shows the run"
+  },
+  "8-memory": {
+    "pass": true,
+    "notes": {
+      "host memory": {
+        "idleVmRssKb": 59568,
+        "withRunVmRssKb": 109360,
+        "heapUsed": 7820432,
+        "bufferRows": 5031,
+        "firstRow": "burst 970 xxxxxxxxxx"
+      },
+      "seconds": 4
+    },
+    "why": "host VmRSS 59568 kB idle, 109360 kB holding 5031 rows (scrollback 5,000 + screen)"
+  },
+  "10-echo": {
+    "pass": true,
+    "notes": {
+      "buffers": {
+        "host": true,
+        "page": true,
+        "tail": [
+          "ready",
+          "",
+          "$SPIKE_TMP\\spike-c10-",
+          "29Md38\\repo>"
+        ]
+      },
+      "seconds": 3
+    },
+    "why": "wrote \"echo ready\" through the test hook; \"ready\" in the host buffer: true, in the window's xterm: true"
+  },
+  "7-app-crash": {
+    "pass": true,
+    "notes": {
+      "job before": {
+        "pids": [
+          6752,
+          30388
+        ],
+        "assign": {
+          "ok": true,
+          "inJob": true,
+          "ms": 44,
+          "polls": 904
+        },
+        "selfInJob": false,
+        "tree": [
+          30388
+        ]
+      },
+      "left 3 s after SIGKILL of main": {
+        "host": false,
+        "server": false,
+        "fake": false,
+        "child": []
+      },
+      "electron processes 3 s after": [],
+      "ms after the main kill until each ended (60 s cap)": {
+        "host": 3000,
+        "server": 3000,
+        "fake": 3000,
+        "child": 3495,
+        "stillAlive": [],
+        "electronLeft": []
+      },
+      "next start": {
+        "stopReason": "app closed",
+        "startupLeftovers": [
+          {
+            "runId": "c3c6d036",
+            "markerPids": []
+          }
+        ],
+        "savedScreenRows": 20,
+        "lastRow": "line 18",
+        "fakeAlive": false,
+        "child": [],
+        "newClaudeStarted": false
+      },
+      "seconds": 23
+    },
+    "why": "run read \"app closed\" with its saved screen; nothing left running; nothing started by itself"
+  }
+}

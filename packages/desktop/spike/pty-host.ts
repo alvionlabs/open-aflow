@@ -4,9 +4,14 @@
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { alive, descendants, markerPids } from './proc.ts'
-import type { IPty } from '@lydell/node-pty'
+import type { IPty } from 'node-pty'
 // Packaged: main names node-pty's folder in resources/native, outside the asar. Unpackaged: normal lookup.
-const { spawn: ptySpawn } = require(process.env.OPENAFLOW_PTY_PATH ?? '@lydell/node-pty') as typeof import('@lydell/node-pty')
+const { spawn: ptySpawn } = require(process.env.OPENAFLOW_PTY_PATH ?? 'node-pty') as typeof import('node-pty')
+const WIN = process.platform === 'win32'
+// Windows: one Job Object per run (KILL_ON_JOB_CLOSE), and the tree by process ID. Each can be turned off to see what the other catches.
+const win = WIN ? (require('./winjob.ts') as typeof import('./winjob.ts')) : undefined
+const USE_JOB = WIN && process.env.OPENAFLOW_SPIKE_JOB !== '0'
+const USE_TREE = process.env.OPENAFLOW_SPIKE_TREE !== '0'
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { Terminal } from '@xterm/headless'
 
@@ -33,6 +38,8 @@ type Term = {
   ser: SerializeAddon
   ports: Set<PortMain>
   unit: string | undefined
+  job?: import('./winjob.ts').Job
+  jobAssign?: { ok: boolean; error?: number; inJob?: boolean; ms: number; polls: number }
   exited?: { exitCode: number; signal?: number }
 }
 
@@ -51,8 +58,47 @@ const signal = (pid: number, sig: NodeJS.Signals) => {
   }
 }
 
+/** Windows: descendants by parent ID from a Toolhelp snapshot. A dead parent breaks the chain (no reparenting). */
+function winDescendants(root: number): number[] {
+  const kids = new Map<number, number[]>()
+  for (const [pid, { ppid }] of win!.snapshot()) kids.set(ppid, [...(kids.get(ppid) ?? []), pid])
+  const out: number[] = []
+  const queue = [root]
+  while (queue.length) {
+    const p = queue.shift()!
+    for (const k of kids.get(p) ?? []) if (!out.includes(k) && k !== root) (out.push(k), queue.push(k))
+  }
+  return out
+}
+
+/** Windows has no SIGHUP or SIGTERM: any signal is TerminateProcess. So: close the ConPTY (node-pty also ends every
+ * process attached to its console), wait, end the job, end tree survivors by ID, check. */
+async function killTreeWin(t: Term, wait = KILL_WAIT_MS) {
+  const t0 = Date.now()
+  const byJob = t.job ? win!.jobPids(t.job) : []
+  const byTree = USE_TREE && t.pid ? winDescendants(t.pid) : []
+  const all = [...new Set([t.pid, ...byJob, ...byTree].filter(Boolean))]
+  try {
+    t.pty.kill()
+  } catch {
+    // closed
+  }
+  const end = Date.now() + wait
+  while (Date.now() < end && all.some(alive)) await new Promise((r) => setTimeout(r, 50))
+  const closeMs = Date.now() - t0
+  const afterClose = all.filter(alive)
+  const jobLeft = t.job ? win!.jobPids(t.job) : []
+  const terminated = t.job ? win!.terminateJob(t.job) : false
+  const forced: number[] = []
+  if (USE_TREE) for (const pid of all.filter(alive)) (signal(pid, 'SIGKILL'), forced.push(pid))
+  await new Promise((r) => setTimeout(r, 300))
+  if (t.job) win!.closeJob(t.job)
+  return { pid: t.pid, useJob: USE_JOB, useTree: USE_TREE, byJob, byTree, closeMs, afterClose, jobLeftAfterClose: jobLeft, terminatedJob: terminated, forced, survivors: all.filter(alive) }
+}
+
 /** Ends a terminal's process tree: snapshot first (tree + env marker), then SIGTERM, wait, SIGKILL. */
 async function killTree(t: Term) {
+  if (WIN) return killTreeWin(t)
   const byTree = descendants(t.pid)
   const byMarker = markerPids(t.runId)
   const byScope = t.unit ? scopePids(t.unit) : []
@@ -118,6 +164,22 @@ function create(m: { id: string; runId: string; file: string; args: string[]; cw
   const p = ptySpawn(file, args, { name: 'xterm-256color', cols: m.cols, rows: m.rows, cwd: m.cwd, env: m.env })
   const t: Term = { id: m.id, runId: m.runId, unit, pty: p, pid: p.pid, head, ser, ports: new Set() }
   terms.set(m.id, t)
+  if (WIN) {
+    // node-pty starts the process later (after its conout worker is ready), so the pid is 0 here. Poll the agent's
+    // innerPid, which is set right after CreateProcess, and assign at once. The gap is a race: see the results.
+    if (USE_JOB) t.job = win!.createJob()
+    const t0 = Date.now()
+    let polls = 0
+    const poll = () => {
+      const pid = (p as any)._agent?.innerPid ?? p.pid
+      polls++
+      if (!pid) return void (Date.now() - t0 < 10_000 ? setImmediate(poll) : send({ op: 'created', id: m.id, pid: 0 }))
+      t.pid = pid
+      if (t.job) t.jobAssign = { ...win!.assign(t.job, pid), ms: Date.now() - t0, polls }
+      send({ op: 'created', id: m.id, pid, jobAssign: t.jobAssign ?? null })
+    }
+    poll()
+  }
   p.onData((d) => {
     head.write(d)
     for (const port of t.ports) port.postMessage({ op: 'data', data: d })
@@ -127,7 +189,7 @@ function create(m: { id: string; runId: string; file: string; args: string[]; cw
     for (const port of t.ports) port.postMessage({ op: 'exit', ...e })
     send({ op: 'exit', id: m.id, ...e })
   })
-  send({ op: 'created', id: m.id, pid: p.pid })
+  if (!WIN) send({ op: 'created', id: m.id, pid: p.pid })
 }
 
 function attach(id: string, port: PortMain) {
@@ -157,6 +219,7 @@ function attach(id: string, port: PortMain) {
 }
 
 function vmRss(): number | undefined {
+  if (WIN) return Math.round(process.memoryUsage().rss / 1024) // working set, not VmRSS
   try {
     const m = /VmRSS:\s+(\d+) kB/.exec(readFileSync('/proc/self/status', 'utf8'))
     return m ? Number(m[1]) : undefined
@@ -185,7 +248,12 @@ async function call(m: any): Promise<unknown> {
     case 'stats':
       return { pid: process.pid, vmRssKb: vmRss(), heapUsed: process.memoryUsage().heapUsed, terms: terms.size }
     case 'markers':
-      return markerPids(m.runId)
+      return WIN ? [] : markerPids(m.runId) // Windows: another process's env can't be read without its memory
+    case 'job':
+      return t ? { pids: t.job ? win!.jobPids(t.job) : [], assign: t.jobAssign ?? null, selfInJob: WIN ? win!.selfInJob() : null, tree: WIN && t.pid ? winDescendants(t.pid) : null } : null
+    case 'terminateAll':
+      // OS shutdown: no time for waits. End every job at once.
+      return [...terms.values()].map((x) => (x.job ? win!.terminateJob(x.job) : false))
     default:
       return { error: `unknown op ${m.op}` }
   }

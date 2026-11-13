@@ -1,0 +1,792 @@
+{
+  "launch": {
+    "pass": null,
+    "notes": {
+      "main pid differs from the launched pid": {
+        "main": 28644,
+        "launched": 5096
+      }
+    }
+  },
+  "2-window-life": {
+    "pass": true,
+    "notes": {
+      "steps": {
+        "reopen": {
+          "count": 70,
+          "max": 70,
+          "ok": true,
+          "bad": []
+        },
+        "reload": {
+          "count": 83,
+          "max": 83,
+          "ok": true,
+          "bad": []
+        },
+        "recreate": {
+          "count": 110,
+          "max": 110,
+          "ok": true,
+          "bad": []
+        },
+        "host": {
+          "count": 110,
+          "max": 110,
+          "ok": true,
+          "bad": []
+        },
+        "replays": 1
+      },
+      "seconds": 24
+    },
+    "why": "every number once and in order after reopen, reload, and a new window (last 110)"
+  },
+  "3-server-life": {
+    "pass": true,
+    "notes": {
+      "before": {
+        "serverPid": 10156,
+        "port": 3300,
+        "health": 200
+      },
+      "after": {
+        "serverPid": 23224,
+        "port": 3300,
+        "health": 200,
+        "before": {
+          "count": 9,
+          "max": 9,
+          "ok": true,
+          "bad": []
+        },
+        "after": {
+          "count": 20,
+          "max": 20,
+          "ok": true,
+          "bad": []
+        }
+      },
+      "seconds": 5
+    },
+    "why": "server restarted (new pid, health 200); terminal kept going 9 -> 20 with no gap"
+  },
+  "4-clean-quit": {
+    "pass": true,
+    "notes": {
+      "pty only: detached": {
+        "childUp": true,
+        "childPids": [
+          31916
+        ],
+        "job": {
+          "pids": [],
+          "assign": null,
+          "selfInJob": false,
+          "tree": [
+            31916
+          ]
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [
+            31916
+          ],
+          "ss": [
+            "TCP    127.0.0.1:47315        0.0.0.0:0              LISTENING       31916"
+          ],
+          "childUp": true
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:40:48.918Z killAll [{\"pid\":14288,\"useJob\":false,\"useTree\":false,\"byJob\":[],\"byTree\":[],\"closeMs\":76,\"afterClose\":[],\"jobLeftAfterClose\":[],\"terminatedJob\":false,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": false
+      },
+      "pty only: orphan": {
+        "childUp": true,
+        "childPids": [
+          32756
+        ],
+        "job": {
+          "pids": [],
+          "assign": null,
+          "selfInJob": false,
+          "tree": []
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [
+            32756
+          ],
+          "ss": [
+            "TCP    127.0.0.1:47316        0.0.0.0:0              LISTENING       32756"
+          ],
+          "childUp": true
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:40:54.679Z killAll [{\"pid\":9180,\"useJob\":false,\"useTree\":false,\"byJob\":[],\"byTree\":[],\"closeMs\":75,\"afterClose\":[],\"jobLeftAfterClose\":[],\"terminatedJob\":false,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": false
+      },
+      "tree: detached": {
+        "childUp": true,
+        "childPids": [
+          1900
+        ],
+        "job": {
+          "pids": [],
+          "assign": null,
+          "selfInJob": false,
+          "tree": [
+            1900
+          ]
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:41:03.194Z killAll [{\"pid\":24720,\"useJob\":false,\"useTree\":true,\"byJob\":[],\"byTree\":[1900],\"closeMs\":3081,\"afterClose\":[1900],\"jobLeftAfterClose\":[],\"terminatedJob\":false,\"forced\":[1900],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "tree: orphan": {
+        "childUp": true,
+        "childPids": [
+          14112
+        ],
+        "job": {
+          "pids": [],
+          "assign": null,
+          "selfInJob": false,
+          "tree": []
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [
+            14112
+          ],
+          "ss": [
+            "TCP    127.0.0.1:47318        0.0.0.0:0              LISTENING       14112"
+          ],
+          "childUp": true
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:41:09.003Z killAll [{\"pid\":18056,\"useJob\":false,\"useTree\":true,\"byJob\":[],\"byTree\":[],\"closeMs\":90,\"afterClose\":[],\"jobLeftAfterClose\":[],\"terminatedJob\":false,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": false
+      },
+      "tree: new-console": {
+        "childUp": true,
+        "childPids": [
+          3036
+        ],
+        "job": {
+          "pids": [],
+          "assign": null,
+          "selfInJob": false,
+          "tree": []
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [
+            3036
+          ],
+          "ss": [
+            "TCP    127.0.0.1:47319        0.0.0.0:0              LISTENING       3036"
+          ],
+          "childUp": true
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:41:14.884Z killAll [{\"pid\":31836,\"useJob\":false,\"useTree\":true,\"byJob\":[],\"byTree\":[],\"closeMs\":92,\"afterClose\":[],\"jobLeftAfterClose\":[],\"terminatedJob\":false,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": false
+      },
+      "job only: detached": {
+        "childUp": true,
+        "childPids": [
+          31732
+        ],
+        "job": {
+          "pids": [
+            20356,
+            31732
+          ],
+          "assign": {
+            "ok": true,
+            "inJob": true,
+            "ms": 49,
+            "polls": 965
+          },
+          "selfInJob": false,
+          "tree": [
+            31732
+          ]
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:41:23.546Z killAll [{\"pid\":20356,\"useJob\":true,\"useTree\":false,\"byJob\":[20356,31732],\"byTree\":[],\"closeMs\":3069,\"afterClose\":[31732],\"jobLeftAfterClose\":[31732],\"terminatedJob\":true,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "job only: orphan": {
+        "childUp": true,
+        "childPids": [
+          25960
+        ],
+        "job": {
+          "pids": [
+            31220,
+            25960
+          ],
+          "assign": {
+            "ok": true,
+            "inJob": true,
+            "ms": 44,
+            "polls": 981
+          },
+          "selfInJob": false,
+          "tree": []
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:41:32.440Z killAll [{\"pid\":31220,\"useJob\":true,\"useTree\":false,\"byJob\":[31220,25960],\"byTree\":[],\"closeMs\":3056,\"afterClose\":[25960],\"jobLeftAfterClose\":[25960],\"terminatedJob\":true,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "job only: new-console": {
+        "childUp": true,
+        "childPids": [
+          3520
+        ],
+        "job": {
+          "pids": [
+            3520,
+            29128,
+            31560
+          ],
+          "assign": {
+            "ok": true,
+            "inJob": true,
+            "ms": 44,
+            "polls": 969
+          },
+          "selfInJob": false,
+          "tree": []
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:41:41.180Z killAll [{\"pid\":31560,\"useJob\":true,\"useTree\":false,\"byJob\":[3520,29128,31560],\"byTree\":[],\"closeMs\":3075,\"afterClose\":[3520,29128],\"jobLeftAfterClose\":[3520,29128],\"terminatedJob\":true,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "job + tree: detached": {
+        "childUp": true,
+        "childPids": [
+          16956
+        ],
+        "job": {
+          "pids": [
+            32020,
+            16956
+          ],
+          "assign": {
+            "ok": true,
+            "inJob": true,
+            "ms": 43,
+            "polls": 945
+          },
+          "selfInJob": false,
+          "tree": [
+            16956
+          ]
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:41:49.675Z killAll [{\"pid\":32020,\"useJob\":true,\"useTree\":true,\"byJob\":[32020,16956],\"byTree\":[16956],\"closeMs\":3072,\"afterClose\":[16956],\"jobLeftAfterClose\":[16956],\"terminatedJob\":true,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "job + tree: orphan": {
+        "childUp": true,
+        "childPids": [
+          10808
+        ],
+        "job": {
+          "pids": [
+            13808,
+            10808
+          ],
+          "assign": {
+            "ok": true,
+            "inJob": true,
+            "ms": 44,
+            "polls": 984
+          },
+          "selfInJob": false,
+          "tree": []
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:41:58.580Z killAll [{\"pid\":13808,\"useJob\":true,\"useTree\":true,\"byJob\":[13808,10808],\"byTree\":[],\"closeMs\":3083,\"afterClose\":[10808],\"jobLeftAfterClose\":[10808],\"terminatedJob\":true,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "job + tree: new-console": {
+        "childUp": true,
+        "childPids": [
+          27224
+        ],
+        "job": {
+          "pids": [
+            27224,
+            10128,
+            30816
+          ],
+          "assign": {
+            "ok": true,
+            "inJob": true,
+            "ms": 45,
+            "polls": 843
+          },
+          "selfInJob": false,
+          "tree": []
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [],
+          "ss": [],
+          "childUp": false
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:42:07.353Z killAll [{\"pid\":30816,\"useJob\":true,\"useTree\":true,\"byJob\":[27224,10128,30816],\"byTree\":[],\"closeMs\":3084,\"afterClose\":[27224,10128],\"jobLeftAfterClose\":[27224,10128],\"terminatedJob\":true,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": true
+      },
+      "job + tree: wmi": {
+        "childUp": true,
+        "childPids": [
+          32632
+        ],
+        "job": {
+          "pids": [
+            3520
+          ],
+          "assign": {
+            "ok": true,
+            "inJob": true,
+            "ms": 51,
+            "polls": 685
+          },
+          "selfInJob": false,
+          "tree": []
+        },
+        "dialog": {
+          "message": "1 run is active. Quit ends it.",
+          "buttons": [
+            "Quit and end runs",
+            "Cancel"
+          ],
+          "defaultId": 1,
+          "cancelId": 1
+        },
+        "afterCancel": {
+          "appAlive": true,
+          "fakeAlive": true,
+          "childUp": true,
+          "runLive": true
+        },
+        "afterQuit": {
+          "appAlive": false,
+          "fakeAlive": false,
+          "pgrep": [
+            32632
+          ],
+          "ss": [
+            "TCP    127.0.0.1:47326        0.0.0.0:0              LISTENING       32632"
+          ],
+          "childUp": true
+        },
+        "stopReason": "quit",
+        "mainLog": [
+          "2026-11-13T04:42:13.448Z killAll [{\"pid\":3520,\"useJob\":true,\"useTree\":true,\"byJob\":[3520],\"byTree\":[],\"closeMs\":92,\"afterClose\":[],\"jobLeftAfterClose\":[],\"terminatedJob\":true,\"forced\":[],\"survivors\":[]}]"
+        ],
+        "pass": false
+      },
+      "console hosts before and after": {
+        "before": 12,
+        "after": 12
+      },
+      "seconds": 91
+    },
+    "why": "pty only: detached: LEFT; pty only: orphan: LEFT; tree: detached: clean; tree: orphan: LEFT; tree: new-console: LEFT; job only: detached: clean; job only: orphan: clean; job only: new-console: clean; job + tree: detached: clean; job + tree: orphan: clean; job + tree: new-console: clean; job + tree: wmi: LEFT"
+  },
+  "4b-session-end": {
+    "pass": true,
+    "notes": {
+      "after session-end": {
+        "childUp": true,
+        "allGoneWithinMs": 581,
+        "host": false,
+        "fake": false,
+        "child": [],
+        "childPort": false,
+        "stopReason": "session end"
+      },
+      "seconds": 3
+    },
+    "why": "store saved as \"session end\"; host, claude, and its detached child ended in 581 ms (simulated event)"
+  },
+  "6-host-crash": {
+    "pass": true,
+    "notes": {
+      "job before": {
+        "pids": [
+          24608,
+          31804
+        ],
+        "assign": {
+          "ok": true,
+          "inJob": true,
+          "ms": 45,
+          "polls": 827
+        },
+        "selfInJob": false,
+        "tree": [
+          31804
+        ]
+      },
+      "after kill": {
+        "oldHost": 31400,
+        "newHost": 31788,
+        "hostStarts": 2,
+        "stopReason": "host crashed",
+        "fakeAlive": false,
+        "childLeft": [],
+        "sweep": [
+          {
+            "runId": "457f4fd7",
+            "markerPids": []
+          }
+        ],
+        "childPort": false
+      },
+      "stopped screen tail": [
+        "line 17",
+        "line 18"
+      ],
+      "resume": {
+        "argv": [
+          "--resume",
+          "76d6e33c-9b5b-4e13-abc3-eac9a8002d8a"
+        ],
+        "noAutoStart": true,
+        "liveAfterResume": {
+          "count": 3,
+          "max": 3,
+          "ok": true,
+          "bad": []
+        }
+      },
+      "seconds": 23
+    },
+    "why": "host restarted; run read \"host crashed\"; claude and its detached child ended (sweep); Resume started claude --resume <uuid>"
+  },
+  "7-app-crash": {
+    "pass": true,
+    "notes": {
+      "job before": {
+        "pids": [
+          19080,
+          32656
+        ],
+        "assign": {
+          "ok": true,
+          "inJob": true,
+          "ms": 56,
+          "polls": 871
+        },
+        "selfInJob": false,
+        "tree": [
+          32656
+        ]
+      },
+      "left 3 s after SIGKILL of main": {
+        "host": false,
+        "server": false,
+        "fake": false,
+        "child": []
+      },
+      "electron processes 3 s after": [],
+      "ms after the main kill until each ended (60 s cap)": {
+        "host": 3000,
+        "server": 3000,
+        "fake": 3000,
+        "child": 3522,
+        "stillAlive": [],
+        "electronLeft": []
+      },
+      "next start": {
+        "stopReason": "app closed",
+        "startupLeftovers": [
+          {
+            "runId": "7d14f64d",
+            "markerPids": []
+          }
+        ],
+        "savedScreenRows": 20,
+        "lastRow": "line 18",
+        "fakeAlive": false,
+        "child": [],
+        "newClaudeStarted": false
+      },
+      "seconds": 23
+    },
+    "why": "run read \"app closed\" with its saved screen; nothing left running; nothing started by itself"
+  },
+  "8-memory": {
+    "pass": true,
+    "notes": {
+      "host memory": {
+        "idleVmRssKb": 60328,
+        "withRunVmRssKb": 113744,
+        "heapUsed": 8715120,
+        "bufferRows": 5031,
+        "firstRow": "burst 970 xxxxxxxxxx"
+      },
+      "seconds": 4
+    },
+    "why": "host VmRSS 60328 kB idle, 113744 kB holding 5031 rows (scrollback 5,000 + screen)"
+  },
+  "10-echo": {
+    "pass": true,
+    "notes": {
+      "buffers": {
+        "host": true,
+        "page": true,
+        "tail": [
+          "ready",
+          "",
+          "$SPIKE_TMP\\spike-c10-",
+          "OdGKEg\\repo>"
+        ]
+      },
+      "seconds": 3
+    },
+    "why": "wrote \"echo ready\" through the test hook; \"ready\" in the host buffer: true, in the window's xterm: true"
+  }
+}

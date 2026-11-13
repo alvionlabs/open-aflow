@@ -10,7 +10,7 @@ const out = join(here, '..', 'dist-spike')
 mkdirSync(out, { recursive: true })
 const node = { bundle: true, platform: 'node', format: 'cjs', target: 'node22', logLevel: 'warning' } as const
 await build({ ...node, entryPoints: [join(here, 'spike-main.ts')], outfile: join(out, 'spike-main.cjs'), external: ['electron'] })
-await build({ ...node, entryPoints: [join(here, 'pty-host.ts')], outfile: join(out, 'pty-host.cjs'), external: ['@lydell/node-pty'] })
+await build({ ...node, entryPoints: [join(here, 'pty-host.ts')], outfile: join(out, 'pty-host.cjs'), external: ['node-pty', 'koffi'] })
 await build({ bundle: true, platform: 'browser', format: 'iife', target: 'chrome130', logLevel: 'warning', entryPoints: [join(here, 'page.ts')], outfile: join(out, 'page.js') })
 const require = createRequire(import.meta.url)
 copyFileSync(join(dirname(require.resolve('@xterm/xterm/package.json')), 'css', 'xterm.css'), join(out, 'xterm.css'))

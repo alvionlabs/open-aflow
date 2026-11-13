@@ -18,8 +18,23 @@ if (env.FAKE_CHILD_PORT) {
   const server = join(dirname(fileURLToPath(import.meta.url)), 'fake-child-server.mjs')
   const marker = env.FAKE_MARKER ?? 'openaflow-spike-child'
   const mode = env.FAKE_CHILD_MODE ?? 'detached'
+  const args = [server, env.FAKE_CHILD_PORT, marker]
   if (mode === 'detached') {
-    spawn(process.execPath, [server, env.FAKE_CHILD_PORT, marker], { detached: true, stdio: 'ignore' }).unref()
+    spawn(process.execPath, args, { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+  } else if (process.platform === 'win32') {
+    if (mode === 'orphan') {
+      // A detached go-between starts the server detached and exits: the server's parent ID then names a dead process.
+      const js = `require('child_process').spawn(process.execPath, ${JSON.stringify(args)}, { detached: true, stdio: 'ignore', windowsHide: true }).unref()`
+      spawn(process.execPath, ['-e', js], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+    } else if (mode === 'new-console') {
+      // `start` gives the server its own console window (minimized), as a user's `start npm run dev` would.
+      spawn('cmd.exe', ['/d', '/c', 'start', '"dev"', '/min', process.execPath, ...args], { stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: false })
+    } else if (mode === 'wmi') {
+      // The escape case, like `env -i` on Linux: WMI starts the process. Its parent is WmiPrvSE, outside the job and the tree.
+      const cmd = `"${process.execPath}" "${server}" ${env.FAKE_CHILD_PORT} ${marker}`.replace(/'/g, "''")
+      const ps = `$si = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ShowWindow=[uint16]0}; Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine='${cmd}'; ProcessStartupInformation=$si} | Out-Null`
+      spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { stdio: 'ignore', windowsHide: true })
+    }
   } else {
     // The shell starts the server in its own session and exits: the server is reparented away from us.
     const cmd = `${mode === 'orphan-clean-env' ? `env -i PATH=/usr/bin:/bin ` : ''}setsid '${process.execPath}' '${server}' ${env.FAKE_CHILD_PORT} ${marker} >/dev/null 2>&1 < /dev/null &`
