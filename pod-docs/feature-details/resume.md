@@ -13,6 +13,7 @@ The board can send `continue` or `go` to a pod run's own Claude session, so you 
   - A `merged` merge adds `Merged PR #N · HH:MM`, and the merge panel closes (`createMergeFlow`'s `onMerged`). Every other merge outcome, and an error, keeps today's panel.
   - A `started` Continue or Go adds `Sent continue · HH:MM` (or `go`), with the started line as its note, plus `Not saved to the action log.` when it isn't logged (`ReplyPanel`'s `onSent`). It shows no result block. A failed start keeps its result block and adds nothing; a refused request keeps its error.
   - The last item is the current one (`— now`): `pod runs` after a send; `Updating…` while the card still names a PR the list shows merged, and that card's Merge button hides; else the reply row's button (`Continue`, `Go`), else the card's title.
+  - The card names a merged PR once (`cardPanel`): a reply row whose text is the model's `PR #N merged.` reads `Continue so pod goes on.` (`PR #N merged: pod cleans up.` reads `Continue so pod cleans up.`) while the list shows PR #N merged. The model's text stays as it is, so the Waiting tab still shows it.
   - The list shows only with a done item. It empties on the first Board where the run's state leaves `running` (a new stop), and on a run switch (the card is keyed per run). It lives in the page only: a reload starts it empty.
   - After the merge panel closes, focus goes to the card's primary button, else its title (`focusAfterMerge`). Focus you moved elsewhere while it merged stays there.
   - In flight, the pressed button reads `Sending…`, and every send button is off. The Waiting tab gets only this label: its merge and reply results stay as they were.
@@ -84,3 +85,4 @@ The board can send `continue` or `go` to a pod run's own Claude session, so you 
 - 2026-11-03 · windows-app plan fix 2 · fixed: a stale owner file whose process ID went to a service process no longer turns auto-continue off, also after a restart.
 - 2026-11-05 · fix-late-merge-continue · the automatic check no longer sends `fix-merged` on a merge over 30 minutes old, or with no merge time.
 - 2026-11-13 · ui-rework N1 · the Next step card shows a "what happened" list: a merged merge closes its panel and a started send leaves no result block, each as a timed item; the send button reads `Sending…` in flight, also in the Waiting tab.
+- 2026-11-13 · ui-rework w2-fix · after a merge, the card's reply row no longer names the PR the list shows merged: it reads `Continue so pod goes on.`

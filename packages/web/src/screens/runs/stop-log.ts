@@ -6,6 +6,7 @@
 import type { ResumeResult, RunState } from '@openaflow/model'
 import type { StopItem } from '../../components/StopList.tsx'
 import type { NextItem } from './next-step.ts'
+import type { ReplyPanelView, ReplyRowView } from './reply-view.ts'
 import { NOT_LOGGED, SEND_LABEL, startedText, type ResumeWord } from './resume-flow.ts'
 
 /** `merged`: the PR the item merged, so a card that still names it waits for the Board. `sent`: a Continue or Go. */
@@ -65,6 +66,29 @@ export function stopView(log: StopLog, card: NextItem): StopView {
   const label = last.sent ? 'pod runs' : hideMerge ? 'Updating…' : nextAction(card)
   const done = log.done.map(({ key, label, time, note }): StopItem => ({ key, label, time, state: 'done', ...(note ? { note } : {}) }))
   return { items: [...done, { key: 'now', label, time: '', state: 'current' }], hideMerge }
+}
+
+/** The model's text for a `continue` after a merge: `PR #N merged.`, or `PR #N merged: <what pod does>.` */
+const MERGED_WHY = /^PR #(\d+) merged(?:\.|: (.+))$/
+
+/** A row's text, without the PR when the list already shows it merged (pick 1 b: `Continue so pod goes on`). */
+function rowWhy(row: ReplyRowView, merged: ReadonlySet<number>): string {
+  const m = row.word === 'continue' ? MERGED_WHY.exec(row.why) : null
+  if (!m || !merged.has(Number(m[1]))) return row.why
+  return `Continue so ${m[2] ?? 'pod goes on.'}`
+}
+
+/**
+ * The reply panel as the card draws it, or undefined for a card with no reply. A row's text that names a PR the list
+ * shows merged drops the PR, so the card names it once. A new object: the Waiting tab and other readers keep the
+ * model's text.
+ */
+export function cardPanel(log: StopLog, card: NextItem): ReplyPanelView | undefined {
+  if (card.action.kind !== 'reply') return undefined
+  const panel = card.action.panel
+  const merged = new Set(log.done.flatMap((d) => (d.merged === undefined ? [] : [d.merged])))
+  if (merged.size === 0) return panel
+  return { ...panel, rows: panel.rows.map((r) => ({ ...r, why: rowWhy(r, merged) })) }
 }
 
 export type Focusable = { focus(): void }

@@ -1,10 +1,14 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { MergeResult, ResumeResult } from '@openaflow/model'
 import type { ActionReply } from '../../actions-client.ts'
 import { createMergeFlow, type Post } from './merge-flow.ts'
 import type { NextItem } from './next-step.ts'
 import { NOT_LOGGED, createResumeFlow, startedText } from './resume-flow.ts'
-import { EMPTY_LOG, FOCUS_PRIMARY, FOCUS_TITLE, focusAfterMerge, logMerged, logRunState, logSent, stopView, type StopLog } from './stop-log.ts'
+import { StopList } from '../../components/StopList.tsx'
+import { ReplyPanel } from './ReplyPanel.tsx'
+import { EMPTY_LOG, FOCUS_PRIMARY, cardPanel, FOCUS_TITLE, focusAfterMerge, logMerged, logRunState, logSent, stopView, type StopLog } from './stop-log.ts'
 
 // Local times, so HH:MM reads the same in any time zone.
 const AT_1203 = new Date(2026, 10, 13, 12, 3, 41).getTime()
@@ -183,6 +187,35 @@ describe('stop log', () => {
     expect(stopView(logRunState(EMPTY_LOG, 'running'), replyCard('continue')).items).toEqual([])
     // One done item is enough for a list.
     expect(stopView(logMerged(EMPTY_LOG, 12, AT_1203), answerCard).items).toHaveLength(2)
+  })
+
+  it('the reply row names no PR the list shows merged', () => {
+    const card = (why: string): NextItem => ({ ...replyCard('continue'), action: { kind: 'reply', panel: { target: { repoId: 'r', run: 'alpha' }, rows: [{ key: 'continue', word: 'continue', why, send: 'continue' }] } } })
+    const whyOf = (log: StopLog, why: string) => cardPanel(log, card(why))!.rows[0]!.why
+    const merged78 = logMerged(EMPTY_LOG, 78, AT_1203)
+    // The model's wave-merged and fix-merged text, and its final-merged text with a tail.
+    expect(whyOf(merged78, 'PR #78 merged.')).toBe('Continue so pod goes on.')
+    expect(whyOf(merged78, 'PR #78 merged: pod cleans up.')).toBe('Continue so pod cleans up.')
+    // Another PR, a PR whose number only starts the same, or no merge in the list: the model's text.
+    expect(whyOf(logMerged(EMPTY_LOG, 7, AT_1203), 'PR #78 merged.')).toBe('PR #78 merged.')
+    expect(whyOf(merged78, 'PR #7 merged.')).toBe('PR #7 merged.')
+    expect(whyOf(EMPTY_LOG, 'PR #78 merged.')).toBe('PR #78 merged.')
+    expect(whyOf(merged78, 'Sprint alpha is done.')).toBe('Sprint alpha is done.')
+    // Only for the card: the panel the Waiting tab draws keeps the model's text.
+    const c = card('PR #78 merged.')
+    cardPanel(merged78, c)
+    expect(c.action.kind === 'reply' && c.action.panel.rows[0]!.why).toBe('PR #78 merged.')
+    expect(cardPanel(merged78, answerCard)).toBeUndefined()
+
+    // Drawn as on the card: the list names the PR once, and the reply row doesn't.
+    const html =
+      renderToStaticMarkup(createElement(StopList, { items: stopView(merged78, c).items })) +
+      renderToStaticMarkup(createElement(ReplyPanel, { view: cardPanel(merged78, c), target: { repoId: 'r', run: 'alpha' }, framed: false, onSent: () => {} }))
+    expect(html.match(/#78/g)).toHaveLength(1)
+    expect(html).toContain('Continue so pod goes on.')
+    // The Waiting tab's panel, with no card in between: the model's text.
+    const waiting = renderToStaticMarkup(createElement(ReplyPanel, { view: c.action.kind === 'reply' ? c.action.panel : undefined, target: { repoId: 'r', run: 'alpha' } }))
+    expect(waiting).toContain('PR #78 merged.')
   })
 
   it('focusAfterMerge', () => {

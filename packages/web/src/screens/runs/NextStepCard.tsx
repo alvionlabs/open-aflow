@@ -9,7 +9,7 @@ import { answerNote } from './queue-view.ts'
 import { ReplyPanel } from './ReplyPanel.tsx'
 import { INITIAL_RESOLVE, createResolveFlow, triageTarget, type ResolveState } from './resolve-flow.ts'
 import type { ResumeWord } from './resume-flow.ts'
-import { EMPTY_LOG, focusAfterMerge, logMerged, logRunState, logSent, stopView, type StopLog } from './stop-log.ts'
+import { EMPTY_LOG, cardPanel, focusAfterMerge, logMerged, logRunState, logSent, stopView, type StopLog } from './stop-log.ts'
 import { TriageButton, TriageError, TriageLine } from './Triage.tsx'
 import { nextStatus } from './view.ts'
 import './next-step.css'
@@ -112,7 +112,7 @@ export function NextStepCard({ repo, run, card }: Props) {
           </div>
         )}
         {run.plan !== undefined && (
-          <ReplyPanel key="reply-panel" view={a.kind === 'reply' ? a.panel : undefined} target={{ repoId: repo.id, run: run.plan }} framed={false} onSent={onSent} />
+          <ReplyPanel key="reply-panel" view={cardPanel(log, card)} target={{ repoId: repo.id, run: run.plan }} framed={false} onSent={onSent} />
         )}
       </section>
       {/* The form quotes the entry it opened for, never the card's current one: the Board can move the card on. */}
