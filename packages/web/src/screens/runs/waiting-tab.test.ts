@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import type { ActionReply } from '../../actions-client.ts'
 import type { AnswerState } from './answer-flow.ts'
-import type { MergeState } from './merge-flow.ts'
+import { confirmView, createMergeFlow, type MergeState, type Post } from './merge-flow.ts'
+import { createResumeFlow, resumeView, sendLabel, startedText } from './resume-flow.ts'
 import type { NextItem } from './next-step.ts'
 import type { WaitingRow } from './queue-view.ts'
 import type { EntryKind } from './entry-kind.ts'
@@ -198,5 +201,37 @@ describe('waiting tab', () => {
     expect(wouldClamp(0, 21)).toBe(false)
     expect(wouldClamp(63, Number.NaN)).toBe(false)
     expect(wouldClamp(63, 0)).toBe(false)
+  })
+
+  it('waiting tab keeps its results', async () => {
+    // The tab's flows take no hook: it calls useMergeFlow() bare and gives its reply panels no onSent.
+    const src = readFileSync(new URL('./WaitingTab.tsx', import.meta.url), 'utf8')
+    expect(src).toMatch(/useMergeFlow\(\)/)
+    expect(src).not.toMatch(/onMerged|onSent/)
+
+    const calls: ((r: ActionReply<unknown>) => void)[] = []
+    const post: Post = <T,>() => new Promise<ActionReply<T>>((resolve) => calls.push(resolve as (r: ActionReply<unknown>) => void))
+    const tick = () => new Promise((r) => setTimeout(r, 0))
+    // Merge with no hook: merged stays in the panel as today, with Merged and Close.
+    const merge = createMergeFlow(() => {}, post)
+    merge.open({ repoId: 'r', number: 7 })
+    calls[0]!({ ok: true, data: { number: 7, url: 'u', title: 't', headSha: 'a'.repeat(40), state: 'open', checks: 'pass', mergeable: 'mergeable', mergeState: 'CLEAN' } })
+    await tick()
+    merge.merge()
+    calls[1]!({ ok: true, data: { outcome: 'merged', number: 7, logged: true } })
+    await tick()
+    expect(confirmView(merge.state())).toMatchObject({ result: { words: 'Merged', chip: { label: 'merged' } }, closeLabel: 'Close' })
+
+    // Continue with no hook: Sending… while in flight (the one change), then the started result block under its row.
+    const resume = createResumeFlow({ repoId: 'r', run: 'alpha' }, () => {}, post)
+    resume.press('continue')
+    expect(sendLabel(resumeView(resume.state(), undefined), 'continue')).toBe('Sending…')
+    calls[2]!({ ok: true, data: { outcome: 'started', logged: false } })
+    await tick()
+    expect(resumeView(resume.state(), undefined)).toEqual({
+      busy: false,
+      word: 'continue',
+      result: { chip: { cls: 's-ok', label: 'started' }, words: startedText(undefined), note: 'Not saved to the action log.' },
+    })
   })
 })
