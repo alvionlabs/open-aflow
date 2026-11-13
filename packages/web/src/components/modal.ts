@@ -82,7 +82,13 @@ export function returnFocus(id: string, doc: Pick<Document, 'getElementById' | '
   doc.getElementById(id)?.focus()
 }
 
-/** A focused button that goes disabled drops focus to the body; take it back to the dialog, so Escape still reaches it. */
+/**
+ * A focused button that goes disabled drops focus to the body; take it to the dialog instead, so Escape still
+ * reaches it. Chromium drops the focus only at its next frame, after React's effects, so a disabled control that
+ * still holds focus counts as lost too.
+ */
 export function keepFocusInside(dialog: { contains(node: unknown): boolean; focus(): void } | null, doc: { activeElement: unknown }): void {
-  if (dialog && !dialog.contains(doc.activeElement)) dialog.focus()
+  if (!dialog) return
+  const active = doc.activeElement as { disabled?: unknown } | null
+  if (!dialog.contains(active) || active?.disabled === true) dialog.focus()
 }

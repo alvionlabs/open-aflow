@@ -190,6 +190,11 @@ describe('shared modal', () => {
     keepFocusInside(dialog, { activeElement: inside })
     expect(dialog.focus).toHaveBeenCalledTimes(1)
     keepFocusInside(null, { activeElement: body })
+    // Chromium moves focus off a button that just went disabled only at its next frame, after React's effects.
+    const goingOff = { disabled: true }
+    const dialog2 = { contains: (n: unknown) => n === goingOff, focus: vi.fn() }
+    keepFocusInside(dialog2, { activeElement: goingOff })
+    expect(dialog2.focus).toHaveBeenCalledTimes(1)
   })
 
   it('focus goes back to the opener', () => {
