@@ -1,8 +1,7 @@
 # Sprint: UI rework
 
-_From plan: pod-docs/plans/ui-rework.md · Slug: ui-rework · Status: active · Generated: 2026-11-12_
+_From plan: pod-docs/plans/ui-rework.md · Slug: ui-rework · Status: archived · Generated: 2026-11-12_
 
-<!-- autopilot-run: started=2026-11-13T00:58:21-08:00 sprints=0 waves=1 -->
 
 ## Status board
 
@@ -12,10 +11,10 @@ _From plan: pod-docs/plans/ui-rework.md · Slug: ui-rework · Status: active · 
 | 1 | R1 | PR open time, review-skip marker, Merge for no-review PRs | ui-rework-R1 | merged | done | medium | — |
 | 1 | F1 | Forget run: model check, route, and log line | ui-rework-F1 | merged | done | medium | — |
 | 1 | D1 | Desktop folder bridge (preload + IPC) | ui-rework-D1 | merged | done | medium | — |
-| 2 | N1 | Next step card: list, merge panel closes, Sending… | ui-rework-N1 | https://github.com/alvionlabs/openaflow/pull/107 | pushed | medium | L1 |
-| 2 | M1 | Runs list: last activity, newest first | ui-rework-M1 | https://github.com/alvionlabs/openaflow/pull/107 | pushed | medium | R1 |
-| 2 | K1 | Remove repo and Forget in the modal; `auto` tag | ui-rework-K1 | https://github.com/alvionlabs/openaflow/pull/107 | pushed | medium | L1, F1 |
-| 2 | A1 | Add repo: Windows dialog or path field; picker and folder route gone | ui-rework-A1 | https://github.com/alvionlabs/openaflow/pull/107 | pushed | medium | L1, D1 |
+| 2 | N1 | Next step card: list, merge panel closes, Sending… | ui-rework-N1 | merged | done | medium | L1 |
+| 2 | M1 | Runs list: last activity, newest first | ui-rework-M1 | merged | done | medium | R1 |
+| 2 | K1 | Remove repo and Forget in the modal; `auto` tag | ui-rework-K1 | merged | done | medium | L1, F1 |
+| 2 | A1 | Add repo: Windows dialog or path field; picker and folder route gone | ui-rework-A1 | merged | done | medium | L1, D1 |
 
 ## Shared contract
 
@@ -240,3 +239,22 @@ _From plan: pod-docs/plans/ui-rework.md · Slug: ui-rework · Status: active · 
 - **Depends on:** L1, D1
 - **One-way door:** none. Only the app's own page used `GET /api/fs/folders`.
 - **Model:** opus
+
+## Sprint summary
+
+- **Synced with merge-target:** up to date (`pod-staging` had no new commits after the plan branch was cut)
+- **Slices shipped:** L1, R1, F1, D1 (wave 1, PR #106, merged by the human at gate 6: one-way doors in F1 and D1), N1, M1, K1, A1 (wave 2, PR #107, merged by autopilot)
+- **Queue entries:** resolved 3 (two one-way doors accepted with PR #106, the gate 6 halt); deferred 2: the `auto` tag in two-column cards (look decision for the human), and "Its 1 run leaves the sidebar." in the Remove repo modal (for the plan review's fix pass)
+- **Slice log:**
+  - L1: opus · medium · test-first yes · runtime a scratch page on Vite dev, 1280 and 375 px, dark and light · 5 NOTEs · time lost none
+  - R1: opus · medium · test-first yes · runtime `pnpm dev` with a stub `gh` · 3 NOTEs · time lost about 5 min (stub `gh` sent invalid JSON)
+  - F1: opus · medium · test-first yes · runtime dev API with a fixture copy and real claim files · 5 NOTEs · time lost none
+  - D1: opus · medium · test-first partly — two tests proved by mutation · runtime real Electron with the real shell and a dialog stand-in · 3 NOTEs · time lost about 3 min (CSP blocked a same-origin iframe check)
+  - Wave 1 fix: opus · medium · `hidden-processes.test.ts` caught the new real-Electron test starting with a visible window; the no-review card text
+  - N1: opus · medium · test-first yes · runtime `pnpm dev` with a stub `gh` and `fake-claude` · 5 NOTEs · time lost about 10 min (smoke setup)
+  - M1: sonnet · medium · test-first partly — `ties` and `selection follows the hash` pass on the old code by nature · runtime none (pure model code; seen in the orchestrator's browser check) · 3 NOTEs · time lost none
+  - K1: opus · medium · test-first yes · runtime dev and `pnpm start` with fixture copies · 6 NOTEs · time lost about 5 min (denied shell calls)
+  - A1: opus · medium · test-first partly — three flow cases first failed on a TypeError in the fake · runtime dev and `pnpm start` · 6 NOTEs · time lost none
+  - Wave 2 fix: opus · medium · the PR named twice, the send button after a started send, the run name in the Forget modal, dead CSS and stale docs
+  - Stalls: none. Wave check notes: wave 1's first `pnpm test:electron` failed with `spawn EBUSY` because a new worktree had no Electron binary (installed once with `node node_modules/electron/install.js`). The human chose "own tests only" for engineers, so the orchestrator ran `pnpm verify` once per combined wave; console counts stayed steady (9 → 6 `conhost`, 5 → 6 `OpenConsole`).
+- **Agent context at hand-back:** 2,027,214 tokens summed over the sprint-planner, 8 slice engineers, and 2 wave-fix engineers — each agent's final context size, not tokens billed

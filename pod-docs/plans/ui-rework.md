@@ -3,6 +3,7 @@
 _Generated: 2026-11-12 · Status: active · Grilled-with: pod (fast)_
 
 Port base: 3000
+<!-- autopilot-run: started=2026-11-13T00:58:21-08:00 sprints=1 waves=1 -->
 
 
 ## Goal
@@ -91,7 +92,7 @@ sequenceDiagram
 
 | Sprint | Goal | Status | Depends on |
 |--------|------|--------|------------|
-| ui-rework | Ship every in-scope item above | active | — |
+| ui-rework | Ship every in-scope item above | done | — |
 
 ## Look
 Same look as the app: [calm-dashboard Look](calm-dashboard.md#look), `packages/web/src/theme/tokens.css`, and `DESIGN.md`. The human picked each change from drawn options:
