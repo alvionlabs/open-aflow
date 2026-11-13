@@ -591,3 +591,89 @@ describe('task runs (/pod:task)', () => {
     expect(runReplies(open, T, NOW).map((x) => x.signal)).toEqual(['fix-waiting'])
   })
 })
+
+// A `/pod:task --no-review` PR: pod's PR template writes `skipped (--no-review)` in its body, which gh
+// reads into `reviewSkipped`. No reviewer comes, so the PR is yours once the engineer handed back.
+describe('no-review task PRs', () => {
+  const T = 'task-scroll'
+  const eng = (from: number, to: number, over: Partial<AgentRun> = {}) => engineer(T, from, to, over)
+  const rev = (from: number, to: number, over: Partial<AgentRun> = {}) => reviewer(from, to, { kind: 'task', branch: T, ...over })
+  const flagged = (number: number, state: PrStatus['state'] = 'open'): PrStatus => ({ ...pr(number, state, T), reviewSkipped: true })
+  const run = (agents: AgentRun[], prs: PrStatus[]) => repo({ claims: [claim(T)], agents, prs })
+  const row = (r: BoardRepo) => rows(r)[0]?.slice(2)
+  const steps = (r: BoardRepo) => buildFixPipeline(r, T, NOW)!.stages.flatMap((s) => s.steps)
+  const step = (r: BoardRepo, key: string) => steps(r).find((s) => s.key === key)
+
+  it('no-review PR gets Merge', () => {
+    const r = run([eng(60, 40, { ended: true })], [flagged(36)])
+    expect(row(r)).toEqual(['PR', 'needs-you'])
+    expect(step(r, 'pr')).toEqual({ key: 'pr', label: 'PR', state: 'you', detail: 'PR #36 · you merge', merge: { number: 36 } })
+    expect(step(r, 'round-1')).toEqual({ key: 'round-1', label: 'Round 1', state: 'skipped', detail: 'skipped · --no-review' })
+    // The rest of the flow reads as before.
+    expect(step(r, 'engineer')).toMatchObject({ state: 'done' })
+    expect(step(r, 'round-2')).toMatchObject({ state: 'wait', detail: 'only after a fix pass' })
+    expect(runReplies(r, T, NOW).map((x) => x.signal)).toEqual(['fix-waiting'])
+  })
+
+  it('no-review PR waits while its engineer works', () => {
+    const cases: [string, AgentRun[]][] = [
+      ['running', [eng(30, 1)]],
+      ['stale', [eng(120, 90)]],
+      [
+        'resumed and running',
+        [
+          eng(120, 1, {
+            turns: [
+              { startedAt: NOW - 120 * MIN, endedAt: NOW - 100 * MIN, lastAt: NOW - 100 * MIN, tokens: 1 },
+              { startedAt: NOW - 10 * MIN, lastAt: NOW - MIN, tokens: 1 },
+            ],
+          }),
+        ],
+      ],
+      ['no engineer yet', []],
+    ]
+    for (const [why, agents] of cases) {
+      const r = run(agents, [flagged(36)])
+      expect(row(r)?.[1], why).not.toBe('needs-you')
+      expect(step(r, 'pr')?.merge, why).toBeUndefined()
+      expect(step(r, 'round-1')?.state, why).not.toBe('skipped')
+    }
+    expect(row(run([eng(30, 1)], [flagged(36)]))).toEqual(['build', 'running'])
+    expect(row(run([eng(120, 90)], [flagged(36)]))).toEqual(['review', 'idle'])
+  })
+
+  it('a reviewer overrides the skip flag', () => {
+    // A reviewer joined: the reviewed rule decides, and Round 1 shows its review.
+    const reviewing = run([eng(60, 40, { ended: true }), rev(39, 1)], [flagged(36)])
+    expect(row(reviewing)).toEqual(['review', 'running'])
+    expect(step(reviewing, 'pr')).toMatchObject({ state: 'wait', detail: 'PR #36 · after review' })
+    expect(step(reviewing, 'pr')?.merge).toBeUndefined()
+    expect(step(reviewing, 'round-1')).toMatchObject({ state: 'live' })
+    const reviewed = run([eng(60, 40, { ended: true }), rev(39, 30, { ended: true })], [flagged(36)])
+    expect(row(reviewed)).toEqual(['PR', 'needs-you'])
+    expect(step(reviewed, 'round-1')).toMatchObject({ state: 'done' })
+    // An engineer that wrote after the review un-reviews it, flag or not.
+    const unreviewed = run([eng(60, 40, { ended: true }), rev(39, 30, { ended: true }), eng(29, 20, { ended: true })], [flagged(36)])
+    expect(row(unreviewed)).toEqual(['review', 'idle'])
+  })
+
+  it('no-review PR follows its newest engineer turn', () => {
+    // An older engineer that died (stale) doesn't hold back the newer one that handed back.
+    expect(row(run([eng(200, 150), eng(60, 40, { ended: true })], [flagged(36)]))).toEqual(['PR', 'needs-you'])
+    // A newer engineer still at work does, even after an older one ended.
+    expect(row(run([eng(200, 150, { ended: true }), eng(60, 1)], [flagged(36)]))).toEqual(['build', 'running'])
+  })
+
+  it('a merged no-review PR reads Round 1 skipped; a closed one waits as before', () => {
+    const merged = run([eng(60, 40, { ended: true })], [flagged(36, 'merged')])
+    expect(row(merged)).toEqual(['PR', 'idle'])
+    expect(step(merged, 'pr')).toEqual({ key: 'pr', label: 'PR', state: 'done', detail: 'PR #36 · merged' })
+    expect(step(merged, 'round-1')).toMatchObject({ state: 'skipped', detail: 'skipped · --no-review' })
+    // With no transcript left, the flag still says why no review ran.
+    expect(step(run([], [flagged(36, 'merged')]), 'round-1')).toMatchObject({ state: 'skipped', detail: 'skipped · --no-review' })
+    const closed = run([eng(60, 40, { ended: true })], [flagged(36, 'closed')])
+    expect(row(closed)).toEqual(['PR', 'idle'])
+    expect(step(closed, 'pr')?.merge).toBeUndefined()
+    expect(step(closed, 'round-1')).toMatchObject({ state: 'wait', detail: 'not started' })
+  })
+})
