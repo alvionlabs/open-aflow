@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import * as model from './index.ts'
-import type { AgentRun, Board, BoardRepo } from './board.ts'
+import type { AgentRun, Board, BoardRepo, PrStatus } from './board.ts'
 import { buildRepoModel, type RepoFiles } from './run-model.ts'
-import { activeRuns, listRuns, type RunSummary } from './runs.ts'
+import { activeRuns, listRuns, runActivity, type RunSummary } from './runs.ts'
 
 // Every snapshot is built inline: test/no-io.test.ts scans this folder, so no file reads here.
 
@@ -283,42 +283,118 @@ describe('listRuns', () => {
     expect(runsOf(repo('r', planFiles(closed), { claims: [claim], agents: [{ ...ended(1), plan: 'beta' }] }))).toEqual(none)
   })
 
-  it('order and count', () => {
-    const halt = queueLine('BLOCKED', 'orchestrator → human', 'plan: alpha', 'Gate 2 halted')
-    const ask = queueLine('PENDING', 'orchestrator → human', 'plan: alpha', 'gate 5 (safety-bound): hit the limit')
-    // Two plans in one repo, in different states.
-    const twoPlans: RepoFiles = {
-      ...planFiles({ slug: 'zed' }),
-      ...Object.fromEntries(Object.entries(planFiles({ slug: 'alpha', sprints: [['first', 'active']] })).filter(([k]) => k.includes('/plans/') || k.includes('/sprints/'))),
-    }
-    const repos = [
-      repo('Bravo', twoPlans),
-      repo('gone', {}, { error: 'folder not found' }),
-      repo('old', { 'pod-docs/README.md': 'pod docs: 1\n' }),
-      repo('charlie', planFiles({ queue: [ask] })),
-      repo('alpha', planFiles(), { agents: [running({ sprint: 'one' })] }),
-      repo('delta', planFiles({ queue: [halt] })),
-      repo('echo', planFiles(), { agents: [running({ sprint: 'one' })] }),
-    ]
-    const runs = listRuns(board(...repos), NOW)
-    expect(runs.map((r) => [r.state, r.repo, r.plan])).toEqual([
-      ['blocked', 'delta', 'alpha'],
-      ['needs-you', 'charlie', 'alpha'],
-      ['running', 'alpha', 'alpha'],
-      ['running', 'echo', 'alpha'],
-      ['idle', 'Bravo', 'alpha'],
-      ['idle', 'Bravo', 'zed'],
-      ['unsupported', 'old', undefined],
-      ['error', 'gone', undefined],
-    ])
-    expect(activeRuns(runs)).toBe(4)
-    expect(activeRuns([])).toBe(0)
+  it('count', () => {
     const only = (state: RunSummary['state']): RunSummary[] => [{ repoId: 'x', repo: 'x', where: '', state }]
+    expect(activeRuns([])).toBe(0)
     expect(['blocked', 'needs-you', 'running', 'idle', 'unsupported', 'error'].map((s) => activeRuns(only(s as RunSummary['state'])))).toEqual([1, 1, 1, 0, 0, 0])
+    const halt = queueLine('BLOCKED', 'orchestrator → human', 'plan: alpha', 'Gate 2 halted')
+    const runs = listRuns(board(repo('a', planFiles({ queue: [halt] })), repo('b', planFiles()), repo('gone', {}, { error: 'folder not found' })), NOW)
+    expect(activeRuns(runs)).toBe(1)
   })
 
   it('is exported from the package entry', () => {
     expect(model.listRuns).toBe(listRuns)
+    expect(model.runActivity).toBe(runActivity)
     expect(model.activeRuns).toBe(activeRuns)
+  })
+})
+
+// Last activity and order (M1). Only the Board's data: agents' lastAt, tagged queue dates, PR times.
+describe('runActivity and the order', () => {
+  const day = (d: string) => Date.parse(`${d}T00:00:00Z`)
+  const dated = (date: string, plan: string, resolved = false) =>
+    `- \`[${date} · PENDING · orchestrator → human · plan: ${plan}]\` Pick one **Resolution:** ${resolved ? 'fixed in #9' : 'pending'}`
+  const prAt = (number: number, over: Partial<PrStatus> = {}): PrStatus => ({ number, state: 'open', checks: 'none', checkedAt: NOW, ...over })
+  const first = (r: BoardRepo) => runsOf(r)[0]!
+  const act = (r: BoardRepo) => runActivity(r, first(r))
+
+  it('activity sources', () => {
+    const files = planFiles({ board: [[1, 'A1', '[#3](https://github.com/o/r/pull/3) merged', 'done'], [2, 'B1', '[#4](https://github.com/o/r/pull/4)', 'pushed'], [2, 'B2', '—', 'pending']] })
+    // Nothing read: none.
+    expect(act(repo('r', files))).toBeUndefined()
+    // Each source alone.
+    expect(act(repo('r', files, { agents: [agent({ sprint: 'one', lastAt: NOW - 50 * MIN })] }))).toBe(NOW - 50 * MIN)
+    expect(act(repo('r', planFiles({ queue: [dated('2026-10-17', 'alpha')] })))).toBe(day('2026-10-17'))
+    expect(act(repo('r', files, { prs: [prAt(3, { state: 'merged', openedAt: NOW - 90 * MIN })] }))).toBe(NOW - 90 * MIN)
+    expect(act(repo('r', files, { prs: [prAt(3, { state: 'merged', openedAt: NOW - 90 * MIN, mergedAt: NOW - 80 * MIN })] }))).toBe(NOW - 80 * MIN)
+    // A resolved entry counts too; another plan's one does not.
+    expect(act(repo('r', planFiles({ queue: [dated('2026-10-16', 'alpha', true)] })))).toBe(day('2026-10-16'))
+    expect(act(repo('r', planFiles({ queue: [dated('2026-10-17', 'beta')] })))).toBeUndefined()
+    // The newest of all three wins.
+    const all = repo('r', files, {
+      agents: [agent({ sprint: 'one', lastAt: NOW - 60 * MIN })],
+      prs: [prAt(4, { openedAt: NOW - 20 * MIN })],
+    })
+    expect(act(all)).toBe(NOW - 20 * MIN)
+    // Another plan's agent and an unknown PR number don't count; the hand-back PR and the plan-branch PR do.
+    const handBack = queueLine('PENDING', 'orchestrator → human', 'plan: alpha', 'Plan complete: merge https://github.com/o/r/pull/12')
+    const final = repo('r', planFiles({ queue: [handBack] }), {
+      agents: [agent({ plan: 'beta', lastAt: NOW })],
+      prs: [prAt(12, { openedAt: NOW - 40 * MIN }), prAt(99, { openedAt: NOW }), prAt(13, { branch: 'alpha', openedAt: NOW - 30 * MIN })],
+    })
+    expect(act(final)).toBe(NOW - 30 * MIN)
+    // A slice PR in a later sprint counts: every sprint of the plan.
+    const twoSprints = planFiles({ sprints: [['one', 'done'], ['two', 'active']], board: DONE_BOARD })
+    expect(act(repo('r', twoSprints, { prs: [prAt(3, { state: 'merged', mergedAt: NOW - 5 * MIN })] }))).toBe(NOW - 5 * MIN)
+    // A malformed date reads as none.
+    expect(act(repo('r', planFiles({ queue: [dated('2026-13-45', 'alpha')] })))).toBeUndefined()
+  })
+
+  it('one-off activity', () => {
+    const files: RepoFiles = { 'pod-docs/README.md': README }
+    const claims = [{ portBase: 3100, repoPath: '/r/r', plan: 'task-scroll' }]
+    const own = agent({ type: 'pod:engineer', branch: 'task-scroll', lastAt: NOW - 30 * MIN })
+    const other = agent({ type: 'pod:engineer', branch: 'task-other', lastAt: NOW - 1 * MIN })
+    const r = repo('r', files, { claims, agents: [own, other], prs: [prAt(5, { branch: 'task-scroll', openedAt: NOW - 10 * MIN }), prAt(6, { branch: 'task-other', openedAt: NOW })] })
+    const run = runsOf(r).find((x) => x.plan === 'task-scroll')!
+    // Its own agent and its fixPr; not another run's agent or PR.
+    expect(runActivity(r, run)).toBe(NOW - 10 * MIN)
+    const noPr = repo('r', files, { claims, agents: [own, other] })
+    expect(runActivity(noPr, runsOf(noPr).find((x) => x.plan === 'task-scroll')!)).toBe(NOW - 30 * MIN)
+    const none = repo('r', files, { claims })
+    expect(runActivity(none, runsOf(none)[0]!)).toBeUndefined()
+    // A merged one-off PR counts by its merge time.
+    const merged = repo('r', files, { claims, prs: [prAt(5, { branch: 'task-scroll', state: 'merged', openedAt: NOW - 90 * MIN, mergedAt: NOW - 2 * MIN })] })
+    expect(runActivity(merged, runsOf(merged)[0]!)).toBe(NOW - 2 * MIN)
+  })
+
+  it('newest first, not by state', () => {
+    const halt = queueLine('BLOCKED', 'orchestrator → human', 'plan: alpha', 'Gate 2 halted')
+    const blockedOld = repo('old', planFiles({ queue: [halt] }), { agents: [agent({ sprint: 'one', lastAt: NOW - 3 * 60 * MIN })] })
+    const idleNew = repo('new', planFiles(), { agents: [agent({ sprint: 'one', lastAt: NOW - 40 * MIN })] })
+    const runs = listRuns(board(blockedOld, idleNew), NOW)
+    expect(runs.map((r) => [r.repo, r.state])).toEqual([['new', 'idle'], ['old', 'blocked']])
+  })
+
+  it('no activity last', () => {
+    const quiet = (name: string) => repo(name, planFiles())
+    const err = repo('aaa-gone', {}, { error: 'folder not found' })
+    const old = repo('zzz-old', { 'pod-docs/README.md': 'pod docs: 1\n' })
+    const active = repo('zzz-active', planFiles(), { agents: [agent({ sprint: 'one', lastAt: NOW - 600 * MIN })] })
+    const runs = listRuns(board(quiet('mid'), err, old, quiet('bravo'), active), NOW)
+    expect(runs.map((r) => r.repo)).toEqual(['zzz-active', 'aaa-gone', 'bravo', 'mid', 'zzz-old'])
+  })
+
+  it('ties', () => {
+    const twoPlans = (): RepoFiles => ({
+      ...planFiles({ slug: 'zed' }),
+      ...Object.fromEntries(Object.entries(planFiles({ slug: 'alpha', sprints: [['first', 'active']] })).filter(([k]) => k.includes('/plans/') || k.includes('/sprints/'))),
+    })
+    const at = (name: string) => repo(name, twoPlans(), { agents: [agent({ sprint: 'one', lastAt: NOW - 5 * MIN }), agent({ sprint: 'first', lastAt: NOW - 5 * MIN })] })
+    const runs = listRuns(board(at('Bravo'), at('alpha')), NOW)
+    expect(runs.map((r) => [r.repo, r.plan])).toEqual([['alpha', 'alpha'], ['alpha', 'zed'], ['Bravo', 'alpha'], ['Bravo', 'zed']])
+  })
+
+  it('order ignores now', () => {
+    const halt = queueLine('BLOCKED', 'orchestrator → human', 'plan: alpha', 'Gate 2 halted')
+    const b = board(
+      repo('a', planFiles({ queue: [halt] }), { agents: [agent({ sprint: 'one', lastAt: NOW - 8 * MIN })] }),
+      repo('b', planFiles(), { agents: [agent({ sprint: 'one', lastAt: NOW - 1 * MIN })] }),
+      repo('c', planFiles(), { agents: [agent({ sprint: 'one', lastAt: NOW - 9 * MIN })] }),
+      repo('d', planFiles()),
+    )
+    const key = (now: number) => listRuns(b, now).map((r) => `${r.repo}/${r.plan}`)
+    expect(key(NOW + 10 * MIN)).toEqual(key(NOW))
+    expect(key(NOW)).toEqual(['b/alpha', 'a/alpha', 'c/alpha', 'd/alpha'])
   })
 })
