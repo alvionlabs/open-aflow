@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { postRepo } from '../../add-repo.ts'
 import { Modal } from '../../components/Modal.tsx'
 import { folderBridge } from '../../desktop-bridge.ts'
-import { canAdd, createAddRepoFlow, type AddRepoFlow, type AddRepoState } from './add-repo-flow.ts'
+import { canAdd, createAddRepoFlow, pathHint, type AddRepoFlow, type AddRepoState } from './add-repo-flow.ts'
 
 /** `repoPaths` is kept for the opener; the folder dialog and the path field don't use it. */
 type Props = { repoPaths: string[]; onClose: () => void }
@@ -52,7 +52,7 @@ export function AddRepoForm({ state, flow }: FormProps) {
         type="text"
         autoComplete="off"
         spellCheck={false}
-        placeholder="C:\code\my-repo"
+        placeholder={pathHint(typeof navigator === 'undefined' ? '' : navigator.userAgent)}
         value={state.path}
         readOnly={state.busy}
         aria-invalid={state.error ? 'true' : undefined}

@@ -14,6 +14,13 @@ import type { PickFolder } from '../../desktop-bridge.ts'
 
 export const BRIDGE_FAILED = "Couldn't open the folder dialog. Type the path instead."
 
+/** The path field's example, in the form of the user's own system. The app and the browser run on one machine. */
+export function pathHint(userAgent: string): string {
+  if (/Windows/.test(userAgent)) return 'C:\\code\\my-repo'
+  if (/Macintosh|Mac OS X/.test(userAgent)) return '/Users/you/code/my-repo'
+  return '/home/you/code/my-repo'
+}
+
 export type AddRepoState =
   /** The folder dialog is up, or its folder is posting: no modal. */
   | { kind: 'picking' }
