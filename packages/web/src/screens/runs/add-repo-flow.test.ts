@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { UNREACHABLE } from '../../actions-client.ts'
 import type { AddResult } from '../../add-repo.ts'
-import { BRIDGE_FAILED, canAdd, createAddRepoFlow, type AddRepoState } from './add-repo-flow.ts'
+import { BRIDGE_FAILED, canAdd, createAddRepoFlow, pathHint, type AddRepoState } from './add-repo-flow.ts'
 
 /** A promise the test settles by hand. */
 function deferred<T>() {
@@ -282,5 +282,14 @@ describe('browser path field', () => {
     const t = setup({ bridge: false })
     t.flow.type('/a')
     expect(t.seen.at(-1)).toEqual(t.flow.state())
+  })
+})
+
+describe('the path hint', () => {
+  it('shows a path in the form of the user\'s own system', () => {
+    expect(pathHint('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')).toBe('C:\\code\\my-repo')
+    expect(pathHint('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36')).toBe('/Users/you/code/my-repo')
+    expect(pathHint('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36')).toBe('/home/you/code/my-repo')
+    expect(pathHint('')).toBe('/home/you/code/my-repo')
   })
 })
