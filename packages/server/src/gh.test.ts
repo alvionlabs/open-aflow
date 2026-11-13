@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { createExec, createGhReader, NO_PR_ASK_LIMIT, NO_PR_SLOW_MS, PR_CACHE_MS, type ExecResult, type GhExec } from './gh.ts'
 
 const REPO = 'E:\\Projects\\chess-web'
-const PR_FIELDS = 'number,state,url,statusCheckRollup,baseRefName,mergedAt'
+const PR_FIELDS = 'number,state,url,statusCheckRollup,baseRefName,mergedAt,createdAt'
 
 type Call = { args: string[]; cwd: string }
 
@@ -499,7 +499,7 @@ describe('createGhReader', () => {
 })
 
 describe('PRs found by head branch (fix runs)', () => {
-  const LIST_FIELDS = 'number,state,url,statusCheckRollup,baseRefName,mergedAt,headRefName,title'
+  const LIST_FIELDS = 'number,state,url,statusCheckRollup,baseRefName,mergedAt,createdAt,headRefName,title,body'
   const item = (n: number, state: string, head = 'fix-scroll') => ({ number: n, state, url: `https://github.com/o/r/pull/${n}`, statusCheckRollup: [], headRefName: head })
 
   /** A fake `gh` that answers `pr list --head <b>` from `lists`. */
@@ -971,5 +971,125 @@ describe('forget and stderr', () => {
     reader.forget(REPO, 8)
     await reader.refresh(REPO, [8])
     expect(prCalls()).toBe(6)
+  })
+})
+
+describe('PR open time and the no-review marker', () => {
+  const MARKER = 'skipped (--no-review)'
+  const listItem = (n: number, head: string, over: Record<string, unknown> = {}) => ({
+    number: n,
+    state: 'OPEN',
+    url: `https://github.com/o/r/pull/${n}`,
+    statusCheckRollup: [],
+    headRefName: head,
+    ...over,
+  })
+
+  /** A fake gh: `pr view <n>` from `views`, `pr list --head <b>` from `lists`. */
+  function fieldsGh() {
+    const calls: string[][] = []
+    const views = new Map<number, unknown>()
+    const lists = new Map<string, unknown[]>()
+    const exec: GhExec = async (args) => {
+      calls.push(args)
+      if (args[0] === 'auth') return ok('')
+      if (args[1] === 'view') {
+        const v = views.get(Number(args[2]))
+        return v === undefined ? { status: 'failed', stdout: '' } : ok(JSON.stringify(v))
+      }
+      const l = lists.get(args[3] ?? '')
+      return l === undefined ? { status: 'failed', stdout: '' } : ok(JSON.stringify(l))
+    }
+    return { calls, views, lists, exec }
+  }
+
+  test('PR fields ask for createdAt, and body by branch', async () => {
+    const gh = fieldsGh()
+    gh.views.set(7, { number: 7, state: 'OPEN', statusCheckRollup: [] })
+    gh.lists.set('task-a', [listItem(8, 'task-a')])
+    const reader = createGhReader({ exec: gh.exec, now: clock().now })
+    await reader.refresh(REPO, [7], ['task-a'], ['pod-staging'])
+    const jsonOf = (a: string[]) => (a[a.indexOf('--json') + 1] ?? '').split(',')
+    const view = gh.calls.find((a) => a[1] === 'view')!
+    const lists = gh.calls.filter((a) => a[1] === 'list')
+    expect(jsonOf(view)).toContain('createdAt')
+    // Only a read by branch asks for the body; a read by number never does.
+    expect(jsonOf(view)).not.toContain('body')
+    expect(lists).toHaveLength(2)
+    for (const l of lists) expect(jsonOf(l)).toEqual(expect.arrayContaining(['createdAt', 'body']))
+  })
+
+  test('openedAt from createdAt', async () => {
+    const gh = fieldsGh()
+    const base = { state: 'OPEN', statusCheckRollup: [] }
+    gh.views.set(1, { number: 1, ...base, createdAt: '2026-11-10T08:30:00Z' })
+    gh.views.set(2, { number: 2, ...base, createdAt: null })
+    gh.views.set(3, { number: 3, ...base, createdAt: 'yesterday' })
+    gh.views.set(4, { number: 4, ...base })
+    gh.views.set(5, { number: 5, ...base, createdAt: 1_700_000_000_000 })
+    gh.lists.set('task-a', [listItem(9, 'task-a', { createdAt: '2026-11-11T09:00:00Z' })])
+    gh.lists.set('task-b', [listItem(10, 'task-b', { createdAt: '' })])
+    const reader = createGhReader({ exec: gh.exec, now: clock().now })
+    await reader.refresh(REPO, [1, 2, 3, 4, 5], ['task-a', 'task-b'])
+    expect(reader.get(REPO, 1)?.openedAt).toBe(Date.UTC(2026, 10, 10, 8, 30))
+    expect(reader.getBranch(REPO, 'task-a')?.openedAt).toBe(Date.UTC(2026, 10, 11, 9))
+    // Null, missing, not a date, or not text: left unset, and the PR still reads.
+    for (const n of [2, 3, 4, 5]) {
+      expect(reader.get(REPO, n), String(n)).toBeDefined()
+      expect(reader.get(REPO, n), String(n)).not.toHaveProperty('openedAt')
+    }
+    expect(reader.getBranch(REPO, 'task-b')).not.toHaveProperty('openedAt')
+  })
+
+  test('reviewSkipped from the body', async () => {
+    const gh = fieldsGh()
+    const secret = 'Private notes: token-abc123 lives here.'
+    const bodies: [string, unknown][] = [
+      ['task-mid', `## Review\n\n${secret}\nReview: ${MARKER} by the human.\n`],
+      ['task-start', `${MARKER}`],
+      ['task-null', null],
+      ['task-none', undefined],
+      ['task-other', `${secret} skipped (no review) and --no-review`],
+      ['task-case', `Review: SKIPPED (--NO-REVIEW)`],
+      ['task-num', 42],
+    ]
+    for (const [b, body] of bodies) gh.lists.set(b, [listItem(20 + gh.lists.size, b, body === undefined ? {} : { body })])
+    gh.views.set(30, { number: 30, state: 'OPEN', statusCheckRollup: [], body: MARKER })
+    const reader = createGhReader({ exec: gh.exec, now: clock().now })
+    await reader.refresh(REPO, [30], bodies.map(([b]) => b))
+    expect(reader.getBranch(REPO, 'task-mid')?.reviewSkipped).toBe(true)
+    expect(reader.getBranch(REPO, 'task-start')?.reviewSkipped).toBe(true)
+    for (const b of ['task-null', 'task-none', 'task-other', 'task-case', 'task-num']) {
+      expect(reader.getBranch(REPO, b), b).toBeDefined()
+      expect(reader.getBranch(REPO, b), b).not.toHaveProperty('reviewSkipped')
+    }
+    // A PR read by number is never flagged, even if gh sent a body.
+    expect(reader.get(REPO, 30)).not.toHaveProperty('reviewSkipped')
+    // No body text is kept: only the flag.
+    for (const pr of [...bodies.map(([b]) => reader.getBranch(REPO, b)), reader.get(REPO, 30)]) {
+      expect(pr).not.toHaveProperty('body')
+      const text = JSON.stringify(pr)
+      expect(text).not.toContain('token-abc123')
+      expect(text).not.toContain('--no-review')
+    }
+  })
+
+  test('the marker added to or taken from the body counts as a change', async () => {
+    const gh = fieldsGh()
+    const c = clock()
+    gh.lists.set('task-a', [listItem(40, 'task-a', { body: 'Review: pending' })])
+    const reader = createGhReader({ exec: gh.exec, now: c.now })
+    await reader.refresh(REPO, [], ['task-a'])
+    gh.lists.set('task-a', [listItem(40, 'task-a', { body: `Review: ${MARKER}` })])
+    c.advance(PR_CACHE_MS)
+    expect(await reader.refresh(REPO, [], ['task-a'])).toBe(true)
+    expect(reader.getBranch(REPO, 'task-a')?.reviewSkipped).toBe(true)
+    gh.lists.set('task-a', [listItem(40, 'task-a', { body: 'Review: pending' })])
+    c.advance(PR_CACHE_MS)
+    expect(await reader.refresh(REPO, [], ['task-a'])).toBe(true)
+    expect(reader.getBranch(REPO, 'task-a')).not.toHaveProperty('reviewSkipped')
+    // The same body again: no change.
+    c.advance(PR_CACHE_MS)
+    expect(await reader.refresh(REPO, [], ['task-a'])).toBe(false)
   })
 })
