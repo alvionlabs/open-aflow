@@ -117,7 +117,8 @@ describe('desktop add error', () => {
     await tick()
     const s = form(t.flow.state())
     expect(s).toMatchObject({ path: 'E:\\code\\chess-web', error: 'Already registered.', canChoose: true, busy: false })
-    expect(canAdd(s)).toBe(true)
+    // The error turns Add off, until the path changes.
+    expect(canAdd(s)).toBe(false)
     expect(t.onClose).not.toHaveBeenCalled()
   })
 
@@ -169,6 +170,8 @@ describe('desktop add error', () => {
     t.picks[1]!.resolve(null)
     await tick()
     expect(form(t.flow.state())).toMatchObject({ path: 'E:\\code\\chess-web', busy: false, error: 'Already registered.' })
+    // The error is back, so Add stays off.
+    expect(canAdd(t.flow.state())).toBe(false)
     expect(t.onClose).not.toHaveBeenCalled()
     expect(t.post).toHaveBeenCalledTimes(1)
   })
@@ -184,6 +187,7 @@ describe('desktop add error', () => {
     t.picks[1]!.reject(new Error('dialog failed'))
     await tick()
     expect(form(t.flow.state())).toMatchObject({ path: 'E:\\code\\chess-web', busy: false, error: BRIDGE_FAILED })
+    expect(canAdd(t.flow.state())).toBe(false)
   })
 })
 
@@ -262,6 +266,38 @@ describe('browser path field', () => {
     expect(form(t.flow.state()).error).toBeUndefined()
     void t.flow.add()
     expect(t.post).toHaveBeenCalledTimes(2)
+  })
+
+  it('an error turns Add off; a change to the path turns it on again', async () => {
+    const t = setup({ bridge: false })
+    t.flow.type('/home/me/repo')
+    void t.flow.add()
+    t.posts[0]!.resolve({ status: 409, error: 'already registered' })
+    await tick()
+    const s = form(t.flow.state())
+    expect(s).toMatchObject({ path: '/home/me/repo', busy: false, error: 'Already registered.' })
+    expect(canAdd(s)).toBe(false)
+    // Enter (add) does nothing while the error shows.
+    void t.flow.add()
+    expect(t.post).toHaveBeenCalledTimes(1)
+    expect(form(t.flow.state()).busy).toBe(false)
+    // A change to the path clears the error and turns Add on.
+    t.flow.type('/home/me/repo2')
+    expect(form(t.flow.state()).error).toBeUndefined()
+    expect(canAdd(t.flow.state())).toBe(true)
+    // A change to a blank path clears the error, but Add stays off.
+    t.flow.type('  ')
+    expect(form(t.flow.state()).error).toBeUndefined()
+    expect(canAdd(t.flow.state())).toBe(false)
+  })
+
+  it('canAdd: an idle form with a path and no error', () => {
+    const base = { kind: 'form', path: '/a', busy: false, canChoose: false } as const
+    expect(canAdd(base)).toBe(true)
+    expect(canAdd({ ...base, error: 'Already registered.' })).toBe(false)
+    expect(canAdd({ ...base, error: '' })).toBe(true)
+    expect(canAdd({ ...base, busy: true })).toBe(false)
+    expect(canAdd({ kind: 'picking' })).toBe(false)
   })
 
   it('Cancel closes; 201 closes', async () => {

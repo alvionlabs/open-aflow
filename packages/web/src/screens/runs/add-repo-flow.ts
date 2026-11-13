@@ -5,6 +5,8 @@
 // and Choose folder… (the dialog again). A dialog that can't open opens the modal and asks for a typed path.
 // With no bridge (the browser build), the modal opens with an empty path field.
 //
+// Add is off while the modal shows an error; a change to the path clears the error.
+//
 // The modal is busy while a post or a dialog is out: Add, Choose folder…, and Cancel then do nothing, so one
 // post runs at a time. After close, nothing more happens, and a late answer is dropped.
 
@@ -35,9 +37,9 @@ export type AddRepoDeps = {
   onClose: () => void
 }
 
-/** Add is on in an idle modal whose path isn't blank. */
+/** Add is on in an idle modal whose path isn't blank and that shows no error. Typing clears the error. */
 export function canAdd(s: AddRepoState): boolean {
-  return s.kind === 'form' && !s.busy && s.path.trim() !== ''
+  return s.kind === 'form' && !s.busy && !s.error && s.path.trim() !== ''
 }
 
 export type AddRepoFlow = ReturnType<typeof createAddRepoFlow>
