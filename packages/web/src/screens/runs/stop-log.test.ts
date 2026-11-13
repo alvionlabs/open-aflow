@@ -191,16 +191,23 @@ describe('stop log', () => {
     const root = (primary: typeof button | null, heading: typeof title | null = title) => ({
       querySelector: (sel: string) => (sel === FOCUS_PRIMARY ? primary : sel === FOCUS_TITLE ? heading : null),
     })
+    const body = {}
+    // Focus fell to the body with the closed panel (null when nothing holds it).
+    const fell = { activeElement: body, body }
     // The card's primary button (Continue, once the Board moved on) when there is one.
-    focusAfterMerge(root(button))
+    focusAfterMerge(root(button), fell)
     expect(button.focus).toHaveBeenCalledTimes(1)
     expect(title.focus).not.toHaveBeenCalled()
     // None (Merge hidden while the Board catches up, or a disabled one): the title.
-    focusAfterMerge(root(null))
+    focusAfterMerge(root(null), { activeElement: null, body })
+    expect(title.focus).toHaveBeenCalledTimes(1)
+    // You moved on while it merged (an answer box, say): focus stays there, so a key press never lands on Continue.
+    focusAfterMerge(root(button), { activeElement: {}, body })
+    expect(button.focus).toHaveBeenCalledTimes(1)
     expect(title.focus).toHaveBeenCalledTimes(1)
     // The card left the page: nothing throws.
-    expect(() => focusAfterMerge(null)).not.toThrow()
-    expect(() => focusAfterMerge(root(null, null))).not.toThrow()
+    expect(() => focusAfterMerge(null, fell)).not.toThrow()
+    expect(() => focusAfterMerge(root(null, null), fell)).not.toThrow()
     // A disabled button never counts.
     expect(FOCUS_PRIMARY).toMatch(/:not\(:disabled\)/)
   })

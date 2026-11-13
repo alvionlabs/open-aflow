@@ -72,8 +72,12 @@ export type FocusRoot = { querySelector(selector: string): Focusable | null }
 export const FOCUS_PRIMARY = 'button.btn.primary:not(:disabled)'
 export const FOCUS_TITLE = '.next-title'
 
-/** After the merge panel closes: the card's primary button (Continue, once the Board moved on), else its title. */
-export function focusAfterMerge(card: FocusRoot | null): void {
-  if (!card) return
+/**
+ * After the merge panel closes: the card's primary button (Continue, once the Board moved on), else its title. Only
+ * when focus fell to the body with the panel: focus you moved elsewhere while it merged stays, so a key press meant
+ * for that never lands on Continue.
+ */
+export function focusAfterMerge(card: FocusRoot | null, doc: { activeElement: unknown; body: unknown }): void {
+  if (!card || (doc.activeElement !== null && doc.activeElement !== doc.body)) return
   ;(card.querySelector(FOCUS_PRIMARY) ?? card.querySelector(FOCUS_TITLE))?.focus()
 }

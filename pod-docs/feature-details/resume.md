@@ -14,7 +14,7 @@ The board can send `continue` or `go` to a pod run's own Claude session, so you 
   - A `started` Continue or Go adds `Sent continue · HH:MM` (or `go`), with the started line as its note, plus `Not saved to the action log.` when it isn't logged (`ReplyPanel`'s `onSent`). It shows no result block. A failed start keeps its result block and adds nothing; a refused request keeps its error.
   - The last item is the current one (`— now`): `pod runs` after a send; `Updating…` while the card still names a PR the list shows merged, and that card's Merge button hides; else the reply row's button (`Continue`, `Go`), else the card's title.
   - The list shows only with a done item. It empties on the first Board where the run's state leaves `running` (a new stop), and on a run switch (the card is keyed per run). It lives in the page only: a reload starts it empty.
-  - After the merge panel closes, focus goes to the card's primary button, else its title (`focusAfterMerge`).
+  - After the merge panel closes, focus goes to the card's primary button, else its title (`focusAfterMerge`). Focus you moved elsewhere while it merged stays there.
   - In flight, the pressed button reads `Sending…`, and every send button is off. The Waiting tab gets only this label: its merge and reply results stay as they were.
   - `HH:MM` is local time. Automatic sends never reach the list.
 - **Toggle route** (`POST /api/actions/auto-continue`): on, off, or on again (which clears the saved stop key, the way to retry a failed send). Only for a listed run. Not logged.

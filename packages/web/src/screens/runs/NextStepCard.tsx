@@ -120,7 +120,7 @@ export function NextStepCard({ repo, run, card }: Props) {
       {/* A failed Close or Keep stays under the card, even after the Board moves the card on. */}
       <TriageError state={resolve} flow={resolveFlow} />
       {merge.kind !== 'idle' && (
-        <MergeConfirm state={merge} flow={mergeFlow} label={`PR #${merge.target.number}`} returnFocus={() => focusAfterMerge(cardRef.current)} />
+        <MergeConfirm state={merge} flow={mergeFlow} label={`PR #${merge.target.number}`} returnFocus={() => focusAfterMerge(cardRef.current, document)} />
       )}
     </>
   )
