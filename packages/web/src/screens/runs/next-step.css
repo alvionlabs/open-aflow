@@ -1,0 +1,14 @@
+/*
+ * The Next step card's "what happened" list (draft pick 3 c): under the title and its detail, above the card's
+ * action. StopList's own look is in components/stop-list.css; this only places it in the card.
+ */
+.next-step .stop-list {
+  max-width: 72ch;
+  margin-top: 16px;
+}
+
+@media (max-width: 480px) {
+  .next-step .stop-list {
+    margin-top: 12px;
+  }
+}

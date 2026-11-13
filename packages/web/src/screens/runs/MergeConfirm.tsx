@@ -2,28 +2,45 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Chip } from './Chip.tsx'
 import { INITIAL, confirmView, createMergeFlow, type MergeFlow, type MergeState } from './merge-flow.ts'
 
-/** One merge flow, owned by the pipeline that shows the Merge buttons. */
-export function useMergeFlow(): [MergeState, MergeFlow] {
+/**
+ * One merge flow, owned by the pipeline that shows the Merge buttons. With `onMerged` (the Next step card), the panel
+ * closes on `merged` and the owner shows the merge; without it (the Waiting tab), the result stays in the panel.
+ */
+export function useMergeFlow(onMerged?: (number: number, at: number) => void): [MergeState, MergeFlow] {
   const [state, setState] = useState<MergeState>(INITIAL)
-  const flow = useMemo(() => createMergeFlow(setState), [])
+  // Read at the reply, so the flow made once calls the latest one.
+  const merged = useRef(onMerged)
+  useEffect(() => {
+    merged.current = onMerged
+  })
+  const hooked = onMerged !== undefined
+  const flow = useMemo(() => createMergeFlow(setState, undefined, hooked ? { onMerged: (n, at) => merged.current?.(n, at) } : {}), [hooked])
   return [state, flow]
 }
 
 export const mergeButtonId = (number: number) => `merge-pr-${number}`
 
-type Props = { state: MergeState; flow: MergeFlow; label: string }
+/** `returnFocus`: where focus goes when the panel closes; by default, back to its Merge button. */
+type Props = { state: MergeState; flow: MergeFlow; label: string; returnFocus?: () => void }
 
 /** The confirm, opened in place under the pipeline step it acts on. */
-export function MergeConfirm({ state, flow, label }: Props) {
+export function MergeConfirm({ state, flow, label, returnFocus }: Props) {
   const view = confirmView(state)
   const ref = useRef<HTMLElement>(null)
   const number = state.kind === 'idle' ? undefined : state.target.number
 
+  const back = useRef(returnFocus)
+  useEffect(() => {
+    back.current = returnFocus
+  })
   // Focus moves into the panel when it opens, so Escape reaches it, and back to its Merge button when it closes.
   useEffect(() => {
     if (number === undefined) return
     ref.current?.focus()
-    return () => document.getElementById(mergeButtonId(number))?.focus()
+    return () => {
+      if (back.current) back.current()
+      else document.getElementById(mergeButtonId(number))?.focus()
+    }
   }, [number])
   // A step's buttons change (Check again gives way to Merge); keep focus in the panel so Escape still works.
   useEffect(() => {
