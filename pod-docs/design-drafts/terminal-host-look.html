@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>terminal-host: the new screens in the current look</title>
+<style>
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-400.woff2") format("woff2"); font-weight:400; }
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-500.woff2") format("woff2"); font-weight:500; }
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-600.woff2") format("woff2"); font-weight:600; }
+  @font-face { font-family:"Geist Mono"; src:url("../../packages/web/public/fonts/geist-mono-400.woff2") format("woff2"); font-weight:400; }
+
+  /* Tokens copied from packages/web/src/theme/tokens.css. No new tokens. */
+  :root {
+    --bg:#fff; --surface:#fafafa; --hover:#f2f2f2; --border:#eaeaea; --border-strong:#d4d4d4;
+    --fg:#171717; --muted:#666; --faint:#8f8f8f; --primary-bg:#171717; --primary-fg:#fff; --focus:#0068d6;
+    --blocked:#d0262f; --danger:#b81d25; --danger-fg:#fff; --needs-you:#b25d00;
+    --running:#0068d6; --ready:#1a8a45; --idle:#7d7d7d; --shadow:rgb(0 0 0 / .08);
+    --font:"Geist","Segoe UI",system-ui,sans-serif;
+    --mono:"Geist Mono",ui-monospace,"Cascadia Code",Consolas,monospace;
+  }
+  :root[data-theme="dark"] {
+    --bg:#000; --surface:#0a0a0a; --hover:#1a1a1a; --border:#262626; --border-strong:#3a3a3a;
+    --fg:#ededed; --muted:#a1a1a1; --faint:#6e6e6e; --primary-bg:#ededed; --primary-fg:#0a0a0a; --focus:#52a8ff;
+    --blocked:#ff5f5f; --danger:#ff5f5f; --danger-fg:#0a0a0a; --needs-you:#f5a623;
+    --running:#52a8ff; --ready:#3ecf72; --idle:#8f8f8f; --shadow:rgb(0 0 0 / .4);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/24px var(--font); }
+  .page { max-width:1280px; margin-inline:auto; padding:48px 32px 96px; display:grid; gap:64px; }
+  .top { display:flex; justify-content:space-between; gap:16px; align-items:start; }
+  h1 { margin:0 0 8px; font-size:36px; line-height:44px; letter-spacing:-.02em; }
+  h2 { margin:0 0 4px; font-size:22px; line-height:28px; }
+  h3 { margin:0; font-size:18px; line-height:24px; font-weight:500; }
+  p { margin:0; color:var(--muted); max-width:72ch; }
+  code { font:13px var(--mono); }
+  section > p { margin-bottom:16px; }
+  :focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+
+  .btn { font:500 14px/20px var(--font); color:var(--fg); background:transparent; border:1px solid var(--border-strong); border-radius:6px; padding:6px 12px; cursor:pointer; display:inline-flex; gap:6px; align-items:center; white-space:nowrap; }
+  .btn:hover { background:var(--hover); }
+  .btn.primary { background:var(--primary-bg); color:var(--primary-fg); border-color:var(--primary-bg); }
+  .btn.ghost { border-color:transparent; }
+  .btn.danger { background:var(--danger); color:var(--danger-fg); border-color:var(--danger); }
+  .btn svg { width:16px; height:16px; }
+
+  /* App frame */
+  .app { border:1px solid var(--border); border-radius:12px; overflow:hidden; display:grid; grid-template-columns:260px 1fr; min-height:560px; background:var(--bg); }
+  .side { border-right:1px solid var(--border); background:var(--surface); padding:16px 12px; display:flex; flex-direction:column; gap:8px; }
+  .logo { font-weight:600; font-size:16px; padding:0 4px 8px; }
+  .card { border:1px solid var(--border); border-radius:8px; padding:8px 12px; background:var(--bg); display:grid; grid-template-columns:1fr; gap:2px; }
+  .card.sel { border-color:var(--border-strong); background:var(--hover); }
+  .card .t { font-size:14px; font-weight:500; }
+  .card .s { font-size:13px; color:var(--muted); display:flex; gap:8px; align-items:center; }
+  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex:none; }
+  .d-run { background:var(--running); } .d-you { background:var(--needs-you); } .d-blk { background:var(--blocked); } .d-idle { background:var(--idle); } .d-ok { background:var(--ready); }
+  .tag { font:12px/16px var(--mono); border:1px solid var(--border-strong); border-radius:999px; padding:0 6px; color:var(--muted); }
+  .side .foot { margin-top:auto; display:flex; gap:4px; }
+  .main { padding:24px 32px; display:flex; flex-direction:column; gap:16px; min-width:0; }
+  .bar { display:flex; align-items:center; gap:12px; }
+  .bar .title { font-size:18px; font-weight:500; }
+  .bar .crumb { color:var(--muted); font-size:14px; }
+  .bar .sp { margin-left:auto; display:flex; gap:8px; }
+  .flow { display:flex; gap:8px; flex-wrap:wrap; font-size:13px; color:var(--muted); }
+  .flow span { border:1px solid var(--border); border-radius:999px; padding:2px 10px; }
+  .flow span.on { border-color:var(--running); color:var(--fg); }
+  .next { border:1px solid var(--border); border-radius:8px; padding:12px 16px; display:flex; gap:16px; align-items:center; }
+  .next .txt { flex:1; }
+  .next .txt b { font-weight:500; display:block; }
+  .next .txt small { color:var(--muted); font-size:14px; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--border); }
+  .tabs button { font:500 14px var(--font); background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); padding:8px 12px; cursor:pointer; display:flex; gap:6px; align-items:center; }
+  .tabs button.on { color:var(--fg); border-color:var(--fg); }
+
+  /* Terminal: theme tokens only. Background --surface, text --fg, cursor --focus. */
+  .term { font:13px/20px var(--mono); background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 16px; min-height:280px; white-space:pre; overflow:hidden; color:var(--fg); position:relative; }
+  .term .m { color:var(--muted); } .term .a { color:var(--running); } .term .g { color:var(--ready); }
+  .cursor { display:inline-block; width:8px; height:16px; background:var(--focus); vertical-align:-3px; }
+  .termfoot { display:flex; gap:12px; align-items:center; font-size:13px; color:var(--muted); }
+  .faded { opacity:.45; }
+  .stopbar { display:flex; gap:12px; align-items:center; border:1px solid var(--border-strong); border-radius:8px; padding:12px 16px; background:var(--bg); }
+  .stopbar .txt { flex:1; }
+  .stopbar b { font-weight:500; }
+  .banner { display:flex; gap:12px; align-items:center; border:1px solid var(--blocked); border-radius:8px; padding:12px 16px; }
+  .banner .txt { flex:1; }
+  .err { border:1px solid var(--blocked); border-radius:8px; padding:12px 16px; display:grid; gap:8px; }
+  .err code { color:var(--muted); }
+
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); gap:24px; align-items:start; }
+  .cap { font:12px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+  .box { border:1px solid var(--border); border-radius:12px; padding:16px; display:grid; gap:12px; }
+
+  /* Native quit dialog (drawn) */
+  .dlg { max-width:440px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface); box-shadow:0 8px 24px var(--shadow); padding:20px; display:grid; gap:12px; font-family:"Segoe UI",system-ui,sans-serif; }
+  .dlg .btns { display:flex; justify-content:flex-end; gap:8px; }
+  .dlg ul { margin:0; padding-left:20px; color:var(--muted); font-size:14px; }
+
+  /* Settings */
+  .set { display:grid; gap:24px; max-width:720px; }
+  .set h3 { padding-bottom:8px; border-bottom:1px solid var(--border); }
+  .field { display:grid; gap:4px; }
+  .field label { font-size:14px; font-weight:500; }
+  .field small { font-size:14px; color:var(--muted); }
+  .field input[type=text], .field input[type=number] { font:13px/20px var(--mono); color:var(--fg); background:var(--bg); border:1px solid var(--border-strong); border-radius:6px; padding:8px 12px; width:100%; }
+  .field input[type=number] { width:140px; }
+  .row { display:flex; gap:12px; align-items:center; }
+  .switch { width:36px; height:20px; border-radius:999px; background:var(--primary-bg); position:relative; flex:none; }
+  .switch::after { content:""; position:absolute; right:2px; top:2px; width:16px; height:16px; border-radius:50%; background:var(--primary-fg); }
+  .preview { font:13px/20px var(--mono); color:var(--muted); background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:8px 12px; white-space:pre-wrap; word-break:break-all; }
+
+  .phone { width:375px; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .phone .side { border-right:0; border-bottom:1px solid var(--border); flex-direction:row; flex-wrap:wrap; }
+  .phone .main { padding:16px; }
+  .phone .term { min-height:220px; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="top">
+  <div>
+    <h1>terminal-host: the new screens</h1>
+    <p>The current look only: tokens from <code>packages/web/src/theme/tokens.css</code>, Geist and Geist Mono, and the rules in <code>DESIGN.md</code>. Nothing here is a new direction. Check each screen, then say what to change.</p>
+  </div>
+  <button class="btn" id="theme" type="button">Light / dark</button>
+</div>
+
+<!-- 1 -->
+<section>
+  <h2>1. A plan run with its Terminal tab open</h2>
+  <p>The Terminal tab sits after Waiting and Log. Like those tabs, it is closed until you open it. A dot on the tab shows a live terminal. You type into the terminal as you would in any terminal. The terminal uses the theme's surface and text colors, and the focus color for the cursor.</p>
+  <div class="app">
+    <aside class="side">
+      <div class="logo">OpenAFlow</div>
+      <div class="card sel"><span class="t">openaflow · terminal-host</span><span class="s"><span class="dot d-run"></span>running</span></div>
+      <div class="card"><span class="t">chess-web · move-list</span><span class="s"><span class="dot d-you"></span>needs you</span></div>
+      <div class="card"><span class="t">notes-app</span><span class="s"><span class="dot d-idle"></span>no active plan</span></div>
+      <div class="foot"><button class="btn ghost" type="button">Add repo</button><button class="btn ghost" type="button">Settings</button></div>
+    </aside>
+    <div class="main">
+      <div class="bar"><span class="title">terminal-host</span><span class="crumb">openaflow</span><div class="sp"><button class="btn ghost" type="button" aria-label="More">
+        <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg></button></div></div>
+      <div class="flow"><span>Plan</span><span>Sprint 1</span><span class="on">Wave 2</span><span>Review</span><span>Ship</span></div>
+      <div class="next"><div class="txt"><b>pod is running wave 2</b><small>Two engineers are at work. Nothing waits on you.</small></div></div>
+      <div class="tabs"><button type="button">Waiting</button><button type="button">Log</button><button type="button" class="on"><span class="dot d-run"></span>Terminal</button></div>
+      <div class="term"><span class="m">╭──────────────────────────────────────────╮</span>
+<span class="m">│</span> ✻ Claude Code                            <span class="m">│</span>
+<span class="m">╰──────────────────────────────────────────╯</span>
+
+<span class="a">●</span> Dispatching wave 2: slices T1, T2
+
+  <span class="g">✓</span> engineer T1 started (worktree terminal-host-T1)
+  <span class="g">✓</span> engineer T2 started (worktree terminal-host-T2)
+
+<span class="m">&gt;</span> <span class="cursor"></span></div>
+      <div class="termfoot"><span class="dot d-run"></span>Live<span>·</span><code>claude</code> in <code>~/Projects/openaflow</code></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section>
+  <h2>2. Start work: New session on a repo with no plan</h2>
+  <p>A repo with no active plan offers <b>New session</b>. You pick a pod skill from a dropdown and describe the work in one field. The app starts <code>claude "/pod:plan &lt;your text&gt;"</code> in the repo, and the Terminal tab opens on the repo's row. This is a start argument, not typed input, so the automatic-input gate doesn't apply. <b>Plain session</b> starts <code>claude</code> with no prompt. When the plan doc appears, the run takes over the terminal.</p>
+  <div class="grid2">
+    <div>
+      <div class="cap">Before (revised 2026-11-13: skill dropdown)</div>
+      <div class="app" style="min-height:300px">
+        <aside class="side"><div class="logo">OpenAFlow</div>
+          <div class="card sel"><span class="t">notes-app</span><span class="s"><span class="dot d-idle"></span>no active plan</span></div></aside>
+        <div class="main"><div class="bar"><span class="title">notes-app</span></div>
+          <div class="next" style="flex-direction:column;align-items:stretch;gap:12px">
+            <div class="txt"><b>No active plan</b><small>Pick what to start, then describe it.</small></div>
+            <div class="field"><label for="sk">Start with</label>
+              <select id="sk" style="font:14px var(--font);color:var(--fg);background:var(--bg);border:1px solid var(--border-strong);border-radius:6px;padding:8px 12px;max-width:320px">
+                <option>Plan: /pod:plan</option><option>Ship an idea: /pod:ship</option><option>One task: /pod:task</option><option>Research: /pod:research</option><option>Park an idea: /pod:idea</option><option>Plain session</option>
+              </select></div>
+            <div class="field"><label for="ar">What to build</label><input id="ar" type="text" value="add tags to notes"></div>
+            <div><button class="btn primary" type="button">New session</button></div>
+          </div></div>
+      </div>
+      <div class="box" style="margin-top:16px"><div class="cap">The dropdown open</div>
+        <div style="border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 8px 24px var(--shadow);background:var(--bg);max-width:320px;padding:4px;display:grid;font-size:14px">
+          <span style="padding:8px 12px;background:var(--hover);border-radius:6px"><b style="font-weight:500">Plan</b> <code>/pod:plan</code><br><small style="color:var(--muted)">Interview, then write a plan.</small></span>
+          <span style="padding:8px 12px"><b style="font-weight:500">Ship an idea</b> <code>/pod:ship</code><br><small style="color:var(--muted)">Research, plan, and build in one go.</small></span>
+          <span style="padding:8px 12px"><b style="font-weight:500">One task</b> <code>/pod:task</code><br><small style="color:var(--muted)">One change, one engineer, one PR.</small></span>
+          <span style="padding:8px 12px"><b style="font-weight:500">Research</b> <code>/pod:research</code></span>
+          <span style="padding:8px 12px"><b style="font-weight:500">Park an idea</b> <code>/pod:idea</code></span>
+          <span style="padding:8px 12px;border-top:1px solid var(--border)"><b style="font-weight:500">Plain session</b><br><small style="color:var(--muted)">Claude with no prompt.</small></span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">After</div>
+      <div class="app" style="min-height:300px">
+        <aside class="side"><div class="logo">OpenAFlow</div>
+          <div class="card sel"><span class="t">notes-app</span><span class="s"><span class="dot d-run"></span>session · no plan yet</span></div></aside>
+        <div class="main"><div class="bar"><span class="title">notes-app</span></div>
+          <div class="tabs"><button type="button" class="on"><span class="dot d-run"></span>Terminal</button></div>
+          <div class="term" style="min-height:160px"><span class="m">&gt;</span> /pod:plan add tags to notes<span class="cursor"></span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section>
+  <h2>3. A stopped run: last saved screen and Resume</h2>
+  <p>After a quit, a crash, or a reboot, the run shows its last saved screen, faded, and a <b>Resume</b> button. Nothing resumes by itself. <b>Dismiss</b> takes the stopped terminal off the run. The run itself stays.</p>
+  <div class="app" style="min-height:420px">
+    <aside class="side"><div class="logo">OpenAFlow</div>
+      <div class="card sel"><span class="t">openaflow · terminal-host</span><span class="s"><span class="dot d-idle"></span>stopped</span></div></aside>
+    <div class="main">
+      <div class="bar"><span class="title">terminal-host</span><span class="crumb">openaflow</span></div>
+      <div class="tabs"><button type="button">Waiting</button><button type="button">Log</button><button type="button" class="on">Terminal</button></div>
+      <div class="stopbar"><span class="dot d-idle"></span><div class="txt"><b>Stopped · app closed</b><br><small class="m" style="color:var(--muted);font-size:14px">The terminal ended at 14:02. Resume starts the same Claude session again.</small></div><button class="btn primary" type="button">Resume</button><button class="btn" type="button">Dismiss</button></div>
+      <div class="term faded" style="min-height:180px"><span class="a">●</span> Dispatching wave 2: slices T1, T2
+  <span class="g">✓</span> engineer T1 started
+<span class="m">&gt;</span></div>
+    </div>
+  </div>
+  <div class="grid2" style="margin-top:24px">
+    <div class="box"><div class="cap">The other stop words</div>
+      <div class="stopbar"><span class="dot d-idle"></span><div class="txt"><b>Stopped · terminals restarted</b></div><button class="btn primary" type="button">Resume</button></div>
+      <div class="stopbar"><span class="dot d-idle"></span><div class="txt"><b>Ended</b> · Claude exited</div><button class="btn primary" type="button">Resume</button></div>
+      <div class="stopbar"><span class="dot d-blk"></span><div class="txt"><b>Can't resume</b><br><small style="color:var(--muted);font-size:14px">The session file is gone.</small></div><button class="btn" type="button">Dismiss</button></div>
+    </div>
+    <div class="box"><div class="cap">Next step card on a hosted run that waits for continue</div>
+      <div class="next"><div class="txt"><b>Wave 1 merged. Reply continue.</b><small>Open the terminal and type <code>continue</code>.</small></div><button class="btn primary" type="button">Open terminal</button></div>
+      <p style="font-size:14px">Until the automatic-input plan, the app types nothing into a hosted session. A run started in your own terminal keeps today's Continue.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section>
+  <h2>4. Something needs you in the terminal</h2>
+  <div class="grid2">
+    <div class="box"><div class="cap">Claude asks to trust the folder</div>
+      <div class="card" style="max-width:260px"><span class="t">notes-app</span><span class="s"><span class="dot d-you"></span>needs you</span></div>
+      <div class="next"><div class="txt"><b>Claude asks to trust this folder</b><small>Answer in the terminal. The app never answers it for you.</small></div><button class="btn primary" type="button">Open terminal</button></div>
+    </div>
+    <div class="box"><div class="cap">The terminals stop answering</div>
+      <div class="banner"><span class="dot d-blk"></span><div class="txt"><b>Terminals are not responding.</b><br><small style="color:var(--muted);font-size:14px">Your sessions may still run. The app keeps trying.</small></div></div>
+    </div>
+    <div class="box"><div class="cap">A run wrapper you changed fails</div>
+      <div class="err"><b>The run didn't start</b><span style="color:var(--muted);font-size:14px">Your run wrapper failed:</span><code>systemd-run: unknown option --scopee</code><div><button class="btn" type="button">Open settings</button></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section>
+  <h2>5. Quit with live sessions</h2>
+  <p>This is a native dialog, so the OS draws it. The drawing shows its text and buttons only. <b>Cancel</b> is the default. After you confirm, the window shows "Ending 2 sessions…" for up to 6 s.</p>
+  <div class="grid2">
+    <div class="dlg" role="dialog" aria-label="Quit OpenAFlow">
+      <h3>2 sessions are active. Quit ends them.</h3>
+      <ul><li>openaflow · terminal-host</li><li>notes-app · no plan yet</li></ul>
+      <div class="btns"><button class="btn" type="button">Quit and end sessions</button><button class="btn primary" type="button">Cancel</button></div>
+    </div>
+    <div class="box" style="place-items:center;min-height:140px"><div class="row"><span class="dot d-run"></span><span>Ending 2 sessions…</span></div></div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section>
+  <h2>6. Settings</h2>
+  <p>You open it from the sidebar's <b>Settings</b> button and from the tray menu. It replaces the main column, with <b>Back</b>. Each change saves at once, with no Save button. The run wrapper section shows on Linux and macOS only.</p>
+  <div class="app" style="grid-template-columns:260px 1fr">
+    <aside class="side"><div class="logo">OpenAFlow</div><div class="card"><span class="t">openaflow · terminal-host</span><span class="s"><span class="dot d-run"></span>running</span></div>
+      <div class="foot"><button class="btn ghost" type="button">Add repo</button><button class="btn ghost" type="button" style="background:var(--hover)">Settings</button></div></aside>
+    <div class="main">
+      <div class="bar"><button class="btn ghost" type="button">Back</button><span class="title">Settings</span></div>
+      <div class="set">
+        <div class="field"><h3>General</h3></div>
+        <div class="row"><span class="switch" role="switch" aria-checked="true"></span><div class="field"><label>Open at login</label><small>Start OpenAFlow in the tray when you sign in.</small></div></div>
+        <div class="field"><h3>Terminals</h3></div>
+        <div class="field"><label for="sb">Scrollback</label><div class="row"><input id="sb" type="number" value="5000"><span style="color:var(--muted);font-size:14px">lines per terminal</span></div><small>Kept for the screen you see after a reopen and next to Resume. Applies to new sessions.</small></div>
+        <div class="field"><h3>Run wrapper</h3></div>
+        <div class="field"><label for="wr">Wrapper command</label><input id="wr" type="text" value="systemd-run --user --scope --quiet --unit=openaflow-run-{runId}.scope"><small>Runs before <code>claude</code>, with no shell. Placeholders: <code>{runId}</code>, <code>{unit}</code>. Leave it empty for no wrapper.</small></div>
+        <div class="field"><label for="st">Stop command</label><input id="st" type="text" value="systemctl --user stop openaflow-run-{runId}.scope"></div>
+        <div class="field"><label>Full command for a new session</label><div class="preview">systemd-run --user --scope --quiet --unit=openaflow-run-7f3c.scope /home/you/.local/bin/claude --session-id 1b2e… --plugin-dir …/openaflow-hooks</div></div>
+        <div><button class="btn" type="button">Reset to default</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section>
+  <h2>7. At 375 px</h2>
+  <p>The sidebar stacks above the main column, as it does today. The terminal takes the full width, and long lines wrap the same way they do in any narrow terminal.</p>
+  <div class="phone">
+    <aside class="side"><div class="card sel" style="flex:1"><span class="t">openaflow · terminal-host</span><span class="s"><span class="dot d-run"></span>running</span></div></aside>
+    <div class="main">
+      <div class="bar"><span class="title">terminal-host</span></div>
+      <div class="tabs"><button type="button">Waiting</button><button type="button">Log</button><button type="button" class="on"><span class="dot d-run"></span>Terminal</button></div>
+      <div class="term"><span class="a">●</span> Dispatching wave 2
+  <span class="g">✓</span> engineer T1
+<span class="m">&gt;</span> <span class="cursor"></span></div>
+    </div>
+  </div>
+</section>
+
+</div>
+<script>
+  document.getElementById('theme').addEventListener('click', () => {
+    const r = document.documentElement;
+    r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark';
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>terminal-host: how it fits together</title>
+<style>
+  :root { --bg:#fff; --surface:#fafafa; --border:#eaeaea; --fg:#171717; --muted:#666; --focus:#0068d6;
+    --font:"Geist","Segoe UI",system-ui,sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace; }
+  :root[data-theme="dark"] { --bg:#000; --surface:#0a0a0a; --border:#262626; --fg:#ededed; --muted:#a1a1a1; --focus:#52a8ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/24px var(--font); }
+  main { max-width:1120px; margin-inline:auto; padding:48px 32px 96px; display:grid; gap:40px; }
+  h1 { margin:0 0 8px; font-size:36px; line-height:44px; }
+  h2 { margin:0 0 12px; font-size:22px; }
+  p, li { color:var(--muted); max-width:80ch; }
+  code { font:13px var(--mono); }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  th, td { text-align:left; padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { color:var(--muted); font-weight:500; }
+  .mermaid { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; overflow:auto; }
+  .btn { font:500 14px var(--font); color:var(--fg); background:none; border:1px solid var(--border); border-radius:6px; padding:6px 12px; cursor:pointer; }
+  .top { display:flex; justify-content:space-between; align-items:start; gap:16px; }
+</style>
+</head>
+<body>
+<main>
+<div class="top">
+  <div>
+    <h1>Plan terminal-host: how it fits together</h1>
+    <p><b>Goal:</b> OpenAFlow hosts its own terminals. Each runs the real <code>claude</code> with your login. You start, watch, type into, resume, and end sessions in the app, and you need no other terminal. This is plan A of three: <code>terminal-host</code>, then <code>openaflow-plugin</code>, then <code>automatic-input</code>. v0.1.0 waits for the first two.</p>
+  </div>
+  <button class="btn" id="theme" type="button">Light / dark</button>
+</div>
+
+<section>
+<h2>Parts</h2>
+<table>
+<thead><tr><th>Part</th><th>New or changed</th><th>Where</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td>Pty host</td><td>new</td><td><code>packages/pty-host</code></td><td>Holds every terminal: node-pty, a headless buffer per session, replay, heartbeat. Knows nothing of plans or pod.</td></tr>
+<tr><td>Host starter</td><td>new</td><td><code>packages/desktop</code></td><td>Starts the pty host, restarts it up to 5 times, watches the heartbeat, hands each window a MessagePort.</td></tr>
+<tr><td>Session ender</td><td>new</td><td><code>packages/desktop</code></td><td>Stop command, tree and marker snapshot, SIGHUP, SIGTERM, SIGKILL; a Job Object on Windows.</td></tr>
+<tr><td>Quit and update flow</td><td>changed</td><td><code>packages/desktop</code></td><td>Quit dialog, "Ending N sessions…", updates only after it.</td></tr>
+<tr><td>Session store</td><td>new</td><td><code>packages/server</code></td><td>Repo, session ID, run marker, start time, stop reason, last screen. In the config folder.</td></tr>
+<tr><td>Session routes</td><td>new</td><td><code>packages/server</code></td><td>New session, Resume, Dismiss. Builds the <code>claude</code> command line.</td></tr>
+<tr><td>Hooks plugin</td><td>new</td><td><code>packages/hooks-plugin</code></td><td>Writes the live session ID and hook state per run marker.</td></tr>
+<tr><td>Run model join</td><td>changed</td><td><code>packages/model</code></td><td>Attaches a hosted session to its run or repo row; reports hosted states.</td></tr>
+<tr><td>Resume runner</td><td>changed</td><td><code>packages/server</code></td><td>Refuses any <code>-p</code> send to a hosted session.</td></tr>
+<tr><td>Terminal tab</td><td>new</td><td><code>packages/web</code></td><td>xterm.js on the MessagePort, stop bar, Resume, Dismiss, Open terminal.</td></tr>
+<tr><td>New session form</td><td>new</td><td><code>packages/web</code></td><td>Skill dropdown, text field, start.</td></tr>
+<tr><td>Settings page</td><td>new</td><td><code>packages/web</code>, <code>packages/desktop</code></td><td>Open at login, scrollback, run wrapper, stop command.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>How they connect</h2>
+<pre class="mermaid">
+flowchart TB
+  Web[Terminal tab and New session form] -->|New session, Resume, Dismiss| Routes[Session routes]
+  Routes -->|start: program, args, cwd, env| Main[Host starter in Electron main]
+  Main -->|start, kill| Host[Pty host]
+  Host -->|node-pty| Claude[claude, your login, hooks plugin]
+  Claude -->|hook events| HookFile[(hook state file)]
+  HookFile -->|live session ID, idle| Server[Server: session store and Board]
+  Host -->|exit, heartbeat| Main
+  Main -->|session exited| Server
+  Server -->|Board with hosted states| Web
+  Web <-->|MessagePort: output, input, resize| Host
+  Main -->|quit, leftovers| Ender[Session ender]
+  Ender -->|stop command, signals, Job Object| Claude
+</pre>
+</section>
+
+<section>
+<h2>Main flow: start a plan from a repo with no plan</h2>
+<pre class="mermaid">
+sequenceDiagram
+  actor You
+  participant Web as Terminal tab
+  participant Server
+  participant Main as Electron main
+  participant Host as Pty host
+  participant Claude as claude
+  You->>Web: pick /pod:plan, type "add tags", New session
+  Web->>Server: POST new session
+  Server->>Server: new UUID and run marker, save session
+  Server->>Main: start claude --session-id UUID --plugin-dir hooks "/pod:plan add tags"
+  Main->>Host: start in repo folder
+  Host->>Claude: spawn in a pty
+  Web->>Host: attach over MessagePort
+  Host-->>Web: replay, then live output
+  Claude->>Server: hook: SessionStart, session ID
+  Claude->>Claude: plan interview, writes the plan doc
+  Server-->>Web: Board: the session now belongs to the new run
+</pre>
+</section>
+
+<section>
+<h2>Data</h2>
+<ul>
+<li><b>Session store</b> <code>&lt;config dir&gt;/sessions.json</code>: the server writes and reads it.</li>
+<li><b>Saved screens</b> <code>&lt;config dir&gt;/screens/</code>: the host writes them every 10 s and at quit. The server reads them for the stop bar.</li>
+<li><b>Hook state</b> <code>&lt;config dir&gt;/hooks/</code>: the hooks plugin writes it, and the server reads it.</li>
+<li><b>Settings</b> <code>&lt;config dir&gt;/settings.json</code>: never stored in a repo.</li>
+</ul>
+</section>
+
+<section>
+<h2>Sprints</h2>
+<table>
+<thead><tr><th>Sprint</th><th>Goal</th><th>Depends on</th></tr></thead>
+<tbody>
+<tr><td>host-core</td><td>The pty host, node-pty, the hooks plugin, and packaging, proved on Windows and Linux. A session starts and replays.</td><td>—</td></tr>
+<tr><td>terminal-tab</td><td>New session with the skill dropdown, the Terminal tab, and hosted run states.</td><td>host-core</td></tr>
+<tr><td>session-life</td><td>Quit, ending process trees, Resume, crashes, the heartbeat banner, and updates.</td><td>terminal-tab</td></tr>
+<tr><td>settings</td><td>The settings page.</td><td>session-life</td></tr>
+</tbody>
+</table>
+</section>
+</main>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+  const draw = () => mermaid.run({ querySelector: '.mermaid' });
+  const dark = () => document.documentElement.dataset.theme === 'dark';
+  const src = [...document.querySelectorAll('.mermaid')].map((e) => e.textContent);
+  mermaid.initialize({ startOnLoad: false, theme: dark() ? 'dark' : 'default' });
+  draw();
+  document.getElementById('theme').addEventListener('click', () => {
+    const r = document.documentElement;
+    r.dataset.theme = dark() ? 'light' : 'dark';
+    document.querySelectorAll('.mermaid').forEach((e, i) => { e.removeAttribute('data-processed'); e.textContent = src[i]; });
+    mermaid.initialize({ startOnLoad: false, theme: dark() ? 'dark' : 'default' });
+    draw();
+  });
+</script>
+</body>
+</html>

@@ -41,6 +41,7 @@ Not automatic input, and kept that way:
 
 - **The folder-trust prompt.** The app never answers it. Its default is **No, exit**.
 - **Resume.** It starts a new `claude --resume <id>` process. It writes nothing into a live session.
+- **New session's start prompt.** The skill and your text (for example `/pod:plan add tags`) go to `claude` as its start argument. Nothing is written into a running session ([plan](../plans/terminal-host.md)). _Unproved:_ `host-core` checks that the start argument runs the skill; if it doesn't, you type it yourself.
 - **Screen reading.** No input decision reads the screen.
 
 ## Known gaps

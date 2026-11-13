@@ -349,3 +349,27 @@ Consequences: a quit with live runs takes at most about 6 s after you confirm.
 Context: both were open in [terminal-host.md](research/terminal-host.md).
 Decision: keep the browser build as the agents' test bench for the non-terminal UI, with no Terminal tab. Keep reading `pod-docs/`, watch-only, until OpenAFlow develops itself with its own plugin; then remove it in its own plan.
 Consequences: `CLAUDE.md` and the smoke recipe stay as they are.
+
+## 2026-11-13 — No release before the terminal host (human decision)
+Context: the `ui-rework` plan was to ship before v0.1.0. The human: "Without terminal host, this app is just a monitor tool. People still have to run Claude Code and run this app at the same time, which I won't even want to use. The goal is to have people use this app only and still manage everything else."
+Decision: v0.1.0 waits for plans [`terminal-host`](plans/terminal-host.md) and `openaflow-plugin`. `automatic-input` may follow the release.
+Options not chosen: release v0.1.0 after `ui-rework` on today's runner (rejected: the app is only a monitor then); wait for all three plans (rejected: automatic input has the most untested gaps and is not needed to use the app only).
+Consequences: this replaces "before v0.1.0" in the `ui-rework` plan. The first-release hand-offs in the queue wait too.
+
+## 2026-11-13 — The terminal host is three plans in a row (human decision)
+Context: the terminal host is more than 4 sprints, and pod reviews a plan's code once, at its end.
+Decision: [`terminal-host`](plans/terminal-host.md) (pty host, Terminal tab, session life, settings), then `openaflow-plugin` (`.openaflow/` and the bundled plugin), then `automatic-input` (send path and auto-continue through the pty).
+Options not chosen: one plan for all of it (rejected: over the sprint cap, and one review for too much code).
+Consequences: until `automatic-input`, the app types nothing into a hosted session; Continue on a hosted run opens the Terminal tab.
+
+## 2026-11-13 — Keep node-pty after the Windows test (human decision)
+Context: on Windows, the human's test of node-pty went well; the agents there suggested another library. The name was not recorded.
+Decision: keep upstream `node-pty@1.2.0-beta.18` (the 2026-11-11 decision). Fix problems if they show.
+Options not chosen: a node-pty fork with prebuilds for older Electron (`@homebridge/node-pty-prebuilt-multiarch`, `@karinjs/node-pty`), or `zigpty` (Zig, node-pty-compatible API, very new). Rejected: node-pty runs VS Code's terminal on all three systems, and none of these has that track record. `@lydell/node-pty` stays the fallback.
+Consequences: `host-core` proves node-pty on Windows, packaged, before anything builds on it.
+
+## 2026-11-13 — New session picks a pod skill from a dropdown (human decision)
+Context: the draft had you type `/pod:plan` in a new terminal. The human: "I'd like to have a dropdown to choose which pod skill to use rather than typing pod:plan."
+Decision: New session has a "Start with" dropdown (`/pod:plan`, `/pod:ship`, `/pod:task`, `/pod:research`, `/pod:idea`, Plain session) and one text field. The app passes the skill and text to `claude` as its start argument.
+Options not chosen: type the command in the terminal (rejected by the human); write the command into the pty after start (rejected: that is automatic input, with all its gates).
+Consequences: unproved that the start argument runs the skill; `host-core` checks it, and the fallback is to type it yourself. The skill list lives in one module so `openaflow-plugin` can change the prefix.
