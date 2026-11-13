@@ -200,6 +200,27 @@ describe('forget-run route', () => {
     expect(s.logged).toEqual([])
   })
 
+  test('a folder named like the port gives 409 claim changed and stays', async () => {
+    const s = await setup()
+    await unlink(join(ports, '3100'))
+    await mkdir(join(ports, '3100'))
+    await writeFile(join(ports, '3100', 'keep'), 'keep')
+    const res = await s.post({ repoId: s.idOf(webPath), run: 'fix-scroll', portBase: 3100 })
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'claim changed' })
+    expect(await readFile(join(ports, '3100', 'keep'), 'utf8')).toBe('keep')
+    expect(s.logged).toEqual([])
+  })
+
+  test('a claim deleted by someone else between the read and the delete gives 404 no claim, then a rebuild', async () => {
+    const s = await setup({ unlink: async () => Promise.reject(Object.assign(new Error('gone'), { code: 'ENOENT' })) })
+    const res = await s.post({ repoId: s.idOf(webPath), run: 'fix-scroll', portBase: 3100 })
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error: 'no claim' })
+    expect(s.events).toEqual(['rebuild'])
+    expect(s.logged).toEqual([])
+  })
+
   test('repeat', async () => {
     const s = await setup()
     const body = { repoId: s.idOf(webPath), run: 'fix-scroll', portBase: 3100 }
@@ -288,6 +309,7 @@ describe('forget-run route', () => {
     expect(res.status).toBe(500)
     expect(await res.json()).toEqual({ error: 'claim unremovable' })
     expect(tried).toEqual([join(ports, '3100')])
+    expect(s.events).toEqual(['log', 'rebuild'])
     expect(s.logged).toEqual([{ action: 'forget-run', repoId, repo: 'web', target: 'fix-scroll · port base 3100', result: 'failed', message: 'EPERM' }])
     expect(await exists(join(ports, '3100'))).toBe(true)
   })
@@ -316,5 +338,8 @@ describe('forget-run route', () => {
     }
     expect(await exists(join(ports, '3100'))).toBe(true)
     expect(s.logged).toEqual([])
+    // The same body with the token gets through.
+    expect((await s.post(body)).status).toBe(200)
+    expect(await exists(join(ports, '3100'))).toBe(false)
   })
 })
