@@ -1,5 +1,5 @@
 // Adding a repo: the POST to /api/repos and the error word as a sentence. The
-// folder picker (screens/runs/folder-picker.ts) drives them.
+// Add repo flow (screens/runs/add-repo-flow.ts) drives them.
 
 import { NEED_RELOAD, pageToken, RESTARTED } from './actions-client.ts'
 
