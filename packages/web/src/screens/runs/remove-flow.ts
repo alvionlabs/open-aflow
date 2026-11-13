@@ -132,18 +132,16 @@ const ERRORS: Record<string, string> = {
 /** The modal's words and state; undefined while closed. The path tells apart two repos with one name. */
 export function confirmView(s: RemoveState): ModalView | undefined {
   if (s.kind === 'idle') return undefined
-  const n = s.target.runs
-  // A claim keeps the repo, and its runs, on the board.
-  const note = s.target.alsoClaimed ? CLAIM_NOTE : n === 1 ? 'Its 1 run leaves the sidebar.' : `Its ${n} runs leave the sidebar.`
   const v: ModalView = {
     heading: `Remove ${s.target.name}?`,
     detail: DETAIL,
     mono: [s.target.path],
-    notes: [note],
     confirmLabel: 'Remove',
     busy: s.kind === 'removing',
     returnFocusTo: s.target.returnTo,
   }
+  // A claim keeps the repo, and its runs, on the board. A repo that is only registered gets no runs line.
+  if (s.target.alsoClaimed) v.notes = [CLAIM_NOTE]
   if (s.kind === 'removing') v.status = 'Removing…'
   if (s.kind === 'error') v.error = ERRORS[s.message] ?? s.message
   return v
