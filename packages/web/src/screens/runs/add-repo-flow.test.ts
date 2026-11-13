@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { UNREACHABLE } from '../../actions-client.ts'
-import type { AddResult } from '../../add-repo.ts'
+import { ADD_ALREADY, ADD_BAD_PATH, ADD_FAILED, type AddResult } from '../../add-repo.ts'
 import { AddRepoForm } from './AddRepoDialog.tsx'
 import { BRIDGE_FAILED, canAdd, createAddRepoFlow, pathHint, type AddRepoState } from './add-repo-flow.ts'
 
@@ -111,7 +111,7 @@ describe('desktop pick', () => {
 })
 
 describe('desktop add error', () => {
-  it('409 shows "Already registered." with the path and Choose folder…', async () => {
+  it('409 shows the already-added message with the path and Choose folder…', async () => {
     const t = setup({ bridge: true })
     t.flow.start()
     t.picks[0]!.resolve('E:\\code\\chess-web')
@@ -119,7 +119,7 @@ describe('desktop add error', () => {
     t.posts[0]!.resolve({ status: 409, error: 'already registered' })
     await tick()
     const s = form(t.flow.state())
-    expect(s).toMatchObject({ path: 'E:\\code\\chess-web', error: 'Already registered.', canChoose: true, busy: false })
+    expect(s).toMatchObject({ path: 'E:\\code\\chess-web', error: ADD_ALREADY, canChoose: true, busy: false })
     // The error turns Add off, until the path changes.
     expect(canAdd(s)).toBe(false)
     expect(t.onClose).not.toHaveBeenCalled()
@@ -172,7 +172,7 @@ describe('desktop add error', () => {
     t.flow.choose()
     t.picks[1]!.resolve(null)
     await tick()
-    expect(form(t.flow.state())).toMatchObject({ path: 'E:\\code\\chess-web', busy: false, error: 'Already registered.' })
+    expect(form(t.flow.state())).toMatchObject({ path: 'E:\\code\\chess-web', busy: false, error: ADD_ALREADY })
     // The error is back, so Add stays off.
     expect(canAdd(t.flow.state())).toBe(false)
     expect(t.onClose).not.toHaveBeenCalled()
@@ -263,7 +263,7 @@ describe('browser path field', () => {
     expect(t.onClose).not.toHaveBeenCalled()
     t.posts[0]!.resolve({ status: 400, error: 'not a directory' })
     await tick()
-    expect(form(t.flow.state())).toMatchObject({ busy: false, error: 'Not a directory.' })
+    expect(form(t.flow.state())).toMatchObject({ busy: false, error: ADD_BAD_PATH })
     // Typing clears the error; Add then sends again.
     t.flow.type('/home/me/repo2')
     expect(form(t.flow.state()).error).toBeUndefined()
@@ -278,7 +278,7 @@ describe('browser path field', () => {
     t.posts[0]!.resolve({ status: 409, error: 'already registered' })
     await tick()
     const s = form(t.flow.state())
-    expect(s).toMatchObject({ path: '/home/me/repo', busy: false, error: 'Already registered.' })
+    expect(s).toMatchObject({ path: '/home/me/repo', busy: false, error: ADD_ALREADY })
     expect(canAdd(s)).toBe(false)
     // Enter (add) does nothing while the error shows.
     void t.flow.add()
@@ -297,7 +297,9 @@ describe('browser path field', () => {
   it('canAdd: an idle form with a path and no error', () => {
     const base = { kind: 'form', path: '/a', busy: false, canChoose: false } as const
     expect(canAdd(base)).toBe(true)
-    expect(canAdd({ ...base, error: 'Already registered.' })).toBe(false)
+    expect(canAdd({ ...base, error: ADD_ALREADY, pathError: true })).toBe(false)
+    // An error that isn't about the path keeps Add on, so the same path can be tried again.
+    expect(canAdd({ ...base, error: ADD_FAILED })).toBe(true)
     expect(canAdd({ ...base, error: '' })).toBe(true)
     expect(canAdd({ ...base, busy: true })).toBe(false)
     expect(canAdd({ kind: 'picking' })).toBe(false)
@@ -342,7 +344,7 @@ describe('the Add repo modal', () => {
   const buttons = (html: string) => [...html.matchAll(/<button([^>]*)>([^<]*)<\/button>/g)].map((m) => ({ label: m[2]!, attrs: m[1]! }))
 
   it('field, Choose folder… below it, the alert, then Cancel and Add', () => {
-    const html = render({ kind: 'form', path: 'E:\\code\\chess-web', busy: false, canChoose: true, error: 'Already registered.' })
+    const html = render({ kind: 'form', path: 'E:\\code\\chess-web', busy: false, canChoose: true, error: ADD_ALREADY })
     const order = ['<label', '<input', '>Choose folder…<', 'class="modal-alert"', '>Cancel<', '>Add<']
     const at = order.map((s) => html.indexOf(s))
     expect(at.every((i) => i >= 0), JSON.stringify(at)).toBe(true)
@@ -357,7 +359,7 @@ describe('the Add repo modal', () => {
     const errorId = /<div id="([^"]+)" class="modal-alert"/.exec(html)?.[1]
     expect(html).toMatch(new RegExp(`<input[^>]*aria-describedby="${errorId}"`))
     expect(html).toMatch(/<input[^>]*aria-invalid="true"/)
-    expect(html).toContain('>Already registered.</p>')
+    expect(html).toContain(`>${ADD_ALREADY}</p>`)
     expect(html).not.toContain('modal-error')
     const add = buttons(html).find((b) => b.label === 'Add')!
     expect(add.attrs).toMatch(/disabled=""/)
@@ -371,5 +373,17 @@ describe('the Add repo modal', () => {
     expect(html).not.toContain('aria-describedby')
     expect(buttons(html).map((b) => b.label)).toEqual(['Cancel', 'Add'])
     expect(buttons(html).find((b) => b.label === 'Add')!.attrs).not.toMatch(/disabled/)
+  })
+})
+
+describe('an error that is not about the path', () => {
+  it('keeps Add on, so you can try the same path again', async () => {
+    const t = setup({ bridge: false })
+    t.flow.type('/home/me/repo')
+    const added = t.flow.add()
+    t.posts[0]!.resolve({ status: 500, error: 'config unreadable' })
+    await added
+    expect(form(t.flow.state())).toMatchObject({ path: '/home/me/repo', error: ADD_FAILED })
+    expect(canAdd(t.flow.state())).toBe(true)
   })
 })
