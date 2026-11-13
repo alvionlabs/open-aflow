@@ -126,7 +126,7 @@ export function forgetView(s: ForgetState): ModalView | undefined {
   const v: ModalView = {
     heading: `Forget ${s.target.name}?`,
     detail: DETAIL,
-    mono: [s.target.worktree, `port base ${s.target.portBase}`],
+    mono: [s.target.worktree, `run ${s.target.run}`, `port base ${s.target.portBase}`],
     confirmLabel: 'Forget',
     busy: s.kind === 'forgetting',
     returnFocusTo: RETURN_TO,
