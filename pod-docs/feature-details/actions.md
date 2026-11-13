@@ -37,6 +37,7 @@ Board actions change something outside the board: merge a PR that waits on you (
 - A queue body can quote `**Answer (human):**` (pod's own gate entries do). Only a marker after the entry's `**Resolution:**` is an answer.
 - `actions.jsonl` sits in the watched config folder, but the filter keeps only `config.json`, so the route rebuilds the Board itself.
 - The rename gives the queue a default file mode. The log is read once at start and never trimmed.
+- Forget also shows on a claim-only run whose open PR waits on your merge. It then takes the run and its PR off the board, and frees a port base a live session may still hold. Kept on purpose, because the modal asks first ([decision](../decisions.md#2026-11-13--forget-on-a-run-whose-pr-waits-on-your-merge-agent-default--override-anytime)).
 
 ## History
 
@@ -51,3 +52,4 @@ Board actions change something outside the board: merge a PR that waits on you (
 - 2026-10-31 · fix-queue-triage review round 1 · fixed: a staging PR asked by number (a pending gate 7 names it) no longer hides the same PR found by the staging branch.
 - 2026-11-01 · fix-remove-repo · added: `remove-repo` entries (`removed`, `failed`) in the action log.
 - 2026-11-12 · ui-rework F1 · added: `forgetCheck` in the model, and `forget-run` entries (`removed`, `failed`) in the action log.
+- 2026-11-13 · ui-rework · plan complete: Forget run (route, log line, modal) and Remove repo's shared modal; final PR #108 passed review at round 2 after fix PR #110 · [report](../reports/ui-rework.html)

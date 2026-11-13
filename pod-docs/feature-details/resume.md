@@ -88,3 +88,4 @@ The board can send `continue` or `go` to a pod run's own Claude session, so you 
 - 2026-11-13 · ui-rework N1 · the Next step card shows a "what happened" list: a merged merge closes its panel and a started send leaves no result block, each as a timed item; the send button reads `Sending…` in flight, also in the Waiting tab.
 - 2026-11-13 · ui-rework w2-fix · after a merge, the card's reply row no longer names the PR the list shows merged: it reads `Continue so pod goes on.`
 - 2026-11-13 · ui-rework w2-fix · after a started Continue or Go, the card hides that send button until the run state or the card changes, or for 60 s, so a second press no longer starts a second send.
+- 2026-11-13 · ui-rework · plan complete: Merge, then Continue reads as one flow on the Next step card; final PR #108 passed review at round 2 · [report](../reports/ui-rework.html)

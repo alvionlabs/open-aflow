@@ -169,3 +169,4 @@ flowchart LR
 - 2026-11-13 · ui-rework M1 · the runs list sorts newest activity first (`runActivity`), not by state, so an idle run with newer work sits above an older blocked one; rows with no activity come last, ties go to repo name then plan. The order never reads `now`.
 - 2026-11-13 · ui-rework w2-fix · the Forget modal adds a `run <name>` mono line for every run, so a plan run also shows the run name an undo needs.
 - 2026-11-13 · ui-rework w2-fix · docs: Add repo is the Windows folder dialog or a path field, and Remove repo and Forget open the shared modal; the folder picker and the in-place Remove panel are gone.
+- 2026-11-13 · ui-rework · plan complete: no-review task PRs get Merge, runs sort newest first with an `auto` tag, and Add repo is the Windows dialog or a path field; final PR #108 passed review at round 2 · [report](../reports/ui-rework.html)

@@ -1,6 +1,6 @@
 # Plan: UI rework (small, before v0.1.0)
 
-_Generated: 2026-11-12 · Status: active · Grilled-with: pod (fast)_
+_Generated: 2026-11-12 · Status: archived · Grilled-with: pod (fast)_
 
 Port base: 3000
 <!-- autopilot-run: started=2026-11-13T00:58:21-08:00 sprints=1 waves=1 -->

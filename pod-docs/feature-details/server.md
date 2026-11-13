@@ -167,3 +167,4 @@ All optional, set as environment variables:
 - 2026-11-05 · fix-rename-internals review round 3 · no copy while the old folder's owner file names a live process; that start runs on the old folder.
 - 2026-11-12 · ui-rework F1 · added: `POST /api/actions/forget-run` deletes one run's leftover port claim file after `forgetCheck` and a fresh read of the file, and logs `forget-run` entries. No UI yet.
 - 2026-11-13 · ui-rework A1 · removed: `GET /api/fs/folders`, its read guard on `/api/fs/*`, the `folders` dep, and `folder-list.ts`. Add repo uses the desktop shell's folder dialog or a typed path. Any unknown path in dev now answers JSON `404 {"error":"not found"}`, as production does.
+- 2026-11-13 · ui-rework · plan complete: the folder-listing route is gone and Forget run is a route; final PR #108 passed review at round 2 · [report](../reports/ui-rework.html)

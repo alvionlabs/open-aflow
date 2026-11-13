@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan report: UI rework</title>
+<!--
+  pod plan report skeleton. /pod:report or /pod:code copies it to pod-docs/reports/<plan-slug>.html; the reporter fills it.
+  Keep: the <style> block, the section ids and their order, the classes below. Replace every UPPER_CASE placeholder
+  and every "fill:" note. Remove a block's example rows; never remove a section (empty → say so in one line).
+  The plan has a Look → set --accent and --display in :root to its palette and display font; change no other CSS.
+  At most 2,000 words.
+  No scripts but the Mermaid loader at the end, nothing else from the web. Images are JPEG files in the PLAN_SLUG/ folder
+  next to this page. No hand-drawn SVG: the one diagram is the Mermaid flowchart below; offline it shows as its text.
+  Scannable: every section opens with one <p class="lead"> takeaway. Anything a reader can skip goes in <details>.
+  No paragraph over three lines; prefer a table row, a list item, or a pill.
+-->
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fff; --fg: #1b1b1f; --muted: #5d5d66; --line: #d9d9e0; --soft: #f4f4f7;
+  --accent: #0068d6; --ok: #1d7a3e; --bad: #b42318; --warn: #a15c07;
+  --display: "Geist", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #131316; --fg: #ececf1; --muted: #a2a2ad; --line: #34343c; --soft: #1d1d22;
+          --accent: #52a8ff; --ok: #5cc98a; --bad: #ff8a80; --warn: #f0b45c; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.55 system-ui, sans-serif; }
+main { max-width: 980px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.25; }
+h1 { font-size: 1.9rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.4rem; margin: 2.5rem 0 .75rem; padding-top: .5rem; border-top: 1px solid var(--line); }
+h3 { font-size: 1.1rem; margin: 1.25rem 0 .5rem; }
+a { color: var(--accent); }
+code, pre { font: 15px/1.45 ui-monospace, Consolas, monospace; }
+pre { background: var(--soft); padding: .75rem; overflow-x: auto; border-radius: 6px; }
+.meta { color: var(--muted); margin: 0 0 1rem; }
+nav.toc { background: var(--soft); border-radius: 8px; padding: .75rem 1rem; }
+nav.toc ol { margin: 0; padding-left: 1.25rem; columns: 2 14rem; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; margin: .5rem 0; }
+th, td { border: 1px solid var(--line); padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: var(--soft); }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin: 1rem 0 .25rem; }
+.stat { background: var(--soft); border-radius: 8px; padding: .5rem .75rem; }
+.stat b { display: block; font-size: 1.3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat span { color: var(--muted); font-size: .9rem; }
+.note { color: var(--muted); font-size: .9rem; margin: 0 0 1rem; }
+.pill { display: inline-block; padding: 0 .5rem; border-radius: 99px; font-size: .9rem; border: 1px solid currentColor; white-space: nowrap; }
+.ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); } .muted { color: var(--muted); }
+.lead { font-size: 1.1rem; font-weight: 600; margin: 0 0 .75rem; }
+details { border: 1px solid var(--line); border-radius: 8px; padding: .5rem .9rem; margin: .5rem 0; }
+details > summary { cursor: pointer; font-weight: 600; }
+details[open] > summary { margin-bottom: .5rem; }
+table.decisions td:first-child { font-weight: 600; min-width: 12rem; }
+.shots { display: grid; grid-template-columns: 3fr 1fr; gap: .75rem; align-items: start; }
+.shots figure { margin: 0; } .shots img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; }
+figcaption { color: var(--muted); font-size: .9rem; }
+.small { display: block; color: var(--muted); font-size: .9rem; }
+table.risks td:first-child { font-weight: 600; }
+pre.mermaid { background: var(--soft); text-align: center; }
+@media (max-width: 520px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { body { font-size: 16px; } .shots { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+
+<h1>UI rework</h1>
+<p class="meta">Plan <code>ui-rework</code> · final PR <a href="https://github.com/alvionlabs/openaflow/pull/108">#108 (pass)</a> · written 2026-11-13 by pod:reporter</p>
+
+<nav class="toc" aria-label="Contents"><ol>
+  <li><a href="#glance">At a glance</a></li>
+  <li><a href="#features">Key features</a></li>
+  <li><a href="#proof">Proof</a></li>
+  <li><a href="#risks">Risks and undo</a></li>
+  <li><a href="#fit">How it fits together, as built</a></li>
+  <li><a href="#decisions">Key decisions</a></li>
+  <li><a href="#left">What's left</a></li>
+</ol></nav>
+
+<section id="glance">
+<h2>At a glance</h2>
+<p><b>Goal:</b> make the run screen say what just happened and what comes next, fix the defects from the Windows install test, and use the Windows folder dialog to add a repo.</p>
+<p><b>Shipped:</b></p>
+<ul>
+  <li>After a merge, the Next step card closes the merge panel and lists what happened, then Continue. Continue shows <code>Sending…</code>, then a sent line. No toast.</li>
+  <li>A <code>--no-review</code> task PR gets Merge once its engineer has ended (queue item 149).</li>
+  <li>The runs list sorts newest activity first. A run with Auto-continue on shows an <code>auto</code> tag.</li>
+  <li>Remove repo and the new <b>Forget this run</b> use one centred confirm modal. Forget removes a leftover run from the board.</li>
+  <li>Add repo opens the Windows "Select Folder" dialog in the desktop app, and a path field in the browser build. The board's own folder browser is gone.</li>
+</ul>
+<div class="stats">
+  <div class="stat"><b>1 · 2 · 8</b><span>sprints · waves · slices</span></div>
+  <div class="stat"><b>4</b><span>PRs</span></div>
+  <div class="stat"><b>104 · +5006 −2899</b><span>files · lines changed</span></div>
+  <div class="stat"><b>~11 h</b><span>wall time</span></div>
+  <div class="stat"><b>~2,027k</b><span>agent context</span></div>
+  <div class="stat"><b>pass</b><span>review, 2 rounds</span></div>
+</div>
+<p class="note">Wall time is estimated from commit times, idle gaps included. Context is final size, not tokens billed; reviewer and #110 fix engineer left out.</p>
+<p class="note">PRs: wave 1 #106, wave 2 #107, final #108 (round 1 <code>fix</code>, round 2 <code>pass</code>), review fixes #110. Lines are against <code>pod-staging</code>.</p>
+<h3>Look here first</h3>
+<ol>
+  <li><code>packages/server/src/forget-run-routes.ts</code> and <code>packages/model/src/forget.ts</code>: Forget deletes a file the app can't bring back. It also shows on a run whose PR still waits on you (an agent default, see Key decisions).</li>
+  <li><code>packages/desktop/src/folder-bridge.ts</code>, <code>preload-main.ts</code>, <code>window-main.ts</code>: the window's first bridge to the main process. The sender check, the sandbox, and the single exposed call are the defence.</li>
+  <li><code>packages/web/src/screens/runs/stop-log.ts</code>: the rules for what the "what happened" list adds, when it resets, and when the send button hides. The reviewer saw it at 400 px only.</li>
+  <li><code>packages/server/src/gh.ts</code> and <code>packages/model/src/fix-runs.ts</code>: Merge for a no-review PR depends on the exact PR-body text <code>skipped (--no-review)</code>. If pod changes that wording, Merge goes away with no error.</li>
+  <li>The installed-app check (Add repo, Merge then Continue, Forget): no script covers it, and nobody has run it. It is yours to do by hand.</li>
+</ol>
+</section>
+
+<section id="features">
+<h2>Key features</h2>
+<p class="lead">A merge now leads straight to Continue on one card, and a leftover run can be removed from the app.</p>
+<div class="scroll"><table>
+  <tr><th>Feature</th><th>What changed</th><th>Shown by</th></tr>
+  <tr><td>Merge, then Continue</td><td>The merge panel closes; a list shows <code>Merged PR #36</code> then Continue; the send reads <code>Sending…</code>, then <code>Sent continue</code> and <code>pod runs</code></td><td>screenshots 1 and 2 below</td></tr>
+  <tr><td>Merge for a no-review PR</td><td>Merge shows once the engineer ended and no reviewer started</td><td>Card read <code>Merge PR #36</code>, Round 1 <code>skipped · --no-review</code> (stub <code>gh</code>)</td></tr>
+  <tr><td>Newest first, <code>auto</code> tag</td><td>Runs sort by last activity, not state; Auto-continue runs carry a tag</td><td>sidebar in screenshot 1</td></tr>
+  <tr><td>Forget this run</td><td>New item in the run's menu; deletes only the run's claim file</td><td>screenshot 3</td></tr>
+  <tr><td>Remove repo</td><td>Same modal, with the folder path; no runs line</td><td>screenshot 4</td></tr>
+  <tr><td>Add repo</td><td>Windows dialog in the desktop app; path field in the browser build</td><td>screenshot 5 (browser build)</td></tr>
+  <tr><td>Folder browser</td><td>Deleted, with <code>GET /api/fs/folders</code></td><td>The route answers 404 JSON</td></tr>
+</table></div>
+<p class="note">The screenshots come from a temp config, a fixture repo, a stub <code>gh</code>, and a fake <code>claude</code>. The Windows dialog can't show on this Linux host.</p>
+
+<h3>1. After the merge</h3>
+<div class="shots">
+  <figure><img alt="Next step card after a merge: a list with Merged PR #36 and Send continue, the PR step reads merged, and the sidebar shows an auto tag" src="ui-rework/next-merged-1200.jpg"><figcaption>Desktop (this fixture had no session yet, so the card shows Copy only)</figcaption></figure>
+  <figure><img alt="The same card at phone width" src="ui-rework/next-merged-375.jpg"><figcaption>375 px</figcaption></figure>
+</div>
+<h3>2. After Continue</h3>
+<div class="shots">
+  <figure><img alt="The card list reads Merged PR #36 · 08:23, Sent continue · 08:24, and pod runs now" src="ui-rework/next-sent-1200.jpg"><figcaption>Desktop</figcaption></figure>
+  <figure><img alt="The same list at phone width" src="ui-rework/next-sent-375.jpg"><figcaption>375 px</figcaption></figure>
+</div>
+<details><summary>The send in flight</summary>
+<figure><img alt="The send button reads Sending… and the line under it reads Sending continue…" src="ui-rework/next-sending-1200.jpg" style="width:100%;height:auto"><figcaption>Desktop, 2 s after the press</figcaption></figure>
+</details>
+<h3>3. Forget this run</h3>
+<div class="shots">
+  <figure><img alt="Centred modal: Forget Smoke?, the worktree path, run task-smoke, port base 3100, Cancel and a red Forget" src="ui-rework/forget-1200.jpg"><figcaption>Desktop</figcaption></figure>
+  <figure><img alt="The same modal at phone width" src="ui-rework/forget-375.jpg"><figcaption>375 px</figcaption></figure>
+</div>
+<h3>4. Remove repo</h3>
+<div class="shots">
+  <figure><img alt="Centred modal: Remove ytb-feed?, the board stops watching this folder, the folder path, Cancel and a red Remove" src="ui-rework/remove-1200.jpg"><figcaption>Desktop</figcaption></figure>
+  <figure><img alt="The same modal at phone width" src="ui-rework/remove-375.jpg"><figcaption>375 px</figcaption></figure>
+</div>
+<h3>5. Add repo, browser build</h3>
+<div class="shots">
+  <figure><img alt="Modal titled Add repo with a path field holding a typed path, Cancel and Add" src="ui-rework/add-1200.jpg"><figcaption>Desktop</figcaption></figure>
+  <figure><img alt="The same modal at phone width" src="ui-rework/add-375.jpg"><figcaption>375 px</figcaption></figure>
+</div>
+</section>
+
+<section id="proof">
+<h2>Proof</h2>
+<p class="lead">7 of 9 criteria met; Forget's tray dot and banner, and the installed-app check, were checked by nobody.</p>
+<div class="scroll"><table>
+  <tr><th>Criterion or feature</th><th>Result</th><th>Checked by</th><th>How</th></tr>
+  <tr><td>Installed-app check: Add repo, Merge then Continue, Forget</td><td><span class="pill warn">not checked</span></td><td>nobody</td><td>No script; the reviewer drove the dialog in the dev shell and an unpacked app, and the installer step failed</td></tr>
+  <tr><td>Forget clears the tray dot and the banner</td><td><span class="pill warn">not checked</span></td><td>nobody</td><td>The sidebar, page move, claim file, and log line were seen; the dot and banner were not</td></tr>
+  <tr><td>Merge then Continue: panel closes, PR named once, <code>Sending…</code>, sent line, no toast</td><td><span class="pill ok">met</span></td><td>engineer's tests, reviewer, this report</td><td>Reviewer saw it at 400 px; this report saw it at 1200 and 375 px, on a stub <code>gh</code> and fake <code>claude</code></td></tr>
+  <tr><td>No-review PR shows Merge; not while the engineer runs</td><td><span class="pill ok">met</span></td><td>engineer's tests, reviewer, this report</td><td>Fixture tests, then the card in the browser</td></tr>
+  <tr><td>Remove repo and Forget: one modal, Escape, click outside, focus, path shown</td><td><span class="pill ok">met</span></td><td>engineer's tests, reviewer, this report</td><td>Both rounds in the browser; the reviewer saw 44 px buttons at 375 px; this report saw only the two modals and the path</td></tr>
+  <tr><td>Newest-first order, <code>auto</code> tag, Add repo, <code>/api/fs/folders</code> 404, <code>pnpm verify</code></td><td><span class="pill ok">met</span></td><td>engineer's tests, reviewer</td><td>Order checked by tests only; verify passed on Windows in round 1 and in CI on #110</td></tr>
+</table></div>
+<h3>Not checked by this report</h3>
+<ul>
+  <li>No test run: this report did not rerun <code>pnpm verify</code>. Round 2 on Linux had 4 server test failures, which the reviewer called environmental.</li>
+  <li>The desktop app, the Windows dialog, the tray, and the installer: this host is Linux.</li>
+  <li>The tests' own strength: the reviewer's mutation checks (30 in round 1) are the only evidence.</li>
+</ul>
+</section>
+
+<section id="risks">
+<h2>Risks and undo</h2>
+<p class="lead">Two one-way doors and one removed route; no auth, data migration, or money change.</p>
+<div class="scroll"><table class="risks">
+  <tr><th>Risk</th><th>Undo</th></tr>
+  <tr><td>Forget deletes a run's port claim file, which pod wrote<span class="small"><code>packages/server/src/forget-run-routes.ts</code></span></td><td>One run: write <code>&lt;ports dir&gt;/&lt;port base&gt;</code> again, holding the repo path, a space, and the run name. The feature: <code>git revert -m 1 84ef406</code></td></tr>
+  <tr><td>The window's first bridge to the main process (a folder dialog that returns one path)<span class="small"><code>packages/desktop/src/preload-main.ts</code></span></td><td><code>git revert c841577</code>, then <code>git revert -m 1 fd9d278</code>, in that order</td></tr>
+  <tr><td>Public API: <code>POST /api/actions/forget-run</code> added, <code>GET /api/fs/folders</code> removed<span class="small"><code>packages/server/src/app.ts</code></span></td><td><code>git revert -m 1 d905e51</code> (the A1 merge) to bring the route back (not rehearsed); only the app's own page used it</td></tr>
+  <tr><td>Forget can free a port base a live session still holds, on a run whose PR waits<span class="small"><code>packages/model/src/forget.ts</code></span></td><td>Same as the first row: write the claim file again</td></tr>
+</table></div>
+</section>
+
+<section id="fit">
+<h2>How it fits together, as built</h2>
+<p class="lead">The page reads the desktop bridge only through one file, and Forget runs web, route, then a model check.</p>
+<pre class="mermaid">
+flowchart LR
+  RS["RunsScreen.tsx"] -- "AddRepoDialog" --> AD["AddRepoDialog.tsx"]
+  RS -- "ConfirmModal" --> CM["ConfirmModal.tsx"]
+  RS -- "NextStepCard" --> NC["NextStepCard.tsx"]
+  NC -- "stop-log items" --> SL["stop-log.ts"]
+  RS -- "forget reducer" --> FF["forget-flow.ts"]
+  FF -- "POST forget-run" --> FR["forget-run-routes.ts"]
+  FF -- "forgetCheck" --> FG["forget.ts"]
+  FR -- "forgetCheck" --> FG
+  FG -- "listRuns" --> RN["runs.ts"]
+  AD -- "folderBridge()" --> DB["desktop-bridge.ts"]
+  DB -. "window.openaflow at runtime" .-> PL["preload-main.ts"]
+  PL -- "channel, answerOf" --> FB["folder-bridge.ts"]
+  WM["window-main.ts"] -- "createFolderBridge" --> FB
+</pre>
+<h3>Differences from the plan</h3>
+<ul>
+  <li>The bridge rules sit in a plain <code>folder-bridge.ts</code> with fakes for tests; the plan named only a preload. The page reads the bridge only through <code>desktop-bridge.ts</code>.</li>
+  <li>Forget adds a fresh re-read of the claim file (<code>409 claim changed</code>) and four refusal words in <code>forgetCheck</code>; the plan said only "Board check".</li>
+  <li>The Board gains <code>openedAt</code> and <code>reviewSkipped</code> on a PR. The plan left open how a no-review PR is found; the engineer read it from the PR body.</li>
+  <li>The list gains an <code>Updating…</code> state and hides the send button after a sent Continue (wave-2 fix); the plan had neither.</li>
+  <li>The <code>auto</code> tag sits under the status in two-column cards, not after it (agent default).</li>
+  <li>Add repo's browser path field is the shared modal, driven by <code>add-repo-flow.ts</code>.</li>
+</ul>
+</section>
+
+<section id="decisions">
+<h2>Key decisions</h2>
+<p class="lead">The human chose the shapes; agents recorded two defaults, both open to override.</p>
+<div class="scroll"><table class="decisions">
+  <tr><th>Decision</th><th>By</th><th>Why</th><th>Instead of</th><th>Consequence</th></tr>
+  <tr><td>Forget deletes only the claim file</td><td>human</td><td>Delete would be the board's first git write, and worktree removal often fails on Windows</td><td>A Delete or Clean up item</td><td>Worktree and branch stay; one-way door for the file</td></tr>
+  <tr><td>Add repo uses Electron's folder dialog</td><td>human</td><td>The parked reasons applied to a dialog opened by a server, not by Electron</td><td>The board's own folder browser</td><td>First bridge to the main process; folder route deleted</td></tr>
+  <tr><td>The merge panel closes; a list shows what happened; no toast for your own click</td><td>human</td><td>The card should name the next step at once</td><td>An in-place result and a toast</td><td>The list is card state and resets at a new stop</td></tr>
+  <tr><td><a href="../decisions.md#2026-11-13--forget-on-a-run-whose-pr-waits-on-your-merge-agent-default--override-anytime">Keep Forget on a run whose PR waits on you</a></td><td>agent</td><td>The modal asks first, and a stuck run needs a way out</td><td>Hiding Forget while a PR waits</td><td>A live session's port base can be freed</td></tr>
+  <tr><td><a href="../decisions.md#2026-11-13--the-auto-tag-in-two-column-sidebar-cards-agent-default--override-anytime">The <code>auto</code> tag sits under the status in two-column cards</a></td><td>agent</td><td><code>DESIGN.md</code> keeps the status column for the status only</td><td>Widening the column, or the tag after the title</td><td>Differs from draft pick 4 b there</td></tr>
+  <tr><td>Find a no-review PR by its body text</td><td>agent</td><td>The Board had no other field</td><td>Guessing from the missing reviewer</td><td>Depends on pod's exact wording</td></tr>
+  <tr><td>Accept both one-way doors (Forget, the folder bridge) with wave 1</td><td>human</td><td>CI passed and GitHub read the PR clean, so autopilot held it for a person</td><td>Merging nothing</td><td>PR #106 merged, wave 2 started</td></tr>
+  <tr><td>Engineers run their own tests only; the orchestrator runs <code>pnpm verify</code> once per wave</td><td>human</td><td>Fewer full runs while engineers work</td><td><code>pnpm verify</code> in every slice</td><td>Wave 1's first Electron run failed on a missing binary, then passed</td></tr>
+  <tr><td>Order runs by newest activity</td><td>agent</td><td>An idle run with fresh work should show above an old blocked one</td><td>State-first order</td><td>The urgent banner still raises blocked runs</td></tr>
+</table></div>
+</section>
+
+<section id="left">
+<h2>What's left</h2>
+<p class="lead">1 to do now, 0 before hosting, 1 someday.</p>
+<h3>Fix next</h3><ul><li>Run the installed-app check by hand: Add repo, Merge then Continue, and Forget (queue entry from the reviewer).</li></ul>
+<h3>Before hosting</h3><ul><li>Nothing queued.</li></ul>
+<h3>Someday</h3><ul><li>Drop <code>RemoveTarget.runs</code> and its count in <code>remove-flow.ts</code>; no code reads them since #110.</li></ul>
+</section>
+
+
+</main>
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs";
+const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "strict" });
+</script>
+</body>
+</html>
