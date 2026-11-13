@@ -12,7 +12,8 @@
 - **Log file.** `desktop.log` in the shell data folder (installed: `%APPDATA%\OpenAFlow\desktop.log`; `OPENAFLOW_DESKTOP_DATA_DIR` moves it). It holds each line the console shows, the server's too, with a time. At 256 KB it moves to `desktop.log.1`, so at most two files stay. In every line, the home folder becomes `~`, in any case, with either slash, with doubled backslashes, or URL-encoded as in a stack frame. A folder that goes on past the home with a sign and a letter or digit (`Name2`, `Name+old`, `Name(2)`) stays. A space swaps, because a folder with a space can't be told from prose: `Name Smith\x` reads `~ Smith\x`, which only mislabels it. A line that names a token is left out. An `Error` the shell itself logs keeps only its name. A server line is text by the time the shell reads it, so a server error keeps its message and stack as the server printed them. No code logs entry text on purpose, but a server error's message could quote what it read. The user's name can also stay where it isn't part of the home path, such as in a Claude project folder name (`C--Users-name-…`). A second launch writes nothing.
 - **Port and token.** The shell sets no port and never holds the token. It reads the port from the server's ready message, and the page gets the token from the server.
 - **Server host.** One restart after a failure. A failure is an exit outside a stop, a `fork` that throws, or no ready in 60 s. A second failure shows a native error box that names the Releases page, hides the window, checks once for an update, and then quits (see [installer-and-updates.md](installer-and-updates.md)). The box says the app checks only when a check runs. One helper, `hideWindows`, hides the windows for the quit, the failure, and a Restart now, and skips a destroyed window. 60 s of ready earns the restart back. A new port fires `onReady` again, and the window and notifier move.
-- **Window.** The normal Windows frame, no app menu, no preload, the page isolated. Close hides it. Off-origin `http` and `https` links open in the system browser, and anything else opens nothing. A `--hidden` start shows only the tray.
+- **Window.** The normal Windows frame, no app menu, the page isolated and sandboxed, with no Node. Close hides it. Off-origin `http` and `https` links open in the system browser, and anything else opens nothing. A `--hidden` start shows only the tray.
+- **Folder bridge.** The window's one preload, `dist/preload.cjs`, gives the page only `window.openaflow.pickFolder()`. It asks the main process on the IPC channel `openaflow:pick-folder`. Only the app window's main frame on the server's current origin may ask. Any other caller (another port or origin, `file:`, `about:blank`, a subframe, a call before the server is ready) gets a rejection with `forbidden`, and no dialog opens. The answer is the Windows Select Folder dialog's first path, owned by the app window, or `null` for a cancel. A call while the dialog is open gets `null`. A dialog error rejects with `dialog failed` and is logged.
 - **Tray.** Open and Quit. After the server failed for good, Open starts a fresh copy, as a second launch does. The dot comes from `bus.onAttention`.
 - **Login item.** No part of the app turns it on today: it moves to a settings page ([decision](../decisions.md#2026-11-04--start-at-login-leaves-the-tray-menu-human-decision)). `createLoginItem` stays for that page. A login item from an earlier version still starts the app with `--hidden`, in the tray with no window. Uninstall still removes it.
 
@@ -40,7 +41,7 @@ sequenceDiagram
 - `taskkill /F` on the main process: the server dies with it before its parent watch runs, and the owner file stays for the next start. The fake lives.
 - `taskkill /F` on the server: a new one is ready within seconds. A second kill within 60 s ends in `failed`, with no third start. The fake lives.
 
-**Logic lives in:** `packages/desktop/src/server-host.ts`, `quit-flow.ts`, `window-rules.ts`, and `shell-main.ts`.
+**Logic lives in:** `packages/desktop/src/server-host.ts`, `quit-flow.ts`, `window-rules.ts`, `folder-bridge.ts`, and `shell-main.ts`.
 
 ## Why it's this way
 
@@ -48,6 +49,7 @@ sequenceDiagram
 - **A stop message, not a signal.** A kill on Windows is abrupt. The parent watch covers a shutdown or a crash, where Electron's quit events don't fire.
 - **`utilityProcess`, not the main process.** A server crash doesn't take the window down. Trade-off: `process.execPath` there is Electron's exe, so `claude-runner.ts` never uses it as a Node fallback.
 - **Electron, not Tauri.** [The human's choice](../decisions.md#2026-11-02--ship-as-an-electron-app-for-friends-first-under-mit): Electron includes Node, and Tauri adds Rust and a separately built server. Trade-off: an installer of about 122 MB.
+- **The page asks for a folder, and the main process decides.** The page gets a path only from a dialog the human answers, never a file listing. The bridge checks the caller's frame, not only its window, so an iframe or a page that navigated off the server can't open the dialog. Trade-off: the window now has a preload, its first bridge to the main process. A new bridge function needs its own sender check.
 - **Close hides to the tray.** Runs and auto-continue need the server alive. Trade-off: Quit is only in the tray menu.
 - **A silent start's replacement starts at once.** A `kill` with no exit event must not hang the app.
 
@@ -62,9 +64,12 @@ sequenceDiagram
 - Electron 45.2.1 has no install script, so `allowBuilds` needs no entry, and `ELECTRON_SKIP_BINARY_DOWNLOAD` has no effect on it.
 - `win.maximize()` also shows a hidden window, so a maximized state applies at `ready-to-show`. Call `win.restore()` only on a minimized window.
 - A same-port restart must `reload`, because a `loadURL` that repeats a URL with a hash can stay in the same document.
+- The preload runs sandboxed: its bundle may require only `electron` (`bundle-desktop.test.ts` holds this). A preload that fails to load fails quietly, and the page simply has no `window.openaflow`.
+- The preload is found beside the main bundle (`__dirname`). A probe bundled to a temp folder needs its own `preload.cjs` there.
+- Register `ipcMain.handle` once per app, not per window: the window opens again after a close, and a second handle on one channel throws.
 - `session-end` is a window's event. With no window, a session end relies on the parent watch alone.
 - A login start while the app runs arrives as a second launch and shows the window.
-- Not checked by any agent: the tray menu's look, real clicks on the icon, the native error box, a real `session-end`, and the 80 s kill on a real process.
+- Not checked by any agent: the native Select Folder dialog from the bridge, the tray menu's look, real clicks on the icon, the native error box, a real `session-end`, and the 80 s kill on a real process.
 
 ## History
 
@@ -78,3 +83,4 @@ sequenceDiagram
 - 2026-11-05 · fix-late-merge-continue · `desktop.log` writes the home folder as `~`.
 - 2026-11-05 · fix-rename-open-aflow · renamed: the window title, tray tooltip, error dialog title, update box, and the server process in Task Manager (`Open AFlow server`) say Open AFlow. The shell data folder moves to `%APPDATA%\Open AFlow`.
 - 2026-11-11 · task-fix-updater-last-chance · a second launch or the tray's Open after the server failed for good starts a fresh copy. The error box names the update check only when one runs. One helper hides the windows.
+- 2026-11-12 · ui-rework D1: the folder bridge. The window gets a preload, `window.openaflow.pickFolder()`, and the main process opens the folder dialog for the app's own page only.

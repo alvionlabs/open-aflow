@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { afterRestart, closeAction, createWindowFlow, hashOf, navigateAction, newWindowAction, originOf, windowOptions, windowUrl, type WindowHandle } from './window-rules.ts'
 
 const ORIGIN = originOf(3130)
+const PRELOAD = 'C:\\app\\dist\\preload.cjs'
 
 const fakeWindow = (url = '') => {
   const win = {
@@ -29,17 +30,18 @@ const flowWith = (o: { hiddenStart?: boolean } = {}) => {
 }
 
 describe('windowOptions', () => {
-  test('the window is plain and isolated', () => {
-    const o = windowOptions({ width: 1280, height: 800 })
+  test('window options with the preload', () => {
+    const o = windowOptions({ width: 1280, height: 800 }, PRELOAD)
     expect(o).toMatchObject({ width: 1280, height: 800, minWidth: 800, minHeight: 600, show: false, backgroundColor: '#000000' })
-    expect(o.webPreferences).toEqual({ contextIsolation: true, nodeIntegration: false, sandbox: true })
-    // The normal Windows frame: nothing here changes it, and no preload reaches the page.
+    // The page stays isolated and sandboxed. The preload is its one bridge, and it gives the page no Node.
+    expect(o.webPreferences).toEqual({ contextIsolation: true, nodeIntegration: false, sandbox: true, preload: PRELOAD })
+    // The normal Windows frame: nothing here changes it.
     for (const key of ['frame', 'titleBarStyle', 'titleBarOverlay', 'transparent']) expect(o).not.toHaveProperty(key)
-    expect(o.webPreferences).not.toHaveProperty('preload')
+    for (const key of ['nodeIntegrationInSubFrames', 'nodeIntegrationInWorker', 'webviewTag']) expect(o.webPreferences).not.toHaveProperty(key)
   })
 
   test('a saved place carries through', () => {
-    expect(windowOptions({ x: -1000, y: 20, width: 900, height: 700 })).toMatchObject({ x: -1000, y: 20, width: 900, height: 700 })
+    expect(windowOptions({ x: -1000, y: 20, width: 900, height: 700 }, PRELOAD)).toMatchObject({ x: -1000, y: 20, width: 900, height: 700 })
   })
 })
 

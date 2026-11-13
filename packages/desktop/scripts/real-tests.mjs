@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 const pkg = join(dirname(fileURLToPath(import.meta.url)), '..')
 const root = join(pkg, '..', '..')
 
-const needed = [join(root, 'packages', 'server', 'dist', 'app', 'server.mjs'), join(pkg, 'dist', 'main.cjs')]
+const needed = [join(root, 'packages', 'server', 'dist', 'app', 'server.mjs'), join(pkg, 'dist', 'main.cjs'), join(pkg, 'dist', 'preload.cjs')]
 const missing = needed.filter((file) => !existsSync(file))
 if (missing.length > 0) {
   console.error(`openaflow: no bundle at ${missing.join(', ')}. Run pnpm build first.`)

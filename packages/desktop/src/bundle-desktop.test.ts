@@ -38,6 +38,20 @@ describe('bundleDesktop', () => {
     expect(Object.keys(meta.metafile.inputs).some((input) => input.endsWith('src/main.ts'))).toBe(true)
   }, 60_000)
 
+  test('preload bundle', async () => {
+    // pnpm build's second entry, from scripts/bundle.ts.
+    const outfile = join(dir, 'preload.cjs')
+    const { externalImports } = await bundleDesktop({ entry: join(here, 'preload-main.ts'), outfile })
+    // Sandboxed: no Node builtin, only Electron's own require.
+    expect(externalImports).toEqual(['electron'])
+    const text = readFileSync(outfile, 'utf8')
+    expect(text).toMatch(/require\("electron"\)/)
+    expect(text).not.toMatch(/^\s*import\s.+from\s/m)
+    expect(text).toContain('openaflow:pick-folder')
+    expect(text).toContain('exposeInMainWorld("openaflow"')
+    expect(text).not.toContain('Electron failed to install correctly')
+  }, 60_000)
+
   test('a default bundle has no test feed', async () => {
     const outfile = join(dir, 'main.cjs')
     const { externalImports } = await bundleDesktop({ entry: join(here, 'main.ts'), outfile })
