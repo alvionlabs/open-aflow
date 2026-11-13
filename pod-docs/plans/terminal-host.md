@@ -19,6 +19,7 @@ Constraints:
 **In scope:**
 - A pty host: a second Electron `utilityProcess` with `node-pty@1.2.0-beta.18` (pinned) and a headless xterm buffer per session. Start, write, resize, kill, list, replay, heartbeat. The window talks to it through `MessagePort` only.
 - Packaging node-pty outside the asar, proved on Windows and Linux, packaged and unpackaged.
+- A Linux package: an AppImage for x64 from `pnpm package` on Linux, with `latest-linux.yml` for the updater, beside today's Windows NSIS installer. The release workflow builds it on `ubuntu-latest`. Today `packages/desktop/scripts/package.ts` builds the Windows installer only.
 - A small OpenAFlow hooks plugin, no skills, loaded with `--plugin-dir`. Its hooks write the live session ID (with its cause) and hook state to a file in the app's config folder, keyed by the run's `OPENAFLOW_RUN` marker.
 - **New session:** a dropdown of pod skills (`/pod:plan`, `/pod:ship`, `/pod:task`, `/pod:research`, `/pod:idea`, and Plain session) plus one text field. The app starts `claude --session-id <uuid> "/pod:<skill> <text>"` in the repo.
 - The Terminal tab beside Waiting and Log, on a run and on a repo row with no plan. A terminal joins the run whose session it holds.
@@ -48,6 +49,7 @@ Constraints:
 | Pty host | new | `packages/pty-host` | Holds every terminal: node-pty, a headless buffer per session, replay, heartbeat. Knows nothing of plans or pod. |
 | Host starter | new | `packages/desktop` (next to the server host) | Starts the pty host, restarts it up to 5 times, watches the heartbeat, hands each window a `MessagePort`. |
 | Session ender | new | `packages/desktop` | Ends a session's process tree: stop command, tree and marker snapshot, SIGHUP, SIGTERM, SIGKILL; Job Object on Windows. Runs at quit and on leftovers. |
+| Linux package | new | `packages/desktop` (package script), `.github/workflows` (release) | An x64 AppImage with `latest-linux.yml`, beside the Windows installer. |
 | Quit and update flow | changed | `packages/desktop` (quit, updater) | Quit dialog, "Ending N sessions…", install updates only after it. |
 | Session store | new | `packages/server` | Per session: repo, session ID, run marker, start time, stop reason, last saved screen. In the config folder. |
 | Session routes | new | `packages/server` (action routes) | New session, Resume, Dismiss. Builds the `claude` command line; the window never does. |
@@ -109,7 +111,7 @@ sequenceDiagram
 
 | Sprint | Goal | Status | Depends on |
 |--------|------|--------|------------|
-| host-core | The pty host, node-pty, the hooks plugin, and packaging, proved on Windows and Linux; a session starts and replays | planned | — |
+| host-core | The pty host, node-pty, the hooks plugin, and packaging (the Windows installer and a new Linux AppImage), proved on Windows and Linux; a session starts and replays | planned | — |
 | terminal-tab | New session with the skill dropdown, the Terminal tab, and the hosted run states on the current run screen | planned | host-core |
 | session-life | Quit, ending process trees, Resume, crashes, the heartbeat banner, and updates | planned | terminal-tab |
 | settings | The settings page: Open at login, scrollback, run wrapper, and stop command | planned | session-life |
@@ -138,6 +140,7 @@ No new look. The human checked the new screens in the current look on 2026-11-13
 - **New session is also in a repo's ⋯ menu,** so you can start a second session (for example `/pod:task`) while a plan runs. (default)
 - **Settings page now** (human, Q6). Builds on the parked [settings-page](../ideas/settings-page.md) idea; Open at login returns there.
 - **Linux is a real target.** CI adds an `ubuntu-latest` job with `xvfb` that runs the `_electron` terminal checks; Windows runs them on `windows-latest`. `real-*.test.ts` files run on Linux too. Builds on the parked `linux-macos-folder-dialog` idea, Linux only. (human, Q3)
+- **Linux ships as an AppImage** (x64). It runs on any distro with no root, and electron-updater can update it in place, as NSIS does on Windows. Options not chosen: `.deb` or `.rpm` (one per distro family, and the updater can't install them without root); Flatpak (a sandbox that blocks running `claude`, `gh`, and `git` from the host). (default)
 - **"Session" in the UI** for a terminal ("Quit and end sessions"); a row stays a "run". (default)
 - **Decision 6 holds:** the current run screen gets the new tab and states, no redesign.
 - **No Agent SDK, no API key, no `-p` for hosted sessions, never `--bare`.** The app never answers the folder-trust prompt and never reads credentials. (default, from the research's Policy)
@@ -155,12 +158,16 @@ No new look. The human checked the new screens in the current look on 2026-11-13
 
 - **The start argument is unproved.** New session rests on `claude --session-id <uuid> --plugin-dir <dir> "/pod:plan <text>"` running the skill as the first turn. Not known: whether a slash command works as the start argument with those flags, what happens when the folder-trust prompt comes first, and how free text passes through `claude.cmd` on Windows (quotes, `%`, `^`, newlines). `host-core` proves it with real `claude` on both systems. Fallback: start with no prompt, prefill nothing, and show "Type `/pod:plan <your text>` in the terminal". Never write the prompt into the pty: that would be automatic input.
 
+- **AppImage needs FUSE 2** on some distros (`libfuse2`). Fedora and Ubuntu 24.04 may lack it. The install note names the package, and `--appimage-extract-and-run` is the fallback.
+- **The tray on GNOME** needs the AppIndicator extension. Without it, a closed window leaves no way back but starting the app again. The install note says so.
+
 ## Open questions
 - What CI time the two `_electron` jobs add, and whether the Linux job runs on every PR or only on `pod-staging`.
 - Whether `/pod:ship` from New session should warn that it runs autopilot.
 
 ## Verification
-- In the installed app on Windows and on Linux, with no build tools: New session with `/pod:plan` starts `claude` in the repo, and the Terminal tab shows it live; you can type in it and sign in.
+- `pnpm package` on Linux makes an AppImage; the release check installs nothing for it but starts it with temp folders and waits for `/api/health`.
+- In the installed app on Windows and in the AppImage on Linux, with no build tools: New session with `/pod:plan` starts `claude` in the repo, and the Terminal tab shows it live; you can type in it and sign in.
 - Close the window to the tray and reopen it, and reload it: the screen replays, and the session went on.
 - Kill the server process: the terminal stays live, and the board comes back.
 - Start a child dev server from the session, then quit and confirm: no `claude`, no child, and no listening port remain (`ps`/`ss` on Linux, `Get-Process`/`netstat` on Windows).

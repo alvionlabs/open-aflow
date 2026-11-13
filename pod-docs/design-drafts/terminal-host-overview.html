@@ -41,6 +41,7 @@
 <tr><td>Pty host</td><td>new</td><td><code>packages/pty-host</code></td><td>Holds every terminal: node-pty, a headless buffer per session, replay, heartbeat. Knows nothing of plans or pod.</td></tr>
 <tr><td>Host starter</td><td>new</td><td><code>packages/desktop</code></td><td>Starts the pty host, restarts it up to 5 times, watches the heartbeat, hands each window a MessagePort.</td></tr>
 <tr><td>Session ender</td><td>new</td><td><code>packages/desktop</code></td><td>Stop command, tree and marker snapshot, SIGHUP, SIGTERM, SIGKILL; a Job Object on Windows.</td></tr>
+<tr><td>Linux package</td><td>new</td><td><code>packages/desktop</code> (package script, release workflow)</td><td>An x64 AppImage with <code>latest-linux.yml</code>, beside the Windows installer.</td></tr>
 <tr><td>Quit and update flow</td><td>changed</td><td><code>packages/desktop</code></td><td>Quit dialog, "Ending N sessions…", updates only after it.</td></tr>
 <tr><td>Session store</td><td>new</td><td><code>packages/server</code></td><td>Repo, session ID, run marker, start time, stop reason, last screen. In the config folder.</td></tr>
 <tr><td>Session routes</td><td>new</td><td><code>packages/server</code></td><td>New session, Resume, Dismiss. Builds the <code>claude</code> command line.</td></tr>
@@ -112,7 +113,7 @@ sequenceDiagram
 <table>
 <thead><tr><th>Sprint</th><th>Goal</th><th>Depends on</th></tr></thead>
 <tbody>
-<tr><td>host-core</td><td>The pty host, node-pty, the hooks plugin, and packaging, proved on Windows and Linux. A session starts and replays.</td><td>—</td></tr>
+<tr><td>host-core</td><td>The pty host, node-pty, the hooks plugin, and packaging (the Windows installer and a new Linux AppImage), proved on Windows and Linux. A session starts and replays.</td><td>—</td></tr>
 <tr><td>terminal-tab</td><td>New session with the skill dropdown, the Terminal tab, and hosted run states.</td><td>host-core</td></tr>
 <tr><td>session-life</td><td>Quit, ending process trees, Resume, crashes, the heartbeat banner, and updates.</td><td>terminal-tab</td></tr>
 <tr><td>settings</td><td>The settings page.</td><td>session-life</td></tr>
