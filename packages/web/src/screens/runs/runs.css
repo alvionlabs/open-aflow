@@ -147,28 +147,6 @@
   padding-right: 17px;
 }
 
-/* The Add repo dialog: a sizing box; the picker inside keeps its own frame. */
-.add-dialog {
-  width: min(720px, calc(100vw - 32px));
-  max-width: none;
-  max-height: calc(100dvh - 32px);
-  margin: auto;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fg);
-  overflow: auto;
-}
-
-.add-dialog::backdrop {
-  background: var(--bg);
-  opacity: 0.72;
-}
-
-.add-dialog .picker {
-  max-width: none;
-}
-
 .banners {
   margin-bottom: 24px;
 }
@@ -1321,11 +1299,6 @@
   .main {
     width: calc(100% - 32px);
     padding: 20px 16px 40px;
-  }
-
-  .add-dialog {
-    width: calc(100vw - 16px);
-    max-height: calc(100dvh - 16px);
   }
 
   .runs-head {

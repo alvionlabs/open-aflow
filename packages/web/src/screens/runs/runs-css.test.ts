@@ -351,6 +351,11 @@ describe('runs.css Add repo size', () => {
     expect(add?.['height']).toBeUndefined()
     expect(add?.['width']).toBe('100%')
   })
+
+  it('has no rule for the old Add repo dialog: Add repo uses the shared modal', () => {
+    const left = runsRules().flatMap((r) => r.selectors.filter((s) => s.includes('.add-dialog')).map((s) => (r.media ? `${s} (@media ${r.media})` : s)))
+    expect(left).toEqual([])
+  })
 })
 
 describe('tabs.css text caps', () => {
