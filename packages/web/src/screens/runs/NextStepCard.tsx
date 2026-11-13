@@ -9,7 +9,7 @@ import { answerNote } from './queue-view.ts'
 import { ReplyPanel } from './ReplyPanel.tsx'
 import { INITIAL_RESOLVE, createResolveFlow, triageTarget, type ResolveState } from './resolve-flow.ts'
 import type { ResumeWord } from './resume-flow.ts'
-import { EMPTY_LOG, cardPanel, focusAfterMerge, logMerged, logRunState, logSent, stopView, type StopLog } from './stop-log.ts'
+import { EMPTY_LOG, cardPanel, focusAfterMerge, holdEndsIn, logCard, logHoldEnd, logMerged, logRunState, logSent, stopView, type StopLog } from './stop-log.ts'
 import { TriageButton, TriageError, TriageLine } from './Triage.tsx'
 import { nextStatus } from './view.ts'
 import './next-step.css'
@@ -43,7 +43,22 @@ export function NextStepCard({ repo, run, card }: Props) {
   useEffect(() => {
     if (resume !== undefined) lastResume.current = resume
   }, [resume])
-  const onSent = useCallback((word: ResumeWord, at: number, result: ResumeResult) => setLog((l) => logSent(l, word, at, result, lastResume.current)), [])
+  // The run's state and card at a send's reply: a started send hides its button until either changes (stop-log.ts).
+  const sendFrom = useRef({ state: run.state, card })
+  sendFrom.current = { state: run.state, card }
+  const onSent = useCallback(
+    (word: ResumeWord, when: number, result: ResumeResult) => setLog((l) => logSent(l, word, when, result, lastResume.current, sendFrom.current)),
+    [],
+  )
+  useEffect(() => setLog((l) => logCard(l, card)), [card])
+  // A send the Board never shows move on gets its button back after SEND_HOLD_MS.
+  const holdAt = log.hold?.at
+  useEffect(() => {
+    if (holdAt === undefined) return
+    const t = setTimeout(() => setLog((l) => logHoldEnd(l, holdAt)), holdEndsIn(log, Date.now()))
+    return () => clearTimeout(t)
+    // Only a new hold sets a new timer: `log` here is the one that holds it.
+  }, [holdAt])
 
   const answerLine = answer.kind === 'idle' ? undefined : answer.target.line
   const quote = formView(answer)?.entry

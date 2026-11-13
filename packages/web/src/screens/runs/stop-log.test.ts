@@ -8,7 +8,7 @@ import type { NextItem } from './next-step.ts'
 import { NOT_LOGGED, createResumeFlow, startedText } from './resume-flow.ts'
 import { StopList } from '../../components/StopList.tsx'
 import { ReplyPanel } from './ReplyPanel.tsx'
-import { EMPTY_LOG, FOCUS_PRIMARY, cardPanel, FOCUS_TITLE, focusAfterMerge, logMerged, logRunState, logSent, stopView, type StopLog } from './stop-log.ts'
+import { EMPTY_LOG, FOCUS_PRIMARY, SEND_HOLD_MS, cardPanel, holdEndsIn, logCard, logHoldEnd, FOCUS_TITLE, focusAfterMerge, logMerged, logRunState, logSent, stopView, type StopLog } from './stop-log.ts'
 
 // Local times, so HH:MM reads the same in any time zone.
 const AT_1203 = new Date(2026, 10, 13, 12, 3, 41).getTime()
@@ -216,6 +216,63 @@ describe('stop log', () => {
     // The Waiting tab's panel, with no card in between: the model's text.
     const waiting = renderToStaticMarkup(createElement(ReplyPanel, { view: c.action.kind === 'reply' ? c.action.panel : undefined, target: { repoId: 'r', run: 'alpha' } }))
     expect(waiting).toContain('PR #78 merged.')
+  })
+
+  it('a started send hides its button until the run moves on', () => {
+    const card = replyCard('continue')
+    const from = { state: 'needs-you', card } as const
+    const sendOf = (log: StopLog, c: NextItem = card) => cardPanel(log, c)!.rows.find((r) => r.word === 'continue')!.send
+    const sent = logSent(EMPTY_LOG, 'continue', AT_1205, started(), RESUME, from)
+    // The sent line replaces the button (pick 2 b): no send on the row, Copy stays.
+    expect(sendOf(sent)).toBeUndefined()
+    const html = renderToStaticMarkup(createElement(ReplyPanel, { view: cardPanel(sent, card), target: { repoId: 'r', run: 'alpha' }, framed: false, onSent: () => {} }))
+    expect(html).not.toMatch(/>Continue<\/button>/)
+    expect(html).toContain('aria-label="Copy continue"')
+    expect(shown(sent, card).at(-1)?.label).toBe('pod runs')
+    // Before the send, and after a failed one or one sent with no card to hold: the button.
+    expect(sendOf(EMPTY_LOG)).toBe('continue')
+    expect(sendOf(logSent(EMPTY_LOG, 'continue', AT_1205, { outcome: 'failed', logged: true }, RESUME, from))).toBe('continue')
+    expect(sendOf(logSent(EMPTY_LOG, 'continue', AT_1205, started(), RESUME))).toBe('continue')
+    // A Board with the same state keeps it hidden; the card isn't changed in place.
+    expect(sendOf(logRunState(sent, 'needs-you'))).toBeUndefined()
+    expect(card.action.kind === 'reply' && card.action.panel.rows[1]!.send).toBe('continue')
+
+    // The run's state changes: the button is back, and stays back if the state goes back.
+    const idle = logRunState(sent, 'idle')
+    expect(sendOf(idle)).toBe('continue')
+    expect(shown(idle, card).at(-1)?.label).toBe('Continue')
+    expect(sendOf(logRunState(idle, 'needs-you'))).toBe('continue')
+    // To running: pod runs stays the current item, and the next stop empties the list as before.
+    const running = logRunState(sent, 'running')
+    expect(shown(running, card).at(-1)?.label).toBe('pod runs')
+    expect(logRunState(running, 'needs-you').hold).toBeUndefined()
+
+    // A new stop with no state change: another card, or the row asks for another reason.
+    const other = replyCard('continue')
+    if (other.action.kind === 'reply') other.action.panel.rows[1]!.why = 'PR #79 merged.'
+    expect(sendOf(sent, other)).toBe('continue')
+    expect(sendOf(logCard(sent, other), card)).toBe('continue')
+    expect(logCard(sent, card)).toBe(sent)
+    expect(sendOf(logCard(sent, { ...card, key: 'reply:beta' }))).toBe('continue')
+  })
+
+  it('a send that never reads running gets its button back after 60 s', () => {
+    const card = replyCard('continue')
+    const sent = logSent(EMPTY_LOG, 'continue', AT_1205, started(), RESUME, { state: 'needs-you', card })
+    // The card's timer waits out the rest of the 60 s from the send.
+    expect(SEND_HOLD_MS).toBe(60_000)
+    expect(holdEndsIn(sent, AT_1205)).toBe(60_000)
+    expect(holdEndsIn(sent, AT_1205 + 59_000)).toBe(1_000)
+    expect(holdEndsIn(sent, AT_1205 + 90_000)).toBe(0)
+    expect(holdEndsIn(EMPTY_LOG, AT_1205)).toBeUndefined()
+    // Then the button is back, and the list's current item names it again.
+    const ended = logHoldEnd(sent, AT_1205)
+    expect(cardPanel(ended, card)!.rows[1]!.send).toBe('continue')
+    expect(shown(ended, card).map((i) => i.label)).toEqual(['Sent continue', 'Continue'])
+    // An older timer leaves a newer send's hold alone.
+    const again = logSent(ended, 'continue', AT_1205 + 120_000, started(), RESUME, { state: 'needs-you', card })
+    expect(logHoldEnd(again, AT_1205)).toBe(again)
+    expect(cardPanel(again, card)!.rows[1]!.send).toBeUndefined()
   })
 
   it('focusAfterMerge', () => {
