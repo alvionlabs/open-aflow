@@ -348,6 +348,24 @@ describe('next step', () => {
     const tsteps = steps(task, tname)
     expect(order(tsteps)).toEqual(['merge pr:36', `reply reply:${tname}`, `pending ${entryKey(UNJOINED)}`])
     expect(tsteps.card).toMatchObject({ title: 'Merge PR #36', detail: 'The task PR is reviewed and waits for you.', action: { kind: 'merge', repoId: 'chess', number: 36 } })
+    // A /pod:task --no-review PR: no reviewer ran, so the card says the review was skipped.
+    const noReview = chess([], {
+      claims: [{ ...claim, plan: tname }],
+      agents: [{ ...eng, branch: tname }],
+      prs: [gh(36, 'open', { branch: tname, reviewSkipped: true })],
+    })
+    expect(steps(noReview, tname).card).toMatchObject({
+      title: 'Merge PR #36',
+      detail: 'The task PR skipped review (--no-review) and waits for you.',
+      action: { kind: 'merge', repoId: 'chess', number: 36 },
+    })
+    // The same flag with a reviewer that ran: reviewed wording.
+    const flaggedReviewed = chess([], {
+      claims: [{ ...claim, plan: tname }],
+      agents: [{ ...eng, branch: tname }, { ...rev, kind: 'task', branch: tname }],
+      prs: [gh(36, 'open', { branch: tname, reviewSkipped: true })],
+    })
+    expect(steps(flaggedReviewed, tname).card).toMatchObject({ title: 'Merge PR #36', detail: 'The task PR is reviewed and waits for you.' })
     const tmerged = chess([], { claims: [{ ...claim, plan: tname }], agents: [{ ...eng, branch: tname }, { ...rev, kind: 'task', branch: tname }], prs: [gh(36, 'merged', { branch: tname, mergedAt: NOW - MIN })] })
     expect(steps(tmerged, tname).card).toMatchObject({ tier: 'reply', title: 'Send continue', detail: 'PR #36 merged.' })
 

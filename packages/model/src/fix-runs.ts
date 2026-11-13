@@ -116,11 +116,32 @@ function matchFixAgents(repo: BoardRepo, name: string): { engineers: AgentRun[];
   }
 }
 
-/** The run's PR while it waits on you: open and reviewed. The Ship step reads `you merge` exactly then. */
+/**
+ * The run's PR while it waits on you: open, and reviewed or done with no review (`isWaiting`). The
+ * Ship step reads `you merge` exactly then.
+ */
 export function fixWaitingPr(repo: BoardRepo, name: string, now: number): PrStatus | undefined {
   const pr = fixPr(repo, name)
-  return pr?.state === 'open' && isReviewed(fixAgents(repo, name, now)) ? pr : undefined
+  return isWaiting(pr, fixAgents(repo, name, now)) ? pr : undefined
 }
+
+/** The open PR is yours to merge: reviewed, or a no-review PR whose engineer handed back. */
+const isWaiting = (pr: PrStatus | undefined, agents: FixAgent[]): boolean =>
+  pr?.state === 'open' && (isReviewed(agents) || isNoReviewDone(pr, agents))
+
+/**
+ * A `/pod:task --no-review` PR (`reviewSkipped`, from its body) that no reviewer joined, and whose
+ * newest engineer turn (by start) ended: pod hands it back with no review. Any reviewer brings back
+ * the reviewed rule. An older engineer that died doesn't hold back a newer one that handed back.
+ */
+const isNoReviewDone = (pr: PrStatus, agents: FixAgent[]): boolean => {
+  if (pr.reviewSkipped !== true || agents.some((x) => x.role === 'reviewer')) return false
+  return agents.filter((x) => x.role !== 'reviewer').at(-1)?.state === 'ended'
+}
+
+/** Round 1 never ran on purpose: a no-review PR with no reviewer, waiting on you or merged. */
+const isReviewSkipped = (pr: PrStatus | undefined, agents: FixAgent[]): boolean =>
+  pr?.reviewSkipped === true && !agents.some((x) => x.role === 'reviewer') && (pr.state === 'merged' || isWaiting(pr, agents))
 
 const phase = (x: FixAgent): string => (x.role === 'reviewer' ? (x.round !== undefined && x.round >= 2 ? 'review round 2' : 'review') : x.role === 'engineer' ? 'build' : 'fix pass')
 
@@ -137,25 +158,27 @@ const isReviewed = (agents: FixAgent[]) => {
 }
 
 /**
- * Where: the newest running agent's step; else `review` for an open PR whose review hasn't
- * run since the last build; else `PR` once there is one; else the newest agent's step; else
- * `build` (pod claims the ports before it dispatches the engineer).
- * State, first match: an agent running → `running`; the PR open and reviewed → `needs-you`; else `idle`.
+ * Where: the newest running agent's step; else `review` for an open PR that doesn't wait on you
+ * (its review hasn't run since the last build, and it isn't a finished no-review PR); else `PR` once
+ * there is one; else the newest agent's step; else `build` (pod claims the ports before it
+ * dispatches the engineer).
+ * State, first match: an agent running → `running`; the PR waits on you (`isWaiting`) → `needs-you`; else `idle`.
  */
 function summary(repo: BoardRepo, name: string, agents: FixAgent[]): FixRunSummary {
   const pr = fixPr(repo, name)
   const running = agents.filter((x) => x.state === 'running')
+  const waiting = isWaiting(pr, agents)
   const where =
     running.length > 0
       ? phase(running.at(-1)!)
-      : pr?.state === 'open' && !isReviewed(agents) && agents.length > 0
+      : pr?.state === 'open' && !waiting && agents.length > 0
         ? 'review'
         : pr
           ? 'PR'
           : agents.length > 0
             ? phase(agents.at(-1)!)
             : 'build'
-  const state = running.length > 0 ? 'running' : pr?.state === 'open' && isReviewed(agents) ? 'needs-you' : 'idle'
+  const state = running.length > 0 ? 'running' : waiting ? 'needs-you' : 'idle'
   const run: FixRunSummary = { plan: name, fix: slugOf(name), where, state }
   const portBase = repo.claims.find((c) => c.plan === name)?.portBase
   if (portBase !== undefined) run.portBase = portBase
@@ -197,15 +220,19 @@ export function buildFixPipeline(repo: BoardRepo, name: string, now: number): Fi
   const agents = fixAgents(repo, name, now)
   const of = (pred: (x: FixAgent) => boolean) => agents.filter(pred)
   const pr = fixPr(repo, name)
+  const waiting = isWaiting(pr, agents)
   const ship: Step = !pr
     ? { key: 'pr', label: 'PR', state: 'wait', detail: 'not open yet' }
-    : pr.state === 'open' && !isReviewed(agents)
+    : pr.state === 'open' && !waiting
       ? { key: 'pr', label: 'PR', state: 'wait', detail: `PR #${pr.number} · after review` }
       : { key: 'pr', label: 'PR', state: PR_STEP[pr.state].state, detail: `PR #${pr.number} · ${PR_STEP[pr.state].text}` }
-  const waiting = fixWaitingPr(repo, name, now)
-  if (waiting) ship.merge = { number: waiting.number }
+  if (waiting && pr) ship.merge = { number: pr.number }
   /** A merged PR was built and reviewed. With no agent at all, its session is past the transcript window, so no figures. */
   const ran = (step: Step): Step => (pr?.state === 'merged' && agents.length === 0 ? { ...step, state: 'done', detail: 'no transcript' } : step)
+  /** A no-review PR's Round 1 says why no review ran, also with no transcript left. */
+  const round1: Step = isReviewSkipped(pr, agents)
+    ? { key: 'round-1', label: 'Round 1', state: 'skipped', detail: 'skipped · --no-review' }
+    : ran(agentStep('round-1', 'Round 1', of((x) => x.role === 'reviewer' && x.round === 1), 'not started', now))
   const stages: Stage[] = [
     {
       key: 'build',
@@ -219,7 +246,7 @@ export function buildFixPipeline(repo: BoardRepo, name: string, now: number): Fi
       key: 'review',
       caption: 'Review',
       steps: [
-        ran(agentStep('round-1', 'Round 1', of((x) => x.role === 'reviewer' && x.round === 1), 'not started', now)),
+        round1,
         agentStep('round-2', 'Round 2', of((x) => x.role === 'reviewer' && x.round !== 1), 'only after a fix pass', now),
       ],
     },

@@ -63,8 +63,8 @@ export function buildConfig(o: BuildOptions): Configuration {
     electronVersion: manifest.devDependencies.electron,
     directories: { output: o.output ?? 'release', buildResources: 'build' },
     extraMetadata: { name: PACKAGED_NAME, version, main: 'dist/main.cjs' },
-    // The app holds no node_modules: every dependency is inside a bundle.
-    files: ['dist/main.cjs', 'assets/**/*', 'package.json', '!node_modules/**/*'],
+    // The app holds no node_modules: every dependency is inside a bundle. The preload is the window's, beside main.cjs.
+    files: ['dist/main.cjs', 'dist/preload.cjs', 'assets/**/*', 'package.json', '!node_modules/**/*'],
     extraResources: [
       { from: '../server/dist/app', to: 'server' },
       { from: o.noticesFile, to: 'THIRD-PARTY-NOTICES.txt' },

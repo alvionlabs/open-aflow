@@ -26,7 +26,7 @@ export type GhReader = {
    * Fetches the PRs that are due, by number and by head branch. `staging` heads are asked about even
    * after a merge (every plan reuses the branch). A head with no open PR slows to NO_PR_SLOW_MS after
    * NO_PR_ASK_LIMIT asks. `true` when the gh status or
-   * any PR's number, state, checks, or url changed.
+   * any PR's number, state, checks, url, or no-review flag changed.
    */
   refresh(repoPath: string, numbers: number[], branches?: string[], staging?: string[]): Promise<boolean>
 }
@@ -47,9 +47,14 @@ export const NO_PR_ASK_LIMIT = (2 * 60 * 60_000) / PR_CACHE_MS
 /** How often a branch is asked about after NO_PR_ASK_LIMIT, in clock time, so a PR opened later still shows. */
 export const NO_PR_SLOW_MS = 5 * 60_000
 export const GH_TIMEOUT_MS = 10_000
-const PR_FIELDS = 'number,state,url,statusCheckRollup,baseRefName,mergedAt'
-/** `title` names a fix run in its header; only PRs found by branch need it. */
-const LIST_FIELDS = `${PR_FIELDS},headRefName,title`
+const PR_FIELDS = 'number,state,url,statusCheckRollup,baseRefName,mergedAt,createdAt'
+/**
+ * `title` names a fix run in its header; `body` holds the no-review marker, read into a flag at parse
+ * and never kept. Only PRs found by branch need them.
+ */
+const LIST_FIELDS = `${PR_FIELDS},headRefName,title,body`
+/** The text pod's PR template writes for a `/pod:task --no-review` PR; any match in the body counts. */
+const NO_REVIEW_MARKER = 'skipped (--no-review)'
 /** A branch gh can't read as a flag, with no spaces or shell characters. */
 const BRANCH = /^[A-Za-z0-9][\w./-]{0,199}$/
 
@@ -188,7 +193,14 @@ export function createGhReader(opts: { exec?: GhExec; now?: () => number; ghFoun
     if (!next) return false
     const prev = entry.value
     entry.value = next
-    return !prev || prev.number !== next.number || prev.state !== next.state || prev.checks !== next.checks || prev.url !== next.url
+    return (
+      !prev ||
+      prev.number !== next.number ||
+      prev.state !== next.state ||
+      prev.checks !== next.checks ||
+      prev.url !== next.url ||
+      prev.reviewSkipped !== next.reviewSkipped
+    )
   }
 
   /**
@@ -314,14 +326,16 @@ function prOf(data: unknown, n: number, checkedAt: number): PrStatus | undefined
   if (typeof d.baseRefName === 'string' && d.baseRefName) pr.base = d.baseRefName
   const mergedAt = typeof d.mergedAt === 'string' ? Date.parse(d.mergedAt) : NaN
   if (Number.isFinite(mergedAt)) pr.mergedAt = mergedAt
+  const openedAt = typeof d.createdAt === 'string' ? Date.parse(d.createdAt) : NaN
+  if (Number.isFinite(openedAt)) pr.openedAt = openedAt
   if (typeof d.title === 'string' && d.title) pr.title = d.title
   return pr
 }
 
 /**
- * Maps `gh pr list --head <branch> --json number,state,url,statusCheckRollup,headRefName,title` output to
- * the branch's PR, with `branch` set: the open one, else the newest. Entries for another head are
- * skipped. `undefined` when the output isn't a list or holds no usable entry (no PR yet).
+ * Maps `gh pr list --head <branch> --json <LIST_FIELDS>` output to the branch's PR, with `branch` set:
+ * the open one, else the newest. Entries for another head are skipped. `undefined` when the output
+ * isn't a list or holds no usable entry (no PR yet). The body only sets `reviewSkipped`.
  */
 export function parsePrList(stdout: string, branch: string, checkedAt: number): PrStatus | undefined {
   let data: unknown
@@ -336,7 +350,9 @@ export function parsePrList(stdout: string, branch: string, checkedAt: number): 
     const d = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>
     if (d.headRefName !== branch || typeof d.number !== 'number' || !Number.isSafeInteger(d.number) || d.number < 1) continue
     const pr = prOf(d, d.number, checkedAt)
-    if (pr) prs.push(pr)
+    if (!pr) continue
+    if (typeof d.body === 'string' && d.body.includes(NO_REVIEW_MARKER)) pr.reviewSkipped = true
+    prs.push(pr)
   }
   const pick = prs.find((p) => p.state === 'open') ?? prs.sort((a, b) => b.number - a.number)[0]
   return pick && { ...pick, branch }

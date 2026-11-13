@@ -98,6 +98,7 @@ function prDetail(pr: WaitingPr): string {
   if (pr.kind === 'wave') return `Wave ${pr.wave} of ${pr.sprint} is handed back to you.`
   if (pr.kind === 'final') return "The plan's final PR is reviewed and waits for you."
   if (pr.kind === 'staging') return 'The staging → main PR waits for you.'
+  if (pr.reviewSkipped) return `The ${pr.kind} PR skipped review (--no-review) and waits for you.`
   return `The ${pr.kind} PR is reviewed and waits for you.`
 }
 

@@ -59,11 +59,15 @@ describe('electron-builder config', () => {
     expect(manifest().version).toBe('0.1.0')
   })
 
+  test('files', () => {
+    // The two bundles, the main process and the window's preload. Everything else is inside them.
+    expect(config().files).toEqual(['dist/main.cjs', 'dist/preload.cjs', 'assets/**/*', 'package.json', '!node_modules/**/*'])
+  })
+
   test('server in extraResources, no node_modules', () => {
     const c = config()
     expect(c.extraResources).toContainEqual({ from: '../server/dist/app', to: 'server' })
     expect(c.extraResources).toContainEqual({ from: NOTICES, to: 'THIRD-PARTY-NOTICES.txt' })
-    expect(c.files).toEqual(['dist/main.cjs', 'assets/**/*', 'package.json', '!node_modules/**/*'])
     expect(c.npmRebuild).toBe(false)
     expect(c.nodeGypRebuild).toBe(false)
   })

@@ -23,6 +23,7 @@ import { moveOldConfig } from './config-move.ts'
 import { createFoundGhExec, createGhReader, defaultGhExec } from './gh.ts'
 import { openWithFallback, wantedPort } from './listen.ts'
 import { createRemoveRepoRoutes } from './remove-repo-routes.ts'
+import { createForgetRunRoutes } from './forget-run-routes.ts'
 import { addRepo, removeRepo } from './repos-config.ts'
 import { createResumeRoutes } from './resume-routes.ts'
 import { createIdleCheck } from './session-activity.ts'
@@ -153,6 +154,17 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
             removeRepo: (p) => removeRepo(configFile, p, platform),
             rebuild: () => watcher.rebuild(),
             forgetToggles: store.forgetPath,
+            log,
+          }),
+        )
+        .route(
+          '/',
+          createForgetRunRoutes({
+            board: () => watcher.board(),
+            portsDir: settings.portsDir,
+            platform,
+            now: Date.now,
+            rebuild: () => watcher.rebuild(),
             log,
           }),
         ),

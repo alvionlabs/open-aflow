@@ -9,6 +9,7 @@ import { createBoardService, type BoardService } from './board-service.ts'
 import { VIEW_FIELDS } from './gh-actions.ts'
 import { createGhReader, type ExecResult, type GhExec } from './gh.ts'
 import { createSessionToken } from './session-token.ts'
+import { projectDirName } from './transcript-files.ts'
 
 const API = 3040
 const WEB = 3041
@@ -78,6 +79,8 @@ type GhState = { state: 'OPEN' | 'MERGED' | 'CLOSED'; head: string; autoMerge?: 
 type FakeGh = {
   calls: string[][]
   prs: Map<number, GhState>
+  /** What `pr list --head <branch>` answers; a branch not set answers `[]`. */
+  lists: Map<string, unknown[]>
   auth: ExecResult['status']
   onMerge: (n: number) => ExecResult
   hold: Set<number>
@@ -96,6 +99,7 @@ function fakeGh(): FakeGh {
   const gh: FakeGh = {
     calls,
     prs,
+    lists: new Map(),
     auth: 'ok',
     /** What `pr merge` does to the PR before it answers. */
     onMerge: (n: number): ExecResult => {
@@ -109,7 +113,7 @@ function fakeGh(): FakeGh {
     exec: (async (args) => {
       calls.push(args)
       if (args[0] === 'auth') return { status: gh.auth, stdout: '' }
-      if (args[1] === 'list') return { status: 'ok', stdout: '[]' }
+      if (args[1] === 'list') return { status: 'ok', stdout: JSON.stringify(gh.lists.get(args[3] ?? '') ?? []) }
       const n = Number(args[1] === 'merge' ? args[2]!.split('/').pop() : args[2])
       if (args[1] === 'merge') {
         if (gh.hold.has(n)) await new Promise<void>((r) => holds.set(n, r))
@@ -137,8 +141,9 @@ function fakeGh(): FakeGh {
 }
 
 /** The routes behind the real app and guard, over a real board service, gh reader, and a fake gh. */
-async function setup(opts: { status?: GhStatus; append?: (e: Omit<ActionEntry, 'at'>) => Promise<boolean> } = {}) {
+async function setup(opts: { status?: GhStatus; append?: (e: Omit<ActionEntry, 'at'>) => Promise<boolean>; gh?: (gh: FakeGh) => void } = {}) {
   const gh = fakeGh()
+  opts.gh?.(gh)
   const reader = createGhReader({ exec: gh.exec, now: () => NOW })
   const logged: NewActionEntry[] = []
   const service: BoardService = createBoardService({
@@ -382,5 +387,38 @@ describe('merge routes', () => {
     expect(await json<MergeResult>(res)).toEqual({ outcome: 'failed', number: 7, message: 'no pull requests found', logged: true })
     expect(s.gh.merges()).toEqual([])
     expect(s.logged).toHaveLength(1)
+  })
+
+  test('no-review PR can be previewed', async () => {
+    // A `/pod:task --no-review` run: its claim, one engineer that handed back, and no reviewer.
+    const task = 'task-scroll'
+    await writeFile(join(root, 'ports', '3500'), `${repoPath} ${task}\n`)
+    const sub = join(root, 'claude', 'projects', projectDirName(repoPath), 'session-1', 'subagents')
+    await mkdir(sub, { recursive: true })
+    await writeFile(join(sub, 'agent-eng1.meta.json'), JSON.stringify({ agentType: 'pod:engineer', description: 'Build task' }))
+    const at = (min: number) => new Date(NOW - 60 * 60_000 + min * 60_000).toISOString()
+    const lines = [
+      { type: 'user', timestamp: at(0), message: { role: 'user', content: `Standalone /pod:task dispatch (no sprint slug).\n\n- **task:** calm the scroll.\n- **branch name:** ${task}\n- **merge-target branch:** main` } },
+      { type: 'assistant', timestamp: at(5), message: { id: 'm1', model: 'claude-opus-5-5', stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 5 }, content: [] } },
+    ]
+    await writeFile(join(sub, 'agent-eng1.jsonl'), lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+    const listed = (body: string) => (gh: FakeGh) => {
+      gh.prs.set(40, { state: 'OPEN', head: SHA })
+      gh.lists.set(task, [{ number: 40, state: 'OPEN', url: url(40), statusCheckRollup: [], headRefName: task, title: 'fix(ui): calm the scroll', body }])
+    }
+
+    // The body holds pod's marker: the PR waits on you, so the preview answers.
+    const s = await setup({ gh: listed('## Review\n\nReview: skipped (--no-review)\n') })
+    expect(s.board().repos[0]!.prs.find((p) => p.number === 40)).toMatchObject({ branch: task, reviewSkipped: true })
+    expect(JSON.stringify(s.board())).not.toContain('--no-review')
+    const preview = await s.post('merge-preview', { repoId: s.repoId, number: 40 })
+    expect(preview.status).toBe(200)
+    expect(await json<MergePreview>(preview)).toMatchObject({ number: 40, state: 'open', headSha: SHA })
+
+    // No marker: the same PR still waits for its review.
+    const plain = await setup({ gh: listed('## Review\n\nReview: pending\n') })
+    const refused = await plain.post('merge-preview', { repoId: plain.repoId, number: 40 })
+    expect(refused.status).toBe(404)
+    expect(await refused.json()).toEqual({ error: 'not waiting on you' })
   })
 })

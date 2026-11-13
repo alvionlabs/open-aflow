@@ -41,10 +41,16 @@ export type RemoveRepoOutcome = 'removed' | 'failed'
 /** What the remove-repo route sends back on success: the path taken out of the board's config. */
 export type RemoveRepoResult = { outcome: 'removed'; path: string; logged: boolean }
 
+export type ForgetRunOutcome = 'removed' | 'failed'
+
+/** What the forget-run route sends back on success: the run whose one port claim file was deleted. */
+export type ForgetRunResult = { outcome: 'removed'; run: string; portBase: number; logged: boolean }
+
 /**
  * One logged action. A merge's `target` is `PR #N`; an answer's is the queue entry's
  * `<date> · <TYPE> · <from → to>`, never the answer text or the body; a resolve's (Close or Keep) the same. A resume's is
  * `<run> · <word>`; `auto` marks one the automatic check sent. A remove-repo's is the repo's path.
+ * A forget-run's is `<run> · port base <N>`.
  */
 export type ActionEntry = { at: number; repoId: string; repo: string; target: string; message?: string } & (
   | { action: 'merge'; result: MergeOutcome }
@@ -52,6 +58,7 @@ export type ActionEntry = { at: number; repoId: string; repo: string; target: st
   | { action: 'resolve'; result: ResolveOutcome }
   | { action: 'resume'; result: ResumeOutcome; reply: 'continue' | 'go'; auto: boolean }
   | { action: 'remove-repo'; result: RemoveRepoOutcome }
+  | { action: 'forget-run'; result: ForgetRunOutcome }
 )
 
 /** An entry before the log stamps its time. Omit spreads over the union, so `action` and `result` stay paired. */
