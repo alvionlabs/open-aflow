@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { activatorClsid, hashFromActivation, toastXml } from './toast-activation.ts'
+import { activatorClsid, hashFromActivation, notificationOptions, toastXml, usesToastActivation } from './toast-activation.ts'
 
 const toast = (over: Partial<{ title: string; body: string; hash: string }> = {}) => ({ title: 'A run', body: 'Merge PR #5', hash: '#/repo/fix-a', ...over })
 const launchOf = (xml: string) => /<toast launch="([^"]*)"/.exec(xml)?.[1]
@@ -77,5 +77,19 @@ describe('the activator the app registers', () => {
     expect(activatorClsid(undefined, EXE)).toBeUndefined()
     expect(activatorClsid({ target: EXE }, EXE)).toBeUndefined()
     expect(activatorClsid({ target: EXE, toastActivatorClsid: '' }, EXE)).toBeUndefined()
+  })
+})
+
+describe('other systems than Windows', () => {
+  test('only Windows has toast activation, so the app skips it elsewhere and still starts', () => {
+    expect(usesToastActivation('win32')).toBe(true)
+    expect(usesToastActivation('linux')).toBe(false)
+    expect(usesToastActivation('darwin')).toBe(false)
+  })
+
+  test('Windows gets the toast XML; Linux and macOS get a plain title and body', () => {
+    expect(notificationOptions(toast(), 'win32')).toEqual({ toastXml: toastXml(toast()) })
+    expect(notificationOptions(toast(), 'linux')).toEqual({ title: 'A run', body: 'Merge PR #5' })
+    expect(notificationOptions(toast(), 'darwin')).toEqual({ title: 'A run', body: 'Merge PR #5' })
   })
 })
