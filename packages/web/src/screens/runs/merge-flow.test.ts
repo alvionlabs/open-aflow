@@ -31,11 +31,13 @@ function fakePost() {
   return { calls, post }
 }
 
-/** A flow, its fake post, and the latest state it reported. */
-function setup() {
+const AT = 1_800_000_000_000
+
+/** A flow, its fake post, and the latest state it reported. With `onMerged`, the flow closes on merged. */
+function setup(onMerged?: (number: number, at: number) => void) {
   const p = fakePost()
   const seen: MergeState[] = []
-  const flow = createMergeFlow((s) => seen.push(s), p.post)
+  const flow = createMergeFlow((s) => seen.push(s), p.post, onMerged ? { onMerged, now: () => AT } : {})
   const tick = () => new Promise((r) => setTimeout(r, 0))
   const answer = async (i: number, reply: ActionReply<unknown>) => {
     expect(p.calls[i], `request ${i} was sent`).toBeDefined()
@@ -48,8 +50,8 @@ function setup() {
 const ok = <T,>(data: T): ActionReply<T> => ({ ok: true, data })
 
 /** Opens A and answers its preview, leaving the flow at confirm. */
-async function atConfirm(over: Partial<MergePreview> = {}) {
-  const t = setup()
+async function atConfirm(over: Partial<MergePreview> = {}, onMerged?: (number: number, at: number) => void) {
+  const t = setup(onMerged)
   t.flow.open(A)
   await t.answer(0, ok(preview(over)))
   return t
@@ -247,5 +249,67 @@ describe('merge flow', () => {
     // Escape and Cancel close an error.
     m.flow.key('Escape')
     expect(m.flow.state().kind).toBe('idle')
+  })
+
+  it('closes on merged only when asked', async () => {
+    // With onMerged: a merged reply calls it once, with the PR and the time, and the panel closes with no result.
+    const merged: [number, number][] = []
+    const t = await atConfirm({}, (n, at) => merged.push([n, at]))
+    t.flow.merge()
+    const before = t.seen.length
+    await t.answer(1, ok(result('merged')))
+    expect(merged).toEqual([[41, AT]])
+    expect(t.flow.state().kind).toBe('idle')
+    expect(confirmView(t.flow.state())).toBeUndefined()
+    // It goes straight to idle: no result state flashes on the way.
+    expect(t.seen.slice(before).map((s) => s.kind)).toEqual(['idle'])
+    // Not logged closes the same way: the card's item carries no note for a merge.
+    const u = await atConfirm({}, (n, at) => merged.push([n, at]))
+    u.flow.merge()
+    await u.answer(1, ok(result('merged', { logged: false })))
+    expect(u.flow.state().kind).toBe('idle')
+    expect(merged).toHaveLength(2)
+    // The flow works on after it closed: the next open reads the PR again.
+    t.flow.open(B)
+    expect(t.flow.state()).toMatchObject({ kind: 'loading', target: B })
+    expect(merged).toHaveLength(2)
+
+    // Without it (the Waiting tab): today's result, with Merged and Close.
+    const w = await atConfirm()
+    w.flow.merge()
+    await w.answer(1, ok(result('merged')))
+    expect(w.flow.state()).toMatchObject({ kind: 'result', target: A })
+    expect(confirmView(w.flow.state())).toMatchObject({ result: { words: 'Merged' }, closeLabel: 'Close' })
+  })
+
+  it('other outcomes keep the panel', async () => {
+    const merged: number[] = []
+    for (const outcome of ['queued', 'auto-merge', 'stale', 'failed', 'unconfirmed'] as const) {
+      const t = await atConfirm({}, (n) => merged.push(n))
+      t.flow.merge()
+      await t.answer(1, ok(result(outcome)))
+      expect(t.flow.state().kind, outcome).toBe('result')
+      expect(confirmView(t.flow.state())?.result?.words, outcome).not.toBe('Merged')
+    }
+    // A failed request keeps its error and Try again.
+    const e = await atConfirm({}, (n) => merged.push(n))
+    e.flow.merge()
+    await e.answer(1, { ok: false, status: 0, message: "Can't reach the board." })
+    expect(confirmView(e.flow.state())).toMatchObject({ error: "Can't reach the board.", tryAgain: true })
+    // A late merged reply for a merge you can no longer see is dropped, and calls nothing.
+    const late = await atConfirm({}, (n) => merged.push(n))
+    late.flow.merge()
+    expect(late.flow.state().kind).toBe('merging')
+    expect(merged).toEqual([])
+    // Check again after stale, then merged: it closes then, once.
+    const s = await atConfirm({}, (n) => merged.push(n))
+    s.flow.merge()
+    await s.answer(1, ok(result('stale', { headSha: NEW_SHA })))
+    s.flow.retry()
+    await s.answer(2, ok(preview({ headSha: NEW_SHA })))
+    s.flow.merge()
+    await s.answer(3, ok(result('merged')))
+    expect(merged).toEqual([41])
+    expect(s.flow.state().kind).toBe('idle')
   })
 })
