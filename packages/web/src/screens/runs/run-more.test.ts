@@ -40,7 +40,7 @@ const run = (repoId: string, name: string, plan: string): RunSummary => ({ repoI
 describe('runs list with the ⋯ button', () => {
   const runs = [run('ra', 'alpha-repo', 'x'), run('rc', 'claimed', 'y')]
   const repos = [repo({}), repo({ id: 'rc', name: 'claimed', path: 'C:/code/claimed', source: 'claim' })]
-  const render = (panelFor?: (r: RunSummary) => unknown) =>
+  const render = () =>
     renderToStaticMarkup(
       createElement(RunsList, {
         runs,
@@ -48,7 +48,6 @@ describe('runs list with the ⋯ button', () => {
         repos,
         removable: (r: RunSummary) => r.repoId === 'ra',
         onRemove: noop,
-        ...(panelFor ? { panelFor: panelFor as never } : {}),
       }),
     )
 
@@ -67,10 +66,8 @@ describe('runs list with the ⋯ button', () => {
     expect(items[1]).not.toContain('run-more')
   })
 
-  it('shows the confirm panel under the card it was opened from', () => {
-    const items = render((r) => (r.plan === 'x' ? createElement('section', { className: 'inplace remove-confirm' }) : null)).match(/<li class="run-item">[\s\S]*?<\/li>/g)!
-    expect(items[0]).toMatch(/<\/div><\/div><section class="inplace remove-confirm"><\/section><\/li>$/)
-    expect(items[1]).not.toContain('remove-confirm')
+  it('ends each card with its link and ⋯: the confirm is the screen modal, never a panel under the card', () => {
+    for (const item of render().match(/<li class="run-item">[\s\S]*?<\/li>/g)!) expect(item).toMatch(/<\/div><\/li>$/)
   })
 })
 

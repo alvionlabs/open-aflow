@@ -357,13 +357,6 @@
   opacity: 1;
 }
 
-/* The sidebar's confirm sits right under its card, at the sidebar's dense size. */
-.run-item > .remove-confirm {
-  margin: 8px 0 0;
-  padding: 12px;
-  font-size: var(--size-dense);
-}
-
 /* base.css makes every icon button 44 px on a phone; this one keeps its 24 px box, and touch gets the target below. */
 @media (max-width: 480px) {
   .btn.icon.run-more {
@@ -1597,28 +1590,4 @@
   .wait-more {
     min-height: 44px;
   }
-}
-
-/* Remove from the board: in place under the run header, like the merge confirm. Its text stays near 72ch. */
-.remove-confirm {
-  margin: 16px 0 32px;
-  max-width: 640px;
-}
-
-.remove-confirm:focus {
-  outline: none;
-}
-
-.remove-confirm:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.remove-path {
-  overflow-wrap: anywhere;
-}
-
-.remove-body {
-  margin: 0;
-  max-width: 72ch;
 }

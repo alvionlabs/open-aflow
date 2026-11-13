@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from 'react'
+import { Fragment } from 'react'
 import type { BoardRepo, RunSummary } from '@openaflow/model'
 import { hashFor } from '../../selection.ts'
 import { moreButtonId, moreName, repoOfRun } from './remove-flow.ts'
@@ -12,10 +12,8 @@ type Props = {
   repos: BoardRepo[]
   /** Whether a run's card gets the ⋯ button: its repo can be removed. */
   removable?: (run: RunSummary) => boolean
-  /** Remove repo, picked from a card's ⋯ menu. */
+  /** Remove repo, picked from a card's ⋯ menu: it opens the screen's confirm modal. */
   onRemove?: (run: RunSummary) => void
-  /** The remove confirm, under the card it was opened from. */
-  panelFor?: (run: RunSummary) => ReactNode
 }
 
 /** A line break opportunity after each `_`, which browsers don't give; a hyphen already has one. */
@@ -36,7 +34,7 @@ const breakAfterUnderscores = (text: string) =>
  * line with the `task` or `fix` tag (`runTag`). Beside each card's link, never inside it, a ⋯ button when its repo can be removed. A
  * hyphen or an underscore is a line break opportunity, so such a word gets its own box to stay whole when it fits.
  */
-export function RunsList({ runs, selected, repos, removable, onRemove, panelFor }: Props) {
+export function RunsList({ runs, selected, repos, removable, onRemove }: Props) {
   return (
     <nav className="runs" aria-label="Runs">
       <span className="eyebrow runs-head">Runs</span>
@@ -73,7 +71,6 @@ export function RunsList({ runs, selected, repos, removable, onRemove, panelFor 
                   </a>
                   {more && <RunMoreMenu runName={moreName(card.name, r.repo)} triggerId={moreButtonId(r)} onRemove={() => onRemove(r)} />}
                 </div>
-                {panelFor?.(r)}
               </li>
             )
           })}
