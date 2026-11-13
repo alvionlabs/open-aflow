@@ -8,10 +8,10 @@ _From plan: pod-docs/plans/ui-rework.md · Slug: ui-rework · Status: active · 
 
 | Wave | Slice | Title | Branch | PR | Status | Confidence | Depends on |
 |------|-------|-------|--------|----|--------|------------|------------|
-| 1 | L1 | Look: shared modal and the "what happened" list | ui-rework-L1 | — | pending | — | — |
-| 1 | R1 | PR open time, review-skip marker, Merge for no-review PRs | ui-rework-R1 | — | pending | — | — |
-| 1 | F1 | Forget run: model check, route, and log line | ui-rework-F1 | — | pending | — | — |
-| 1 | D1 | Desktop folder bridge (preload + IPC) | ui-rework-D1 | — | pending | — | — |
+| 1 | L1 | Look: shared modal and the "what happened" list | ui-rework-L1 | — | pushed | medium | — |
+| 1 | R1 | PR open time, review-skip marker, Merge for no-review PRs | ui-rework-R1 | — | pushed | medium | — |
+| 1 | F1 | Forget run: model check, route, and log line | ui-rework-F1 | — | pushed | medium | — |
+| 1 | D1 | Desktop folder bridge (preload + IPC) | ui-rework-D1 | — | pushed | medium | — |
 | 2 | N1 | Next step card: list, merge panel closes, Sending… | ui-rework-N1 | — | pending | — | L1 |
 | 2 | M1 | Runs list: last activity, newest first | ui-rework-M1 | — | pending | — | R1 |
 | 2 | K1 | Remove repo and Forget in the modal; `auto` tag | ui-rework-K1 | — | pending | — | L1, F1 |
