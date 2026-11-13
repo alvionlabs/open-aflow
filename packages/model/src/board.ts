@@ -66,6 +66,13 @@ export type PrStatus = {
   mergedAt?: number
   /** The PR's title as gh gives it; only on a PR found by its branch. */
   title?: string
+  /** When it opened (ms since epoch), from gh's `createdAt`; unset when gh gave no usable time. */
+  openedAt?: number
+  /**
+   * Only on a PR found by its branch whose body holds `skipped (--no-review)`: pod's PR template
+   * writes it for a `/pod:task --no-review` PR. The body itself is never kept.
+   */
+  reviewSkipped?: true
 }
 
 export type GhStatus = 'ok' | 'missing' | 'logged-out' | 'unknown'
