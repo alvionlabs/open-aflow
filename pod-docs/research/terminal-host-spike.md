@@ -1,8 +1,8 @@
 # Research: terminal-host spike findings
 
-_Run: 2026-11-11 · Linux (Fedora 44, Wayland, Electron 45.2.1, Node 26.13.0, Claude Code 2.1.322) · Windows: not run · Used by: [terminal-host.md](terminal-host.md)_
+_Run: 2026-11-11 · Linux (Fedora 44, Wayland, Electron 45.2.1, Node 26.13.0, Claude Code 2.1.322) · Windows: 2026-11-13 (Windows 11 Home 26300, Electron 45.2.1, Node 26.13.0, Claude Code 2.1.323), see [Windows](#windows) · Used by: [terminal-host.md](terminal-host.md)_
 
-**Status:** done on Linux. The human chose Linux only for now (2026-11-11, [decisions.md](../decisions.md)), so Windows is out of scope for this spike. On Linux, every check passes, with these limits:
+**Status:** done on Linux (2026-11-11) and on Windows (2026-11-13). The human first chose Linux only (2026-11-11, [decisions.md](../decisions.md)) and asked for the Windows run later. On Linux, every check passes, with these limits:
 
 - Two checks passed only after a fix to the design: 5 (the draft rule) and 6 (a sweep after a host crash). See [Design changes](#design-changes).
 - Part 5a ran with the first version of the gate. Its send path did not change, and the new gate opened at an idle prompt in the rerun.
@@ -10,7 +10,7 @@ _Run: 2026-11-11 · Linux (Fedora 44, Wayland, Electron 45.2.1, Node 26.13.0, Cl
 - Check 8 ran check 1 on the packaged app with the fake `claude`, not the real one.
 - A child that clears its env survives quit unless the run is in a systemd scope (an option in the spike).
 
-Windows was not run, by the human's choice. It stays untested: a plan that ships the terminal host on Windows must test it first.
+Windows ran later, on 2026-11-13, on the branch `spike/terminal-host-windows`. Every check passes there, with a Job Object per run. See [Windows](#windows).
 
 The prototype is throwaway code on the branch `spike/terminal-host`, in `packages/desktop/spike/`. It never merges to `main`. The raw results are in `packages/desktop/spike/results/` on that branch.
 
@@ -27,22 +27,22 @@ The prototype is throwaway code on the branch `spike/terminal-host`, in `package
 
 ## Results
 
-Linux only. "Fake" means the fake `claude` (`spike/fake-claude.mjs`); "real" means the user's own `claude` with `--model haiku`.
+The Evidence column is for Linux. For Windows, see [Windows](#windows). "Fake" means the fake `claude` (`spike/fake-claude.mjs`); "real" means the user's own `claude` with `--model haiku`.
 
 | # | Check | Linux | Windows | Evidence |
 |---|---|---|---|---|
-| 1 | Start and show (real) | Pass | Not run | `claude` answered `PONG`. The host buffer and the window's xterm both show it. |
-| 2 | Window life (fake) | Pass | Not run | 113 numbered lines, each once and in order, after hide 10 s and show, a reload, and a destroyed and new window. |
-| 3 | Server life (fake) | Pass | Not run | Server killed by PID. New server PID, `/api/health` 200. Terminal went 10 → 21 lines with no gap. |
-| 4 | Clean quit (fake) | Pass | Not run | Dialog text and buttons correct; **Cancel** keeps app, run, and child. **Quit and end runs** leaves no process and no listening port. One gap, closed by a systemd scope; see [Ending a run](#ending-a-run). |
-| 5 | Safe auto-continue (real) | Pass, after a fix | Not run | a) `continue` became a user turn in the transcript. b) Failed with the planned rules; passes with the draft rule. c) No send during a permission dialog held 70 s. |
-| 6 | Host crash (fake) | Pass, after a fix | Not run | Host killed by PID. App started a new host. Run read `host crashed`; `claude` ended. A detached child survived until main swept it by marker (added after the first run). **Resume** started `claude --resume <uuid>`. |
-| 7 | App crash (fake) | Pass | Not run | Run read `app closed` with its last saved screen. A detached child survived the crash; the start sweep ended it. Nothing started by itself. |
-| 8 | Package and memory (fake) | Pass | Not run | Linux `dir` package. node-pty loaded with no build step. Checks 1 (fake start) and 4 passed on the packaged app. Sizes and memory below. |
-| 9 | Session ID drift (real) | Finding | Not run | See [Session IDs](#session-ids). |
-| 10 | Electron test | Pass | Not run | `spike/checks.mjs` runs every check with Playwright `_electron`. |
-| 11 | Session-only plugin (real) | Pass | Not run | `/openaflow-spike:hello` ran the skill in the app. Plain `claude` in the same repo: `No commands match "/openaflow-spike:hello"`. |
-| — | Real `claude` kills (real, no turn) | Finding | Not run | Real `claude` ended after a host crash (about 1 s, no sweep), a quit, and an app crash. See [Ending a run](#ending-a-run). |
+| 1 | Start and show (real) | Pass | Pass | `claude` answered `PONG`. The host buffer and the window's xterm both show it. |
+| 2 | Window life (fake) | Pass | Pass | 113 numbered lines, each once and in order, after hide 10 s and show, a reload, and a destroyed and new window. |
+| 3 | Server life (fake) | Pass | Pass | Server killed by PID. New server PID, `/api/health` 200. Terminal went 10 → 21 lines with no gap. |
+| 4 | Clean quit (fake) | Pass | Pass, with a Job Object | Dialog text and buttons correct; **Cancel** keeps app, run, and child. **Quit and end runs** leaves no process and no listening port. One gap, closed by a systemd scope; see [Ending a run](#ending-a-run). |
+| 5 | Safe auto-continue (real) | Pass, after a fix | Pass | a) `continue` became a user turn in the transcript. b) Failed with the planned rules; passes with the draft rule. c) No send during a permission dialog held 70 s. |
+| 6 | Host crash (fake) | Pass, after a fix | Pass, with a Job Object | Host killed by PID. App started a new host. Run read `host crashed`; `claude` ended. A detached child survived until main swept it by marker (added after the first run). **Resume** started `claude --resume <uuid>`. |
+| 7 | App crash (fake) | Pass | Pass, with a Job Object | Run read `app closed` with its last saved screen. A detached child survived the crash; the start sweep ended it. Nothing started by itself. |
+| 8 | Package and memory (fake) | Pass | Pass, on a machine with some build tools | Linux `dir` package. node-pty loaded with no build step. Checks 1 (fake start) and 4 passed on the packaged app. Sizes and memory below. |
+| 9 | Session ID drift (real) | Finding | Same finding | See [Session IDs](#session-ids). |
+| 10 | Electron test | Pass | Pass | `spike/checks.mjs` runs every check with Playwright `_electron`. |
+| 11 | Session-only plugin (real) | Pass | Pass | `/openaflow-spike:hello` ran the skill in the app. Plain `claude` in the same repo: `No commands match "/openaflow-spike:hello"`. |
+| — | Real `claude` kills (real, no turn) | Finding | Finding | Real `claude` ended after a host crash (about 1 s, no sweep), a quit, and an app crash. See [Ending a run](#ending-a-run). |
 
 Real `claude` use: 10 short Haiku turns (9 typed prompts and one skill run), counted from the transcripts. The human approved about 6-8. The extra turns came from check 5: one turn sent by the bug that the check found, and one rerun after the fix. The kill checks typed nothing and spent no turn.
 
@@ -192,7 +192,7 @@ These change [terminal-host.md](terminal-host.md). The same edits are in that fi
 
 ## Not tested
 
-- Windows: every check. ConPTY, Job Objects, and packaging there.
+- Windows: see [Windows: not tested](#windows-not-tested).
 - The gate during a question dialog (`AskUserQuestion`), a plan approval, and the trust prompt (default **No, exit**). Each may fire other hook events than a permission dialog.
 - The gate with subagents or background work still running after `Stop`. The 60 s transcript idle rule stays for that case.
 - macOS.
@@ -201,6 +201,175 @@ These change [terminal-host.md](terminal-host.md). The same edits are in that fi
 - A hosted session that loads the plugin twice (installed and `--plugin-dir`).
 - The quit dialog by mouse: the test stubbed `dialog.showMessageBox`, because Playwright can't click native dialogs.
 - Check 1 with real `claude` on the packaged app. The packaged run used the fake.
+
+## Windows
+
+_Run: 2026-11-13 · Windows 11 Home (build 26300), Electron 45.2.1, Node 26.13.0, Claude Code 2.1.323 (`claude.exe` from npm) · branch `spike/terminal-host-windows`_
+
+**Status:** done. Every check passes on Windows. The fix that makes it work is a Job Object per run, held by the pty host. Limits:
+
+- Check 8 ran on this machine, and this machine has build tools. See [Check 8 and build tools](#check-8-and-build-tools).
+- `session-end` was simulated: the test emitted the event. No real log off or shutdown was done.
+- A process that WMI starts escapes every way the spike tried. This is the Windows form of the `env -i` gap on Linux.
+- A child that `claude` starts in the first 45-60 ms of its life can escape the job. See [The assign gap](#the-assign-gap).
+
+Real `claude` use: 8 short Haiku turns (7 typed prompts and one skill run), on a private test repo, approved by the human. The kill checks typed nothing and spent no turn. The repo had no changes afterwards.
+
+### Windows results
+
+"Fake" means the fake `claude`; "real" means `claude.exe --model haiku`. The raw results are in `packages/desktop/spike/results/*-windows*.json`.
+
+| # | Check | Windows | Evidence |
+|---|---|---|---|
+| 1 | Start and show (real) | Pass | `claude` answered `PONG`. The host buffer and the window's xterm both show it. |
+| 2 | Window life (fake) | Pass | 110 numbered lines, each once and in order, after hide 10 s and show, a reload, and a destroyed and new window. |
+| 3 | Server life (fake) | Pass | Server killed by PID. New server PID, `/api/health` 200. Terminal went 9 → 20 lines with no gap. |
+| 4 | Clean quit (fake) | Pass, with a Job Object | Dialog text and buttons correct; **Cancel** keeps app, run, and child. With the job, **Quit and end runs** leaves no process and no listening port for a detached child, an orphan, and a child with its own console. A WMI-started child survives. See [Ending a run on Windows](#ending-a-run-on-windows). |
+| 4b | OS shutdown (fake, simulated) | Pass | After `session-end`, the store read `session end`, and the host, `claude`, and a detached child ended within 0.6-0.8 s. |
+| 5 | Safe auto-continue (real) | Pass | a) `continue` became a user turn. b) A draft blocked the send after the typing wait. c) No send during a permission dialog held 65 s; no file was made. The hook events are the same as on Linux. |
+| 6 | Host crash (fake) | Pass, with a Job Object | Host killed by PID. App started a new host. Run read `host crashed`. `claude` and its detached child ended with the host's job handle: no sweep ran. **Resume** started `claude --resume <uuid>`. With no job, the child survived. |
+| 7 | App crash (fake) | Pass, with a Job Object | Main killed by PID. Within 3 s, the host, the server, `claude`, and its detached child ended. Next start: run read `app closed` with its last saved screen; nothing started by itself. With no job, the child survived. |
+| 8 | Package and memory (fake) | Pass, on a machine with some build tools | Windows `dir` package. node-pty and koffi loaded from prebuilt binaries. Checks 1 (fake start), 4 (detached child), 7, and 10 passed on the packaged app. Sizes and memory below. |
+| 9 | Session ID drift (real) | Same finding as Linux | `/clear` wrote a new file with `SessionStart` `source: clear`. `/resume <id>` went back to the first file with `source: resume`. |
+| 10 | Electron test | Pass | `cmd.exe` in the ConPTY. The test wrote `echo ready` through the test hook and read `ready` in the host buffer and in the window's xterm. Unpackaged and packaged. |
+| 11 | Session-only plugin (real) | Pass | `/openaflow-spike:hello` ran the skill in the app. Plain `claude` in the same repo: `No commands match "/openaflow-spike:hello"`. |
+| — | Real `claude` kills (real, no turn) | Finding | See [Ending a run on Windows](#ending-a-run-on-windows). |
+
+### node-pty on Windows
+
+- Upstream `node-pty@1.2.0-beta.18` (decision 12) loaded in an Electron 45 `utilityProcess`, unpackaged and packaged. It ships `prebuilds/win32-x64` with `conpty.node`, `conpty_console_list.node`, `conpty.dll`, and `OpenConsole.exe`. Its loader tries `build/Release` first, then `prebuilds/`.
+- pnpm skipped node-pty's install script (`allowBuilds: node-pty: false`), and no `build/` folder exists. So the prebuilt binary is what loaded.
+- **The PID comes late.** node-pty on Windows starts the process only after its conout worker is ready. `pty.pid` is 0 right after `spawn()`. The host polls the agent's inner PID, which is set right after `CreateProcess`. That took 43-60 ms in every run.
+- The Electron binary was missing after `pnpm install` here too. `node node_modules/electron/install.js` fixed it, as on Linux.
+
+### Ending a run on Windows
+
+Windows has no SIGHUP or SIGTERM. Node's `process.kill(pid, sig)` calls `TerminateProcess` for any signal, and a negative PID (a process group) is not supported. node-pty's `kill()` closes the ConPTY and ends every process attached to its console.
+
+The spike gives each run a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and no breakaway flag. The pty host creates it through koffi (an FFI library with prebuilt binaries) and holds the only handle. The handle is not inheritable. The host puts the `claude` process in the job as soon as it has the PID. Each child that `claude` starts later joins the job too, even with `detached: true`.
+
+To end a run, the host:
+
+1. Takes the job's PID list and, as an option, the tree by parent PID.
+2. Closes the ConPTY (`pty.kill()`).
+3. Waits up to 3 s for those processes to end.
+4. Calls `TerminateJobObject`, then ends tree survivors by PID.
+5. Closes the job handle.
+
+What each way found, for a child HTTP server that tries to outlive `claude` (check 4, fake `claude`):
+
+| Child started as | ConPTY close only | Tree by PID | Job only | Job and tree |
+|---|---|---|---|---|
+| `spawn(..., { detached: true })` (still a child) | **Survived** | Ended | Ended | Ended |
+| Orphan: a detached go-between starts it, then exits | **Survived** | **Survived** | Ended | Ended |
+| Own console: `cmd /c start /min node server` | — | **Survived** | Ended | Ended |
+| Started by WMI (`Win32_Process.Create`) | — | — | — | **Survived** |
+
+- ConPTY close ends only processes attached to the console. A detached child is not attached.
+- The tree by PID misses orphans. Windows does not reparent a process when its parent exits, so the chain from `claude` breaks. A stale parent PID can also match a new, unrelated process, because Windows reuses PIDs.
+- The job caught every child that `claude` or its children started. Only a process that another service starts (WMI here; also the Task Scheduler and COM servers) is outside it.
+- The tree added nothing that the job missed.
+- The env marker can't replace either one on Windows. Reading another process's env needs its memory (`ReadProcessMemory` on its PEB), so the spike did not read it.
+
+Real `claude`, at its prompt with no turn (check 12w):
+
+| Event | Real `claude` |
+|---|---|
+| Quit, ConPTY close only (no job) | Ended in 0.6 s |
+| Quit, job | Ended in 0.6 s. The ConPTY close ended it before the job did. |
+| Host crash, no job | Ended after 5.0 s |
+| App crash, job | Ended in 0.8 s |
+
+- `claude` ends on ConPTY close, as it ends on SIGHUP on Linux.
+- With no job, a host crash left `claude` running for 5 s. This matches the time Windows gives a console process to handle a close event. With the job, it ends when the host's handle closes.
+- `claude` at its prompt had no child processes. _Not tested:_ real `claude` with a turn, a tool, an MCP server, or a dev server in flight.
+
+### Host crash and app crash on Windows
+
+- When the host ends for any reason, Windows closes its handles. Each job then ends every process in it. So a host crash, an app crash, and an OS end of the app need no sweep. Check 6 and 7 passed this way; with the job off, the detached child survived both.
+- When main was killed, Electron's other processes (host, server, renderer, GPU, network) ended within 3 s, as on Linux.
+- **Test finding:** Playwright's launched process is not Electron main on Windows. The first check 7 killed that PID, and main kept running. The next start then exited at once, because main still held the single-instance lock. The checks now kill the PID that main reports (`process.pid`).
+
+### OS shutdown
+
+- Electron sends `session-end` on Windows. The spike's handler does no waits: it writes the run store with `session end`, tells the host to call `TerminateJobObject` for each run, and ends the host. Ending the host alone would close every job.
+- Simulated by `app.emit('session-end')`: all ended within 0.6-0.8 s. _Not tested:_ a real log off or shutdown, and whether Windows gives the app time for the store write.
+- The screen is not saved at `session-end`. The 10 s timer save is the last one.
+
+### The assign gap
+
+- The job gets `claude` 43-60 ms after `spawn()`. A child that `claude` starts in that time is not in the job. Real `claude` started no child in that time in these runs, and the fake starts its child later than that. This gap was not hit, but it is real.
+- Ways to close it, not tested:
+  - A small launcher that joins a named job, then starts `claude`. Children then always start inside the job.
+  - Start the process in the job (`PROC_THREAD_ATTRIBUTE_JOB_LIST`). node-pty does not offer this today.
+
+### Check 8 and build tools
+
+- **This machine has build tools.** Visual Studio 18 Community is installed, but no `cl.exe` was found in it. MSYS2 with `gcc` and Python are installed too. So this is not the clean machine that check 8 asks for.
+- What the spike shows instead: pnpm skipped the install scripts of node-pty and koffi, no `build/` folder exists for node-pty, and the packaged app loaded both from the prebuilt files in `resources/native`. node-gyp did not run. A clean Windows machine (or a fresh VM) must still run the packaged app.
+
+### Package and memory on Windows
+
+- Windows `dir` package: 361 MB unpacked, 156 MB as a zip. Electron is nearly all of it. The app's asar: 792 KB. The server: 819 KB.
+- node-pty, `win32-x64` only and with no `.pdb` files: 1.7 MB. `OpenConsole.exe` is 1.0 MB of it.
+- koffi, `win32_x64` only: 1.6 MB.
+- The pty host's memory is the working set (`process.memoryUsage().rss`), not `VmRSS`, so it is not the same measure as on Linux:
+
+| | Unpackaged | Packaged |
+|---|---|---|
+| Host idle, no terminal | 60-101 MB | 60 MB |
+| One terminal holding 5,031 rows of 70 characters | 114-146 MB | 109 MB |
+
+- One full terminal costs about 45-55 MB here. Windows trims working sets, so the idle number moved between runs.
+
+### Windows: other findings
+
+- The plugin's hooks run on Windows with `node "${CLAUDE_PLUGIN_ROOT}/hooks/log.mjs"`. They gave the same events, in the same order, as on Linux.
+- The folder-trust prompt did not show: `claude` already trusted the test repo.
+- The checks opened no console window that stayed. The count of console hosts (`conhost.exe`, `OpenConsole.exe`) was the same before and after check 4. The own-console child opened one minimized window, and the job closed it.
+
+### Design changes for Windows
+
+These change [terminal-host.md](terminal-host.md). They are not yet in that file.
+
+1. **A Job Object per run is required on Windows.** Use `KILL_ON_JOB_CLOSE`, no breakaway, a handle that is not inheritable, and the pty host as the only holder. This replaces the env marker sweeps and the systemd scope on Windows. It also covers a host crash, an app crash, and an OS shutdown with no sweep at the next start.
+2. **Ending a run on Windows** (decision 23): close the ConPTY, wait up to 3 s for the `claude` process only, call `TerminateJobObject`, check that the job is empty, then close the handle. Do not wait for the whole job: a detached child never ends on ConPTY close, so that wait always runs the full 3 s.
+3. **Drop the tree by PID on Windows,** or keep it only as a fallback when the job can't be made. It found nothing that the job missed, it misses orphans, and PID reuse makes it unsafe.
+4. **A native helper for Job Objects.** The plan chooses one: koffi (1.6 MB, prebuilt, FFI), or a small N-API addon of our own built in CI. node-pty has no Job Object support.
+5. **Close the assign gap** with a launcher that joins the job first, or record it as a known limit.
+6. **OS shutdown:** handle `session-end` with no waits: write the store, end every job, end the host.
+7. **Known gap:** a process started by WMI, the Task Scheduler, or a COM server is outside the job. No way found to end it. State it, as for `env -i` on Linux.
+8. **Electron tests on Windows** must kill main by the PID it reports, not by Playwright's process PID.
+
+### Windows: not tested
+
+- A clean Windows machine with no build tools (check 8). This machine has them.
+- A real log off or shutdown. `session-end` was emitted by the test.
+- Real `claude` with a turn, a tool, or its own children in flight at quit or crash.
+- The assign gap with a child started in the first 60 ms.
+- An installer (NSIS) build of the spike, and Windows arm64.
+- The trust prompt on Windows.
+
+### How to run it on Windows
+
+On the branch `spike/terminal-host-windows`, in `packages/desktop` (PowerShell):
+
+```powershell
+pnpm install
+node node_modules/electron/install.js   # the Electron binary, if pnpm skipped it
+pnpm -w build                           # the server bundle
+npx tsx spike/bundle.ts                 # dist-spike/
+$env:SPIKE_TMP = '<scratch folder>'
+node spike/checks.mjs                   # fake only: 2 3 4 4b 6 7 8-memory 10-echo
+$env:SPIKE_APP_ENV = '{"OPENAFLOW_SPIKE_JOB":"0"}'; node spike/checks.mjs 6-host-crash 7-app-crash; Remove-Item Env:SPIKE_APP_ENV  # the same with no job
+$env:SPIKE_REAL_REPO = '<test repo>'; $env:SPIKE_REAL_CLAUDE = '<path to claude.exe>'
+node spike/checks.mjs 1-real-start 5-auto-continue 9-session-drift 11-plugin  # real claude, uses turns
+node spike/checks.mjs 12w-real-kill                                          # real claude, no turns
+npx tsx spike/package.ts; $env:SPIKE_PACKAGED = '1'; $env:SPIKE_ELECTRON = "$PWD\release-spike\win-unpacked\openaflow-spike.exe"
+node spike/checks.mjs 8-package 8-memory 10-echo 7-app-crash
+```
+
+The app's server uses port 3300 (`SPIKE_API_PORT`). Each check gets its own config, ports, and data folders under `SPIKE_TMP`. `SPIKE_CASES` picks rows of the check 4 matrix by name.
 
 ## How to run it again
 

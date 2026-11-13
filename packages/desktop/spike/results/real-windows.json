@@ -1,0 +1,364 @@
+{
+  "launch": {
+    "pass": null,
+    "notes": {
+      "main pid differs from the launched pid": {
+        "main": 31756,
+        "launched": 33164
+      }
+    }
+  },
+  "1-real-start": {
+    "pass": true,
+    "notes": {
+      "run": {
+        "runId": "79f634ef",
+        "termId": "79f634ef-1",
+        "sessionId": "66fc8d83-63de-4fde-9eae-fc821a18174d"
+      },
+      "ready": true,
+      "transcript": {
+        "file": "~\\.claude\\projects\\<run-test-repo-project>\\66fc8d83-63de-4fde-9eae-fc821a18174d.jsonl",
+        "exists": true
+      },
+      "seconds": 10
+    },
+    "why": "claude answered PONG in the hosted terminal (host buffer and window)"
+  },
+  "5-auto-continue": {
+    "pass": true,
+    "notes": {
+      "gate before any turn": {
+        "ok": true,
+        "reasons": [],
+        "lastEvent": {
+          "event": "SessionStart",
+          "session_id": "3e2376ed-bb80-4a52-8567-d38dc9744564",
+          "transcript_path": "~\\.claude\\projects\\<run-test-repo-project>\\3e2376ed-bb80-4a52-8567-d38dc9744564.jsonl",
+          "source": "startup",
+          "at": 1794546226388
+        }
+      },
+      "gate after the turn (typing wait running)": {
+        "ok": false,
+        "reasons": [
+          "typed 1546 ms ago"
+        ],
+        "lastEvent": {
+          "event": "Stop",
+          "session_id": "3e2376ed-bb80-4a52-8567-d38dc9744564",
+          "transcript_path": "~\\.claude\\projects\\<run-test-repo-project>\\3e2376ed-bb80-4a52-8567-d38dc9744564.jsonl",
+          "at": 1794546286046
+        }
+      },
+      "a) request right after typing": {
+        "sent": false,
+        "waiting": [
+          "typed 1549 ms ago"
+        ]
+      },
+      "a) transcript user turns": [
+        "Reply with the word READY and nothing else.",
+        "continue"
+      ],
+      "b) request with text in the box": {
+        "request": {
+          "sent": false,
+          "waiting": [
+            "typed 3 ms ago",
+            "draft in the input box (typed with no submit since)"
+          ]
+        },
+        "sentWhileTyping": false
+      },
+      "b) gate after the typing wait, text still in the box": {
+        "ok": false,
+        "reasons": [
+          "draft in the input box (typed with no submit since)"
+        ],
+        "lastEvent": {
+          "event": "Stop",
+          "session_id": "3e2376ed-bb80-4a52-8567-d38dc9744564",
+          "transcript_path": "~\\.claude\\projects\\<run-test-repo-project>\\3e2376ed-bb80-4a52-8567-d38dc9744564.jsonl",
+          "at": 1794546295584
+        }
+      },
+      "b) screen line holding the text": [
+        "❯ half typed"
+      ],
+      "c) permission dialog on screen": true,
+      "c) hook events since the request": [
+        {
+          "event": "UserPromptSubmit"
+        },
+        {
+          "event": "PreToolUse",
+          "tool": "Bash"
+        },
+        {
+          "event": "PermissionRequest",
+          "tool": "Bash"
+        },
+        {
+          "event": "Notification",
+          "type": "permission_prompt",
+          "message": "Claude needs your permission"
+        }
+      ],
+      "c) after 65 s": {
+        "gate": {
+          "ok": false,
+          "reasons": [
+            "busy or dialog: UserPromptSubmit, PreToolUse, PermissionRequest, Notification(permission_prompt)"
+          ],
+          "lastEvent": {
+            "event": "Notification",
+            "session_id": "3e2376ed-bb80-4a52-8567-d38dc9744564",
+            "transcript_path": "~\\.claude\\projects\\<run-test-repo-project>\\3e2376ed-bb80-4a52-8567-d38dc9744564.jsonl",
+            "notification_type": "permission_prompt",
+            "message": "Claude needs your permission",
+            "at": 1794546315986
+          }
+        },
+        "sentDuringDialog": false,
+        "fileMade": false
+      },
+      "parts": {
+        "a": true,
+        "b": true,
+        "c": true
+      },
+      "seconds": 156
+    },
+    "why": "a) send became a user turn: true; b) send waited while typing: true; c) no send during the permission dialog: true"
+  },
+  "9-session-drift": {
+    "pass": true,
+    "notes": {
+      "steps": {
+        "step1": {
+          "started": "2b7087c5-8e49-4f0e-a701-2eb4481f1cdb",
+          "alphaIn": true
+        },
+        "step2": {
+          "bravoFile": "5fd860fb-f992-47bb-8cee-b46f1ff86117.jsonl",
+          "sameAsStart": false,
+          "sessionStarts": [
+            {
+              "id": "2b7087c5-8e49-4f0e-a701-2eb4481f1cdb",
+              "source": "startup"
+            },
+            {
+              "id": "5fd860fb-f992-47bb-8cee-b46f1ff86117",
+              "source": "clear"
+            }
+          ]
+        },
+        "step3": {
+          "charlieFile": "2b7087c5-8e49-4f0e-a701-2eb4481f1cdb.jsonl",
+          "backToStart": true,
+          "sessionStarts": [
+            {
+              "id": "2b7087c5-8e49-4f0e-a701-2eb4481f1cdb",
+              "source": "startup"
+            },
+            {
+              "id": "5fd860fb-f992-47bb-8cee-b46f1ff86117",
+              "source": "clear"
+            },
+            {
+              "id": "2b7087c5-8e49-4f0e-a701-2eb4481f1cdb",
+              "source": "resume"
+            }
+          ],
+          "afterResumeScreen": [
+            "    █ █    █ █",
+            "              ",
+            "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+            "❯                                                                                                                       ",
+            "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+            "  Haiku 5.5 (1M) medium  |  <run-test-repo> (main)                                                                   ",
+            "  [----------] 5% 50K    |  5h: 2% (-10%) 4h23m | 7d: 51% (+4%) 3d16h",
+            "  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent"
+          ]
+        },
+        "newFiles": [
+          "2b7087c5-8e49-4f0e-a701-2eb4481f1cdb.jsonl",
+          "5fd860fb-f992-47bb-8cee-b46f1ff86117.jsonl"
+        ]
+      },
+      "hook events": [
+        {
+          "event": "SessionStart",
+          "id": "2b7087c5",
+          "source": "startup"
+        },
+        {
+          "event": "UserPromptSubmit",
+          "id": "2b7087c5"
+        },
+        {
+          "event": "Stop",
+          "id": "2b7087c5"
+        },
+        {
+          "event": "SessionEnd",
+          "id": "2b7087c5"
+        },
+        {
+          "event": "SessionStart",
+          "id": "5fd860fb",
+          "source": "clear"
+        },
+        {
+          "event": "UserPromptSubmit",
+          "id": "5fd860fb"
+        },
+        {
+          "event": "Stop",
+          "id": "5fd860fb"
+        },
+        {
+          "event": "SessionEnd",
+          "id": "5fd860fb"
+        },
+        {
+          "event": "SessionStart",
+          "id": "2b7087c5",
+          "source": "resume"
+        },
+        {
+          "event": "UserPromptSubmit",
+          "id": "2b7087c5"
+        },
+        {
+          "event": "Stop",
+          "id": "2b7087c5"
+        }
+      ],
+      "seconds": 29
+    },
+    "why": "finding: /clear -> new session file; /resume <id> -> back to the first file; SessionStart hook carries the new id: true"
+  },
+  "11-plugin": {
+    "pass": true,
+    "notes": {
+      "in app": true,
+      "outside": {
+        "unknown": false,
+        "ranSkill": false,
+        "tail": [
+          "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────Nocommandsmatch\"/openaflow-spike:hello\"",
+          "●Unknowncommand:/openaflow-spike:hello[-]    ████████████chilling████████████",
+          "█ █    █ █",
+          "❯",
+          "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────⏵⏵automodeon(shift+tabtocycle)·←1agent◐medium·/effort",
+          "▄▄▄▄▄▄▄▄▄▄▄▄▀▀▄▄▄▄▄▄▀▀▀▀Haik 5.5 (1M) medium  |  <run-test-repo> (main)[----------]0%0|5h:2%(-10%)4h22m|7d:51%(+4%)3d16h⏵⏵automodeon(shift+tabtocycle)·←1agent████████████  ██████  ▄▄▄▄▄▄▄▄▄▄▄▄▀▀▄▄▄▄▄▄▀▀▀▀██████████████████"
+        ]
+      },
+      "seconds": 17
+    },
+    "why": "skill ran in the app: true; outside: absent"
+  },
+  "12w-real-kill": {
+    "pass": true,
+    "notes": {
+      "a) quit, ConPTY close only (no job, no tree)": {
+        "before": [
+          {
+            "pid": 7384,
+            "name": "claude.exe"
+          }
+        ],
+        "jobPids": [],
+        "assign": null,
+        "allGoneWithinMs": 563,
+        "left": [],
+        "killAll": [
+          {
+            "pid": 7384,
+            "useJob": false,
+            "useTree": false,
+            "byJob": [],
+            "byTree": [],
+            "closeMs": 68,
+            "afterClose": [],
+            "jobLeftAfterClose": [],
+            "terminatedJob": false,
+            "forced": [],
+            "survivors": []
+          }
+        ]
+      },
+      "b) host crash, no job": {
+        "before": [
+          {
+            "pid": 29488,
+            "name": "claude.exe"
+          }
+        ],
+        "jobPids": [],
+        "assign": null,
+        "allGoneWithinMs": 5033,
+        "left": []
+      },
+      "c) quit, job + tree": {
+        "before": [
+          {
+            "pid": 7716,
+            "name": "claude.exe"
+          }
+        ],
+        "jobPids": [
+          7716
+        ],
+        "assign": {
+          "ok": true,
+          "inJob": true,
+          "ms": 48,
+          "polls": 922
+        },
+        "allGoneWithinMs": 596,
+        "left": [],
+        "killAll": [
+          {
+            "pid": 7716,
+            "useJob": true,
+            "useTree": true,
+            "byJob": [
+              7716
+            ],
+            "byTree": [],
+            "closeMs": 90,
+            "afterClose": [],
+            "jobLeftAfterClose": [],
+            "terminatedJob": true,
+            "forced": [],
+            "survivors": []
+          }
+        ]
+      },
+      "d) app crash, job + tree": {
+        "before": [
+          {
+            "pid": 19788,
+            "name": "claude.exe"
+          }
+        ],
+        "jobPids": [
+          19788
+        ],
+        "assign": {
+          "ok": true,
+          "inJob": true,
+          "ms": 46,
+          "polls": 915
+        },
+        "allGoneWithinMs": 775,
+        "left": []
+      },
+      "seconds": 29
+    },
+    "why": "a) quit, ConPTY close only (no job, no tree): gone in 563 ms; b) host crash, no job: gone in 5033 ms; c) quit, job + tree: gone in 596 ms; d) app crash, job + tree: gone in 775 ms"
+  }
+}
