@@ -12,10 +12,10 @@ _From plan: pod-docs/plans/ui-rework.md · Slug: ui-rework · Status: active · 
 | 1 | R1 | PR open time, review-skip marker, Merge for no-review PRs | ui-rework-R1 | merged | done | medium | — |
 | 1 | F1 | Forget run: model check, route, and log line | ui-rework-F1 | merged | done | medium | — |
 | 1 | D1 | Desktop folder bridge (preload + IPC) | ui-rework-D1 | merged | done | medium | — |
-| 2 | N1 | Next step card: list, merge panel closes, Sending… | ui-rework-N1 | — | pushed | medium | L1 |
-| 2 | M1 | Runs list: last activity, newest first | ui-rework-M1 | — | pushed | medium | R1 |
-| 2 | K1 | Remove repo and Forget in the modal; `auto` tag | ui-rework-K1 | — | pushed | medium | L1, F1 |
-| 2 | A1 | Add repo: Windows dialog or path field; picker and folder route gone | ui-rework-A1 | — | pushed | medium | L1, D1 |
+| 2 | N1 | Next step card: list, merge panel closes, Sending… | ui-rework-N1 | https://github.com/alvionlabs/openaflow/pull/107 | pushed | medium | L1 |
+| 2 | M1 | Runs list: last activity, newest first | ui-rework-M1 | https://github.com/alvionlabs/openaflow/pull/107 | pushed | medium | R1 |
+| 2 | K1 | Remove repo and Forget in the modal; `auto` tag | ui-rework-K1 | https://github.com/alvionlabs/openaflow/pull/107 | pushed | medium | L1, F1 |
+| 2 | A1 | Add repo: Windows dialog or path field; picker and folder route gone | ui-rework-A1 | https://github.com/alvionlabs/openaflow/pull/107 | pushed | medium | L1, D1 |
 
 ## Shared contract
 
