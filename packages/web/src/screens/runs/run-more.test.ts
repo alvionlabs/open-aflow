@@ -2,10 +2,11 @@ import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { BoardRepo, RunSummary } from '@openaflow/model'
+import type { Board, BoardRepo, RunSummary } from '@openaflow/model'
 import { RunMoreMenuView } from './RunMoreMenu.tsx'
 import { RunsList } from './RunsList.tsx'
 import { moreButtonId } from './remove-flow.ts'
+import { switchView } from './resume-flow.ts'
 
 const noop = () => {}
 const text = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -148,5 +149,41 @@ describe("the card link's accessible name", () => {
   it('ends with the fix tag on a fix run, where the card shows it', () => {
     // With no PR on the Board, a fix run is named from its slug, as on the card.
     expect(link({ repo: 'chess-web', state: 'running', fix: 'list-timeouts' })).toContain('aria-label="List timeouts running chess-web fix"')
+  })
+})
+
+describe('auto tag', () => {
+  const runs = [run('ra', 'alpha-repo', 'x'), run('ra', 'alpha-repo', 'y'), { repoId: 'ra', repo: 'alpha-repo', where: '', state: 'idle' } as RunSummary]
+  const fix = { ...run('ra', 'alpha-repo', 'task-scroll'), fix: 'scroll', state: 'needs-you' } as RunSummary
+  const board = { generatedAt: 0, gh: 'ok', repos: [repo({})], autoContinue: [{ repoId: 'ra', run: 'x' }, { repoId: 'ra', run: 'task-scroll' }] } as Board
+  const items = (list: RunSummary[]) =>
+    renderToStaticMarkup(createElement(RunsList, { runs: list, selected: list[0], repos: [repo({})], auto: (r: RunSummary) => switchView(r, board)?.on === true })).match(
+      /<li class="run-item">[\s\S]*?<\/li>/g,
+    )!
+
+  it('an auto-continue run shows the tag right after its status, and its link name says auto after the state', () => {
+    const [on] = items(runs)
+    expect(on).toMatch(/<span class="status [^"]*">idle<\/span><span class="chip tag">auto<\/span><span class="run-line">/)
+    expect(on).toContain('aria-label="x idle auto alpha-repo"')
+  })
+
+  it('an off run and a repo row show no tag, and their names have no auto', () => {
+    const [, off, row] = items(runs)
+    for (const item of [off!, row!]) {
+      expect(item).not.toContain('>auto<')
+      expect(/aria-label="([^"]*)"/.exec(item)![1]).not.toMatch(/\bauto\b/)
+    }
+  })
+
+  it('a one-off run keeps its kind tag on the repo line, and auto after the status', () => {
+    const [card] = items([fix])
+    expect(card).toMatch(/<span class="status [^"]*">needs you<\/span><span class="chip tag">auto<\/span>/)
+    expect(card).toMatch(/<span class="run-repo muted">alpha-repo<\/span><span class="chip tag">task<\/span>/)
+    expect(card).toMatch(/aria-label="Scroll needs you auto alpha-repo task"/)
+  })
+
+  it('with no auto rule, no card has the tag', () => {
+    const html = renderToStaticMarkup(createElement(RunsList, { runs, selected: runs[0], repos: [repo({})] }))
+    expect(html).not.toContain('>auto<')
   })
 })

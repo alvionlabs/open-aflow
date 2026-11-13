@@ -232,6 +232,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
               const t = sideTarget(r)
               if (t) removeFlow.open(t)
             }}
+            auto={(r) => switchView(r, board)?.on === true}
           />
           <div className="side-foot">
             <button ref={repoButton} className="btn lead add-repo" type="button" aria-haspopup="dialog" onClick={() => setPicking(true)}>
