@@ -2,7 +2,7 @@
 
 ## What it is
 
-Board actions change something outside the board: merge a PR that waits on you (a handed-back wave PR, a reviewed fix PR, or the final plan PR), append your answer to a queue entry that waits on you, and resume a run with `continue` or `go` (see [resume.md](resume.md)). Every merge, answer, and resume request that passes its checks goes in the action log, and so does each repo removed from the board (Remove repo, [server.md](server.md)). Server side: `packages/server/src` (the action, answer, and queue-writer modules); the routes sit behind the action guard ([server.md](server.md)). The screens are in [runs-and-pipeline.md](runs-and-pipeline.md).
+Board actions change something outside the board: merge a PR that waits on you (a handed-back wave PR, a reviewed fix PR, or the final plan PR), append your answer to a queue entry that waits on you, and resume a run with `continue` or `go` (see [resume.md](resume.md)). Every merge, answer, and resume request that passes its checks goes in the action log, and so does each repo removed from the board (Remove repo, [server.md](server.md)) and each run's port claim forgotten (Forget run, [server.md](server.md)). Server side: `packages/server/src` (the action, answer, and queue-writer modules); the routes sit behind the action guard ([server.md](server.md)). The screens are in [runs-and-pipeline.md](runs-and-pipeline.md).
 
 ## How it works
 
@@ -50,3 +50,4 @@ Board actions change something outside the board: merge a PR that waits on you (
 - 2026-10-31 · fix-queue-triage · added: the resolve route (Close and Keep) and `resolve` entries in the action log; the queue writer can rewrite an entry's pending Resolution as well as append an answer. The PRs the server asks gh about now include the staging PR a pending gate 7 entry names.
 - 2026-10-31 · fix-queue-triage review round 1 · fixed: a staging PR asked by number (a pending gate 7 names it) no longer hides the same PR found by the staging branch.
 - 2026-11-01 · fix-remove-repo · added: `remove-repo` entries (`removed`, `failed`) in the action log.
+- 2026-11-12 · ui-rework F1 · added: `forgetCheck` in the model, and `forget-run` entries (`removed`, `failed`) in the action log.
