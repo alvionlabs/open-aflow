@@ -1,0 +1,53 @@
+/*
+ * The "what happened" list (draft pick 3 c): a thin left rule, one dot per item on it. A done item has a --ready
+ * ring on the page colour; the current item a filled --needs-you dot. The dots are status colours, never text:
+ * the words (" · 12:03", " — now") carry the state.
+ */
+.stop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 4px;
+  border-left: 1px solid var(--border-strong);
+}
+
+.stop-item {
+  position: relative;
+  padding: 0 0 8px 16px;
+  font-size: var(--size-dense);
+  line-height: 1.55;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.stop-item:last-child {
+  padding-bottom: 0;
+}
+
+/* Centred on the 1 px rule (4 px in from the list's edge) and on the first line of text. */
+.stop-item::before {
+  content: "";
+  position: absolute;
+  left: -9px;
+  top: 6px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--ready);
+  border-radius: 50%;
+  background: var(--bg);
+}
+
+.stop-item.current::before {
+  border-color: var(--needs-you);
+  background: var(--needs-you);
+}
+
+.stop-when {
+  font-size: var(--size-micro);
+  color: var(--muted);
+}
+
+.stop-note {
+  font-size: var(--size-micro);
+  color: var(--muted);
+  max-width: 72ch;
+}
