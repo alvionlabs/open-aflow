@@ -3,7 +3,18 @@ import { COPIED, COPIED_MS, COPY_FAILED, copyText, type CopyResult } from '../..
 import { Icon } from '../../theme/icons.tsx'
 import { Chip } from './Chip.tsx'
 import type { ReplyPanelView } from './reply-view.ts'
-import { RESUME_INITIAL, createResumeFlow, resumeView, type ResumeFlow, type ResumeState, type ResumeView, type RunTarget } from './resume-flow.ts'
+import type { ResumeResult } from '@openaflow/model'
+import {
+  RESUME_INITIAL,
+  createResumeFlow,
+  resumeView,
+  sendLabel,
+  type ResumeFlow,
+  type ResumeState,
+  type ResumeView,
+  type ResumeWord,
+  type RunTarget,
+} from './resume-flow.ts'
 
 /** A quiet Copy button. `Copied` for COPIED_MS; on a failed copy, the text shown selected to copy by hand. */
 function CopyButton({ text, what }: { text: string; what: string }) {
@@ -38,8 +49,6 @@ function CopyButton({ text, what }: { text: string; what: string }) {
     </span>
   )
 }
-
-const SEND_LABEL = { continue: 'Continue', go: 'Go' } as const
 
 /** The result of the last Continue or Go, in place: its status, chip and words, or the error, with Close. */
 function ResumeOutcome({ view, flow }: { view: ResumeView; flow: ResumeFlow }) {
@@ -130,10 +139,30 @@ function RunItYourself({ view }: { view: ReplyPanelView }) {
  * only on a press. Every row keeps Copy. The last send's result stays
  * after the Board drops the reply, until you close it. The chat to paste it in sits behind
  * `Run it yourself`. `framed={false}` drops the frame and the heading, for use inside a card.
+ * `onSent` takes each result instead (the Next step card's list): a started send then shows no result here.
  */
-export function ReplyPanel({ view, target, framed = true }: { view: ReplyPanelView | undefined; target: RunTarget; framed?: boolean }) {
+export function ReplyPanel({
+  view,
+  target,
+  framed = true,
+  onSent,
+}: {
+  view: ReplyPanelView | undefined
+  target: RunTarget
+  framed?: boolean
+  onSent?: (word: ResumeWord, at: number, result: ResumeResult) => void
+}) {
   const [state, setState] = useState<ResumeState>(RESUME_INITIAL)
-  const flow = useMemo(() => createResumeFlow(target, setState), [target.repoId, target.run])
+  // Read at the reply, so the flow made once per run calls the latest one.
+  const sent = useRef(onSent)
+  useEffect(() => {
+    sent.current = onSent
+  })
+  const hooked = onSent !== undefined
+  const flow = useMemo(
+    () => createResumeFlow(target, setState, undefined, hooked ? { onSent: (w, at, r) => sent.current?.(w, at, r) } : {}),
+    [target.repoId, target.run, hooked],
+  )
   const resume = resumeView(state, view?.session?.resume)
   const outcome = <ResumeOutcome view={resume} flow={flow} />
   const cls = framed ? 'inplace reply-panel' : 'reply-panel bare'
@@ -152,7 +181,7 @@ export function ReplyPanel({ view, target, framed = true }: { view: ReplyPanelVi
                 <CopyButton text={r.word} what={r.word} />
                 {r.send && (
                   <button className="btn primary" type="button" disabled={resume.busy} onClick={() => flow.press(r.send!)}>
-                    {SEND_LABEL[r.send]}
+                    {sendLabel(resume, r.send)}
                   </button>
                 )}
               </span>

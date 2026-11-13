@@ -364,3 +364,13 @@ Consequences: the tray dot and the run cards still show a new repo's items. A re
 Context: pod 0.10 renamed `/pod:fix` to `/pod:task`. Its claim and branch are `task-<slug>`, and its reviewer gets `kind: task`. OpenAFlow knew only `fix-<slug>` and `kind: fix`, so a `/pod:task` run showed nothing. This extends the 2026-10-20 "fix runs on the board" decision.
 Decision: a claim `task-<slug>` that names no plan is a one-off run, with the same rules as a `fix-<slug>` run, and a `task` tag. A reviewer of `kind: task` or `kind: fix` joins either kind of run, and is never a plan's agent. An engineer's `branch name` field comes before a `branch` field.
 Consequences: old `fix-<slug>` runs work as before. Reply keys stay `fix-merged:<pr>`, so saved auto-continue keys don't send again. A `Branch:` sentence in a reviewer's task text can still set its branch; the reviewer still joins its run by its PR number.
+
+## 2026-11-13 — The auto tag in two-column sidebar cards (agent default — override anytime)
+Context: in a two-column sidebar card (sidebar 324 px or wider, or stacked at 375 px), `DESIGN.md` keeps the 88 px status column for the status only, so the `auto` tag can't sit after the status as the ui-rework pick drew. As built: `pod-docs/design-drafts/ui-rework-auto-tag-two-column.png`.
+Decision: keep it under the status, inside the status column. In the default 260 px sidebar it sits right after the status.
+Options not chosen: widen the status column (every card's rail moves); put the tag after the title (it leaves the status it describes).
+
+## 2026-11-13 — Forget on a run whose PR waits on your merge (agent default — override anytime)
+Context: review round 1 of PR #108 found that Forget this run shows on any claim-only run that isn't running, including a `/pod:task` run whose PR waits on your merge. Forget then takes the run and its waiting PR off the board, and frees a port base a live session may still hold.
+Decision: keep Forget there. The modal names the run and asks first.
+Options not chosen: hide Forget while a run has a waiting PR (safer, but a stuck run with a stale PR could then never be forgotten from the app).

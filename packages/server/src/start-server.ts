@@ -15,7 +15,6 @@ import { createApp } from './app.ts'
 import { createAutoContinue } from './auto-continue.ts'
 import { createAutoContinueStore } from './auto-continue-store.ts'
 import { createBoardService } from './board-service.ts'
-import { listFolders, nodeFolderFs } from './folder-list.ts'
 import { portsDir } from './claims.ts'
 import { claudeBin, createClaudeRunner } from './claude-runner.ts'
 import { configPath, listenConfig, liveConfigDir, oldConfigDir, portFromEnv, type Env } from './config.ts'
@@ -23,6 +22,7 @@ import { moveOldConfig } from './config-move.ts'
 import { createFoundGhExec, createGhReader, defaultGhExec } from './gh.ts'
 import { openWithFallback, wantedPort } from './listen.ts'
 import { createRemoveRepoRoutes } from './remove-repo-routes.ts'
+import { createForgetRunRoutes } from './forget-run-routes.ts'
 import { addRepo, removeRepo } from './repos-config.ts'
 import { createResumeRoutes } from './resume-routes.ts'
 import { createIdleCheck } from './session-activity.ts'
@@ -129,7 +129,6 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
       web,
       tools,
       addRepo: (p) => addRepo(configFile, p, platform),
-      folders: (dir) => listFolders(dir, { fs: nodeFolderFs, platform, home: homedir() }),
       timeline: createTimelineSource({ board: () => watcher.board(), ...settings, now: Date.now }).timeline,
       actions: new Hono()
         .use('*', work.track)
@@ -153,6 +152,17 @@ export async function startServer(env: Env, o: { production?: Production; exit?:
             removeRepo: (p) => removeRepo(configFile, p, platform),
             rebuild: () => watcher.rebuild(),
             forgetToggles: store.forgetPath,
+            log,
+          }),
+        )
+        .route(
+          '/',
+          createForgetRunRoutes({
+            board: () => watcher.board(),
+            portsDir: settings.portsDir,
+            platform,
+            now: Date.now,
+            rebuild: () => watcher.rebuild(),
             log,
           }),
         ),

@@ -12,7 +12,8 @@ const BACKGROUND = '#000000'
 
 export type WindowBounds = { x?: number; y?: number; width: number; height: number }
 
-export function windowOptions(bounds: WindowBounds) {
+/** `preload` is the bundled preload-main.ts, `dist/preload.cjs`. It is the page's one bridge: `window.openaflow.pickFolder()`. */
+export function windowOptions(bounds: WindowBounds, preload: string) {
   return {
     ...bounds,
     minWidth: MIN_WIDTH,
@@ -20,7 +21,7 @@ export function windowOptions(bounds: WindowBounds) {
     title: APP_NAME,
     show: false,
     backgroundColor: BACKGROUND,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, preload },
   }
 }
 

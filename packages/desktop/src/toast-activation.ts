@@ -40,3 +40,13 @@ export function activatorClsid(shortcut: ShortcutRead | undefined, execPath: str
   if (!shortcut || shortcut.target.toLowerCase() !== execPath.toLowerCase()) return undefined
   return shortcut.toastActivatorClsid || undefined
 }
+
+/** Toast activation (`Notification.handleActivation`, the activator CLSID) exists on Windows only; elsewhere the call throws. */
+export function usesToastActivation(platform: NodeJS.Platform): boolean {
+  return platform === 'win32'
+}
+
+/** A notification's options: the toast XML on Windows, a plain title and body elsewhere, where `toastXml` is ignored. */
+export function notificationOptions(toast: { title: string; body: string; hash: string }, platform: NodeJS.Platform): { toastXml: string } | { title: string; body: string } {
+  return usesToastActivation(platform) ? { toastXml: toastXml(toast) } : { title: toast.title, body: toast.body }
+}

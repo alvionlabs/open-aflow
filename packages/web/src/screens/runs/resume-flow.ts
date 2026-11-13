@@ -145,13 +145,25 @@ export type ResumeFlow = {
   close(): void
 }
 
+/**
+ * `onSent`: each send's result goes to the owner (the Next step card's list) with the time. A `started` one then
+ * leaves no result block: the flow goes to idle. A failed one keeps its block; a refused request isn't a result.
+ * `now` is for tests.
+ */
+export type ResumeHooks = { onSent?: (word: ResumeWord, at: number, result: ResumeResult) => void; now?: () => number }
+
 /** Runs the resume reducer and posts resume once per press. */
-export function createResumeFlow(target: RunTarget, onChange: (s: ResumeState) => void, post: Post = defaultPost): ResumeFlow {
+export function createResumeFlow(target: RunTarget, onChange: (s: ResumeState) => void, post: Post = defaultPost, { onSent, now = Date.now }: ResumeHooks = {}): ResumeFlow {
   let state = RESUME_INITIAL
   const dispatch = (e: ResumeEvent) => {
     const prev = state
     state = reduceResume(state, e)
     if (state === prev) return
+    if (onSent && state.kind === 'result') {
+      const { word, result } = state
+      if (result.outcome === 'started') state = { kind: 'idle', seq: state.seq }
+      onSent(word, now(), result)
+    }
     onChange(state)
     const s = state
     if (s.kind === 'sending') {
@@ -172,6 +184,13 @@ export const NOT_LOGGED = 'Not saved to the action log.'
 export function startedText(resume: string | undefined): string {
   const base = "The session started again. A terminal open on it won't show the board's send"
   return resume ? `${base}: run ${resume} to see it.` : `${base}.`
+}
+
+export const SEND_LABEL: Record<ResumeWord, string> = { continue: 'Continue', go: 'Go' }
+
+/** A send button's words: `Sending…` on the one in flight, else its word. Every button is off while `busy`. */
+export function sendLabel(view: ResumeView, send: ResumeWord): string {
+  return view.busy && view.word === send ? 'Sending…' : SEND_LABEL[send]
 }
 
 export type ResumeView = {

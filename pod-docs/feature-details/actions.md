@@ -2,7 +2,7 @@
 
 ## What it is
 
-Board actions change something outside the board: merge a PR that waits on you (a handed-back wave PR, a reviewed fix PR, or the final plan PR), append your answer to a queue entry that waits on you, and resume a run with `continue` or `go` (see [resume.md](resume.md)). Every merge, answer, and resume request that passes its checks goes in the action log, and so does each repo removed from the board (Remove repo, [server.md](server.md)). Server side: `packages/server/src` (the action, answer, and queue-writer modules); the routes sit behind the action guard ([server.md](server.md)). The screens are in [runs-and-pipeline.md](runs-and-pipeline.md).
+Board actions change something outside the board: merge a PR that waits on you (a handed-back wave PR, a reviewed fix PR, or the final plan PR), append your answer to a queue entry that waits on you, and resume a run with `continue` or `go` (see [resume.md](resume.md)). Every merge, answer, and resume request that passes its checks goes in the action log, and so does each repo removed from the board (Remove repo, [server.md](server.md)) and each run's port claim forgotten (Forget run, [server.md](server.md)). Server side: `packages/server/src` (the action, answer, and queue-writer modules); the routes sit behind the action guard ([server.md](server.md)). The screens are in [runs-and-pipeline.md](runs-and-pipeline.md).
 
 ## How it works
 
@@ -13,9 +13,10 @@ Board actions change something outside the board: merge a PR that waits on you (
   - `unconfirmed` when the call succeeded but GitHub doesn't show a result yet; `failed` with gh's trimmed stderr, or `PR is closed`.
 - **Answer:** the text is cleaned (control characters dropped, whitespace folded to one line, at most 2000 characters, no `**Resolution:**` or `**Answer (` of its own; see [run-model.md](run-model.md)), then appended to the end of the entry's one line as ` **Answer (human):** <text>`. The writer works on bytes: it splices that one line and keeps line endings, BOM, and other bytes as they were. It writes a temp file beside the queue, reads the queue again, and renames only if nothing changed. Results: `answered`, `changed` (entry gone, duplicated, or the file changed while saving), or `failed`.
 - **Resolve (Close and Keep):** `POST /api/actions/resolve` with `repoId`, `line`, and `kind` (`close` or `keep`); any other field counts for nothing. The entry must be `isAnswerable` (`404 not waiting on you`), and the server's own `triage` of it must give a Done reason for `close` or a value for `keep` (`409` with `The board no longer reads this entry as done.` or `This entry states no value in use.`). The writer rewrites the line's `**Resolution:** pending` to `**Resolution:** <local date> — closed from the board: <reason>` or `— kept: <value>`, with the answer's path and guards; a line that no longer reads as pending is `changed`. It shares the answer's one write per repo (`409 answer in progress`). Results: `closed`, `kept`, `changed`, or `failed`, logged as `resolve` with the entry's header as the target.
+- **Forget check** (`forgetCheck` in `packages/model/src/forget.ts`): whether a run may lose its port claim. Checks, first failure wins: the run isn't on `listRuns` for its repo → `not a run`; no claim names it → `no claim` (a plan doc's `Port base:` isn't a claim); its state is `running` → `run is running`; two or more claims name it, or it would still be listed with its claims taken out (a live plan) → `still listed`. Else `ok` with the one claim's port base. A leftover fix run (PR merged, agents ended) and a claimed archived plan closing out pass.
 - **Where you press it:** Merge and Answer sit on the Next step card, or on a row in the Waiting tab, and open in place under it; the Action log is in the Log tab. Continue and Go sit on a reply ([runs-and-pipeline.md](runs-and-pipeline.md)).
 - **Path:** exactly `<repo>/pod-docs/handoff-queue.md`, whose real path must sit under the repo's real path. A missing file is never created.
-- **Action log:** one JSON line per logged request in `<config dir>/actions.jsonl`, never in a repo. Merge, answer, resolve, resume, and remove-repo entries (`removed` or `failed`, the target is the repo's path) each pair an `action` with its own results; the reader drops lines that don't fit. `Board.actions` is the newest 50; after each logged action the server rebuilds the Board and sends it before it answers. A failed append gives `logged: false`.
+- **Action log:** one JSON line per logged request in `<config dir>/actions.jsonl`, never in a repo. Merge, answer, resolve, resume, remove-repo entries (`removed` or `failed`, the target is the repo's path), and forget-run entries (`removed` or `failed`, the target is `<run> · port base <N>`) each pair an `action` with its own results; the reader drops lines that don't fit. `Board.actions` is the newest 50; after each logged action the server rebuilds the Board and sends it before it answers. A failed append gives `logged: false`.
 
 ## Why it's this way
 
@@ -36,6 +37,7 @@ Board actions change something outside the board: merge a PR that waits on you (
 - A queue body can quote `**Answer (human):**` (pod's own gate entries do). Only a marker after the entry's `**Resolution:**` is an answer.
 - `actions.jsonl` sits in the watched config folder, but the filter keeps only `config.json`, so the route rebuilds the Board itself.
 - The rename gives the queue a default file mode. The log is read once at start and never trimmed.
+- Forget also shows on a claim-only run whose open PR waits on your merge. It then takes the run and its PR off the board, and frees a port base a live session may still hold. Kept on purpose, because the modal asks first ([decision](../decisions.md#2026-11-13--forget-on-a-run-whose-pr-waits-on-your-merge-agent-default--override-anytime)).
 
 ## History
 
@@ -49,3 +51,5 @@ Board actions change something outside the board: merge a PR that waits on you (
 - 2026-10-31 · fix-queue-triage · added: the resolve route (Close and Keep) and `resolve` entries in the action log; the queue writer can rewrite an entry's pending Resolution as well as append an answer. The PRs the server asks gh about now include the staging PR a pending gate 7 entry names.
 - 2026-10-31 · fix-queue-triage review round 1 · fixed: a staging PR asked by number (a pending gate 7 names it) no longer hides the same PR found by the staging branch.
 - 2026-11-01 · fix-remove-repo · added: `remove-repo` entries (`removed`, `failed`) in the action log.
+- 2026-11-12 · ui-rework F1 · added: `forgetCheck` in the model, and `forget-run` entries (`removed`, `failed`) in the action log.
+- 2026-11-13 · ui-rework · plan complete: Forget run (route, log line, modal) and Remove repo's shared modal; final PR #108 passed review at round 2 after fix PR #110 · [report](../reports/ui-rework.html)

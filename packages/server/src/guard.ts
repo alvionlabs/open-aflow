@@ -65,8 +65,8 @@ export function actionGuard({ ports, token }: { ports: readonly number[]; token:
 }
 
 /**
- * Guards reads that need the session token, such as the folder listing under
- * /api/fs/. After the request guard's checks (Host; Origin too on anything but
+ * Guards reads that need the session token: the setup check's /api/tools
+ * (production only). After the request guard's checks (Host; Origin too on anything but
  * GET and HEAD), the `X-OpenAFlow-Token` header must match. A token in the URL
  * doesn't count. Host 403, Origin 403, then token 403.
  */

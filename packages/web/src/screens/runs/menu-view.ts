@@ -19,7 +19,7 @@ export function reduceMenu(open: boolean, event: MenuEvent): MenuNext {
       return { open: false, focusTrigger: open }
     case 'run-change':
     case 'pick-remove':
-      // Remove opens its confirm panel, which takes focus.
+      // Remove repo and Forget this run open the shared confirm modal, which takes focus.
       return { open: false, focusTrigger: false }
     case 'pick-theme':
     case 'press-switch':

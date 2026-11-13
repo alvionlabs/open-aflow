@@ -2,7 +2,7 @@
 
 ## What it is
 
-The API server (`packages/server`) finds the repos to show, reads their pod docs, agent transcripts and port claims, asks `gh` about live PRs, builds one `Board`, keeps it current as files change, and serves it to the web app. It also lists folders for the folder picker. It writes only its own config folder (config, session token, action log, toggles, resume logs) and one line of a repo's `pod-docs/handoff-queue.md`. Covers the features.md rows API health, Board JSON, Folder listing, Live updates, Add repo, Request guard, Action token, and Error banners (server side). The actions are in [actions.md](actions.md) and [resume.md](resume.md).
+The API server (`packages/server`) finds the repos to show, reads their pod docs, agent transcripts and port claims, asks `gh` about live PRs, builds one `Board`, keeps it current as files change, and serves it to the web app. It writes only its own config folder (config, session token, action log, toggles, resume logs) and one line of a repo's `pod-docs/handoff-queue.md`. Covers the features.md rows API health, Board JSON, Live updates, Add repo, Request guard, Action token, and Error banners (server side). The actions are in [actions.md](actions.md) and [resume.md](resume.md).
 
 ## How it works
 
@@ -24,8 +24,8 @@ The API server (`packages/server`) finds the repos to show, reads their pod docs
 - **Watching:** one watcher per folder; a rebuild after 300 ms of quiet, never later than 1.5 s after a burst starts. Clients get a Board over SSE only when its JSON changed.
 - **Guards,** in order, the first failure answers:
   - every route: a loopback `Host` on the API or web port (`403 forbidden host`), and an exact `Origin` on writes. No CORS headers; both ports bind `127.0.0.1`.
-  - `/api/actions/*` (remove-repo included) and `POST /api/repos` (`actionGuard`): Origin, a body over 64 KB (`413`), POST, `application/json`, the token, a JSON object.
-  - `/api/fs/*` (`readGuard`): the token only, no `Origin`.
+  - `/api/actions/*` (remove-repo and forget-run included) and `POST /api/repos` (`actionGuard`): Origin, a body over 64 KB (`413`), POST, `application/json`, the token, a JSON object.
+  - `GET /api/tools` (`readGuard`, production only): the token only, no `Origin`.
   - The token is a fresh random value per API start. In dev it's in `<config dir>/session-token`, and Vite puts it in the page's `<meta name="openaflow-token">`. In production it stays in memory, and the server puts it in the page. The page sends it as `X-OpenAFlow-Token`. Compared in constant time. Never in the Board, a URL, a cookie, a log, or `pnpm build` output.
 - **Two modes, one wiring** (`startServer` in `start-server.ts`; `runMain` prints a rejection as `openaflow: <message>`, exits 1, and connects the signals). `main.ts` runs dev. `main-production.ts` runs production and finds its `web` folder from `import.meta.url`, never from the working folder.
 
@@ -69,22 +69,8 @@ The API server (`packages/server`) finds the repos to show, reads their pod docs
 - **Agents of a repo** (`agentOfRepo` in `transcript-files.ts`, per build, on the cached parse): by the first `cwd` in the session's own `<session>.jsonl`, never the agent's: an agent can work anywhere, and every agent of a session is placed the same way. Session in the repo (`isInsideRepo`, the `sameRepoPath` case rule) → listed, and it can be sent to. In a folder that, or a parent of which, folds exactly to this repo's Claude project name (a sibling or the sibling's worktree) → not listed. No session file, no `cwd` in the file's first 1 MB, or anywhere else (`chess-web-A1`) → listed, marked `sessionUnproven`, and no send. The `cwd` never reaches the Board. Each build stats each listed session file once per repo; a file whose size or mtime changed is read again, from its head only, 64 KB at a time.
 - **Add repo:** a local absolute path only; a Windows path starting with two separators → `400 not a local path` before any file system call.
 - **Remove repo** (`POST /api/actions/remove-repo`, `{ repoId }`, `remove-repo-routes.ts`, `repos-config.ts`): the repo comes from the current Board by id and, when sent, `path` (the page always sends it). Board ids are unique, so the `path` match (`404 not on the board`) and `409 ambiguous repo` (an id two Board repos share with no `path`; the page offers no Remove for such a repo) are safety checks that normal use doesn't reach; a claim-only repo is `404 not registered`. `removeRepo` reads `config.json` as it is now, inside the same per-file write queue as `addRepo`, takes out every entry that is the same repo by `sameRepoPath` (case per the folder's file system; a gone folder gets the OS default), and writes through the same temp file and rename. Not listed → `404 not registered`, nothing written; unreadable → `500 config unreadable`, never overwritten; a write that throws → `500 config unwritable`, logged `failed`. It never touches the repo's files, claims, or transcripts. A `both` repo leaves the config and stays on the Board through its claim. It sits under `/api/actions/` because the action guard takes only a POST; a `DELETE` would need a guard change.
-- **Folder listing** (`GET /api/fs/folders[?path=]`, `folder-list.ts`, `guard.ts`, `app.ts`):
-
-```mermaid
-flowchart TD
-  A[GET /api/fs/folders] --> H{Host loopback?} -->|no| H403[403 forbidden host]
-  H -->|yes| T{token header right?} -->|no| T403[403 bad token]
-  T -->|yes| P{path given?} -->|no| R[roots: A:\ to Z:\ that answer in 1500 ms, or / and home]
-  P -->|yes| S{NUL? two leading separators? absolute?} -->|bad| E400[400 bad request / not a local path / not absolute]
-  S -->|ok| L{win32: path a link to a network target?} -->|yes| E400
-  L -->|no| D{a folder?} -->|no| E404[404 not a directory]
-  D -->|unreadable| K[200 locked: true, folders: empty]
-  D -->|yes| F[subfolders only, case-blind sort, first 1000, podDocs each]
-```
-
-  Example: `?path=E:/Projects` → `{ path: "E:\\Projects", parent: "E:\\", locked: false, truncated: false, folders: [{ name: "openaflow", path: "E:\\Projects\\openaflow", podDocs: true }, …] }`. With no token → `403 {"error":"bad token"}`; `?path=%5C%5Chost%5Cshare` → `400 {"error":"not a local path"}`.
-  - A link counts as a folder only when it ends at a local folder. On Windows each target is read with `readlink` and a network or device target is dropped before anything follows it; a linked `pod-docs` reads `false`. Files and broken links are left out. It reads names, types and link targets, never a file, and stores nothing.
+- **Forget run** (`POST /api/actions/forget-run`, `{ repoId, run, portBase }`, `forget-run-routes.ts`): deletes one run's leftover port claim file, so a run whose PR merged long ago leaves the runs list. A bad shape, or a `portBase` that isn't an integer from 1 to 65535 → `400 bad request`. The repo comes from the current Board by id: none → `404 not on the board`, two → `409 ambiguous repo`. Then `forgetCheck` ([actions.md](actions.md)): `409 run is running`, else `404` with its reason (`not a run`, `no claim`, `still listed`); a `portBase` that isn't the checked claim's → `404 no claim`. The server reads `<ports dir>/<portBase>` again, its name built from the integer only: missing → `404 no claim` and a rebuild; another repo (`sameRepoPath`), another run, text that isn't a claim, or a read error such as a folder of that name → `409 claim changed`, and nothing is deleted. It deletes that one file with `unlink` (never a folder): an error → `500 claim unremovable`, logged `failed` with the error code, then a rebuild; ENOENT counts as missing. Success logs `forget-run` `removed` with target `<run> · port base <N>`, rebuilds, and answers `200 { outcome: 'removed', run, portBase, logged }`. Refusals aren't logged. Forgets run one at a time, each on the Board as it is in its turn, so a second one finds the run gone (on Windows a second delete of a file being deleted fails with EPERM). It never runs git and never touches a worktree, a branch, the config, or a toggle: a toggle stays and sends nothing while the run is off the Board. It can't be undone by the app (a one-way door): to bring a claim back, write `<ports dir>/<portBase>` again with `<repo path> <run>`.
+- **No folder listing:** the folder picker and `GET /api/fs/folders` are gone (ui-rework A1). Add repo takes a path from the desktop shell's Windows folder dialog, or a typed one in the browser build. `/api/fs/folders` and any other unknown path answer `404 {"error":"not found"}`, with or without the token: in dev from `app.ts`'s JSON 404, in production from the web app.
 
 ### Settings
 
@@ -104,9 +90,6 @@ All optional, set as environment variables:
 ## Why it's this way
 
 - **Loopback, a Host check, and an `Origin` check for writes:** DNS rebinding is the risk even for a read-only server, and a 2026 advisory showed Host alone isn't enough for a server with write tools ([research](../research/board-actions.md)).
-- **The folder listing needs the token but not an `Origin`:** it shows the whole disk's folder names, so a page on another site must not read it. Browsers leave `Origin` off same-origin GETs, so `actionGuard` (which needs one) couldn't guard it; a new `readGuard` does ([plan](../plans/calm-dashboard.md#key-decisions)).
-- **Folders only, with a `pod-docs` mark, refusing UNC and device paths:** the pattern Syncthing, Jellyfin and Radarr use behind a key ([research](../research/folder-picker.md)). Opening a share on Windows can send your login to another machine, so link targets are checked before any `stat`.
-- **Windows drives by trying `A:` to `Z:`:** Node has no API to list drives; a drive that doesn't answer in 1500 ms is left out (sprint contract), so one slow drive doesn't hold up the roots.
 - **Add repo needs the token:** a registered repo is a folder the board reads and runs `gh` in.
 - **`gh` by absolute path from absolute `PATH` entries:** a `gh.exe` planted in a cloned repo could otherwise run on the 30 s refresh.
 - **A new token per launch** keeps `dist` free of it. Trade-off: a page from before a restart must reload.
@@ -118,9 +101,6 @@ All optional, set as environment variables:
 
 ## Watch out
 
-- The listing checks only the last part of a typed path for a link to a share: a link in the middle (`C:\x\link\sub`) is followed (queue, someday). Making one needs admin rights and the token.
-- An empty `?path=` is `400 not absolute`; leave `path` out for the roots.
-- More than 1000 subfolders: `truncated: true`, and the picker can't prefix-filter past the cut (queue, someday).
 - A repo's id changes when a clash forms or ends. Stored ids don't follow it: a bookmark or an old tab opens the first run; action log entries keep the old id, which only the row's React key reads (the row shows the stored repo name). An open page follows the change by path (`followRepoId` in `selection.ts`).
 - Claude's project folder name (`projectDirName`) uses the same character rule as the plain id, so `chess-web` and `chess_web` read one transcript folder, even with only one of them on the board. Only the `cwd` in the session's own file tells them apart: never give a repo a session by project folder alone, by an agent's own `cwd`, or by a name prefix (`chess-web-A1` is not a sibling of `chess-web`), and never send on a session marked `sessionUnproven`.
 - Compare real paths with `path.relative`, never a string prefix: `C:\x-other` starts with `C:\x`.
@@ -185,3 +165,6 @@ All optional, set as environment variables:
 - 2026-11-05 · fix-rename-internals review · the copy uses one temp folder per start, so two starts at once can't leave a half copy; a failed copy runs that start on an OS temp folder, so the next start copies again.
 - 2026-11-05 · fix-rename-internals review round 2 · needed files copy strictly with a 2 s retry, logs best effort; a failed copy runs that start on the old folder, not a temp one; part copies older than an hour are removed; the dev page reads its token through `liveConfigDir`.
 - 2026-11-05 · fix-rename-internals review round 3 · no copy while the old folder's owner file names a live process; that start runs on the old folder.
+- 2026-11-12 · ui-rework F1 · added: `POST /api/actions/forget-run` deletes one run's leftover port claim file after `forgetCheck` and a fresh read of the file, and logs `forget-run` entries. No UI yet.
+- 2026-11-13 · ui-rework A1 · removed: `GET /api/fs/folders`, its read guard on `/api/fs/*`, the `folders` dep, and `folder-list.ts`. Add repo uses the desktop shell's folder dialog or a typed path. Any unknown path in dev now answers JSON `404 {"error":"not found"}`, as production does.
+- 2026-11-13 · ui-rework · plan complete: the folder-listing route is gone and Forget run is a route; final PR #108 passed review at round 2 · [report](../reports/ui-rework.html)
