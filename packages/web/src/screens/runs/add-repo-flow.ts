@@ -2,13 +2,13 @@
 //
 // With the desktop bridge, the Windows folder dialog opens at once and no modal shows while it is up. Cancel
 // closes; a folder posts at once, and a 201 closes. A refused post opens the modal with the error, the path,
-// and Choose folder… (the dialog again). A dialog that can't open opens the modal and asks for a typed path.
+// and Browse… (the dialog again). A dialog that can't open opens the modal and asks for a typed path.
 // With no bridge (the browser build), the modal opens with an empty path field.
 //
 // Add is off while the modal shows a path error (already added, or not a folder); a change to the path clears
 // it. After any other error, Add stays on, so the same path can be tried again.
 //
-// The modal is busy while a post or a dialog is out: Add, Choose folder…, and Cancel then do nothing, so one
+// The modal is busy while a post or a dialog is out: Add, Browse…, and Cancel then do nothing, so one
 // post runs at a time. After close, nothing more happens, and a late answer is dropped.
 
 import { UNREACHABLE } from '../../actions-client.ts'
@@ -27,7 +27,7 @@ export function pathHint(userAgent: string): string {
 export type AddRepoState =
   /** The folder dialog is up, or its folder is posting: no modal. */
   | { kind: 'picking' }
-  /** The modal. `path` is the field as typed; `canChoose` shows Choose folder…. */
+  /** The modal. `path` is the field as typed; `canChoose` shows Browse…. */
   | { kind: 'form'; path: string; busy: boolean; canChoose: boolean; error?: string; pathError?: boolean }
   | { kind: 'closed' }
 
@@ -120,7 +120,7 @@ export function createAddRepoFlow(deps: AddRepoDeps, onChange: (s: AddRepoState)
       showForm({ busy: true })
       await post(shown.trim(), shown)
     },
-    /** Choose folder…: the dialog again. Cancel there keeps the modal as it was. */
+    /** Browse…: the dialog again. Cancel there keeps the modal as it was. */
     choose() {
       if (!pick || state.kind !== 'form' || state.busy) return
       const before = state

@@ -374,3 +374,9 @@ Options not chosen: widen the status column (every card's rail moves); put the t
 Context: review round 1 of PR #108 found that Forget this run shows on any claim-only run that isn't running, including a `/pod:task` run whose PR waits on your merge. Forget then takes the run and its waiting PR off the board, and frees a port base a live session may still hold.
 Decision: keep Forget there. The modal names the run and asks first.
 Options not chosen: hide Forget while a run has a waiting PR (safer, but a stuck run with a stale PR could then never be forgotten from the app).
+
+## 2026-11-13 — Add repo: Browse… beside the field, path errors under it (human decision)
+Context: on Linux, the H2/H3 modal felt wrong: `Choose folder…` on its own row read as a second field, and a path error showed twice (a red field and a red box). The human picked from `pod-docs/design-drafts/add-repo-error-choices.html`: "1 b, 2 b", and asked for less tight spacing than 2 b drew.
+Decision: `Browse…` (the folder icon) sits at the right of the path field, on its row, in the desktop app only. A path error ("already added", "not a folder") shows as red text with the alert icon under the field, with no box. A system error (try again, reload, the folder dialog failed) stays in the shared alert box above the actions; Remove repo and Forget keep the box. The modal spaces its groups 16 px apart and the actions 24 px below (the draft: 8 px and 20 px).
+Options not chosen: `Choose folder…` on its own row under the field (1 a, read as a second field); a folder icon inside the field (1 c, no label, easy to miss); every error in the red box (2 a, a path error shows twice).
+Consequences: the inline error text is `--danger`, not `--blocked`, because `tokens.test.ts` keeps status colours off text; in dark the two are the same red.

@@ -6,6 +6,7 @@ import { postRepo } from '../../add-repo.ts'
 import { Modal } from '../../components/Modal.tsx'
 import { ModalAlert } from '../../components/ModalAlert.tsx'
 import { folderBridge } from '../../desktop-bridge.ts'
+import { Icon } from '../../theme/icons.tsx'
 import { canAdd, createAddRepoFlow, pathHint, type AddRepoFlow, type AddRepoState } from './add-repo-flow.ts'
 
 /** `repoPaths` is kept for the opener; the folder dialog and the path field don't use it. */
@@ -30,9 +31,9 @@ export function AddRepoDialog({ onClose }: Props) {
 type FormProps = { state: Extract<AddRepoState, { kind: 'form' }>; flow: AddRepoFlow }
 
 /**
- * The modal, top to bottom: the label, the path field, Choose folder… (desktop only) under the field, the error in
- * the shared alert box, then Cancel and Add. Add is off while a path error shows (`canAdd`); the field is then
- * marked invalid.
+ * The modal, top to bottom: the heading; the field group (the label, a row with the path field and Browse…
+ * (desktop only), and a path error inline under the row); a system error in the shared alert box; then Cancel and
+ * Add. A path error marks the field invalid and turns Add off (`canAdd`). Spacing is in runs.css.
  */
 export function AddRepoForm({ state, flow }: FormProps) {
   const headingId = useId()
@@ -41,43 +42,52 @@ export function AddRepoForm({ state, flow }: FormProps) {
   const field = useRef<HTMLInputElement>(null)
   // After the modal's showModal(): a closed dialog can't take focus.
   useEffect(() => field.current?.focus(), [])
+  const pathError = state.error !== undefined && state.pathError === true
 
   return (
     <Modal labelledBy={headingId} busy={state.busy} onClose={flow.cancel} className="add-repo-modal">
       <h2 id={headingId} className="modal-heading">
         Add repo
       </h2>
-      <label className="modal-detail" htmlFor={fieldId}>
-        The repo folder's full path
-      </label>
-      <input
-        ref={field}
-        id={fieldId}
-        className="input mono"
-        type="text"
-        autoComplete="off"
-        spellCheck={false}
-        placeholder={pathHint(typeof navigator === 'undefined' ? '' : navigator.userAgent)}
-        value={state.path}
-        readOnly={state.busy}
-        aria-invalid={state.error && state.pathError ? 'true' : undefined}
-        aria-describedby={state.error ? errorId : undefined}
-        onChange={(e) => flow.type(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key !== 'Enter') return
-          e.preventDefault()
-          void flow.add()
-        }}
-      />
-      {state.canChoose && (
-        // A block row, so the button keeps its own width in the panel's grid.
-        <div className="add-repo-choose">
-          <button className="btn" type="button" disabled={state.busy} onClick={flow.choose}>
-            Choose folder…
-          </button>
+      <div className="add-repo-field">
+        <label className="modal-detail" htmlFor={fieldId}>
+          The repo folder's full path
+        </label>
+        <div className="add-repo-row">
+          <input
+            ref={field}
+            id={fieldId}
+            className="input mono"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={pathHint(typeof navigator === 'undefined' ? '' : navigator.userAgent)}
+            value={state.path}
+            readOnly={state.busy}
+            aria-invalid={pathError ? 'true' : undefined}
+            aria-describedby={state.error ? errorId : undefined}
+            onChange={(e) => flow.type(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              void flow.add()
+            }}
+          />
+          {state.canChoose && (
+            <button className="btn lead" type="button" disabled={state.busy} onClick={flow.choose}>
+              <Icon name="folder" />
+              Browse…
+            </button>
+          )}
         </div>
-      )}
-      {state.error && <ModalAlert id={errorId} message={state.error} />}
+        {pathError && (
+          <p id={errorId} className="modal-field-error" role="alert">
+            <Icon name="alert" />
+            <span>{state.error}</span>
+          </p>
+        )}
+      </div>
+      {state.error && !pathError && <ModalAlert id={errorId} message={state.error} />}
       <div className="modal-actions">
         <button className="btn quiet" type="button" disabled={state.busy} onClick={flow.cancel}>
           Cancel
