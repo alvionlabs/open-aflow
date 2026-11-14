@@ -44,198 +44,184 @@ const form = (s: AddRepoState) => {
   return s
 }
 
-describe('desktop pick', () => {
-  it('starts the folder dialog at once, with no modal while it is up', () => {
+describe('desktop: the form first', () => {
+  it('opens the modal with an empty path and Browse…; no folder dialog until Browse…', async () => {
     const t = setup({ bridge: true })
-    expect(t.flow.state()).toEqual({ kind: 'picking' })
-    t.flow.start()
-    expect(t.pick).toHaveBeenCalledTimes(1)
-    expect(t.flow.state().kind).toBe('picking')
-  })
-
-  it('null closes with no post', async () => {
-    const t = setup({ bridge: true })
-    t.flow.start()
-    t.picks[0]!.resolve(null)
-    await tick()
-    expect(t.post).not.toHaveBeenCalled()
-    expect(t.onClose).toHaveBeenCalledTimes(1)
-    expect(t.flow.state().kind).toBe('closed')
-  })
-
-  it('an empty path counts as a cancel', async () => {
-    const t = setup({ bridge: true })
-    t.flow.start()
-    t.picks[0]!.resolve('')
-    await tick()
-    expect(t.post).not.toHaveBeenCalled()
-    expect(t.onClose).toHaveBeenCalledTimes(1)
-  })
-
-  it('a path posts once, with still no modal; 201 closes', async () => {
-    const t = setup({ bridge: true })
-    t.flow.start()
-    t.picks[0]!.resolve('E:\\code\\chess-web')
-    await tick()
-    expect(t.post).toHaveBeenCalledTimes(1)
-    expect(t.post).toHaveBeenCalledWith('E:\\code\\chess-web')
-    expect(t.flow.state().kind).toBe('picking')
-    expect(t.onClose).not.toHaveBeenCalled()
-    t.posts[0]!.resolve({ status: 201 })
-    await tick()
-    expect(t.onClose).toHaveBeenCalledTimes(1)
-    expect(t.flow.state().kind).toBe('closed')
-  })
-
-  it('a second start (React StrictMode runs effects twice) opens one dialog', async () => {
-    const t = setup({ bridge: true })
-    t.flow.start()
-    t.flow.start()
-    expect(t.pick).toHaveBeenCalledTimes(1)
-  })
-
-  it('after close, nothing more happens', async () => {
-    const t = setup({ bridge: true })
-    t.flow.start()
-    t.picks[0]!.resolve(null)
-    await tick()
-    t.flow.type('x')
-    void t.flow.add()
-    t.flow.choose()
-    t.flow.cancel()
-    expect(t.post).not.toHaveBeenCalled()
-    expect(t.pick).toHaveBeenCalledTimes(1)
-    expect(t.onClose).toHaveBeenCalledTimes(1)
-    expect(t.flow.state().kind).toBe('closed')
-  })
-})
-
-describe('desktop add error', () => {
-  it('409 shows the already-added message with the path and Choose folder…', async () => {
-    const t = setup({ bridge: true })
-    t.flow.start()
-    t.picks[0]!.resolve('E:\\code\\chess-web')
-    await tick()
-    t.posts[0]!.resolve({ status: 409, error: 'already registered' })
-    await tick()
-    const s = form(t.flow.state())
-    expect(s).toMatchObject({ path: 'E:\\code\\chess-web', error: ADD_ALREADY, canChoose: true, busy: false })
-    // The error turns Add off, until the path changes.
-    expect(canAdd(s)).toBe(false)
-    expect(t.onClose).not.toHaveBeenCalled()
-  })
-
-  it('a post that throws (board out of reach) says to try again, with Add on', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const t = setup({ bridge: true })
-    t.flow.start()
-    t.picks[0]!.resolve('E:\\code\\chess-web')
-    await tick()
-    t.posts[0]!.reject(new TypeError('Failed to fetch'))
-    await tick()
-    const s = form(t.flow.state())
-    expect(s).toMatchObject({ path: 'E:\\code\\chess-web', error: ADD_FAILED, busy: false })
-    expect(s.pathError).toBeUndefined()
-    expect(canAdd(s)).toBe(true)
-    // The exact cause is in the console.
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining(UNREACHABLE))
-    warn.mockRestore()
-  })
-
-  it('Choose folder… opens the dialog again; while it is up the modal is busy; a path posts', async () => {
-    const t = setup({ bridge: true })
-    t.flow.start()
-    t.picks[0]!.resolve('E:\\code\\chess-web')
-    await tick()
-    t.posts[0]!.resolve({ status: 409, error: 'already registered' })
-    await tick()
-    t.flow.choose()
-    expect(t.pick).toHaveBeenCalledTimes(2)
-    expect(form(t.flow.state()).busy).toBe(true)
-    // Busy: a second Choose, an Add, or a Cancel does nothing.
-    t.flow.choose()
-    void t.flow.add()
-    t.flow.cancel()
-    expect(t.pick).toHaveBeenCalledTimes(2)
-    expect(t.post).toHaveBeenCalledTimes(1)
-    expect(t.onClose).not.toHaveBeenCalled()
-    t.picks[1]!.resolve('E:\\code\\ytb-feed')
-    await tick()
-    expect(t.post).toHaveBeenLastCalledWith('E:\\code\\ytb-feed')
-    expect(form(t.flow.state())).toMatchObject({ path: 'E:\\code\\ytb-feed', busy: true })
-    expect(form(t.flow.state()).error).toBeUndefined()
-    t.posts[1]!.resolve({ status: 201 })
-    await tick()
-    expect(t.onClose).toHaveBeenCalledTimes(1)
-  })
-
-  it('Choose folder… cancelled keeps the modal and its path', async () => {
-    const t = setup({ bridge: true })
-    t.flow.start()
-    t.picks[0]!.resolve('E:\\code\\chess-web')
-    await tick()
-    t.posts[0]!.resolve({ status: 409, error: 'already registered' })
-    await tick()
-    t.flow.choose()
-    t.picks[1]!.resolve(null)
-    await tick()
-    expect(form(t.flow.state())).toMatchObject({ path: 'E:\\code\\chess-web', busy: false, error: ADD_ALREADY })
-    // The error is back, so Add stays off.
+    expect(t.flow.state()).toEqual({ kind: 'form', path: '', busy: false, canChoose: true })
     expect(canAdd(t.flow.state())).toBe(false)
+    await tick()
+    expect(t.pick).not.toHaveBeenCalled()
+    t.flow.choose()
+    expect(t.pick).toHaveBeenCalledTimes(1)
+  })
+
+  it('a typed path adds with no folder dialog', () => {
+    const t = setup({ bridge: true })
+    t.flow.type(' /home/me/repo ')
+    void t.flow.add()
+    expect(t.pick).not.toHaveBeenCalled()
+    expect(t.post).toHaveBeenCalledWith('/home/me/repo')
+  })
+
+  it('a picked folder fills the field, posts nothing, turns Add on, and moves focus to Add', async () => {
+    const t = setup({ bridge: true })
+    t.flow.choose()
+    t.picks[0]!.resolve('/home/me/chess-web')
+    await tick()
+    const s = form(t.flow.state())
+    expect(s).toEqual({ kind: 'form', path: '/home/me/chess-web', busy: false, canChoose: true, focus: 'add' })
+    expect(canAdd(s)).toBe(true)
+    expect(t.post).not.toHaveBeenCalled()
     expect(t.onClose).not.toHaveBeenCalled()
+  })
+
+  it('a picked folder clears a path error, so Add turns on', async () => {
+    const t = setup({ bridge: true })
+    t.flow.type('/home/me/chess-web')
+    void t.flow.add()
+    t.posts[0]!.resolve({ status: 409, error: 'already registered' })
+    await tick()
+    expect(canAdd(t.flow.state())).toBe(false)
+    t.flow.choose()
+    t.picks[0]!.resolve('/home/me/ytb-feed')
+    await tick()
+    const s = form(t.flow.state())
+    expect(s).toMatchObject({ path: '/home/me/ytb-feed', busy: false })
+    expect(s.error).toBeUndefined()
+    expect(s.pathError).toBeUndefined()
+    expect(canAdd(s)).toBe(true)
     expect(t.post).toHaveBeenCalledTimes(1)
   })
 
-  it('Choose folder… that fails keeps the path and says to type it', async () => {
+  it('a picked folder clears a system error too', async () => {
     const t = setup({ bridge: true })
-    t.flow.start()
-    t.picks[0]!.resolve('E:\\code\\chess-web')
-    await tick()
-    t.posts[0]!.resolve({ status: 409, error: 'already registered' })
+    t.flow.choose()
+    t.picks[0]!.reject(new Error('dialog failed'))
     await tick()
     t.flow.choose()
-    t.picks[1]!.reject(new Error('dialog failed'))
+    t.picks[1]!.resolve('/home/me/chess-web')
     await tick()
-    const s = form(t.flow.state())
-    expect(s).toMatchObject({ path: 'E:\\code\\chess-web', busy: false, error: BRIDGE_FAILED })
-    // The dialog failure replaces the path error, so Add follows the path: here it isn't blank, so Add is on.
-    expect(s.pathError).toBeUndefined()
-    expect(canAdd(s)).toBe(true)
+    expect(form(t.flow.state()).error).toBeUndefined()
   })
-})
 
-describe('bridge fails', () => {
-  for (const word of ['forbidden', 'dialog failed']) {
-    it(`a ${word} rejection shows the type-the-path message and the field`, async () => {
+  for (const answer of [null, '']) {
+    it(`a cancelled pick (${JSON.stringify(answer)}) changes nothing and gives focus back to Browse…`, async () => {
       const t = setup({ bridge: true })
-      t.flow.start()
+      t.flow.type('/home/me/chess-web')
+      void t.flow.add()
+      t.posts[0]!.resolve({ status: 409, error: 'already registered' })
+      await tick()
+      const before = form(t.flow.state())
+      t.flow.choose()
+      t.picks[0]!.resolve(answer)
+      await tick()
+      expect(t.flow.state()).toEqual({ ...before, focus: 'browse' })
+      expect(canAdd(t.flow.state())).toBe(false)
+      expect(t.post).toHaveBeenCalledTimes(1)
+      expect(t.onClose).not.toHaveBeenCalled()
+    })
+  }
+
+  for (const word of ['forbidden', 'dialog failed']) {
+    it(`a pick that fails (${word}) shows the type-the-path message in the box and keeps the path`, async () => {
+      const t = setup({ bridge: true })
+      t.flow.type('/home/me/chess-web')
+      t.flow.choose()
       t.picks[0]!.reject(new Error(word))
       await tick()
       const s = form(t.flow.state())
       expect(BRIDGE_FAILED).toBe("Couldn't open the folder dialog. Type the path instead.")
-      expect(s).toMatchObject({ path: '', error: BRIDGE_FAILED, busy: false })
-      expect(canAdd(s)).toBe(false)
+      expect(s).toMatchObject({ path: '/home/me/chess-web', busy: false, error: BRIDGE_FAILED, focus: 'path' })
+      expect(s.pathError).toBeUndefined()
+      expect(canAdd(s)).toBe(true)
       expect(t.post).not.toHaveBeenCalled()
       expect(t.onClose).not.toHaveBeenCalled()
     })
   }
 
-  it('the typed path then posts', async () => {
+  it('while a pick is out the modal is busy: Add, Browse…, Cancel, and typing do nothing', async () => {
     const t = setup({ bridge: true })
-    t.flow.start()
-    t.picks[0]!.reject(new Error('dialog failed'))
-    await tick()
-    t.flow.type('  E:\\code\\chess-web ')
-    expect(form(t.flow.state()).error).toBeUndefined()
+    t.flow.type('/home/me/old')
+    t.flow.choose()
+    expect(form(t.flow.state()).busy).toBe(true)
+    expect(canAdd(t.flow.state())).toBe(false)
     void t.flow.add()
+    t.flow.choose()
+    t.flow.cancel()
+    t.flow.type('/x')
+    expect(t.post).not.toHaveBeenCalled()
+    expect(t.pick).toHaveBeenCalledTimes(1)
+    expect(t.onClose).not.toHaveBeenCalled()
+    expect(form(t.flow.state()).path).toBe('/home/me/old')
+    t.picks[0]!.resolve('/home/me/new')
+    await tick()
+    expect(form(t.flow.state())).toMatchObject({ path: '/home/me/new', busy: false })
+  })
+
+  it('Add after a pick posts that path; 201 closes', async () => {
+    const t = setup({ bridge: true })
+    t.flow.choose()
+    t.picks[0]!.resolve('E:\\code\\chess-web')
+    await tick()
+    const added = t.flow.add()
+    expect(t.post).toHaveBeenCalledTimes(1)
     expect(t.post).toHaveBeenCalledWith('E:\\code\\chess-web')
+    expect(form(t.flow.state()).busy).toBe(true)
+    t.posts[0]!.resolve({ status: 201 })
+    await added
+    expect(t.onClose).toHaveBeenCalledTimes(1)
+    expect(t.flow.state().kind).toBe('closed')
+  })
+
+  it('Add after a pick, refused as already added: the inline path error, the path kept, Add off', async () => {
+    const t = setup({ bridge: true })
+    t.flow.choose()
+    t.picks[0]!.resolve('E:\\code\\chess-web')
+    await tick()
+    const added = t.flow.add()
+    t.posts[0]!.resolve({ status: 409, error: 'already registered' })
+    await added
+    const s = form(t.flow.state())
+    // Add was off while busy, so focus goes back to the field to fix the path.
+    expect(s).toMatchObject({ path: 'E:\\code\\chess-web', busy: false, error: ADD_ALREADY, pathError: true, canChoose: true, focus: 'path' })
+    expect(canAdd(s)).toBe(false)
+    expect(t.onClose).not.toHaveBeenCalled()
+  })
+
+  it('Add after a pick that throws (board out of reach): the box says try again, Add on', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const t = setup({ bridge: true })
+    t.flow.choose()
+    t.picks[0]!.resolve('E:\\code\\chess-web')
+    await tick()
+    const added = t.flow.add()
+    t.posts[0]!.reject(new TypeError('Failed to fetch'))
+    await added
+    const s = form(t.flow.state())
+    expect(s).toMatchObject({ path: 'E:\\code\\chess-web', error: ADD_FAILED, busy: false, focus: 'path' })
+    expect(s.pathError).toBeUndefined()
+    expect(canAdd(s)).toBe(true)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(UNREACHABLE))
+    warn.mockRestore()
+  })
+
+  it('after close, nothing more happens', async () => {
+    const t = setup({ bridge: true })
+    t.flow.cancel()
+    t.flow.type('x')
+    void t.flow.add()
+    t.flow.choose()
+    t.flow.cancel()
+    expect(t.post).not.toHaveBeenCalled()
+    expect(t.pick).not.toHaveBeenCalled()
+    expect(t.onClose).toHaveBeenCalledTimes(1)
+    expect(t.flow.state().kind).toBe('closed')
   })
 })
 
 describe('browser path field', () => {
-  it('opens the empty field at once, with no Choose folder…; start opens no dialog', () => {
+  it('opens the empty field at once, with no Browse…; choose does nothing', () => {
     const t = setup({ bridge: false })
-    t.flow.start()
     const s = form(t.flow.state())
     expect(s).toEqual({ kind: 'form', path: '', busy: false, canChoose: false })
     t.flow.choose()
@@ -312,7 +298,7 @@ describe('browser path field', () => {
     expect(canAdd({ ...base, error: ADD_FAILED })).toBe(true)
     expect(canAdd({ ...base, error: '' })).toBe(true)
     expect(canAdd({ ...base, busy: true })).toBe(false)
-    expect(canAdd({ kind: 'picking' })).toBe(false)
+    expect(canAdd({ kind: 'closed' })).toBe(false)
   })
 
   it('Cancel closes; 201 closes', async () => {
