@@ -284,3 +284,38 @@ describe('Add repo modal look', () => {
     expect(gaps['heading to field group']).toBeGreaterThan(8)
   })
 })
+
+// An invalid field shows one red signal: its focus ring is the same red as its border, not the blue ring.
+// Add repo's path field and the answer form's textarea both set aria-invalid on an `.input`.
+describe('invalid field focus ring', () => {
+  const baseCss = () => stripComments(readFileSync(join(here, '..', 'theme', 'base.css'), 'utf8'))
+  const INVALID = '.input[aria-invalid="true"]:focus-visible'
+
+  it('an invalid field rings in --blocked; valid fields, buttons, and the global ring stay --focus', () => {
+    const css = baseCss()
+    expect(declsOf(css, ':focus-visible')['outline']).toBe('2px solid var(--focus)')
+    const valid = declsOf(css, '.input:focus-visible')
+    expect(valid['outline']).toBe('2px solid var(--focus)')
+    const invalid = declsOf(css, INVALID)
+    // Same width as the field's own ring, so keyboard users still see where focus is; only the colour changes.
+    expect(invalid['outline']).toBe('2px solid var(--blocked)')
+    // The border stays red on focus, whatever the order of the rules.
+    expect(invalid['border-color']).toBe('var(--blocked)')
+    // No other rule draws a red ring: buttons and the rest keep the blue one.
+    const red = rules(css).filter((r) => r.decls.some(([p, v]) => p.startsWith('outline') && v.includes('--blocked')))
+    expect(red.map((r) => r.selectors.join(', '))).toEqual([INVALID])
+  })
+
+  it('the red ring meets 3:1 against the surface and the page, light and dark (WCAG 1.4.11)', () => {
+    // The ring's colour, as the rule names it.
+    const ring = /var\((--[a-z0-9-]+)\)/.exec(declsOf(baseCss(), INVALID)['outline'] ?? '')?.[1]
+    expect(ring, 'the invalid ring names a token').toBe('--blocked')
+    // Both fields sit on --surface (the modal panel, the in-place form); --bg covers a field on the page.
+    for (const [theme, t] of [['light', light()], ['dark', dark()]] as const) {
+      for (const ground of ['surface', 'bg']) {
+        const ratio = contrast(t[ring!]!, t[`--${ground}`]!)
+        expect(ratio, `${theme} ${ring} on --${ground} = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(3)
+      }
+    }
+  })
+})
