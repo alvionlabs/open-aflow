@@ -299,6 +299,9 @@ describe('invalid field focus ring', () => {
     const invalid = declsOf(css, INVALID)
     // Same width as the field's own ring, so keyboard users still see where focus is; only the colour changes.
     expect(invalid['outline']).toBe('2px solid var(--blocked)')
+    // The same offset too: the field's ring sits on its border (0), and the invalid rule leaves it alone.
+    expect(valid['outline-offset']).toBe('0')
+    expect(invalid['outline-offset']).toBeUndefined()
     // The border stays red on focus, whatever the order of the rules.
     expect(invalid['border-color']).toBe('var(--blocked)')
     // No other rule draws a red ring: buttons and the rest keep the blue one.
