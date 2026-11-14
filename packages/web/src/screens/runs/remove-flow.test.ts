@@ -1,10 +1,10 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BoardRepo, RemoveRepoResult, RunSummary } from '@openaflow/model'
-import type { ActionReply } from '../../actions-client.ts'
+import { NEED_RELOAD, RESTARTED, UNREACHABLE, type ActionReply } from '../../actions-client.ts'
 import { ConfirmModal } from '../../components/ConfirmModal.tsx'
-import { REMOVE_ITEM, confirmView, createRemoveFlow, hashAfterRemove, moreName, navigateAfterRemove, removeTarget, repoOfRun, type Post, type RemoveState, type RemoveTarget } from './remove-flow.ts'
+import { REMOVE_ERRORS, REMOVE_ITEM, confirmView, createRemoveFlow, hashAfterRemove, moreName, navigateAfterRemove, removeTarget, repoOfRun, type Post, type RemoveState, type RemoveTarget } from './remove-flow.ts'
 
 const A: RemoveTarget = { repoId: 'ra', name: 'alpha-repo', path: 'C:/code/alpha-repo', alsoClaimed: false, runs: 2, returnTo: 'run-menu-trigger' }
 const B: RemoveTarget = { repoId: 'rb', name: 'beta-repo', path: 'C:/code/beta-repo', alsoClaimed: false, runs: 1, returnTo: 'run-menu-trigger' }
@@ -99,7 +99,7 @@ describe('remove flow', () => {
     t.flow.remove()
     await t.answer(0, refused('config unreadable', 500))
     expect(t.flow.state()).toMatchObject({ kind: 'error', target: A })
-    expect(confirmView(t.flow.state())?.error).toBe("The board's config file can't be read, so nothing changed. Fix or delete config.json, then try again.")
+    expect(confirmView(t.flow.state())?.error).toBe("Can't read config.json. Please fix it and try again")
     expect(t.removed).toEqual([])
     t.flow.remove()
     expect(t.calls).toHaveLength(2)
@@ -112,15 +112,15 @@ describe('remove flow', () => {
     t.flow.open(A)
     t.flow.remove()
     await t.answer(0, refused('not registered'))
-    expect(confirmView(t.flow.state())?.error).toBe("This repo is no longer in the board's list.")
+    expect(confirmView(t.flow.state())?.error).toBe('This repo is already gone')
     t.flow.open(A)
     t.flow.remove()
     await t.answer(1, refused('not on the board'))
-    expect(confirmView(t.flow.state())?.error).toBe("This repo is no longer in the board's list.")
+    expect(confirmView(t.flow.state())?.error).toBe('This repo is already gone')
     t.flow.open(A)
     t.flow.remove()
-    await t.answer(2, refused('The board restarted. Reload the page.', 403))
-    expect(confirmView(t.flow.state())?.error).toBe('The board restarted. Reload the page.')
+    await t.answer(2, refused(RESTARTED, 403))
+    expect(confirmView(t.flow.state())?.error).toBe('The app restarted. Please reload')
   })
 
   it('a reply for a confirm that was closed and opened again is dropped', async () => {
@@ -131,6 +131,53 @@ describe('remove flow', () => {
     t.flow.cancel()
     t.flow.open(B)
     expect(t.flow.state()).toMatchObject({ kind: 'confirm', target: B })
+  })
+})
+
+describe('error text', () => {
+  afterEach(() => vi.restoreAllMocks())
+  const failWith = async (message: string, status: number) => {
+    const t = setup()
+    t.flow.open(A)
+    t.flow.remove()
+    await t.answer(0, refused(message, status))
+    return t
+  }
+
+  it('each route word maps to its text', async () => {
+    const words: [string, number, string][] = [
+      ['not registered', 404, 'This repo is already gone'],
+      ['not on the board', 404, 'This repo is already gone'],
+      ['config unreadable', 500, "Can't read config.json. Please fix it and try again"],
+      ['config unwritable', 500, "Couldn't save that. Please try again"],
+      ['ambiguous repo', 409, 'Two repos share this id, so nothing changed'],
+    ]
+    for (const [word, status, text] of words) expect(confirmView((await failWith(word, status)).flow.state())!.error, word).toBe(text)
+  })
+
+  it('an unknown word, HTTP 500, or no answer shows the try-again text and sends the raw word and status to the console, once', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const [word, status] of [['something new', 418], ['HTTP 500', 500], [UNREACHABLE, 0], ['forbidden origin', 403], ['constructor', 400]] as const) {
+      warn.mockClear()
+      const t = await failWith(word, status)
+      expect(confirmView(t.flow.state())!.error, word).toBe('Something went wrong. Please try again')
+      confirmView(t.flow.state())
+      expect(warn, word).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0]![0]).toContain(`HTTP ${status}`)
+      expect(warn.mock.calls[0]![0]).toContain(word)
+    }
+  })
+
+  it('a dead or missing token asks for a reload; it and a known word write nothing to the console', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const word of [RESTARTED, NEED_RELOAD]) expect(confirmView((await failWith(word, 403)).flow.state())!.error).toBe('The app restarted. Please reload')
+    await failWith('not registered', 404)
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('no message ends with a period', () => {
+    for (const text of [...REMOVE_ERRORS.values(), 'Something went wrong. Please try again', 'The app restarted. Please reload']) expect(text, text).not.toMatch(/\.$/)
+    expect(REMOVE_ERRORS.size).toBe(5)
   })
 })
 
@@ -273,7 +320,7 @@ describe('two repos with the same id (chess-web and chess_web)', () => {
     t.flow.open(A)
     t.flow.remove()
     await t.answer(0, refused('ambiguous repo', 409))
-    expect(confirmView(t.flow.state())?.error).toBe("Another repo on the board has the same id, so the board can't tell which one to remove. Nothing changed.")
+    expect(confirmView(t.flow.state())?.error).toBe('Two repos share this id, so nothing changed')
   })
 })
 
