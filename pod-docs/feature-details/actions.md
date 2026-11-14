@@ -53,3 +53,4 @@ Board actions change something outside the board: merge a PR that waits on you (
 - 2026-11-01 · fix-remove-repo · added: `remove-repo` entries (`removed`, `failed`) in the action log.
 - 2026-11-12 · ui-rework F1 · added: `forgetCheck` in the model, and `forget-run` entries (`removed`, `failed`) in the action log.
 - 2026-11-13 · ui-rework · plan complete: Forget run (route, log line, modal) and Remove repo's shared modal; final PR #108 passed review at round 2 after fix PR #110 · [report](../reports/ui-rework.html)
+- 2026-11-14 · ui-rework H7 · the Forget modal's errors are short and warm, with no period at the end (for example `no claim` → "Already forgotten. Nothing to do"); any word the modal doesn't know, or no answer, shows "Something went wrong. Please try again" and the exact word and status go to the console.

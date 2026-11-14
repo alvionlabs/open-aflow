@@ -1,10 +1,11 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildRepoModel, type AgentRun, type BoardRepo, type ForgetRunResult, type PrStatus, type RunSummary } from '@openaflow/model'
-import { NEED_RELOAD, UNREACHABLE, type ActionReply } from '../../actions-client.ts'
+import { NEED_RELOAD, RESTARTED, UNREACHABLE, type ActionReply } from '../../actions-client.ts'
 import { ConfirmModal } from '../../components/ConfirmModal.tsx'
 import {
+  FORGET_ERRORS,
   FORGET_ITEM,
   createForgetFlow,
   forgetTarget,
@@ -208,36 +209,59 @@ describe('one request per confirm', () => {
 })
 
 describe('errors', () => {
+  afterEach(() => vi.restoreAllMocks())
+  const failWith = async (message: string, status: number) => {
+    const t = setup()
+    t.flow.open(T)
+    t.flow.forget()
+    await t.answer(0, refused(message, status))
+    return t
+  }
   const words: [string, number, string][] = [
-    ['bad request', 400, "The board couldn't read this request. Reload the page, then try again."],
-    ['not on the board', 404, "This run's repo is no longer on the board."],
-    ['not a run', 404, 'This run is no longer on the board.'],
-    ['no claim', 404, "This run's port claim is already gone."],
-    ['still listed', 404, 'The board would still list this run without its port claim, so nothing changed.'],
-    ['ambiguous repo', 409, "Another repo on the board has the same id, so the board can't tell which run to forget. Nothing changed."],
-    ['run is running', 409, 'This run is running again, so the board keeps it. Nothing changed.'],
-    ['claim changed', 409, 'The port claim file now names another run, so nothing was deleted.'],
-    ['claim unremovable', 500, "The board couldn't delete the port claim file, so the run stays."],
+    ['bad request', 400, "Something's off. Please reload and try again"],
+    ['not on the board', 404, "This repo isn't on the board anymore"],
+    ['not a run', 404, 'This run is already gone'],
+    ['no claim', 404, 'Already forgotten. Nothing to do'],
+    ['still listed', 404, 'This run would still show, so it stays'],
+    ['ambiguous repo', 409, 'Two repos share this id, so nothing changed'],
+    ['run is running', 409, 'This run just started again, so it stays'],
+    ['claim changed', 409, 'Another run took this claim, so nothing was deleted'],
+    ['claim unremovable', 500, "Couldn't remove it. Please try again"],
   ]
 
-  it('each route word maps to a sentence', async () => {
-    for (const [word, status, sentence] of words) {
-      const t = setup()
-      t.flow.open(T)
-      t.flow.forget()
-      await t.answer(0, refused(word, status))
-      expect(forgetView(t.flow.state())!.error, word).toBe(sentence)
+  it('each route word maps to its text', async () => {
+    for (const [word, status, text] of words) expect(forgetView((await failWith(word, status)).flow.state())!.error, word).toBe(text)
+  })
+
+  it('an unknown word, HTTP 500, or no answer shows the try-again text and sends the raw word and status to the console, once', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const [word, status] of [['something new', 418], ['HTTP 500', 500], ['HTTP 502', 502], [UNREACHABLE, 0], ['forbidden origin', 403], ['constructor', 400]] as const) {
+      warn.mockClear()
+      const t = await failWith(word, status)
+      expect(forgetView(t.flow.state())!.error, word).toBe('Something went wrong. Please try again')
+      forgetView(t.flow.state())
+      expect(warn, word).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0]![0]).toContain(`HTTP ${status}`)
+      expect(warn.mock.calls[0]![0]).toContain(word)
     }
   })
 
-  it("an unknown word, or the client's own message, shows as is", async () => {
-    for (const message of ['HTTP 502', NEED_RELOAD, UNREACHABLE, 'something new']) {
-      const t = setup()
-      t.flow.open(T)
-      t.flow.forget()
-      await t.answer(0, refused(message, 0))
-      expect(forgetView(t.flow.state())!.error).toBe(message)
-    }
+  it('a dead or missing token asks for a reload; it, a known word, and a dropped reply write nothing to the console', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const word of [RESTARTED, NEED_RELOAD]) expect(forgetView((await failWith(word, 403)).flow.state())!.error).toBe('The app restarted. Please reload')
+    await failWith('no claim', 404)
+    const t = setup()
+    t.flow.open(T)
+    t.flow.forget()
+    t.flow.cancel()
+    await t.answer(0, refused('something new', 418))
+    expect(t.flow.state().kind).toBe('idle')
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('no message ends with a period', () => {
+    for (const text of [...FORGET_ERRORS.values(), 'Something went wrong. Please try again', 'The app restarted. Please reload']) expect(text, text).not.toMatch(/\.$/)
+    expect(FORGET_ERRORS.size).toBe(words.length)
   })
 })
 
