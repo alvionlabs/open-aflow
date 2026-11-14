@@ -2,7 +2,8 @@
  * The shared modal (draft pick 6 c): a panel on --surface, centred on a dimmed page. The <dialog> itself is a
  * transparent frame with no padding, so a press on the panel never targets it (backdropClose in modal.ts).
  * It is 560 px wide at most, and on any screen the width less a 16 px page margin a side: 343 px at 375 px.
- * Text is --fg or --muted only; the error's red is a dot, as elsewhere on the page.
+ * Text is --fg or --muted, but for a field's own error in --danger. Any other error is the alert box: a red border,
+ * a light red tint, and a red icon.
  */
 .modal {
   width: min(560px, calc(100vw - 32px));
@@ -67,21 +68,57 @@
   position: absolute;
 }
 
-.modal-error {
-  font-size: var(--size-dense);
-  color: var(--fg);
+.modal-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   max-width: 72ch;
-  overflow-wrap: anywhere;
+  margin-top: 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--blocked);
+  border-radius: var(--radius-md);
+  /* 12% red on the panel: --fg reads 14.3:1 on it in light and 15.0:1 in dark, the red icon 4.2:1 and 5.9:1 (look.test.ts checks the text at 4.5:1). */
+  background: color-mix(in srgb, var(--blocked) 12%, var(--surface));
 }
 
-.modal-error::before {
-  content: "";
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 8px;
-  border-radius: 50%;
-  background: var(--blocked);
+/* The icon is the status red, centred on the first line of text (20 px line, 16 px icon). */
+.modal-alert svg {
+  flex: none;
+  margin-top: 2px;
+  stroke: var(--blocked);
+}
+
+.modal-alert-text {
+  font-size: var(--size-dense);
+  /* A whole-pixel line, so the icon above can sit at its exact centre. */
+  line-height: 20px;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/*
+ * A field's own error, directly under the field: red text with the alert icon, no box. --blocked is never text
+ * (tokens.test.ts), so the text is --danger, the same red as --blocked in dark; the icon is --blocked, like the
+ * invalid field's border.
+ */
+.modal-field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 72ch;
+  font-size: var(--size-dense);
+  line-height: 20px;
+  color: var(--danger);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* The 16 px icon, centred on the first 20 px line. */
+.modal-field-error svg {
+  flex: none;
+  margin-top: 2px;
+  stroke: var(--blocked);
 }
 
 .modal-actions {

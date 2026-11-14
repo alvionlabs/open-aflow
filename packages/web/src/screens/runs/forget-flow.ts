@@ -6,7 +6,7 @@
 import { forgetCheck, type BoardRepo, type ForgetRunResult, type RunSummary } from '@openaflow/model'
 import { postAction, type ActionReply } from '../../actions-client.ts'
 import { hashFor } from '../../selection.ts'
-import type { ModalView, Post } from './remove-flow.ts'
+import { refusalText, warnUnknown, type ModalView, type Post } from './remove-flow.ts'
 
 /** The ⋯ menu's item. */
 export const FORGET_ITEM = 'Forget this run'
@@ -91,6 +91,7 @@ export function createForgetFlow(
     if (state === prev) return
     onChange(state)
     if (prev.kind === 'forgetting' && state.kind === 'idle' && e.type === 'forgotten') onForgotten(prev.target, prev.after)
+    if (state.kind === 'error' && e.type === 'forgotten' && !e.reply.ok) warnUnknown('forget run', FORGET_ERRORS, e.reply)
     const s = state
     if (s.kind === 'forgetting') {
       const { repoId, run, portBase } = s.target
@@ -107,18 +108,21 @@ export function createForgetFlow(
 
 const DETAIL = 'The board stops listing this run. Its worktree and branch stay.'
 
-/** The forget-run route's words; any other message (the client's own, or a new word) shows as is. */
-const ERRORS: Record<string, string> = {
-  'bad request': "The board couldn't read this request. Reload the page, then try again.",
-  'not on the board': "This run's repo is no longer on the board.",
-  'not a run': 'This run is no longer on the board.',
-  'no claim': "This run's port claim is already gone.",
-  'still listed': 'The board would still list this run without its port claim, so nothing changed.',
-  'ambiguous repo': "Another repo on the board has the same id, so the board can't tell which run to forget. Nothing changed.",
-  'run is running': 'This run is running again, so the board keeps it. Nothing changed.',
-  'claim changed': 'The port claim file now names another run, so nothing was deleted.',
-  'claim unremovable': "The board couldn't delete the port claim file, so the run stays.",
-}
+/**
+ * The forget-run route's words. Short and warm, with no period at the end (DESIGN.md, "Forms and errors"). Any other
+ * word shows the try-again text, and the exact cause goes to the console (`refusalText`, `warnUnknown`).
+ */
+export const FORGET_ERRORS: ReadonlyMap<string, string> = new Map([
+  ['bad request', "Something's off. Please reload and try again"],
+  ['not on the board', "This repo isn't on the board anymore"],
+  ['not a run', 'This run is already gone'],
+  ['no claim', 'Already forgotten. Nothing to do'],
+  ['still listed', 'This run would still show, so it stays'],
+  ['run is running', 'This run just started again, so it stays'],
+  ['claim changed', 'Another run took this claim, so nothing was deleted'],
+  ['claim unremovable', "Couldn't remove it. Please try again"],
+  ['ambiguous repo', 'Two repos share this id, so nothing changed'],
+])
 
 /** The modal's words and state; undefined while closed. The mono lines are what a hand undo needs. */
 export function forgetView(s: ForgetState): ModalView | undefined {
@@ -132,7 +136,7 @@ export function forgetView(s: ForgetState): ModalView | undefined {
     returnFocusTo: RETURN_TO,
   }
   if (s.kind === 'forgetting') v.status = 'Forgetting…'
-  if (s.kind === 'error') v.error = ERRORS[s.message] ?? s.message
+  if (s.kind === 'error') v.error = refusalText(FORGET_ERRORS, s.message)
   return v
 }
 

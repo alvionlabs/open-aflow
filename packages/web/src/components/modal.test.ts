@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { ConfirmModal, type ConfirmModalProps } from './ConfirmModal.tsx'
+import { ModalAlert } from './ModalAlert.tsx'
 import { backdropClose, createModalEvents, keepFocusInside, returnFocus } from './modal.ts'
 import { StopList, type StopItem } from './StopList.tsx'
 
@@ -173,12 +174,30 @@ describe('shared modal', () => {
 
     // Both at once: the status, then the error, both before the buttons.
     const failed = confirm({ status: 'Checked.', error: 'Couldn’t save the board’s config.' })
-    expect(failed).toMatch(/<p[^>]*role="alert"[^>]*>Couldn’t save the board’s config\.<\/p>/)
+    // The error is the shared modal alert, the same markup as ModalAlert renders.
+    expect(failed).toContain(renderToStaticMarkup(createElement(ModalAlert, { message: 'Couldn’t save the board’s config.' })))
+    expect(failed).not.toContain('modal-error')
     const s = failed.indexOf('role="status"')
     const e = failed.indexOf('role="alert"')
     expect(s).toBeGreaterThanOrEqual(0)
     expect(e).toBeGreaterThan(s)
     expect(failed.indexOf('>Cancel<')).toBeGreaterThan(e)
+  })
+
+  it('modal alert: a box with role="alert", the alert icon, and the message', () => {
+    const html = renderToStaticMarkup(createElement(ModalAlert, { message: 'Already registered.', id: 'err-1' }))
+    const box = /^<div([^>]*)>/.exec(html)?.[1] ?? ''
+    expect(box).toMatch(/class="modal-alert"/)
+    expect(box).toMatch(/role="alert"/)
+    expect(box).toMatch(/id="err-1"/)
+    // The shared alert icon (a ring with !), hidden from assistive tech, before the message.
+    const icon = html.indexOf('<svg')
+    expect(icon).toBeGreaterThan(0)
+    expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*>.*<circle cx="8" cy="8" r="6"><\/circle><path d="M8 4\.75v3\.75M8 11\.25v\.01"><\/path><\/svg>/)
+    expect(html).toMatch(/<p class="modal-alert-text">Already registered\.<\/p>/)
+    expect(html.indexOf('Already registered.')).toBeGreaterThan(icon)
+    // No id given, no id attribute.
+    expect(renderToStaticMarkup(createElement(ModalAlert, { message: 'x' }))).not.toContain('id=')
   })
 
   it('focus stays in the dialog when its focused button goes disabled', () => {

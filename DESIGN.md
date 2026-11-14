@@ -30,3 +30,17 @@ Read this before any UI change. It holds all design rules.
 - Put status values in a fixed-width, left-aligned column, so their dots line up on one rail. The column holds the status only (dot and word), so it never wraps.
 - The status dot comes first, in a fixed-width column, everywhere.
 - Show attributes and figures (confidence, model, minutes, tokens) as tags or inline text after the title, never in the status column.
+
+## Forms and errors
+
+Decided on 2026-11-13 in the Add repo modal ([choices](pod-docs/design-drafts/add-repo-error-choices.html)).
+
+- Show each error in one place only. Never show the same error on the field and in a box.
+- An error about one field goes directly under that field: red text (`--danger`, 14 px) with the 16 px alert icon, and no box. The field gets `aria-invalid="true"` and a red border (`--blocked`), and `aria-describedby` points at the error.
+- While an invalid field has focus, its focus ring is red (`--blocked`), not blue. Never draw a blue ring around a red border.
+- Use the alert box (a 1 px `--blocked` border, a light red tint, the alert icon) only for an error that is not about one field: the app failed, the server is out of reach, or the page must reload.
+- Keep the submit button off only while the same input would fail again, such as a path that is already added. After an error where a retry can work, keep it on.
+- Open a form with its field first. A picker button fills the field; it never submits by itself.
+- Put a picker button, such as **Browse…**, on the same row as its field, at the right. On a narrow screen it may wrap under the field.
+- In a form, a field and its label or error sit 8 px apart. Groups sit 16 px apart. The actions row sits at least 24 px below the last group.
+- Keep error text short and warm: a few plain words, no period at the end, and what you can do next ('Something went wrong. Please try again'). Put the exact cause in the console.

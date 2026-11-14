@@ -1,7 +1,8 @@
 // A yes-or-no question in the shared modal: the heading, the detail, mono lines (paths, port bases), muted notes,
-// the status and the error, then Cancel (quiet) and the confirm (danger). Busy turns both buttons off.
+// the status and the error (the shared alert box), then Cancel (quiet) and the confirm (danger). Busy turns both buttons off.
 import { useId } from 'react'
 import { Modal } from './Modal.tsx'
+import { ModalAlert } from './ModalAlert.tsx'
 
 export type ConfirmModalProps = {
   heading: string
@@ -39,11 +40,7 @@ export function ConfirmModal({ heading, detail, mono, notes, confirmLabel, busy,
       <p className="muted modal-status" role="status">
         {status}
       </p>
-      {error && (
-        <p className="modal-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ModalAlert message={error} />}
       <div className="modal-actions">
         <button className="btn quiet" type="button" disabled={busy} onClick={onCancel}>
           Cancel

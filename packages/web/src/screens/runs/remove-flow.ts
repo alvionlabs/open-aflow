@@ -4,7 +4,8 @@
 // so a reply that arrives after a cancel or another open is dropped.
 
 import type { BoardRepo, RemoveRepoResult, RunSummary } from '@openaflow/model'
-import { postAction, type ActionReply } from '../../actions-client.ts'
+import { NEED_RELOAD, postAction, RESTARTED, type ActionReply } from '../../actions-client.ts'
+import { RELOAD, TRY_AGAIN } from '../../add-repo.ts'
 import type { ConfirmModalProps } from '../../components/ConfirmModal.tsx'
 import { hashFor } from '../../selection.ts'
 
@@ -77,6 +78,7 @@ export function createRemoveFlow(
     if (state === prev) return
     onChange(state)
     if (prev.kind === 'removing' && state.kind === 'idle') onRemoved(prev.target, prev.after)
+    if (state.kind === 'error' && e.type === 'removed' && !e.reply.ok) warnUnknown('remove repo', REMOVE_ERRORS, e.reply)
     const s = state
     if (s.kind === 'removing') {
       void post<RemoveRepoResult>('remove-repo', { repoId: s.target.repoId, path: s.target.path }).then((reply) => dispatch({ type: 'removed', seq: s.seq, reply }))
@@ -121,12 +123,28 @@ const isRunOf = (run: RunSummary, repoId: string, name: string) => run.repoId ==
 const DETAIL = 'The board stops watching this folder. No files change.'
 const CLAIM_NOTE = 'A running pod run also lists this repo through its port claim, so it stays in the sidebar until that run ends.'
 
-const ERRORS: Record<string, string> = {
-  'not registered': "This repo is no longer in the board's list.",
-  'not on the board': "This repo is no longer in the board's list.",
-  'config unreadable': "The board's config file can't be read, so nothing changed. Fix or delete config.json, then try again.",
-  'config unwritable': "The board couldn't save its config file, so nothing changed.",
-  'ambiguous repo': "Another repo on the board has the same id, so the board can't tell which one to remove. Nothing changed.",
+/** The remove-repo route's words. Short and warm, with no period at the end (DESIGN.md, "Forms and errors"). */
+export const REMOVE_ERRORS: ReadonlyMap<string, string> = new Map([
+  ['not registered', 'This repo is already gone'],
+  ['not on the board', 'This repo is already gone'],
+  ['config unreadable', "Can't read config.json. Please fix it and try again"],
+  ['config unwritable', "Couldn't save that. Please try again"],
+  ['ambiguous repo', 'Two repos share this id, so nothing changed'],
+])
+
+/**
+ * A refusal's text: the route word's own, the reload text for a dead or missing token, or else the try-again text.
+ * No raw server word reaches the screen.
+ */
+export function refusalText(errors: ReadonlyMap<string, string>, word: string): string {
+  if (word === RESTARTED || word === NEED_RELOAD) return RELOAD
+  return errors.get(word) ?? TRY_AGAIN
+}
+
+/** For the try-again text only: the exact cause goes to the console, once per reply, so a bug report can name it. */
+export function warnUnknown(action: string, errors: ReadonlyMap<string, string>, reply: { status: number; message: string }): void {
+  if (refusalText(errors, reply.message) !== TRY_AGAIN) return
+  console.warn(`openaflow: ${action} failed (HTTP ${reply.status}: ${reply.message})`)
 }
 
 /** The modal's words and state; undefined while closed. The path tells apart two repos with one name. */
@@ -143,7 +161,7 @@ export function confirmView(s: RemoveState): ModalView | undefined {
   // A claim keeps the repo, and its runs, on the board. A repo that is only registered gets no runs line.
   if (s.target.alsoClaimed) v.notes = [CLAIM_NOTE]
   if (s.kind === 'removing') v.status = 'Removing…'
-  if (s.kind === 'error') v.error = ERRORS[s.message] ?? s.message
+  if (s.kind === 'error') v.error = refusalText(REMOVE_ERRORS, s.message)
   return v
 }
 

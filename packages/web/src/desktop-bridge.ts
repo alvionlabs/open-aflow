@@ -4,8 +4,8 @@
 export type PickFolder = () => Promise<string | null>
 
 /**
- * The desktop shell's folder dialog, or undefined in the browser build. It opens the Windows Select Folder
- * dialog and resolves to the chosen path, or null on cancel; it rejects with `forbidden` or `dialog failed`.
+ * The desktop shell's folder dialog, or undefined in the browser build. It opens the system's folder
+ * dialog (Windows, Linux, or macOS) and resolves to the chosen path, or null on cancel; it rejects with `forbidden` or `dialog failed`.
  */
 export function folderBridge(win: unknown = globalThis.window): PickFolder | undefined {
   if (typeof win !== 'object' || win === null) return undefined

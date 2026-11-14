@@ -147,6 +147,42 @@
   padding-right: 17px;
 }
 
+/*
+ * The Add repo modal (picks 1 b and 2 b). Three groups, 16 px apart: the heading, the field group, and a system
+ * error's alert box; the actions sit 24 px below the last. Inside the field group, the label, the row, and a path
+ * error (`.modal-field-error`, in modal.css) sit 8 px apart. Scoped here, so Remove repo and Forget keep the shared modal's spacing.
+ */
+.add-repo-modal .modal-panel {
+  gap: 16px;
+}
+
+.add-repo-modal .modal-alert {
+  margin-top: 0;
+}
+
+.add-repo-modal .modal-actions {
+  margin-top: 8px;
+}
+
+.add-repo-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The path field and Browse… share a row; the field takes the rest. Under 168 px of field, Browse… wraps below. */
+.add-repo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.add-repo-row .input {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
 .banners {
   margin-bottom: 24px;
 }
