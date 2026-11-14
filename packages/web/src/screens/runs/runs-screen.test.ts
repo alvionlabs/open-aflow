@@ -524,6 +524,17 @@ describe('sibling keys', () => {
     expect(keyOf('NextStepCard')).toBeDefined()
     expect(keyOf('Flow')).not.toBe(keyOf('NextStepCard'))
   })
+
+  // Found in the browser: with one key, switching runs left the last run's Auto-continue button beside the new
+  // one, and a press on it posted the toggle for the run you had left.
+  it('Auto-continue and the ⋯ menu, siblings in the header, never share a key', async () => {
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync(new URL('./RunsScreen.tsx', import.meta.url), 'utf8')
+    const keyOf = (tag: string) => new RegExp(`<${tag}\\s+key=\{([^}]+\}?)\}`).exec(src)?.[1]
+    expect(keyOf('AutoContinueButton')).toBeDefined()
+    expect(keyOf('BarMenu')).toBeDefined()
+    expect(keyOf('AutoContinueButton')).not.toBe(keyOf('BarMenu'))
+  })
 })
 
 describe('urgent banner', () => {

@@ -76,6 +76,7 @@ flowchart LR
 - Each `.flow-step` keeps `position: relative`: it holds its `.sr-only` word. Measure the connectors against `.flow`, not `.flow-scroll` (4 px padding given back by a -4 px margin, and only the visible width on phones).
 - The flow's scroll box (`.flow-scroll`) is the positioned parent of the cards' `.sr-only` words; without `position: relative` they escape it and widen the page (828 px at 375 px).
 - `Flow` and `NextStepCard` are siblings: key them differently (`flow:<run>` and `<run>`). A shared key left the last run's flow on screen after a run switch.
+- `AutoContinueButton` and `BarMenu` are siblings in the header's `.run-actions`: key them differently (`auto:<run>` and `<run>`). A shared key left the last run's button beside the new one after a run switch, and a press on it toggled the run you had left.
 - `pod-staging` is reused by every plan, and pod's gate 7 reuses an open `pod-staging` → `main` PR, so its number can be below the final PR's: never compare numbers. An open one counts; a merged one counts only when it merged after the final PR (`mergedAt`). gh re-asks the staging branch even after a merge (`refresh(…, staging)`).
 - The chess-web fixture's `## Look` sections are empty (scrubbed), so Look picked reads `not recorded` there.
 - Two repos with the same folder name show as two identical rows (queue, someday). Their cards now differ by run name, but the muted repo line still reads the same.

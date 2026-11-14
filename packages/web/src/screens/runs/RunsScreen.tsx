@@ -208,10 +208,10 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
     />
   )
   // The run header's right end: Auto-continue (plan and fix runs) just left of the ⋯ menu. Keyed by run, so a
-  // failed save's message stays with its own run.
+  // failed save's message stays with its own run. Its own key: the ⋯ menu beside it is keyed by run too.
   const headerActions = (
     <div className="run-actions">
-      {selected?.plan !== undefined && autoSwitch && <AutoContinueButton key={runKey} target={{ repoId: selected.repoId, run: selected.plan }} on={autoSwitch.on} />}
+      {selected?.plan !== undefined && autoSwitch && <AutoContinueButton key={`auto:${runKey}`} target={{ repoId: selected.repoId, run: selected.plan }} on={autoSwitch.on} />}
       {menu}
     </div>
   )
