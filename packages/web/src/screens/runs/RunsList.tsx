@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import type { BoardRepo, RunSummary } from '@openaflow/model'
 import { hashFor } from '../../selection.ts'
+import { Icon } from '../../theme/icons.tsx'
 import { moreButtonId, moreName, repoOfRun } from './remove-flow.ts'
 import { RunMoreMenu } from './RunMoreMenu.tsx'
 import { runTag } from './plan-view.ts'
@@ -14,7 +15,7 @@ type Props = {
   removable?: (run: RunSummary) => boolean
   /** Remove repo, picked from a card's ⋯ menu: it opens the screen's confirm modal. */
   onRemove?: (run: RunSummary) => void
-  /** Whether the board sends `continue` for this run by itself (`switchView`): the card gets the `auto` tag. */
+  /** Whether the board sends `continue` for this run by itself (`switchView`): the card gets the fast-forward icon. */
   auto?: (run: RunSummary) => boolean
 }
 
@@ -32,8 +33,8 @@ const breakAfterUnderscores = (text: string) =>
   ))
 
 /**
- * The runs: one card each with the run header's name, its state as a dot and a word (then the `auto` tag when
- * auto-continue is on), and its repo as a muted line with the `task` or `fix` tag (`runTag`). Beside each card's link, never inside it, a ⋯ button when its repo can be removed. A
+ * The runs: one card each with the run header's name (then, while auto-continue is on, a fast-forward icon in the
+ * card's top-right corner, on the title row), its state as a dot and a word, and its repo as a muted line with the `task` or `fix` tag (`runTag`). Beside each card's link, never inside it, a ⋯ button when its repo can be removed. A
  * hyphen or an underscore is a line break opportunity, so such a word gets its own box to stay whole when it fits.
  */
 export function RunsList({ runs, selected, repos, removable, onRemove, auto }: Props) {
@@ -50,7 +51,7 @@ export function RunsList({ runs, selected, repos, removable, onRemove, auto }: P
             const more = onRemove && removable?.(r)
             const isAuto = auto?.(r) === true
             // In plain text: a <wbr> would read as a space in the link's accessible name.
-            const label = [card.name, state.label, isAuto ? 'auto' : undefined, card.repo, tag].filter((part) => part !== undefined).join(' ')
+            const label = [card.name, state.label, isAuto ? 'auto-continue on' : undefined, card.repo, tag].filter((part) => part !== undefined).join(' ')
             return (
               // Two repos can share an id (and so a hash); the repo name keeps the keys apart.
               <li key={`${href}|${r.repo}`} className="run-item">
@@ -65,8 +66,12 @@ export function RunsList({ runs, selected, repos, removable, onRemove, auto }: P
                           </Fragment>
                         ))}
                       </b>
+                      {isAuto && (
+                        <span className="run-auto" role="img" aria-label="Auto-continue on" title="Auto-continue on">
+                          <Icon name="fast-forward" />
+                        </span>
+                      )}
                       <span className={`status ${state.cls}`}>{state.label}</span>
-                      {isAuto && <span className="chip tag">auto</span>}
                       <span className="run-line">
                         {card.repo !== undefined && <span className="run-repo muted">{breakAfterUnderscores(card.repo)}</span>}
                         {tag && <span className="chip tag">{tag}</span>}

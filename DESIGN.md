@@ -20,6 +20,7 @@ Read this before any UI change. It holds all design rules.
 - Never use text glyphs (`+`, `⋯`, `↑`) as icons; use SVG icons from the shared set.
 - Size inline controls such as breadcrumbs to their text; never give them a fixed min-width that leaves uneven gaps.
 - Icon-only buttons such as ⋯ use the ghost style (`.btn.ghost`): transparent at rest, a see-through fill on hover, focus, and while open, and the normal focus ring.
+- A toggle that changes how a run behaves is a button with a pressed look (`aria-pressed`) where you watch the run, not a switch hidden in a menu.
 - Danger menu items use red text on a light red tint on hover and focus (color-mix of `--danger` at 14%, 18% on press), at 4.5:1 or more.
 
 ## Spacing

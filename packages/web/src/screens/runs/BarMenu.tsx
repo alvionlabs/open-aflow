@@ -1,14 +1,10 @@
 import type { RefObject } from 'react'
 import { Icon } from '../../theme/icons.tsx'
 import type { ChoiceStorage } from '../../theme/theme.ts'
-import { AutoContinueSwitch } from './AutoContinueSwitch.tsx'
 import { ForgetRunItem, RemoveRepoItem, useMenu } from './menu-parts.tsx'
-import { runKey } from './menu-view.ts'
-import type { RunTarget } from './resume-flow.ts'
 import { ThemeControl } from './ThemeControl.tsx'
 import './menu.css'
 
-type AutoContinue = { target: RunTarget; on: boolean }
 /** The menu's last items, each after a confirm: Forget drops the selected run's claim, Remove its repo. */
 type MenuAction = { onPick: () => void }
 
@@ -18,10 +14,8 @@ export const MENU_TRIGGER_ID = 'run-menu-trigger'
 export type BarMenuViewProps = {
   open: boolean
   onToggle: () => void
-  /** Called when a theme is picked or the switch is pressed; the menu stays open. */
+  /** Called when a theme is picked; the menu stays open. */
   onThemePick?: () => void
-  onSwitchPress?: () => void
-  autoContinue?: AutoContinue
   portBase?: number
   forget?: MenuAction
   remove?: MenuAction
@@ -32,7 +26,7 @@ export type BarMenuViewProps = {
 }
 
 /** The trigger and, when open, the menu. */
-export function BarMenuView({ open, onToggle, onThemePick, onSwitchPress, autoContinue, portBase, forget, remove, storage, triggerRef, menuRef }: BarMenuViewProps) {
+export function BarMenuView({ open, onToggle, onThemePick, portBase, forget, remove, storage, triggerRef, menuRef }: BarMenuViewProps) {
   return (
     <div className="bar-menu">
       <button ref={triggerRef} id={MENU_TRIGGER_ID} type="button" className="btn sm icon ghost" aria-label="Menu" aria-expanded={open} onClick={onToggle}>
@@ -40,15 +34,6 @@ export function BarMenuView({ open, onToggle, onThemePick, onSwitchPress, autoCo
       </button>
       {open && (
         <div ref={menuRef} className="menu bar-menu-panel" role="group" aria-label="Menu">
-          {autoContinue && (
-            <>
-              <div className="mi">
-                <AutoContinueSwitch target={autoContinue.target} on={autoContinue.on} onPress={onSwitchPress} />
-                <span className="mi-note">this run</span>
-              </div>
-              <hr />
-            </>
-          )}
           <div className="mi mi-block">
             <ThemeControl storage={storage} onPick={onThemePick} />
           </div>
@@ -67,16 +52,17 @@ export function BarMenuView({ open, onToggle, onThemePick, onSwitchPress, autoCo
   )
 }
 
-/** The bar's ⋯ menu: the run's auto-continue switch, the theme, the run's port base, Forget this run, and Remove repo. */
-export function BarMenu({ autoContinue, portBase, forget, remove }: { autoContinue?: AutoContinue; portBase?: number; forget?: MenuAction; remove?: MenuAction }) {
-  const { open, send, triggerRef, menuRef } = useMenu(runKey(autoContinue))
+/**
+ * The run header's ⋯ menu: the theme, the run's port base, Forget this run, and Remove repo. Auto-continue is a
+ * button in the run header, not here. The screen keys the menu by run, so a new run gets a closed menu.
+ */
+export function BarMenu({ portBase, forget, remove }: { portBase?: number; forget?: MenuAction; remove?: MenuAction }) {
+  const { open, send, triggerRef, menuRef } = useMenu('')
   return (
     <BarMenuView
       open={open}
       onToggle={() => send('toggle')}
       onThemePick={() => send('pick-theme')}
-      onSwitchPress={() => send('press-switch')}
-      autoContinue={autoContinue}
       portBase={portBase}
       {...(forget ? { forget: { onPick: () => (send('pick-remove'), forget.onPick()) } } : {})}
       {...(remove ? { remove: { onPick: () => (send('pick-remove'), remove.onPick()) } } : {})}

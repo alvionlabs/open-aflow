@@ -7,6 +7,7 @@ import { returnFocus } from '../../components/modal.ts'
 import { Icon } from '../../theme/icons.tsx'
 import { BoardScreen } from '../board/BoardScreen.tsx'
 import { AddRepoDialog } from './AddRepoDialog.tsx'
+import { AutoContinueButton } from './AutoContinueButton.tsx'
 import { BarMenu } from './BarMenu.tsx'
 import { Flow } from './Flow.tsx'
 import { Chip } from './Chip.tsx'
@@ -201,11 +202,18 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
   const menu = (
     <BarMenu
       key={runKey}
-      autoContinue={selected?.plan !== undefined && autoSwitch ? { target: { repoId: selected.repoId, run: selected.plan }, on: autoSwitch.on } : undefined}
       portBase={selected?.portBase}
       {...(toForget ? { forget: { onPick: () => forgetFlow.open(toForget) } } : {})}
       {...(toRemove ? { remove: { onPick: () => removeFlow.open(toRemove) } } : {})}
     />
+  )
+  // The run header's right end: Auto-continue (plan and fix runs) just left of the ⋯ menu. Keyed by run, so a
+  // failed save's message stays with its own run. Its own key: the ⋯ menu beside it is keyed by run too.
+  const headerActions = (
+    <div className="run-actions">
+      {selected?.plan !== undefined && autoSwitch && <AutoContinueButton key={`auto:${runKey}`} target={{ repoId: selected.repoId, run: selected.plan }} on={autoSwitch.on} />}
+      {menu}
+    </div>
   )
 
   return (
@@ -271,7 +279,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
             </div>
           ) : view === 'board' && pipeline && selected.plan !== undefined ? (
             <>
-              {header && <RunHeader header={header} actions={menu} />}
+              {header && <RunHeader header={header} actions={headerActions} />}
               <p className="back">
                 <a href={hashFor(selected)}>Back to the run</a>
               </p>
@@ -280,21 +288,7 @@ export function RunsScreen({ board, stream, runs, selected, view, slice, agent, 
           ) : (
             <>
               {header && (
-                <RunHeader
-                  header={header}
-                  titleRef={runTitle}
-                  actions={
-                    <div className="run-actions">
-                      {pipeline && (
-                        <a className="btn sm quiet board-link" href={hashFor(selected, 'board')} aria-label="Open the wave board">
-                          <span className="board-link-long">Open the wave board</span>
-                          <span className="board-link-short">Wave board</span>
-                        </a>
-                      )}
-                      {menu}
-                    </div>
-                  }
-                />
+                <RunHeader header={header} titleRef={runTitle} actions={headerActions} {...(pipeline ? { boardHref: hashFor(selected, 'board') } : {})} />
               )}
               <Flow key={`flow:${runKey}`} stages={stages} />
               {steps && <NextStepCard key={runKey} repo={repo} run={selected} card={steps.card} />}

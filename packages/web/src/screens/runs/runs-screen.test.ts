@@ -4,10 +4,13 @@ import { buildRepoModel, listRuns, type Board, type BoardRepo, type Claim, type 
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { loadFixture } from '../../../../model/test/load-fixture.ts'
+import type { ActionReply } from '../../actions-client.ts'
 import type { StreamState } from '../../board-stream.ts'
 import { hashFor, type View } from '../../selection.ts'
+import { AutoContinueButtonView } from './AutoContinueButton.tsx'
 import { MENU_TRIGGER_ID } from './BarMenu.tsx'
 import { confirmView, moreButtonId, removeTarget } from './remove-flow.ts'
+import { createToggleFlow, toggleView, type Post, type ToggleState } from './resume-flow.ts'
 import { RunsList } from './RunsList.tsx'
 import { RunsScreen } from './RunsScreen.tsx'
 import type { TabStorage } from './tab-memory.ts'
@@ -77,11 +80,11 @@ function storage(value: string | null = null): TabStorage {
   }
 }
 
-type Render = { repo: BoardRepo; others?: BoardRepo[]; run?: RunSummary; plan?: string; view?: View; stream?: StreamState; tab?: string | null; agent?: string }
+type Render = { repo: BoardRepo; others?: BoardRepo[]; run?: RunSummary; plan?: string; view?: View; stream?: StreamState; tab?: string | null; agent?: string; auto?: boolean }
 
 /** The screen's markup for a Board of `repo` (then `others`), the run of `repo` picked by plan (or given). */
-function render({ repo, others = [], run, plan = PLAN, view = 'pipeline', stream = 'live', tab = null, agent }: Render): { html: string; run: RunSummary } {
-  const board = boardOf(repo, ...others)
+function render({ repo, others = [], run, plan = PLAN, view = 'pipeline', stream = 'live', tab = null, agent, auto = false }: Render): { html: string; run: RunSummary } {
+  const board: Board = { ...boardOf(repo, ...others), ...(auto ? { autoContinue: [{ repoId: repo.id, run: run?.plan ?? plan }] } : {}) }
   const runs = listRuns(board, NOW)
   const selected = run ?? runs.find((r) => r.repoId === repo.id && r.plan === plan)
   if (!selected) throw new Error(`no run ${plan}`)
@@ -252,15 +255,9 @@ describe('run flow', () => {
     // The fold line for phones: the current step, with its mark, closed at start.
     expect(flow.markup).toMatch(/<button[^>]*class="flow-fold"[^>]*aria-expanded="false"[^>]*>[\s\S]*?<svg[\s\S]*?Wave 3 · PR #78 · you merge[\s\S]*?<\/button>/)
     expect(flow.markup).not.toMatch(/class="flow-frame open"/)
-    // The wave board link sits in the run header, before the ⋯ menu; not in the flow.
+    // The wave board link sits in the header's progress row (see its own tests); not in the flow.
     expect(flow.markup).not.toMatch(/Open the wave board/)
-    const header = headerOf(html)
-    const link = new RegExp(`<a[^>]*class="btn sm quiet board-link"[^>]*href="${hashFor(run, 'board').replace(/[/#]/g, (c) => `\\${c}`)}"[^>]*>([\\s\\S]*?)</a>`).exec(header)
-    expect(link, 'the board link').not.toBeNull()
-    // The full label on desktop; a short one on phones, so the plan name keeps one line beside the menu.
-    expect(link![0]).toMatch(/aria-label="Open the wave board"/)
-    expect(link![1]).toBe('<span class="board-link-long">Open the wave board</span><span class="board-link-short">Wave board</span>')
-    expect(header.indexOf('board-link')).toBeLessThan(header.indexOf('aria-label="Menu"'))
+    expect(partsOf(html).meta).toContain(`href="${hashFor(run, 'board')}"`)
   })
 
   it('several sprints stack in one Sprint column: five columns whatever the sprint count', () => {
@@ -418,8 +415,9 @@ describe('sidebar', () => {
     // No slash crumb and no eyebrow above the title.
     expect(header).not.toMatch(/run-crumb|eyebrow/)
     expect(text(header)).not.toMatch(/\//)
-    // The wave board link and the menu stay at the right end.
-    expect(header.indexOf('Open the wave board')).toBeGreaterThan(header.indexOf('run-sub'))
+    // Auto-continue and the menu stay at the right end; the wave board link moved to the progress row.
+    expect(header.indexOf('auto-button')).toBeGreaterThan(header.indexOf('run-sub'))
+    expect(header.indexOf('Open the wave board')).toBeGreaterThan(header.indexOf('class="run-meta"'))
   })
 
   it('heads a fix run with its readable slug while it has no PR', () => {
@@ -526,6 +524,17 @@ describe('sibling keys', () => {
     expect(keyOf('NextStepCard')).toBeDefined()
     expect(keyOf('Flow')).not.toBe(keyOf('NextStepCard'))
   })
+
+  // Found in the browser: with one key, switching runs left the last run's Auto-continue button beside the new
+  // one, and a press on it posted the toggle for the run you had left.
+  it('Auto-continue and the ⋯ menu, siblings in the header, never share a key', async () => {
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync(new URL('./RunsScreen.tsx', import.meta.url), 'utf8')
+    const keyOf = (tag: string) => new RegExp(`<${tag}\\s+key=\{([^}]+\}?)\}`).exec(src)?.[1]
+    expect(keyOf('AutoContinueButton')).toBeDefined()
+    expect(keyOf('BarMenu')).toBeDefined()
+    expect(keyOf('AutoContinueButton')).not.toBe(keyOf('BarMenu'))
+  })
 })
 
 describe('urgent banner', () => {
@@ -605,5 +614,94 @@ describe('one remove modal', () => {
     expect(list).not.toContain('PANEL')
     // Nothing is open at start.
     expect(render({ repo }).html).not.toMatch(/<dialog|remove-confirm/)
+  })
+})
+
+/** The header's top row (title, Auto-continue, ⋯) and its progress row (strip, wave, wave board link). */
+function partsOf(html: string): { top: string; meta: string } {
+  const header = headerOf(html)
+  const at = header.indexOf('<div class="run-meta"')
+  return { top: at < 0 ? header : header.slice(0, at), meta: at < 0 ? '' : header.slice(at) }
+}
+const FAST_FORWARD = 'M2 3.5l5.5 4.5L2 12.5zM8.5 3.5L14 8l-5.5 4.5z'
+const PAUSE = 'M5.5 3.5v9M10.5 3.5v9'
+/** The Auto-continue button's markup, or undefined. */
+const autoButtonOf = (html: string) => /<button[^>]*class="btn sm lead auto-button"[^>]*>[\s\S]*?<\/button>/.exec(html)?.[0]
+
+describe('Auto-continue button in the run header', () => {
+  it('on: pressed, with the fast-forward icon, just left of the ⋯ menu', () => {
+    const { top } = partsOf(render({ repo: chess([onlyQueue()]), auto: true }).html)
+    const button = autoButtonOf(top)
+    expect(button, 'the button').toBeDefined()
+    expect(button).toMatch(/aria-pressed="true"/)
+    expect(button).toContain(`d="${FAST_FORWARD}"`)
+    expect(button).not.toContain(`d="${PAUSE}"`)
+    expect(text(button!).trim()).toBe('Auto-continue')
+    expect(top.indexOf('auto-button')).toBeLessThan(top.indexOf('aria-label="Menu"'))
+    // One control: no switch anywhere on the page.
+    expect(top).not.toMatch(/role="switch"/)
+  })
+
+  it('off: not pressed, with the pause icon', () => {
+    const { top } = partsOf(render({ repo: chess([onlyQueue()]) }).html)
+    const button = autoButtonOf(top)
+    expect(button, 'the button').toBeDefined()
+    expect(button).toMatch(/aria-pressed="false"/)
+    expect(button).toContain(`d="${PAUSE}"`)
+    expect(button).not.toContain(`d="${FAST_FORWARD}"`)
+  })
+
+  it('shows on a fix run and on the wave board view, as the ⋯ switch did', () => {
+    const claim: Claim = { portBase: 3100, repoPath: '/c', plan: 'fix-scroll' }
+    const fix = autoButtonOf(partsOf(render({ repo: chess([], { claims: [claim] }), plan: 'fix-scroll', auto: true }).html).top)
+    const board = autoButtonOf(partsOf(render({ repo: chess(), view: 'board' }).html).top)
+    expect(fix, 'on the fix run').toBeDefined()
+    expect(board, 'on the wave board').toBeDefined()
+    expect(fix).toMatch(/aria-pressed="true"/)
+    expect(board).toMatch(/aria-pressed="false"/)
+  })
+
+  it('a press posts the toggle; a refused post shows its error under the button, and the button stays off', async () => {
+    const posts: { path: string; body: object }[] = []
+    const refuse: Post = async <T,>(path: string, body: object) => {
+      posts.push({ path, body })
+      return { ok: false, status: 409, message: 'not a run' } as ActionReply<T>
+    }
+    let state: ToggleState | undefined
+    const flow = createToggleFlow({ repoId: 'chess', run: PLAN }, (s) => (state = s), refuse)
+    flow.board(false)
+    flow.press()
+    expect(posts).toEqual([{ path: 'auto-continue', body: { repoId: 'chess', run: PLAN, on: true } }])
+    // While it saves, the button shows the value asked for and takes no second press.
+    const saving = renderToStaticMarkup(createElement(AutoContinueButtonView, { view: toggleView(false, state!), onPress: () => {} }))
+    expect(saving).toMatch(/aria-pressed="true"[^>]*disabled=""|disabled=""[^>]*aria-pressed="true"/)
+    await Promise.resolve()
+    await Promise.resolve()
+    const html = renderToStaticMarkup(createElement(AutoContinueButtonView, { view: toggleView(false, state!), onPress: () => {} }))
+    expect(html).toMatch(/aria-pressed="false"/)
+    expect(html).toMatch(/<span id="auto-continue-error" class="auto-continue-error" role="alert">not a run<\/span>/)
+    expect(html).toMatch(/aria-describedby="auto-continue-error"/)
+  })
+})
+
+describe('Open the wave board in the progress row', () => {
+  it('sits at the right end of the progress row, after the wave, not in the header top row', () => {
+    const { html, run } = render({ repo: chess([onlyQueue()]) })
+    const { top, meta } = partsOf(html)
+    expect(top).not.toMatch(/wave board/i)
+    const link = /<a[^>]*class="btn sm trail quiet board-link"[^>]*>[\s\S]*?<\/a>/.exec(meta)?.[0]
+    expect(link, 'the link in the progress row').toBeDefined()
+    expect(link).toContain(`href="${hashFor(run, 'board')}"`)
+    expect(link).toMatch(/aria-label="Open the wave board"/)
+    // Full label on desktop, short on phones, then a right arrow.
+    expect(link).toMatch(/<span class="board-link-long">Open the wave board<\/span><span class="board-link-short">Wave board<\/span><svg/)
+    expect(link).toContain('d="M3 8h9.5M8 3.5L12.5 8 8 12.5"')
+    expect(meta.indexOf('run-wave')).toBeLessThan(meta.indexOf('board-link'))
+  })
+
+  it('a fix run and the wave board view have none', () => {
+    const claim: Claim = { portBase: 3100, repoPath: '/c', plan: 'fix-scroll' }
+    expect(headerOf(render({ repo: chess([], { claims: [claim] }), plan: 'fix-scroll' }).html)).not.toMatch(/wave board/i)
+    expect(headerOf(render({ repo: chess(), view: 'board' }).html)).not.toMatch(/Open the wave board/)
   })
 })

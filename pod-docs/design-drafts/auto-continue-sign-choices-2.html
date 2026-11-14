@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auto-continue sign, round 2: positions</title>
+<style>
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-400.woff2") format("woff2"); font-weight:400; }
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-500.woff2") format("woff2"); font-weight:500; }
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-600.woff2") format("woff2"); font-weight:600; }
+  @font-face { font-family:"Geist Mono"; src:url("../../packages/web/public/fonts/geist-mono-400.woff2") format("woff2"); font-weight:400; }
+
+  :root { color-scheme: light dark; --pg-bg: light-dark(#fff, #111); --pg-fg: light-dark(#171717, #ededed); --pg-muted: light-dark(#666, #a1a1a1); --pg-line: light-dark(#eaeaea, #2a2a2a); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--pg-bg); color: var(--pg-fg); font: 16px/24px "Geist", system-ui, sans-serif; }
+  main { max-width: 1320px; margin-inline: auto; padding: 40px 24px 80px; display: grid; gap: 56px; }
+  h1 { margin: 0 0 8px; font-size: 32px; line-height: 40px; }
+  h2 { margin: 0 0 4px; font-size: 22px; }
+  .lead, .q > p { margin: 0; color: var(--pg-muted); max-width: 84ch; }
+  .cols { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 16px; align-items: start; }
+  .col { display: grid; gap: 8px; }
+  .col.narrow { width: 300px; }
+  .col.wide { width: 100%; max-width: 1000px; }
+  .col h3 { margin: 0; font-size: 16px; font-weight: 600; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .col .cap { margin: 0; font-size: 14px; color: var(--pg-muted); }
+  .tagx { font: 500 12px/18px "Geist", sans-serif; padding: 0 8px; border-radius: 999px; border: 1px solid var(--pg-line); color: var(--pg-muted); }
+  .tagx.rec { border-color: #3ecf72; color: #3ecf72; }
+  .why { margin: 12px 0 0; font-size: 14px; color: var(--pg-muted); }
+  .reply { font: 500 18px "Geist", sans-serif; padding: 16px 20px; border: 1px solid var(--pg-line); border-radius: 12px; }
+  .state { font: 12px "Geist Mono", monospace; letter-spacing: .04em; text-transform: uppercase; color: var(--pg-muted); }
+
+  .app { --bg:#000; --surface:#0a0a0a; --hover:#1a1a1a; --border:#262626; --border-strong:#3a3a3a; --fg:#ededed; --muted:#a1a1a1; --running:#52a8ff; --idle:#8f8f8f; --ready:#3ecf72;
+    background: var(--bg); color: var(--fg); font-family: "Geist", sans-serif; padding: 20px 24px; border-radius: 12px; border: 1px solid var(--pg-line); }
+  .card { display: grid; gap: 4px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .card .row1 { display: flex; align-items: baseline; gap: 8px; }
+  .card .name { font-size: 16px; font-weight: 500; flex: 1; min-width: 0; }
+  .card .st { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+  .card .row3 { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .card .row3 .grow { flex: 1; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); flex: none; }
+  .auto { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .auto svg { width: 14px; height: 14px; stroke: var(--running); }
+  .head { display: flex; align-items: flex-start; gap: 8px; }
+  .head .t { flex: 1; min-width: 0; }
+  .head h4 { margin: 0; font-size: 24px; font-weight: 600; line-height: 32px; }
+  .sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; font: 500 14px/1 "Geist", sans-serif; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--fg); white-space: nowrap; }
+  .btn.pressed { background: color-mix(in srgb, var(--running) 14%, var(--bg)); border-color: color-mix(in srgb, var(--running) 55%, var(--border-strong)); }
+  .btn.off { color: var(--muted); }
+  .btn.off svg { stroke: var(--muted); }
+  .btn.ghost { border-color: transparent; color: var(--muted); }
+  .btn svg { width: 16px; height: 16px; stroke: var(--running); }
+  .btn.quiet { height: 28px; padding: 0 8px; border-color: transparent; color: var(--muted); font-size: 13px; }
+  .metarow { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
+  .strip { display: flex; gap: 4px; }
+  .strip i { width: 16px; height: 4px; border-radius: 2px; background: var(--border-strong); }
+  .strip i.d { background: var(--fg); }
+  .wave { font: 13px "Geist Mono", monospace; color: var(--muted); }
+  .grow { flex: 1; }
+  .flowhead { display: flex; align-items: center; margin-top: 24px; }
+  .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-top: 8px; }
+  .flow .lab { font: 12px "Geist Mono", monospace; letter-spacing: .06em; color: var(--muted); }
+  .flow .box { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+  .flow .box small { display: block; font: 12px "Geist Mono", monospace; color: var(--muted); }
+  .mark { outline: 1px dashed #f5a623; outline-offset: 3px; border-radius: 6px; }
+  .legend { font-size: 13px; color: var(--pg-muted); margin: 8px 0 0; }
+  .legend i { display: inline-block; width: 14px; height: 10px; outline: 1px dashed #f5a623; margin-right: 6px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="loop" viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.25 6.5A5.25 5.25 0 0 0 3.6 4.4M2.75 9.5a5.25 5.25 0 0 0 9.65 2.1"/><path d="M3.25 2v2.75H6M12.75 14v-2.75H10"/></symbol>
+  <symbol id="more" viewBox="0 0 16 16"><circle cx="3" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="13" cy="8" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="arrow" viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></symbol>
+</svg>
+<main>
+<header>
+  <h1>Auto-continue sign, round 2: positions</h1>
+  <p class="lead">You picked the loop icon with "Auto" on the card, and a button by ⋯ in the run view, labelled just "Auto-continue". These are the places left to decide. <a href="auto-continue-sign-choices.html" style="color:inherit">Round 1</a>.</p>
+</header>
+
+<section class="q">
+  <h2>1. Where "Auto" sits on the sidebar card</h2>
+  <p>Now it sits after the status, which <code>DESIGN.md</code> keeps for the status only (dot and word). Same card in each option.</p>
+  <div class="cols">
+    <div class="col narrow"><h3>a. On the repo line, at the right <span class="tagx rec">recommended</span></h3><p class="cap">The bottom line holds facts about the run; the status line stays clean.</p>
+      <div class="app" style="padding:16px"><div class="card"><div class="row1"><span class="name">Sparring ladder to Liem</span></div><span class="st"><span class="dot"></span>idle</span><span class="row3"><span class="grow">chess-web</span><span class="auto mark"><svg><use href="#loop"/></svg>Auto</span></span></div></div></div>
+    <div class="col narrow"><h3>b. After the title</h3><p class="cap">Where <code>DESIGN.md</code> puts tags. Long titles push it to a new line.</p>
+      <div class="app" style="padding:16px"><div class="card"><div class="row1"><span class="name">Sparring ladder to Liem</span><span class="auto mark"><svg><use href="#loop"/></svg>Auto</span></div><span class="st"><span class="dot"></span>idle</span><span class="row3">chess-web</span></div></div></div>
+    <div class="col narrow"><h3>c. Top-right corner, icon only</h3><p class="cap">Smallest. The word moves into the tooltip.</p>
+      <div class="app" style="padding:16px"><div class="card"><div class="row1"><span class="name">Sparring ladder to Liem</span><span class="auto mark" title="Auto-continue on"><svg><use href="#loop"/></svg></span></div><span class="st"><span class="dot"></span>idle</span><span class="row3">chess-web</span></div></div></div>
+  </div>
+  <p class="legend"><i></i>Dashed outline: the piece that differs (not part of the design).</p>
+  <p class="why">Why a: it follows the design rule (status column holds the status only), it never wraps under a long title, and the bottom line already holds facts about the run.</p>
+</section>
+
+<section class="q">
+  <h2>2. How the "Auto-continue" button shows on and off</h2>
+  <p>The button is a switch: one press turns it on or off. Its label stays "Auto-continue"; only its look changes.</p>
+  <div class="cols">
+    <div class="col narrow"><h3>a. Pressed look when on <span class="tagx rec">recommended</span></h3><p class="cap">On: a blue tint and a blue icon. Off: a plain button with a grey icon.</p>
+      <div class="app" style="display:grid;gap:12px"><span class="state">On</span><span><span class="btn pressed mark"><svg><use href="#loop"/></svg>Auto-continue</span></span><span class="state">Off</span><span><span class="btn off mark"><svg><use href="#loop"/></svg>Auto-continue</span></span></div></div>
+    <div class="col narrow"><h3>b. A small switch inside the button</h3><p class="cap">Clearer on/off, but wider: what you wanted to avoid.</p>
+      <div class="app" style="display:grid;gap:12px"><span class="state">On</span><span><span class="btn mark">Auto-continue <span style="width:28px;height:16px;border-radius:8px;background:#52a8ff;display:inline-block;position:relative"><span style="position:absolute;right:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#000"></span></span></span></span><span class="state">Off</span><span><span class="btn mark">Auto-continue <span style="width:28px;height:16px;border-radius:8px;background:#3a3a3a;display:inline-block;position:relative"><span style="position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#a1a1a1"></span></span></span></span></div></div>
+  </div>
+  <p class="legend"><i></i>Dashed outline: the piece that differs (not part of the design).</p>
+  <p class="why">Why a: it keeps the button as narrow as the label, and a pressed look is the usual sign of a toggle button (screen readers get <code>aria-pressed</code>).</p>
+</section>
+
+<section class="q">
+  <h2>3. Where "Open the wave board" goes</h2>
+  <p>You asked to move it near the flow diagram, so the header holds only Auto-continue and ⋯. Shown with Auto-continue on.</p>
+  <div class="cols">
+    <div class="col wide"><h3>a. At the right end of the progress row <span class="tagx rec">recommended</span></h3><p class="cap">The row with the progress strip and "Wave 3 of 3" sits right above the flow, and the link names where the waves are.</p>
+      <div class="app">
+        <div class="head"><div class="t"><h4>Sparring ladder to Liem</h4><p class="sub">chess-web · Plan · started 27 days ago</p></div><span class="btn pressed"><svg><use href="#loop"/></svg>Auto-continue</span><span class="btn ghost"><svg style="stroke:none;fill:currentColor"><use href="#more"/></svg></span></div>
+        <div class="metarow"><span class="strip"><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i></span><span class="wave">Wave 3 of 3</span><span class="grow"></span><span class="btn quiet mark">Open the wave board<svg style="stroke:currentColor;width:14px;height:14px"><use href="#arrow"/></svg></span></div>
+        <div class="flow" style="margin-top:20px"><div><span class="lab">THINK</span><div class="box">Research<small>no research</small></div></div><div><span class="lab">YOU</span><div class="box">Look picked<small>not recorded</small></div></div><div><span class="lab">SPRINT 1 OF 1</span><div class="box">Wave 1<small>3 slices</small></div></div><div><span class="lab">CHECK</span><div class="box">Final review<small>not started</small></div></div><div><span class="lab">SHIP</span><div class="box">Final PR<small>not open yet</small></div></div></div>
+      </div></div>
+    <div class="col wide"><h3>b. Under the flow, at the right</h3><p class="cap">Right after the diagram, as "see more of this".</p>
+      <div class="app">
+        <div class="head"><div class="t"><h4>Sparring ladder to Liem</h4><p class="sub">chess-web · Plan · started 27 days ago</p></div><span class="btn pressed"><svg><use href="#loop"/></svg>Auto-continue</span><span class="btn ghost"><svg style="stroke:none;fill:currentColor"><use href="#more"/></svg></span></div>
+        <div class="metarow"><span class="strip"><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i></span><span class="wave">Wave 3 of 3</span></div>
+        <div class="flow" style="margin-top:20px"><div><span class="lab">THINK</span><div class="box">Research<small>no research</small></div></div><div><span class="lab">YOU</span><div class="box">Look picked<small>not recorded</small></div></div><div><span class="lab">SPRINT 1 OF 1</span><div class="box">Wave 1<small>3 slices</small></div></div><div><span class="lab">CHECK</span><div class="box">Final review<small>not started</small></div></div><div><span class="lab">SHIP</span><div class="box">Final PR<small>not open yet</small></div></div></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px"><span class="btn quiet mark">Open the wave board<svg style="stroke:currentColor;width:14px;height:14px"><use href="#arrow"/></svg></span></div>
+      </div></div>
+    <div class="col wide"><h3>c. On the sprint step of the flow</h3><p class="cap">The link sits on the "Wave" box itself. Most direct, but a small target, and the box already has text.</p>
+      <div class="app">
+        <div class="head"><div class="t"><h4>Sparring ladder to Liem</h4><p class="sub">chess-web · Plan · started 27 days ago</p></div><span class="btn pressed"><svg><use href="#loop"/></svg>Auto-continue</span><span class="btn ghost"><svg style="stroke:none;fill:currentColor"><use href="#more"/></svg></span></div>
+        <div class="metarow"><span class="strip"><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i></span><span class="wave">Wave 3 of 3</span></div>
+        <div class="flow" style="margin-top:20px"><div><span class="lab">THINK</span><div class="box">Research<small>no research</small></div></div><div><span class="lab">YOU</span><div class="box">Look picked<small>not recorded</small></div></div><div><span class="lab">SPRINT 1 OF 1</span><div class="box">Wave 1<small>3 slices</small><span class="mark" style="display:inline-flex;gap:4px;align-items:center;margin-top:4px;font-size:13px;color:#a1a1a1">Wave board<svg style="width:12px;height:12px;stroke:currentColor"><use href="#arrow"/></svg></span></div></div><div><span class="lab">CHECK</span><div class="box">Final review<small>not started</small></div></div><div><span class="lab">SHIP</span><div class="box">Final PR<small>not open yet</small></div></div></div>
+      </div></div>
+  </div>
+  <p class="legend"><i></i>Dashed outline: the piece that differs (not part of the design).</p>
+  <p class="why">Why a: it stays easy to find in one place, sits next to "Wave 3 of 3" which it opens, and leaves the header with only Auto-continue and ⋯.</p>
+</section>
+
+<p class="reply">Reply: 1 a, 2 a, 3 a</p>
+</main>
+</body>
+</html>
