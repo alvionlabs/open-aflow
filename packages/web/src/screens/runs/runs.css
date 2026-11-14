@@ -426,7 +426,7 @@
   min-width: 0;
 }
 
-/* The title and its meta line on the left, the wave board link and the ⋯ menu at the right end. */
+/* The title and its meta line on the left, Auto-continue and the ⋯ menu at the right end. */
 .run-top {
   display: flex;
   align-items: flex-start;
@@ -442,11 +442,54 @@
 .run-actions {
   display: flex;
   flex: none;
-  align-items: center;
+  /* Top, so a failed save's message under Auto-continue grows the row down, not the ⋯ with it. */
+  align-items: flex-start;
   gap: 8px;
 }
 
+/*
+ * Auto-continue, a toggle button as narrow as its label. On: pressed, with a blue tint, a blue-mixed border and a
+ * blue fast-forward icon. Off: a plain button, its pause icon and label muted. The wrapper is as wide as the button,
+ * so a failed save's message wraps under it and never widens the header.
+ */
+.auto-toggle {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min-content;
+}
+
+.auto-button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--running) 14%, var(--bg));
+  border-color: color-mix(in srgb, var(--running) 55%, var(--border-strong));
+}
+
+.auto-button[aria-pressed="true"]:hover {
+  background: color-mix(in srgb, var(--running) 20%, var(--bg));
+}
+
+.auto-button[aria-pressed="true"] svg {
+  color: var(--running);
+}
+
+.auto-button[aria-pressed="false"] {
+  color: var(--muted);
+}
+
+.auto-button[aria-pressed="false"]:hover {
+  color: var(--fg);
+}
+
+.auto-continue-error {
+  display: flex;
+  align-items: center;
+  font-size: var(--size-small);
+  overflow-wrap: anywhere;
+}
+
+/* A quiet link at the right end of the progress row, with a right arrow. */
 .board-link {
+  margin-left: auto;
   white-space: nowrap;
 }
 
@@ -898,7 +941,7 @@
 .merge-why::before,
 .merge-error::before,
 .resume-error::before,
-.auto-switch-error::before,
+.auto-continue-error::before,
 .answer-error::before {
   content: "";
   display: inline-block;
@@ -1186,21 +1229,6 @@
   flex: 1 1 14rem;
   min-width: 0;
   margin: 0;
-  overflow-wrap: anywhere;
-}
-
-/* The auto-continue switch beside the run's state chip; a failed save's message beside it. */
-.auto-switch {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.auto-switch-error {
-  font-size: var(--size-small);
   overflow-wrap: anywhere;
 }
 

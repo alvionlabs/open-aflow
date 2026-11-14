@@ -31,12 +31,12 @@ describe('menu contents', () => {
     expect(html).toMatch(/class="menu[ "][^>]*role="group"/)
   })
 
-  it('has the auto-continue switch only with autoContinue', () => {
-    expect(render({})).not.toContain('role="switch"')
-    const html = render({ autoContinue: { target, on: true } })
-    expect(html).toMatch(/role="switch"[^>]*aria-checked="true"/)
-    expect(text(html)).toContain('Auto-continue')
-    expect(render({ autoContinue: { target, on: false } })).toMatch(/aria-checked="false"/)
+  it('has no Auto-continue switch: the run header holds the one control', () => {
+    for (const on of [true, false]) {
+      const html = render({ autoContinue: { target, on }, portBase: 3100 })
+      expect(html).not.toContain('role="switch"')
+      expect(text(html)).not.toContain('Auto-continue')
+    }
   })
 
   it('has the ports only with portBase', () => {
