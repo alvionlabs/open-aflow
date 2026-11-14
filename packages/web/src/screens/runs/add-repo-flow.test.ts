@@ -353,47 +353,70 @@ describe('the Add repo modal', () => {
   }
   const buttons = (html: string) => [...html.matchAll(/<button([^>]*)>([^<]*)<\/button>/g)].map((m) => ({ label: m[2]!, attrs: m[1]! }))
 
-  it('field, Choose folder… below it, the alert, then Cancel and Add', () => {
+  /** The markup between the first `<div class="add-repo-row">` and its closing tag (it holds no nested div). */
+  const row = (html: string) => /<div class="add-repo-row">([\s\S]*?)<\/div>/.exec(html)?.[1]
+
+  it('path error: the label, a row with the field and Browse…, the inline error, then Cancel and Add', () => {
     const html = render({ kind: 'form', path: 'E:\\code\\chess-web', busy: false, canChoose: true, error: ADD_ALREADY, pathError: true })
-    const order = ['<label', '<input', '>Choose folder…<', 'class="modal-alert"', '>Cancel<', '>Add<']
+    const order = ['<label', 'class="add-repo-row"', '<input', 'Browse…</button>', 'class="modal-field-error"', '>Cancel<', '>Add<']
     const at = order.map((s) => html.indexOf(s))
     expect(at.every((i) => i >= 0), JSON.stringify(at)).toBe(true)
     expect([...at].sort((a, b) => a - b)).toEqual(at)
-    // Choose folder… is its own row under the field, not in the action row.
+    // The field and Browse… share one row; Browse… is a regular button with the 16 px folder icon, not in the actions.
+    const inRow = row(html)!
+    expect(inRow).toMatch(/^<input[^>]*>/)
+    expect(inRow).toMatch(/<button class="btn lead" type="button"><svg[^>]*width="16"[^>]*>[\s\S]*?<\/svg>Browse…<\/button>$/)
     const actions = html.slice(html.indexOf('class="modal-actions"'))
-    expect(actions).not.toContain('Choose folder…')
     expect(buttons(actions).map((b) => b.label)).toEqual(['Cancel', 'Add'])
-    expect(html).toMatch(/<div class="add-repo-choose"><button class="btn" type="button">Choose folder…<\/button><\/div>/)
-    // The alert is the shared one, named by the field; Add is off while a path error shows.
-    expect(html).toMatch(/<div id="[^"]+" class="modal-alert" role="alert">/)
-    const errorId = /<div id="([^"]+)" class="modal-alert"/.exec(html)?.[1]
-    expect(html).toMatch(new RegExp(`<input[^>]*aria-describedby="${errorId}"`))
+    // The path error is inline under the row: no alert box. The field names it and is invalid; Add is off.
+    expect(html).not.toContain('modal-alert')
+    const inline = /<p id="([^"]+)" class="modal-field-error" role="alert"><svg[^>]*>[\s\S]*?<\/svg><span>([^<]*)<\/span><\/p>/.exec(html)
+    expect(inline, html).not.toBeNull()
+    expect(inline![2]).toBe(ADD_ALREADY)
+    expect(html).toMatch(new RegExp(`<input[^>]*aria-describedby="${inline![1]}"`))
     expect(html).toMatch(/<input[^>]*aria-invalid="true"/)
-    expect(html).toContain(`>${ADD_ALREADY}</p>`)
-    expect(html).not.toContain('modal-error')
-    const add = buttons(html).find((b) => b.label === 'Add')!
-    expect(add.attrs).toMatch(/disabled=""/)
+    // The label, the row, and the inline error are one group, so the panel's gaps fall between groups.
+    expect(html).toMatch(/<div class="add-repo-field"><label[\s\S]*?<\/label><div class="add-repo-row">[\s\S]*?<\/div><p id="[^"]+" class="modal-field-error"[\s\S]*?<\/p><\/div>/)
+    expect(buttons(html).find((b) => b.label === 'Add')!.attrs).toMatch(/disabled=""/)
   })
 
-  it('an error that is not about the path: the alert names the field, the field is not invalid, Add is on', () => {
-    const html = render({ kind: 'form', path: '/home/me/repo', busy: false, canChoose: false, error: ADD_FAILED })
-    const errorId = /<div id="([^"]+)" class="modal-alert"/.exec(html)?.[1]
-    expect(errorId).toBeDefined()
-    expect(html).toMatch(new RegExp(`<input[^>]*aria-describedby="${errorId}"`))
-    expect(html).not.toContain('aria-invalid')
-    // React escapes the apostrophe.
-    expect(html).toContain(`>${ADD_FAILED.replace("'", '&#x27;')}</p>`)
-    expect(buttons(html).find((b) => b.label === 'Add')!.attrs).not.toMatch(/disabled/)
+  it('the second path error shows inline too', () => {
+    const html = render({ kind: 'form', path: '/nope', busy: false, canChoose: false, error: ADD_BAD_PATH, pathError: true })
+    expect(html).toContain(`<span>${ADD_BAD_PATH.replace("'", '&#x27;')}</span>`)
+    expect(html).not.toContain('modal-alert')
   })
 
-  it('no Choose folder… without the bridge, no alert without an error, and Add on for a path', () => {
+  for (const message of [ADD_FAILED, ADD_RELOAD, BRIDGE_FAILED]) {
+    it(`system error "${message}": the alert box above the actions, no inline error, the field not invalid, Add on`, () => {
+      const html = render({ kind: 'form', path: '/home/me/repo', busy: false, canChoose: true, error: message })
+      expect(html).not.toContain('modal-field-error')
+      expect(html).not.toContain('aria-invalid')
+      const errorId = /<div id="([^"]+)" class="modal-alert" role="alert">/.exec(html)?.[1]
+      expect(errorId, html).toBeDefined()
+      expect(html).toMatch(new RegExp(`<input[^>]*aria-describedby="${errorId}"`))
+      // React escapes the apostrophe.
+      expect(html).toContain(`>${message.replace("'", '&#x27;')}</p>`)
+      // The box sits after the field group and before the actions.
+      const at = ['class="add-repo-field"', '</div></div><div id=', 'class="modal-alert"', 'class="modal-actions"'].map((s) => html.indexOf(s))
+      expect(at.every((i) => i >= 0), JSON.stringify(at)).toBe(true)
+      expect([...at].sort((a, b) => a - b)).toEqual(at)
+      expect(buttons(html).find((b) => b.label === 'Add')!.attrs).not.toMatch(/disabled/)
+    })
+  }
+
+  it('without the bridge: no Browse…, the field alone fills its row, no error, and Add on for a path', () => {
     const html = render({ kind: 'form', path: '/home/me/repo', busy: false, canChoose: false })
-    expect(html).not.toContain('Choose folder…')
-    expect(html).not.toContain('add-repo-choose')
+    expect(html).not.toContain('Browse')
+    expect(row(html)).toMatch(/^<input[^>]*\/>$/)
     expect(html).not.toContain('role="alert"')
     expect(html).not.toContain('aria-describedby')
     expect(buttons(html).map((b) => b.label)).toEqual(['Cancel', 'Add'])
     expect(buttons(html).find((b) => b.label === 'Add')!.attrs).not.toMatch(/disabled/)
+  })
+
+  it('Browse… is off while the modal is busy', () => {
+    const html = render({ kind: 'form', path: '/home/me/repo', busy: true, canChoose: true })
+    expect(row(html)).toMatch(/<button class="btn lead" type="button" disabled="">/)
   })
 })
 
