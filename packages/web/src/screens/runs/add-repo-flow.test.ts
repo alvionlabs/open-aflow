@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { RESTARTED, UNREACHABLE } from '../../actions-client.ts'
-import { ADD_ALREADY, ADD_BAD_PATH, ADD_FAILED, ADD_RELOAD, type AddResult } from '../../add-repo.ts'
+import { ADD_ALREADY, ADD_BAD_PATH, TRY_AGAIN, RELOAD, type AddResult } from '../../add-repo.ts'
 import { AddRepoForm } from './AddRepoDialog.tsx'
 import { BRIDGE_FAILED, canAdd, createAddRepoFlow, pathHint, type AddRepoState } from './add-repo-flow.ts'
 
@@ -198,7 +198,7 @@ describe('desktop: the form first', () => {
     t.posts[0]!.reject(new TypeError('Failed to fetch'))
     await added
     const s = form(t.flow.state())
-    expect(s).toMatchObject({ path: 'E:\\code\\chess-web', error: ADD_FAILED, busy: false, focus: 'path' })
+    expect(s).toMatchObject({ path: 'E:\\code\\chess-web', error: TRY_AGAIN, busy: false, focus: 'path' })
     expect(s.pathError).toBeUndefined()
     expect(canAdd(s)).toBe(true)
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(UNREACHABLE))
@@ -295,7 +295,7 @@ describe('browser path field', () => {
     expect(canAdd(base)).toBe(true)
     expect(canAdd({ ...base, error: ADD_ALREADY, pathError: true })).toBe(false)
     // An error that isn't about the path keeps Add on, so the same path can be tried again.
-    expect(canAdd({ ...base, error: ADD_FAILED })).toBe(true)
+    expect(canAdd({ ...base, error: TRY_AGAIN })).toBe(true)
     expect(canAdd({ ...base, error: '' })).toBe(true)
     expect(canAdd({ ...base, busy: true })).toBe(false)
     expect(canAdd({ kind: 'closed' })).toBe(false)
@@ -372,7 +372,7 @@ describe('the Add repo modal', () => {
     expect(html).not.toContain('modal-alert')
   })
 
-  for (const message of [ADD_FAILED, ADD_RELOAD, BRIDGE_FAILED]) {
+  for (const message of [TRY_AGAIN, RELOAD, BRIDGE_FAILED]) {
     it(`system error "${message}": the alert box above the actions, no inline error, the field not invalid, Add on`, () => {
       const html = render({ kind: 'form', path: '/home/me/repo', busy: false, canChoose: true, error: message })
       expect(html).not.toContain('modal-field-error')
@@ -413,7 +413,7 @@ describe('an error that is not about the path', () => {
     const added = t.flow.add()
     t.posts[0]!.resolve({ status: 500, error: 'config unreadable' })
     await added
-    expect(form(t.flow.state())).toMatchObject({ path: '/home/me/repo', error: ADD_FAILED })
+    expect(form(t.flow.state())).toMatchObject({ path: '/home/me/repo', error: TRY_AGAIN })
     expect(canAdd(t.flow.state())).toBe(true)
     // Add again with the same path: it posts, and a 201 closes the modal.
     const again = t.flow.add()
@@ -430,7 +430,7 @@ describe('an error that is not about the path', () => {
     const added = t.flow.add()
     t.posts[0]!.resolve({ status: 403, error: RESTARTED })
     await added
-    expect(form(t.flow.state())).toMatchObject({ error: ADD_RELOAD })
+    expect(form(t.flow.state())).toMatchObject({ error: RELOAD })
     expect(canAdd(t.flow.state())).toBe(true)
   })
 })
