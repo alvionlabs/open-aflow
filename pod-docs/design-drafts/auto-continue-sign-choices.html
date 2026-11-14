@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auto-continue: how the run shows it</title>
+<style>
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-400.woff2") format("woff2"); font-weight:400; }
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-500.woff2") format("woff2"); font-weight:500; }
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-600.woff2") format("woff2"); font-weight:600; }
+  @font-face { font-family:"Geist Mono"; src:url("../../packages/web/public/fonts/geist-mono-400.woff2") format("woff2"); font-weight:400; }
+
+  :root { color-scheme: light dark; --pg-bg: light-dark(#fff, #111); --pg-fg: light-dark(#171717, #ededed); --pg-muted: light-dark(#666, #a1a1a1); --pg-line: light-dark(#eaeaea, #2a2a2a); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--pg-bg); color: var(--pg-fg); font: 16px/24px "Geist", system-ui, sans-serif; }
+  main { max-width: 1320px; margin-inline: auto; padding: 40px 24px 80px; display: grid; gap: 56px; }
+  h1 { margin: 0 0 8px; font-size: 32px; line-height: 40px; }
+  h2 { margin: 0 0 4px; font-size: 22px; }
+  .lead, .q > p { margin: 0; color: var(--pg-muted); max-width: 80ch; }
+  .cols { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 16px; align-items: start; }
+  .col { display: grid; gap: 8px; }
+  .col.narrow { width: 300px; }
+  .col.wide { width: 620px; }
+  .col h3 { margin: 0; font-size: 16px; font-weight: 600; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .col .cap { margin: 0; font-size: 14px; color: var(--pg-muted); min-height: 40px; }
+  .tagx { font: 500 12px/18px "Geist", sans-serif; padding: 0 8px; border-radius: 999px; border: 1px solid var(--pg-line); color: var(--pg-muted); }
+  .tagx.rec { border-color: #3ecf72; color: #3ecf72; }
+  .why { margin: 12px 0 0; font-size: 14px; color: var(--pg-muted); }
+  .reply { font: 500 18px "Geist", sans-serif; padding: 16px 20px; border: 1px solid var(--pg-line); border-radius: 12px; }
+
+  /* Product, dark theme: tokens.css values. */
+  .app { --bg:#000; --surface:#0a0a0a; --hover:#1a1a1a; --border:#262626; --border-strong:#3a3a3a; --fg:#ededed; --muted:#a1a1a1; --faint:#6e6e6e; --running:#52a8ff; --ready:#3ecf72; --idle:#8f8f8f;
+    background: var(--bg); color: var(--fg); font-family: "Geist", sans-serif; padding: 16px; border-radius: 12px; border: 1px solid var(--pg-line); }
+  .card { display: grid; gap: 4px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .card .name { font-size: 16px; font-weight: 500; }
+  .card .st { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); flex: none; }
+  .card .repo { font-size: 13px; color: var(--muted); }
+  .chip { font: 13px/20px "Geist Mono", monospace; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--fg); }
+  .auto { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); }
+  .auto svg { width: 14px; height: 14px; stroke: currentColor; }
+  .auto.on svg { stroke: var(--running); }
+  .ico-only svg { width: 16px; height: 16px; stroke: var(--running); }
+  .head { display: flex; align-items: flex-start; gap: 12px; }
+  .head .t { flex: 1; min-width: 0; }
+  .head h4 { margin: 0; font-size: 24px; font-weight: 600; line-height: 32px; }
+  .sub { margin: 4px 0 0; font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; font: 500 14px/1 "Geist", sans-serif; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--fg); white-space: nowrap; }
+  .btn.ghost { border-color: transparent; color: var(--muted); }
+  .btn svg { width: 16px; height: 16px; stroke: currentColor; }
+  .btn .on { color: var(--running); }
+  .strip { display: flex; gap: 4px; margin-top: 12px; }
+  .strip i { width: 16px; height: 4px; border-radius: 2px; background: var(--border-strong); }
+  .strip i.d { background: var(--fg); }
+  .next { margin-top: 16px; padding: 16px 20px; border: 1px solid var(--border); border-radius: 12px; display: grid; gap: 6px; }
+  .next .k { font: 12px "Geist Mono", monospace; letter-spacing: .06em; color: var(--muted); }
+  .next b { font-weight: 500; }
+  .next .line { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .next .line svg { width: 14px; height: 14px; stroke: var(--running); }
+  .mark { outline: 1px dashed #f5a623; outline-offset: 3px; border-radius: 6px; }
+  .legend { font-size: 13px; color: var(--pg-muted); margin: 8px 0 0; }
+  .legend i { display: inline-block; width: 14px; height: 10px; outline: 1px dashed #f5a623; margin-right: 6px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="loop" viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.25 6.5A5.25 5.25 0 0 0 3.6 4.4M2.75 9.5a5.25 5.25 0 0 0 9.65 2.1"/><path d="M3.25 2v2.75H6M12.75 14v-2.75H10"/></symbol>
+  <symbol id="more" viewBox="0 0 16 16"><circle cx="3" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="13" cy="8" r="1.4" fill="currentColor"/></symbol>
+</svg>
+<main>
+<header>
+  <h1>Auto-continue: how a run shows it</h1>
+  <p class="lead">When Auto-continue is on, OpenAFlow sends <code>continue</code> to the run by itself. Today the only sign is a mono <code>auto</code> pill on the sidebar card. You want a better sign, and one in the main run view too. Drawn in the app's dark theme.</p>
+</header>
+
+<section class="q">
+  <h2>1. The sign on the sidebar card</h2>
+  <p>It sits after the status. It only shows while Auto-continue is on.</p>
+  <div class="cols">
+    <div class="col narrow"><h3>a. Mono pill <span class="tagx">now</span></h3><p class="cap">A code-style pill. Reads like a label from the code, not a state.</p>
+      <div class="app"><div class="card"><span class="name">Sparring ladder to Liem</span><span class="st"><span class="dot"></span>idle <span class="chip mark">auto</span></span><span class="repo">chess-web</span></div></div></div>
+    <div class="col narrow"><h3>b. Loop icon + "Auto" <span class="tagx rec">recommended</span></h3><p class="cap">A small blue loop icon and a muted word. Reads as "this runs on its own".</p>
+      <div class="app"><div class="card"><span class="name">Sparring ladder to Liem</span><span class="st"><span class="dot"></span>idle <span class="auto on mark"><svg><use href="#loop"/></svg>Auto</span></span><span class="repo">chess-web</span></div></div></div>
+    <div class="col narrow"><h3>c. Loop icon only</h3><p class="cap">The smallest. Needs a tooltip; a first-time user may not know the icon.</p>
+      <div class="app"><div class="card"><span class="name">Sparring ladder to Liem</span><span class="st"><span class="dot"></span>idle <span class="ico-only mark" title="Auto-continue on"><svg><use href="#loop"/></svg></span></span><span class="repo">chess-web</span></div></div></div>
+  </div>
+  <p class="legend"><i></i>Dashed outline: the piece that differs (not part of the design).</p>
+  <p class="why">Why b: an icon plus one word is clear on first sight and still small. The blue matches "running" without claiming the run is running.</p>
+</section>
+
+<section class="q">
+  <h2>2. The sign in the main run view</h2>
+  <p>The run's header: title, meta line, and the ⋯ menu where the switch lives today.</p>
+  <div class="cols">
+    <div class="col wide"><h3>a. In the meta line</h3><p class="cap">"Auto-continue on" joins the muted line under the title. Quiet; to turn it off you still open ⋯.</p>
+      <div class="app"><div class="head"><div class="t"><h4>Sparring ladder to Liem</h4><p class="sub">chess-web · Plan · started 27 days ago · <span class="auto on mark"><svg><use href="#loop"/></svg>Auto-continue on</span></p></div><span class="btn ghost">Open the wave board</span><span class="btn ghost"><svg><use href="#more"/></svg></span></div><div class="strip"><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i></div></div></div>
+    <div class="col wide"><h3>b. A button by the ⋯ menu <span class="tagx rec">recommended</span></h3><p class="cap">Shows the state and switches it in one press. Shown always: "Auto-continue: On" or "Off".</p>
+      <div class="app"><div class="head"><div class="t"><h4>Sparring ladder to Liem</h4><p class="sub">chess-web · Plan · started 27 days ago</p></div><span class="btn mark"><svg class="on"><use href="#loop"/></svg>Auto-continue: On</span><span class="btn ghost">Open the wave board</span><span class="btn ghost"><svg><use href="#more"/></svg></span></div><div class="strip"><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i></div></div></div>
+    <div class="col wide"><h3>c. A line on the Next step card</h3><p class="cap">Says what will happen next. Only shows while on; the switch stays in ⋯.</p>
+      <div class="app"><div class="head"><div class="t"><h4>Sparring ladder to Liem</h4><p class="sub">chess-web · Plan · started 27 days ago</p></div><span class="btn ghost">Open the wave board</span><span class="btn ghost"><svg><use href="#more"/></svg></span></div>
+        <div class="next"><span class="k">NEXT STEP</span><b>Wave 2 merged. Reply continue.</b><span class="line mark"><svg><use href="#loop"/></svg>Auto-continue is on: OpenAFlow sends continue when pod is idle</span></div></div></div>
+  </div>
+  <p class="legend"><i></i>Dashed outline: the piece that differs (not part of the design).</p>
+  <p class="why">Why b: you see the state and change it where you look, without opening a menu. The ⋯ switch can stay or go.</p>
+</section>
+
+<p class="reply">Reply: 1 b, 2 b</p>
+</main>
+</body>
+</html>

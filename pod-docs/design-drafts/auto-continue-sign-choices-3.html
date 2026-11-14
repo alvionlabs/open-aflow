@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auto-continue sign, round 3: the icon</title>
+<style>
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-400.woff2") format("woff2"); font-weight:400; }
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-500.woff2") format("woff2"); font-weight:500; }
+  @font-face { font-family:"Geist"; src:url("../../packages/web/public/fonts/geist-600.woff2") format("woff2"); font-weight:600; }
+  @font-face { font-family:"Geist Mono"; src:url("../../packages/web/public/fonts/geist-mono-400.woff2") format("woff2"); font-weight:400; }
+  :root { color-scheme: light dark; --pg-bg: light-dark(#fff, #111); --pg-fg: light-dark(#171717, #ededed); --pg-muted: light-dark(#666, #a1a1a1); --pg-line: light-dark(#eaeaea, #2a2a2a); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--pg-bg); color: var(--pg-fg); font: 16px/24px "Geist", system-ui, sans-serif; }
+  main { max-width: 1320px; margin-inline: auto; padding: 40px 24px 80px; display: grid; gap: 40px; }
+  h1 { margin: 0 0 8px; font-size: 32px; line-height: 40px; }
+  .lead { margin: 0; color: var(--pg-muted); max-width: 84ch; }
+  .cols { display: flex; flex-wrap: wrap; gap: 24px; align-items: start; }
+  .col { display: grid; gap: 8px; width: 290px; }
+  .col h3 { margin: 0; font-size: 16px; font-weight: 600; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .col .cap { margin: 0; font-size: 14px; color: var(--pg-muted); min-height: 48px; }
+  .tagx { font: 500 12px/18px "Geist", sans-serif; padding: 0 8px; border-radius: 999px; border: 1px solid var(--pg-line); color: var(--pg-muted); }
+  .tagx.rec { border-color: #3ecf72; color: #3ecf72; }
+  .why { margin: 0; font-size: 14px; color: var(--pg-muted); }
+  .reply { font: 500 18px "Geist", sans-serif; padding: 16px 20px; border: 1px solid var(--pg-line); border-radius: 12px; }
+  .state { font: 12px "Geist Mono", monospace; letter-spacing: .04em; text-transform: uppercase; color: #a1a1a1; }
+  .app { --bg:#000; --surface:#0a0a0a; --border:#262626; --border-strong:#3a3a3a; --fg:#ededed; --muted:#a1a1a1; --running:#52a8ff; --idle:#8f8f8f;
+    background: var(--bg); color: var(--fg); padding: 16px; border-radius: 12px; border: 1px solid var(--pg-line); display: grid; gap: 10px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; font: 500 14px/1 "Geist", sans-serif; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--fg); white-space: nowrap; width: max-content; }
+  .btn svg { width: 16px; height: 16px; }
+  .btn.on { background: color-mix(in srgb, var(--running) 14%, var(--bg)); border-color: color-mix(in srgb, var(--running) 55%, var(--border-strong)); }
+  .btn.on svg { color: var(--running); }
+  .btn.off { color: var(--muted); }
+  .btn.off svg { color: var(--muted); }
+  .card { display: grid; gap: 4px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .card .row1 { display: flex; align-items: center; gap: 8px; }
+  .card .name { font-size: 16px; font-weight: 500; flex: 1; }
+  .card .row1 svg { width: 16px; height: 16px; color: var(--running); }
+  .card .st { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); }
+  .card .repo { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="loop" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.25 6.5A5.25 5.25 0 0 0 3.6 4.4M2.75 9.5a5.25 5.25 0 0 0 9.65 2.1"/><path d="M3.25 2v2.75H6M12.75 14v-2.75H10"/></symbol>
+  <symbol id="loop-off" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.25 6.5A5.25 5.25 0 0 0 3.6 4.4M2.75 9.5a5.25 5.25 0 0 0 9.65 2.1"/><path d="M3.25 2v2.75H6M12.75 14v-2.75H10"/><path d="M2 2l12 12"/></symbol>
+  <symbol id="ff" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 3.5l5.5 4.5L2 12.5zM8.5 3.5L14 8l-5.5 4.5z"/></symbol>
+  <symbol id="pause" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.5 3.5v9M10.5 3.5v9"/></symbol>
+  <symbol id="zap" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M9 1.75L3.5 9h4l-.5 5.25L12.5 7h-4z"/></symbol>
+  <symbol id="play" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4.5 3v10l8-5z"/></symbol>
+</svg>
+<main>
+<header>
+  <h1>Auto-continue, round 3: the icon</h1>
+  <p class="lead">The button keeps the pressed look (blue tint when on). Each option shows the button on and off, and the sidebar card's icon (it shows only while on). <a href="auto-continue-sign-choices-2.html" style="color:inherit">Round 2</a>.</p>
+</header>
+<div class="cols">
+  <div class="col"><h3>a. Loop, same icon <span class="tagx">now</span></h3><p class="cap">Only the color changes between on and off.</p>
+    <div class="app"><span class="state">On</span><span class="btn on"><svg><use href="#loop"/></svg>Auto-continue</span><span class="state">Off</span><span class="btn off"><svg><use href="#loop"/></svg>Auto-continue</span><span class="state">Card</span><div class="card"><div class="row1"><span class="name">Sparring ladder to Liem</span><svg><use href="#loop"/></svg></div><span class="st"><span class="dot"></span>idle</span><span class="repo">chess-web</span></div></div></div>
+  <div class="col"><h3>b. Loop, struck through when off</h3><p class="cap">Same picture, plus a line across it when off. On and off read apart even without color.</p>
+    <div class="app"><span class="state">On</span><span class="btn on"><svg><use href="#loop"/></svg>Auto-continue</span><span class="state">Off</span><span class="btn off"><svg><use href="#loop-off"/></svg>Auto-continue</span><span class="state">Card</span><div class="card"><div class="row1"><span class="name">Sparring ladder to Liem</span><svg><use href="#loop"/></svg></div><span class="st"><span class="dot"></span>idle</span><span class="repo">chess-web</span></div></div></div>
+  <div class="col"><h3>c. Fast-forward on, pause off <span class="tagx rec">recommended</span></h3><p class="cap">Media controls everyone knows: it goes on by itself, or it waits for you.</p>
+    <div class="app"><span class="state">On</span><span class="btn on"><svg><use href="#ff"/></svg>Auto-continue</span><span class="state">Off</span><span class="btn off"><svg><use href="#pause"/></svg>Auto-continue</span><span class="state">Card</span><div class="card"><div class="row1"><span class="name">Sparring ladder to Liem</span><svg><use href="#ff"/></svg></div><span class="st"><span class="dot"></span>idle</span><span class="repo">chess-web</span></div></div></div>
+  <div class="col"><h3>d. Bolt, the automation sign</h3><p class="cap">Common for "runs by itself" in automation tools. Can read as "fast" or "power".</p>
+    <div class="app"><span class="state">On</span><span class="btn on"><svg><use href="#zap"/></svg>Auto-continue</span><span class="state">Off</span><span class="btn off"><svg><use href="#zap"/></svg>Auto-continue</span><span class="state">Card</span><div class="card"><div class="row1"><span class="name">Sparring ladder to Liem</span><svg><use href="#zap"/></svg></div><span class="st"><span class="dot"></span>idle</span><span class="repo">chess-web</span></div></div></div>
+</div>
+<p class="why">Why c: the loop says "repeat", but Auto-continue means "go on to the next step by itself". Fast-forward says that, and pause for off says "waits for you"; the card icon alone is clear too.</p>
+<p class="reply">Reply: c</p>
+</main>
+</body>
+</html>
