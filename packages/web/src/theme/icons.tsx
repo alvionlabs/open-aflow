@@ -20,6 +20,8 @@ export type IconName =
   | 'circle'
   | 'alert'
   | 'blocked'
+  | 'fast-forward'
+  | 'pause'
 
 /** Stroked shapes, drawn on a 16 × 16 grid. */
 const STROKED: Record<Exclude<IconName, 'more' | 'dot'>, ReactNode> = {
@@ -45,6 +47,9 @@ const STROKED: Record<Exclude<IconName, 'more' | 'dot'>, ReactNode> = {
       <path d="M3.75 12.25l8.5-8.5" />
     </>
   ),
+  // Auto-continue: on goes on by itself (fast-forward), off waits for you (pause).
+  'fast-forward': <path d="M2 3.5l5.5 4.5L2 12.5zM8.5 3.5L14 8l-5.5 4.5z" />,
+  pause: <path d="M5.5 3.5v9M10.5 3.5v9" />,
 }
 
 export const ICON_NAMES: readonly IconName[] = [...(Object.keys(STROKED) as IconName[]), 'more', 'dot']

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { Icon, ICON_NAMES, type IconName } from './icons.tsx'
 
-const NAMES: IconName[] = ['plus', 'more', 'check', 'chevron-right', 'chevron-down', 'arrow-up', 'arrow-right', 'folder', 'close', 'dot', 'circle', 'alert', 'blocked']
+const NAMES: IconName[] = ['plus', 'more', 'check', 'chevron-right', 'chevron-down', 'arrow-up', 'arrow-right', 'folder', 'close', 'dot', 'circle', 'alert', 'blocked', 'fast-forward', 'pause']
 
 const render = (name: IconName) => renderToStaticMarkup(createElement(Icon, { name }))
 
@@ -44,6 +44,16 @@ describe('icons', () => {
     }
     // Each name draws its own shape.
     expect(seen.size).toBe(NAMES.length)
+  })
+})
+
+describe('the Auto-continue icons', () => {
+  const paths = (name: IconName) => [...render(name).matchAll(/<path d="([^"]*)"/g)].map((m) => m[1])
+  it('fast-forward is two right-pointing triangles, as drawn in round 3', () => {
+    expect(paths('fast-forward')).toEqual(['M2 3.5l5.5 4.5L2 12.5zM8.5 3.5L14 8l-5.5 4.5z'])
+  })
+  it('pause is two vertical bars, as drawn in round 3', () => {
+    expect(paths('pause')).toEqual(['M5.5 3.5v9M10.5 3.5v9'])
   })
 })
 
