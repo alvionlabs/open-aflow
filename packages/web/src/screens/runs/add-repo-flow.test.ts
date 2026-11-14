@@ -130,7 +130,7 @@ describe('desktop: the form first', () => {
       t.picks[0]!.reject(new Error(word))
       await tick()
       const s = form(t.flow.state())
-      expect(BRIDGE_FAILED).toBe("Couldn't open the folder dialog. Type the path instead.")
+      expect(BRIDGE_FAILED).toBe("The folder dialog didn't open. You can type the path")
       expect(s).toMatchObject({ path: '/home/me/chess-web', busy: false, error: BRIDGE_FAILED, focus: 'path' })
       expect(s.pathError).toBeUndefined()
       expect(canAdd(s)).toBe(true)

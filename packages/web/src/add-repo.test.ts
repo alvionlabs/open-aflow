@@ -6,6 +6,14 @@ describe('the message for a failed add', () => {
   it('a status with no error word is a failed add', () => {
     expect(addError({ status: 415 })).toEqual({ message: TRY_AGAIN, pathError: false })
   })
+
+  it('reads short and warm, with no period at the end', () => {
+    expect(ADD_ALREADY).toBe('This repo is already here')
+    expect(ADD_BAD_PATH).toBe("That path doesn't look right")
+    expect(TRY_AGAIN).toBe('Something went wrong. Please try again')
+    expect(RELOAD).toBe('The app restarted. Please reload')
+    for (const m of [ADD_ALREADY, ADD_BAD_PATH, TRY_AGAIN, RELOAD]) expect(m, m).not.toMatch(/\.$/)
+  })
 })
 
 describe('postRepo', () => {

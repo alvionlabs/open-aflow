@@ -35,10 +35,11 @@ export async function postRepo(path: string, deps: PostRepoDeps = {}): Promise<A
   return typeof error === 'string' && error.length > 0 ? { status: res.status, error } : { status: res.status }
 }
 
-export const ADD_ALREADY = 'This repo is already added.'
-export const ADD_BAD_PATH = "This path isn't a folder on this computer."
-export const TRY_AGAIN = "Couldn't add the repo. Try again."
-export const RELOAD = 'The app restarted. Reload the page.'
+// Short and warm, with no period at the end (DESIGN.md, "Forms and errors"). Remove repo and Forget use the last two too.
+export const ADD_ALREADY = 'This repo is already here'
+export const ADD_BAD_PATH = "That path doesn't look right"
+export const TRY_AGAIN = 'Something went wrong. Please try again'
+export const RELOAD = 'The app restarted. Please reload'
 
 /** What the modal says after a refused add. `pathError`: the same path would fail again, so Add waits for a change. */
 export type AddError = { message: string; pathError: boolean }

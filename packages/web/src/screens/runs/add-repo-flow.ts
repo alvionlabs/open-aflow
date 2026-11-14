@@ -7,7 +7,7 @@
 // `focus` tells the modal where focus goes after a pick: Add after a folder, Browse… after a cancel, the field
 // after a failure. After a refused Add, focus goes to the field too.
 //
-// Add is off while the modal shows a path error (already added, or not a folder); a change to the path clears
+// Add is off while the modal shows a path error (already here, or a path that doesn't look right); a change to the path clears
 // it. After any other error, Add stays on, so the same path can be tried again.
 //
 // The modal is busy while a post or a folder dialog is out: Add, Browse…, and Cancel then do nothing, so one
@@ -17,7 +17,7 @@ import { UNREACHABLE } from '../../actions-client.ts'
 import { addError, type AddResult } from '../../add-repo.ts'
 import type { PickFolder } from '../../desktop-bridge.ts'
 
-export const BRIDGE_FAILED = "Couldn't open the folder dialog. Type the path instead."
+export const BRIDGE_FAILED = "The folder dialog didn't open. You can type the path"
 
 /** The path field's example, in the form of the user's own system. The app and the browser run on one machine. */
 export function pathHint(userAgent: string): string {
