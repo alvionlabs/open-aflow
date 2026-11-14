@@ -1,6 +1,7 @@
-// Add repo: the desktop shell's folder dialog, or a path field in the shared modal. The rules are in
-// add-repo-flow.ts; this file only wires them. The opener (screen 1's sidebar) puts focus back on its button
-// after `onClose`, so `onClose` runs only once the modal has left the page and the page is no longer inert.
+// Add repo: a path field in the shared modal, with Browse… (the desktop shell's folder dialog) beside it in the
+// desktop app. The rules are in add-repo-flow.ts; this file only wires them. The opener (screen 1's sidebar)
+// puts focus back on its button after `onClose`, so `onClose` runs only once the modal has left the page and the
+// page is no longer inert.
 import { useEffect, useId, useRef, useState } from 'react'
 import { postRepo } from '../../add-repo.ts'
 import { Modal } from '../../components/Modal.tsx'
@@ -9,7 +10,7 @@ import { folderBridge } from '../../desktop-bridge.ts'
 import { Icon } from '../../theme/icons.tsx'
 import { canAdd, createAddRepoFlow, pathHint, type AddRepoFlow, type AddRepoState } from './add-repo-flow.ts'
 
-/** `repoPaths` is kept for the opener; the folder dialog and the path field don't use it. */
+/** `repoPaths` is kept for the opener; the modal doesn't use it. */
 type Props = { repoPaths: string[]; onClose: () => void }
 
 export function AddRepoDialog({ onClose }: Props) {
@@ -20,7 +21,6 @@ export function AddRepoDialog({ onClose }: Props) {
   close.current = onClose
   const view = state ?? flow.state()
 
-  useEffect(() => flow.start(), [flow])
   useEffect(() => {
     if (view.kind === 'closed') close.current()
   }, [view.kind])
@@ -40,8 +40,15 @@ export function AddRepoForm({ state, flow }: FormProps) {
   const fieldId = useId()
   const errorId = useId()
   const field = useRef<HTMLInputElement>(null)
+  const browse = useRef<HTMLButtonElement>(null)
+  const add = useRef<HTMLButtonElement>(null)
   // After the modal's showModal(): a closed dialog can't take focus.
   useEffect(() => field.current?.focus(), [])
+  // After a pick's answer or a refused Add, once the controls are on again. Any other change carries no `focus`.
+  useEffect(() => {
+    const target = { add, browse, path: field, none: undefined }[state.focus ?? 'none']
+    target?.current?.focus()
+  }, [state])
   const pathError = state.error !== undefined && state.pathError === true
 
   return (
@@ -74,7 +81,7 @@ export function AddRepoForm({ state, flow }: FormProps) {
             }}
           />
           {state.canChoose && (
-            <button className="btn lead" type="button" disabled={state.busy} onClick={flow.choose}>
+            <button ref={browse} className="btn lead" type="button" disabled={state.busy} onClick={() => void flow.choose()}>
               <Icon name="folder" />
               Browse…
             </button>
@@ -92,7 +99,7 @@ export function AddRepoForm({ state, flow }: FormProps) {
         <button className="btn quiet" type="button" disabled={state.busy} onClick={flow.cancel}>
           Cancel
         </button>
-        <button className="btn primary" type="button" disabled={!canAdd(state)} onClick={() => void flow.add()}>
+        <button ref={add} className="btn primary" type="button" disabled={!canAdd(state)} onClick={() => void flow.add()}>
           Add
         </button>
       </div>
