@@ -276,17 +276,25 @@
 }
 
 /*
- * The auto tag: right after the status when the board sends `continue` for the run by itself. In two columns it sits
- * under the status, in the status column, and the name spans both rows, so the tag never pushes the repo line down.
+ * The Auto-continue sign: a 16 px fast-forward icon on the title row while the board sends `continue` for the run
+ * by itself. In two columns it takes its own column between the name and the status, so the status keeps its 88 px
+ * column and every dot stays on one rail. Its word is in the tooltip and the card's link name.
  */
-.run-body > .chip.tag {
-  grid-column: 2;
-  justify-self: start;
-  margin-top: 4px;
+.run-body:has(> .run-auto) {
+  grid-template-columns: minmax(0, 1fr) auto 88px;
 }
 
-.run-body:has(> .chip.tag) > b {
-  grid-row: span 2;
+.run-body > .run-auto {
+  display: flex;
+  align-items: center;
+  /* As tall as the name's first line, so the icon centres on it. */
+  min-height: calc(var(--size-dense) * 1.55);
+}
+
+.run-body > .run-auto svg {
+  width: 16px;
+  height: 16px;
+  color: var(--running);
 }
 
 /*
@@ -310,21 +318,14 @@
     display: none;
   }
 
-  /* Stacked, the auto tag shares the status line, 8 px after the status. */
-  .run-body:has(> .chip.tag) {
-    grid-template-columns: auto minmax(0, 1fr);
+  /* Stacked, the icon sits in the top-right corner beside the name, and the status line spans the card under it. */
+  .run-body:has(> .run-auto) {
+    grid-template-columns: minmax(0, 1fr) auto;
     column-gap: 8px;
   }
 
-  .run-body:has(> .chip.tag) > b {
+  .run-body:has(> .run-auto) > .status {
     grid-column: 1 / -1;
-    grid-row: auto;
-  }
-
-  .run-body > .chip.tag {
-    grid-column: 2;
-    align-self: center;
-    margin-top: 0;
   }
 }
 
